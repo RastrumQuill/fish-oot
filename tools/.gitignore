@@ -1,0 +1,14 @@
+# Output files
+*.exe
+armips
+bin2c
+mkdmadata
+mkldscript
+mkspecrules
+preprocess_pragmas
+vtxdis
+yaz0
+
+compiler_archives/archives/
+ido_recomp/
+egcs/

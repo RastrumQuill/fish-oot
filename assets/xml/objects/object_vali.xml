@@ -1,0 +1,95 @@
+<Root>
+    <File Name="object_vali" Segment="6">
+        <Animation Name="gBariAttackAnim" Offset="0x710"/>
+        <Animation Name="gBariDamagedAnim" Offset="0x854"/>
+        <Animation Name="gBariRecoverAnim" Offset="0xB34"/>
+        <Animation Name="gBariAgitatedAnim" Offset="0xD9C"/> <!-- unused -->
+        <Animation Name="gBariIdleAnim" Offset="0x14AC"/>
+        <Array Name="gBariCoreVtx" Count="53" Offset="0x14C0">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariNucleusVtx" Count="4" Offset="0x1810">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariHoodVtx" Count="46" Offset="0x1850">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariRightFangVtx" Count="18" Offset="0x1B30">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariLeftFangVtx" Count="18" Offset="0x1C50">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariRightTentacleSpikeVtx" Count="12" Offset="0x1D70">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariRightTentacleSpikeJointVtx" Count="18" Offset="0x1E30">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariRightTentacleBodyVtx" Count="19" Offset="0x1F50">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariRightTentacleJointVtx" Count="20" Offset="0x2080">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariLeftTentacleSpikeVtx" Count="12" Offset="0x21C0">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariLeftTentacleSpikeJointVtx" Count="18" Offset="0x2280">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariLeftTentacleBodyVtx" Count="19" Offset="0x23A0">
+            <Vtx/>
+        </Array>
+        <Array Name="gBariLeftTentacleJointVtx" Count="20" Offset="0x24D0">
+            <Vtx/>
+        </Array>
+        <DList Name="gBariCoreDL" Offset="0x2610"/>
+        <DList Name="gBariNucleusDL" Offset="0x2740"/>
+        <DList Name="gBariHoodDL" Offset="0x27D8"/>
+        <DList Name="gBariRightFangDL" Offset="0x2968"/>
+        <DList Name="gBariLeftFangDL" Offset="0x2A28"/>
+        <DList Name="gBariRightTentacleSpikeDL" Offset="0x2AE8"/>
+        <DList Name="gBariRightTentacleSpikeJointDL" Offset="0x2B80"/>
+        <DList Name="gBariRightTentacleBodyDL" Offset="0x2C20"/>
+        <DList Name="gBariRightTentacleJointDL" Offset="0x2D50"/>
+        <DList Name="gBariLeftTentacleSpikeDL" Offset="0x2DF8"/>
+        <DList Name="gBariLeftTentacleSpikeJointDL" Offset="0x2E90"/>
+        <DList Name="gBariLeftTentacleBodyDL" Offset="0x2F30"/>
+        <DList Name="gBariLeftTentacleJointDL" Offset="0x3060"/>
+        <Texture Name="gBariNucleusTex" Format="ia16" Width="32" Height="32" Offset="0x3108"/>
+        <Texture Name="gBariPartsTex" Format="ia16" Width="8" Height="8" Offset="0x3908"/> <!-- fangs and tentacles parts -->
+        <Texture Name="gBariBodyTex" Format="ia16" Width="16" Height="32" Offset="0x3988"/> <!-- hood top and tentacles body -->
+        <Texture Name="gBariHoodBottomTex" Format="ia16" Width="8" Height="16" Offset="0x3D88"/>
+        <Texture Name="gBariCoreTex" Format="ia16" Width="32" Height="32" Offset="0x3E88"/>
+        <Limb Name="gBariRootLimb" LimbType="Standard" EnumName="BARI_LIMB_ROOT" Offset="0x4688"/>
+        <Limb Name="gBariNucleusLimb" LimbType="Standard" EnumName="BARI_LIMB_NUCLEUS" Offset="0x4694"/>
+        <Limb Name="gBariRightFangRootRootLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_FANG_ROOT_ROOT" Offset="0x46A0"/>
+        <Limb Name="gBariRightFangRootLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_FANG_ROOT" Offset="0x46AC"/>
+        <Limb Name="gBariRightFangLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_FANG" Offset="0x46B8"/>
+        <Limb Name="gBariLeftFangRootRootLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_FANG_ROOT_ROOT" Offset="0x46C4"/>
+        <Limb Name="gBariLeftFangRootLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_FANG_ROOT" Offset="0x46D0"/>
+        <Limb Name="gBariLeftFangLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_FANG" Offset="0x46DC"/>
+        <Limb Name="gBariLeftTentacleRootLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_ROOT" Offset="0x46E8"/>
+        <Limb Name="gBariLeftTentacleJointRootLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_JOINT_ROOT" Offset="0x46F4"/>
+        <Limb Name="gBariLeftTentacleBodyRootLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_BODY_ROOT" Offset="0x4700"/>
+        <Limb Name="gBariLeftTentacleSpikeJointRootLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_SPIKE_JOINT_ROOT" Offset="0x470C"/>
+        <Limb Name="gBariLeftTentacleSpikeRootLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_SPIKE_ROOT" Offset="0x4718"/>
+        <Limb Name="gBariLeftTentacleSpikeLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_SPIKE" Offset="0x4724"/>
+        <Limb Name="gBariLeftTentacleSpikeJointLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_SPIKE_JOINT" Offset="0x4730"/>
+        <Limb Name="gBariLeftTentacleBodyLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_BODY" Offset="0x473C"/>
+        <Limb Name="gBariLeftTentacleJointLimb" LimbType="Standard" EnumName="BARI_LIMB_LEFT_TENTACLE_JOINT" Offset="0x4748"/>
+        <Limb Name="gBariRightTentacleRootLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_ROOT" Offset="0x4754"/>
+        <Limb Name="gBariRightTentacleJointRootLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_JOINT_ROOT" Offset="0x4760"/>
+        <Limb Name="gBariRightTentacleBodyRootLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_BODY_ROOT" Offset="0x476C"/>
+        <Limb Name="gBariRightTentacleSpikeJointRootLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_SPIKE_JOINT_ROOT" Offset="0x4778"/>
+        <Limb Name="gBariRightTentacleSpikeRootLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_SPIKE_ROOT" Offset="0x4784"/>
+        <Limb Name="gBariRightTentacleSpikeLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_SPIKE" Offset="0x4790"/>
+        <Limb Name="gBariRightTentacleSpikeJointLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_SPIKE_JOINT" Offset="0x479C"/>
+        <Limb Name="gBariRightTentacleBodyLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_BODY" Offset="0x47A8"/>
+        <Limb Name="gBariRightTentacleJointLimb" LimbType="Standard" EnumName="BARI_LIMB_RIGHT_TENTACLE_JOINT" Offset="0x47B4"/>
+        <Limb Name="gBariCoreLimb" LimbType="Standard" EnumName="BARI_LIMB_CORE" Offset="0x47C0"/>
+        <Limb Name="gBariHoodLimb" LimbType="Standard" EnumName="BARI_LIMB_HOOD" Offset="0x47CC"/>
+        <Skeleton Name="gBariSkel" Type="Normal" LimbType="Standard" LimbNone="BARI_LIMB_NONE" LimbMax="BARI_LIMB_MAX" EnumName="BariLimb" Offset="0x4848"/>
+    </File>
+</Root>
