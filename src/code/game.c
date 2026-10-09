@@ -31,6 +31,7 @@
 #include "debug.h"
 #include "dma.h"
 #include "game.h"
+#include "fishmod.h"
 #include "play_state.h"
 #include "vis.h"
 
@@ -206,6 +207,10 @@ void GameState_Draw(GameState* gameState, GraphicsContext* gfxCtx) {
         GameState_SetFBFilter(&newDList);
     }
 
+#if FISHMOD_DEBUG
+    Fishmod_DebugDrawText(gameState, &newDList);
+#endif
+
 #if DEBUG_FEATURES
     sLastButtonPressed = gameState->input[0].press.button | gameState->input[0].cur.button;
     if (R_DISABLE_INPUT_DISPLAY == 0) {
@@ -293,6 +298,9 @@ void PadMgr_RequestPadData(PadMgr* padMgr, Input* inputs, s32 gameRequest);
 
 void GameState_ReqPadData(GameState* gameState) {
     PadMgr_RequestPadData(&gPadMgr, gameState->input, true);
+#if FISHMOD_DEBUG
+    Fishmod_AutoplayInput(gameState, gameState->input);
+#endif
 }
 
 void GameState_Update(GameState* gameState) {
