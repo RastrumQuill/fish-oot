@@ -1,3 +1,4 @@
+#include "fishmod.h"
 #include "play_state.h"
 
 #include "versions.h"
@@ -584,6 +585,10 @@ void Play_Update(PlayState* this) {
     Input* input = this->state.input;
     s32 isPaused;
     STACK_PAD(s32);
+
+#if FISHMOD_DEBUG
+    Fishmod_DebugPlayUpdate(this);
+#endif
 
 #if DEBUG_FEATURES
     if ((SREG(1) < 0) || (DREG(0) != 0)) {

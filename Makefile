@@ -214,6 +214,18 @@ ifeq ($(NON_MATCHING),1)
   COMPARE := 0
 endif
 
+# fishmod: FISHMOD_DEBUG=1 boots straight into a test scene with debug text;
+# FISHMOD_SCRIPT=<name> also plays the autoplay input script fishmod/scripts/<name>.inc.c
+FISHMOD_DEBUG ?= 0
+FISHMOD_SCRIPT ?=
+ifeq ($(FISHMOD_DEBUG),1)
+  CPP_DEFINES += -DFISHMOD_DEBUG=1
+  COMPARE := 0
+endif
+ifneq ($(FISHMOD_SCRIPT),)
+  CPP_DEFINES += -DFISHMOD_SCRIPT=\"fishmod/scripts/$(FISHMOD_SCRIPT).inc.c\"
+endif
+
 BUILD_DIR := build/$(VERSION)
 EXPECTED_DIR := expected/$(BUILD_DIR)
 BASEROM_DIR := baseroms/$(VERSION)

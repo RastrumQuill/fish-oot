@@ -4,12 +4,19 @@
 #include "printf.h"
 #include "translation.h"
 #include "save.h"
+#include "fishmod.h"
+#include "play_state.h"
 
 void Setup_InitImpl(SetupState* this) {
     PRINTF(T("ゼルダ共通データ初期化\n", "Zelda common data initialization\n"));
     SaveContext_Init();
     this->state.running = false;
+#if FISHMOD_DEBUG
+    Fishmod_DebugBoot();
+    SET_NEXT_GAMESTATE(&this->state, Play_Init, PlayState);
+#else
     SET_NEXT_GAMESTATE(&this->state, ConsoleLogo_Init, ConsoleLogoState);
+#endif
 }
 
 void Setup_Destroy(UNUSED GameState* thisx) {
