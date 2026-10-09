@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = git@github.com:Thar0/com-plugin.git
+	branch = main
+	commit = c4f3ba845a386a254c912a4ceb780371f9a66722
+	parent = 77827c25b63e7a292ca45eee6bceeda7c8600af4
+	method = merge
+	cmdver = 0.4.6

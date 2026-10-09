@@ -1,0 +1,1391 @@
+<Root>
+    <ExternalFile OutPath="assets/misc/link_animetion/"/>
+    <File Name="gameplay_keep" Segment="4">
+        <Texture Name="gHilite1Tex" Format="rgba16" Width="16" Height="16" Offset="0x0"/>
+        <Texture Name="gHilite2Tex" Format="rgba16" Width="16" Height="16" Offset="0x200"/>
+        <Texture Name="gHylianShieldDesignTex" Format="rgba16" Width="32" Height="64" Offset="0x400"/>
+        <Texture Name="gOcarinaOfTimeDesignTex" Format="rgba16" Width="32" Height="16" Offset="0x1400"/>
+        <Texture Name="gBottleGlassTex" Format="rgba16" Width="16" Height="16" Offset="0x1800"/>
+        <Texture Name="gDekuStickTex" Format="i8" Width="8" Height="8" Offset="0x1A00"/>
+        <Texture Name="gLinkHairTex" Format="rgba16" Width="16" Height="16" Offset="0x1A40"/>
+        <Texture Name="gLinkTunic1Tex" Format="i8" Width="16" Height="16" Offset="0x1C40"/>
+        <Texture Name="gLinkTunic2Tex" Format="i8" Width="16" Height="32" Offset="0x1D40"/>
+        <Texture Name="gLinkTunic3Tex" Format="i8" Width="16" Height="16" Offset="0x1F40"/>
+        <Array Name="gLinkPauseChildJointTable" Count="24" Offset="0x2040">
+            <Vector Type="s16" Dimensions="3"/>
+        </Array>
+        <Array Name="gLinkPauseChildDekuShieldJointTable" Count="24" Offset="0x20D0">
+            <Vector Type="s16" Dimensions="3"/>
+        </Array>
+        <Array Name="gLinkPauseAdultBgsJointTable" Count="24" Offset="0x2160">
+            <Vector Type="s16" Dimensions="3"/>
+        </Array>
+        <Array Name="gLinkPauseAdultJointTable" Count="24" Offset="0x21F0">
+            <Vector Type="s16" Dimensions="3"/>
+        </Array>
+        <Array Name="gLinkPauseAdultShieldJointTable" Count="24" Offset="0x2280">
+            <Vector Type="s16" Dimensions="3"/>
+        </Array>
+
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_DDbox_open" Offset="0x2310"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_Tbox_open" Offset="0x2318"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_atozusari" Offset="0x2320"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_bashi" Offset="0x2328"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_doorA_link" Offset="0x2330"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_doorB_link" Offset="0x2338"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_futtobi" Offset="0x2340"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_get1" Offset="0x2348"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_get2" Offset="0x2350"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_get3" Offset="0x2358"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_goto_future" Offset="0x2360"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_koutai" Offset="0x2368"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_koutai_kennuki" Offset="0x2370"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_koutai_wait" Offset="0x2378"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_mimawasi" Offset="0x2380"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_mimawasi_wait" Offset="0x2388"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_miokuri" Offset="0x2390"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_miokuri_wait" Offset="0x2398"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_nozoki" Offset="0x23A0"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_return_to_future" Offset="0x23A8"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_standup" Offset="0x23B0"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_demo_standup_wait" Offset="0x23B8"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_climb_endAL" Offset="0x23C0"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_climb_endAR" Offset="0x23C8"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_climb_endBL" Offset="0x23D0"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_climb_endBR" Offset="0x23D8"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_climb_startA" Offset="0x23E0"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_climb_startB" Offset="0x23E8"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_climb_upL" Offset="0x23F0"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_climb_upR" Offset="0x23F8"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_normal_defense_ALL" Offset="0x2400"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_op3_negaeri" Offset="0x2408"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_op3_okiagari" Offset="0x2410"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_op3_tatiagari" Offset="0x2418"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_op3_wait1" Offset="0x2420"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_op3_wait2" Offset="0x2428"/>
+        <PlayerAnimation Name="gPlayerAnim_clink_op3_wait3" Offset="0x2430"/>
+        <PlayerAnimation Name="gPlayerAnim_d_link_imanodare" Offset="0x2438"/>
+        <PlayerAnimation Name="gPlayerAnim_d_link_orooro" Offset="0x2440"/>
+        <PlayerAnimation Name="gPlayerAnim_d_link_orowait" Offset="0x2448"/>
+        <PlayerAnimation Name="gPlayerAnim_demo_link_nwait" Offset="0x2450"/>
+        <PlayerAnimation Name="gPlayerAnim_demo_link_orosuu" Offset="0x2458"/>
+        <PlayerAnimation Name="gPlayerAnim_demo_link_tewatashi" Offset="0x2460"/>
+        <PlayerAnimation Name="gPlayerAnim_demo_link_twait" Offset="0x2468"/>
+        <PlayerAnimation Name="gPlayerAnim_kolink_odoroki_demo" Offset="0x2470"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_LLside_kiru_endL" Offset="0x2478"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_LLside_kiru_finsh_endR" Offset="0x2480"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_LRside_kiru_endR" Offset="0x2488"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_LRside_kiru_finsh_endL" Offset="0x2490"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Lnormal_kiru_endR" Offset="0x2498"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Lnormal_kiru_finsh_endR" Offset="0x24A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Lpierce_kiru_endL" Offset="0x24A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Lpierce_kiru_finsh_endR" Offset="0x24B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Lrolling_kiru_endR" Offset="0x24B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Lside_kiru_endR" Offset="0x24C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Lside_kiru_finsh_endR" Offset="0x24C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Rside_kiru_endR" Offset="0x24D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_Rside_kiru_finsh_endR" Offset="0x24D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_anchor2fighter" Offset="0x24E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_back_brake" Offset="0x24E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_back_hitR" Offset="0x24F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_back_walk" Offset="0x24F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_bom_side_walkL" Offset="0x2500"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_bom_side_walkR" Offset="0x2508"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_defense_hit" Offset="0x2510"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_defense_long_hitL" Offset="0x2518"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_defense_long_hitR" Offset="0x2520"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_front_hitR" Offset="0x2528"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_jump_kiru_finsh_endR" Offset="0x2530"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_landingR" Offset="0x2538"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_normal_kiru_finsh_endR" Offset="0x2540"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_pierce_kiru_endR" Offset="0x2548"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_pierce_kiru_finsh_endR" Offset="0x2550"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_power_kiru_wait_endR" Offset="0x2558"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_rolling_kiru_endR" Offset="0x2560"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_side_walkL" Offset="0x2568"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_side_walkR" Offset="0x2570"/>
+        <PlayerAnimation Name="gPlayerAnim_002578" Offset="0x2578"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitL2defense" Offset="0x2580"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitL2defense_long" Offset="0x2588"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitL" Offset="0x2590"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitL_defense" Offset="0x2598"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitL_defense_wait" Offset="0x25A0"/>
+        <PlayerAnimation Name="gPlayerAnim_0025A8" Offset="0x25A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitL_pierce_kiru" Offset="0x25B0"/>
+        <PlayerAnimation Name="gPlayerAnim_0025B8" Offset="0x25B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitR2defense" Offset="0x25C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitR2defense_long" Offset="0x25C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitR" Offset="0x25D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitR_defense" Offset="0x25D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitR_defense_wait" Offset="0x25E0"/>
+        <PlayerAnimation Name="gPlayerAnim_0025E8" Offset="0x25E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_anchor_waitR_pierce_kiru" Offset="0x25F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_boom_catch" Offset="0x25F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_boom_throwL" Offset="0x2600"/>
+        <PlayerAnimation Name="gPlayerAnim_link_boom_throwR" Offset="0x2608"/>
+        <PlayerAnimation Name="gPlayerAnim_002610" Offset="0x2610"/>
+        <PlayerAnimation Name="gPlayerAnim_link_boom_throw_side_walkL" Offset="0x2618"/>
+        <PlayerAnimation Name="gPlayerAnim_link_boom_throw_side_walkR" Offset="0x2620"/>
+        <PlayerAnimation Name="gPlayerAnim_link_boom_throw_wait2waitR" Offset="0x2628"/>
+        <PlayerAnimation Name="gPlayerAnim_link_boom_throw_waitL" Offset="0x2630"/>
+        <PlayerAnimation Name="gPlayerAnim_link_boom_throw_waitR" Offset="0x2638"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_bug_in" Offset="0x2640"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_bug_miss" Offset="0x2648"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_bug_out" Offset="0x2650"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_drink_demo" Offset="0x2658"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_drink_demo_end" Offset="0x2660"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_drink_demo_start" Offset="0x2668"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_drink_demo_wait" Offset="0x2670"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_fish_in" Offset="0x2678"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_fish_miss" Offset="0x2680"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_fish_out" Offset="0x2688"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_read" Offset="0x2690"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bottle_read_end" Offset="0x2698"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_bow_ready" Offset="0x26A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_bow_shoot" Offset="0x26A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_bow_shoot_end" Offset="0x26B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_bow_shoot_next" Offset="0x26B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_bow_wait" Offset="0x26C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_defense" Offset="0x26C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_defense_wait" Offset="0x26D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_side_runL" Offset="0x26D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_side_runR" Offset="0x26E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_side_walk" Offset="0x26E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_bow_walk2ready" Offset="0x26F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_child_tunnel_door" Offset="0x26F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_child_tunnel_end" Offset="0x2700"/>
+        <PlayerAnimation Name="gPlayerAnim_link_child_tunnel_start" Offset="0x2708"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_DDbox_open" Offset="0x2710"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_Tbox_open" Offset="0x2718"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_back_to_past" Offset="0x2720"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_baru_op1" Offset="0x2728"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_baru_op2" Offset="0x2730"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_baru_op3" Offset="0x2738"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_bikkuri" Offset="0x2740"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_doorA_link" Offset="0x2748"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_doorA_link_free" Offset="0x2750"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_doorB_link" Offset="0x2758"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_doorB_link_free" Offset="0x2760"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_furimuki2" Offset="0x2768"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_furimuki2_wait" Offset="0x2770"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_furimuki" Offset="0x2778"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_get_itemA" Offset="0x2780"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_get_itemB" Offset="0x2788"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_goma_furimuki" Offset="0x2790"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_gurad" Offset="0x2798"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_gurad_wait" Offset="0x27A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_jibunmiru" Offset="0x27A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kakeyori" Offset="0x27B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kakeyori_mimawasi" Offset="0x27B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kakeyori_miokuri" Offset="0x27C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kakeyori_miokuri_wait" Offset="0x27C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kakeyori_wait" Offset="0x27D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kaoage" Offset="0x27D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kaoage_wait" Offset="0x27E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kenmiru1" Offset="0x27E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kenmiru1_wait" Offset="0x27F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kenmiru2" Offset="0x27F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kenmiru2_modori" Offset="0x2800"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kenmiru2_wait" Offset="0x2808"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_kousan" Offset="0x2810"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_look_hand" Offset="0x2818"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_look_hand_wait" Offset="0x2820"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_nozokikomi" Offset="0x2828"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_nozokikomi_wait" Offset="0x2830"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_return_to_past" Offset="0x2838"/>
+        <PlayerAnimation Name="gPlayerAnim_002840" Offset="0x2840"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_sita_wait" Offset="0x2848"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_ue" Offset="0x2850"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_ue_wait" Offset="0x2858"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_warp" Offset="0x2860"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_zeldamiru" Offset="0x2868"/>
+        <PlayerAnimation Name="gPlayerAnim_link_demo_zeldamiru_wait" Offset="0x2870"/>
+        <PlayerAnimation Name="gPlayerAnim_link_derth_rebirth" Offset="0x2878"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_LLside_kiru" Offset="0x2880"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_LLside_kiru_end" Offset="0x2888"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_LLside_kiru_finsh" Offset="0x2890"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_LLside_kiru_finsh_end" Offset="0x2898"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_LRside_kiru" Offset="0x28A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_LRside_kiru_end" Offset="0x28A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_LRside_kiru_finsh" Offset="0x28B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_LRside_kiru_finsh_end" Offset="0x28B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lnormal_kiru" Offset="0x28C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lnormal_kiru_end" Offset="0x28C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lnormal_kiru_finsh" Offset="0x28D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lnormal_kiru_finsh_end" Offset="0x28D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpierce_kiru" Offset="0x28E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpierce_kiru_end" Offset="0x28E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpierce_kiru_finsh" Offset="0x28F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpierce_kiru_finsh_end" Offset="0x28F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpower_jump_kiru" Offset="0x2900"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpower_jump_kiru_end" Offset="0x2908"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpower_jump_kiru_hit" Offset="0x2910"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpower_kiru_side_walk" Offset="0x2918"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpower_kiru_start" Offset="0x2920"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpower_kiru_wait" Offset="0x2928"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpower_kiru_wait_end" Offset="0x2930"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lpower_kiru_walk" Offset="0x2938"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lrolling_kiru" Offset="0x2940"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lrolling_kiru_end" Offset="0x2948"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lside_jump" Offset="0x2950"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lside_jump_endL" Offset="0x2958"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lside_jump_end" Offset="0x2960"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lside_kiru" Offset="0x2968"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lside_kiru_end" Offset="0x2970"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lside_kiru_finsh" Offset="0x2978"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Lside_kiru_finsh_end" Offset="0x2980"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Rside_jump" Offset="0x2988"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Rside_jump_endR" Offset="0x2990"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Rside_jump_end" Offset="0x2998"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Rside_kiru" Offset="0x29A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Rside_kiru_end" Offset="0x29A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Rside_kiru_finsh" Offset="0x29B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Rside_kiru_finsh_end" Offset="0x29B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Wrolling_kiru" Offset="0x29C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_Wrolling_kiru_end" Offset="0x29C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_backturn_jump" Offset="0x29D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_backturn_jump_endR" Offset="0x29D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_backturn_jump_end" Offset="0x29E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_damage_run" Offset="0x29E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_damage_run_long" Offset="0x29F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_defense" Offset="0x29F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_defense_long" Offset="0x2A00"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_defense_long_hit" Offset="0x2A08"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_defense_long_wait" Offset="0x2A10"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_defense_wait" Offset="0x2A18"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_fighter2long" Offset="0x2A20"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_front_jump" Offset="0x2A28"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_front_jump_endR" Offset="0x2A30"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_front_jump_end" Offset="0x2A38"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_heavy_run_long" Offset="0x2A40"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_jump_kiru" Offset="0x2A48"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_jump_kiru_finsh" Offset="0x2A50"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_jump_kiru_finsh_end" Offset="0x2A58"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_jump_rollkiru" Offset="0x2A60"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_landing_roll_long" Offset="0x2A68"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_normal2fighter" Offset="0x2A70"/>
+        <PlayerAnimation Name="gPlayerAnim_002A78" Offset="0x2A78"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_normal_kiru" Offset="0x2A80"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_normal_kiru_endR" Offset="0x2A88"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_normal_kiru_end" Offset="0x2A90"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_normal_kiru_finsh" Offset="0x2A98"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_normal_kiru_finsh_end" Offset="0x2AA0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_pierce_kiru" Offset="0x2AA8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_pierce_kiru_end" Offset="0x2AB0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_pierce_kiru_finsh" Offset="0x2AB8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_pierce_kiru_finsh_end" Offset="0x2AC0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_power_jump_kiru_end" Offset="0x2AC8"/>
+        <PlayerAnimation Name="gPlayerAnim_002AD0" Offset="0x2AD0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_power_kiru_side_walk" Offset="0x2AD8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_power_kiru_startL" Offset="0x2AE0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_power_kiru_start" Offset="0x2AE8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_power_kiru_wait" Offset="0x2AF0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_power_kiru_wait_end" Offset="0x2AF8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_power_kiru_walk" Offset="0x2B00"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_reboundR" Offset="0x2B08"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_rebound" Offset="0x2B10"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_rebound_longR" Offset="0x2B18"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_rebound_long" Offset="0x2B20"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_rolling_kiru" Offset="0x2B28"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_rolling_kiru_end" Offset="0x2B30"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_run" Offset="0x2B38"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_run_long" Offset="0x2B40"/>
+        <PlayerAnimation Name="gPlayerAnim_002B48" Offset="0x2B48"/>
+        <PlayerAnimation Name="gPlayerAnim_002B50" Offset="0x2B50"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_side_walkL_long" Offset="0x2B58"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_side_walkR_long" Offset="0x2B60"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_side_walk_long" Offset="0x2B68"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_turn_kiruL" Offset="0x2B70"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_turn_kiruL_end" Offset="0x2B78"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_turn_kiruR" Offset="0x2B80"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_turn_kiruR_end" Offset="0x2B88"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_upper_kiruR" Offset="0x2B90"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_upper_pierce_kiru" Offset="0x2B98"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_upper_pierce_kiru_end" Offset="0x2BA0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_wait2waitL_long" Offset="0x2BA8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_wait2waitR_long" Offset="0x2BB0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_waitL2wait_long" Offset="0x2BB8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_waitL_long" Offset="0x2BC0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_waitR2wait_long" Offset="0x2BC8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_waitR_long" Offset="0x2BD0"/>
+        <PlayerAnimation Name="gPlayerAnim_002BD8" Offset="0x2BD8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_wait_long" Offset="0x2BE0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_walk_endL_long" Offset="0x2BE8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_walk_endR_long" Offset="0x2BF0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fighter_walk_long" Offset="0x2BF8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fishing_fish_catch" Offset="0x2C00"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fishing_fish_catch_end" Offset="0x2C08"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fishing_reel_down" Offset="0x2C10"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fishing_reel_left" Offset="0x2C18"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fishing_reel_right" Offset="0x2C20"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fishing_reel_up" Offset="0x2C28"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fishing_throw" Offset="0x2C30"/>
+        <PlayerAnimation Name="gPlayerAnim_link_fishing_wait" Offset="0x2C38"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_hit" Offset="0x2C40"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_hit_endR" Offset="0x2C48"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_hit_end" Offset="0x2C50"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_long2free" Offset="0x2C58"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_long2long" Offset="0x2C60"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_normal2long" Offset="0x2C68"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_side_hit" Offset="0x2C70"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_side_hit_endR" Offset="0x2C78"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hammer_side_hit_end" Offset="0x2C80"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hatto_demo" Offset="0x2C88"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hook_fly_start" Offset="0x2C90"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hook_fly_wait" Offset="0x2C98"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hook_shot_ready" Offset="0x2CA0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hook_side_runL" Offset="0x2CA8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hook_side_runR" Offset="0x2CB0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hook_side_walk" Offset="0x2CB8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hook_wait" Offset="0x2CC0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_hook_walk2ready" Offset="0x2CC8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_last_hit_motion1" Offset="0x2CD0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_last_hit_motion2" Offset="0x2CD8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_honoo1" Offset="0x2CE0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_honoo2" Offset="0x2CE8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_honoo3" Offset="0x2CF0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_kaze1" Offset="0x2CF8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_kaze2" Offset="0x2D00"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_kaze3" Offset="0x2D08"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_tamashii1" Offset="0x2D10"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_tamashii2" Offset="0x2D18"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_tamashii3" Offset="0x2D20"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_tame" Offset="0x2D28"/>
+        <PlayerAnimation Name="gPlayerAnim_link_magic_tame_kaijyo" Offset="0x2D30"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_100step_up" Offset="0x2D38"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_150step_up" Offset="0x2D40"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_250jump_start" Offset="0x2D48"/>
+        <PlayerAnimation Name="gPlayerAnim_002D50" Offset="0x2D50"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_45_turn" Offset="0x2D58"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_45_turn_free" Offset="0x2D60"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_Fclimb_hold2upL" Offset="0x2D68"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_Fclimb_sideL" Offset="0x2D70"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_Fclimb_sideR" Offset="0x2D78"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_Fclimb_startA" Offset="0x2D80"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_Fclimb_startB" Offset="0x2D88"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_Fclimb_upL" Offset="0x2D90"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_Fclimb_upR" Offset="0x2D98"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_brake" Offset="0x2DA0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_brake_end" Offset="0x2DA8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_downA" Offset="0x2DB0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_downB" Offset="0x2DB8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_down_wake" Offset="0x2DC0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_hit" Offset="0x2DC8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_run" Offset="0x2DD0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_shitR" Offset="0x2DD8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_shit" Offset="0x2DE0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_back_walk" Offset="0x2DE8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_backspace" Offset="0x2DF0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_box_kick" Offset="0x2DF8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_carryB" Offset="0x2E00"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_carryB_free" Offset="0x2E08"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_carryB_wait" Offset="0x2E10"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_check" Offset="0x2E18"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_check_end" Offset="0x2E20"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_check_end_free" Offset="0x2E28"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_check_free" Offset="0x2E30"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_check_wait" Offset="0x2E38"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_check_wait_free" Offset="0x2E40"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_down" Offset="0x2E48"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_endAL" Offset="0x2E50"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_endAR" Offset="0x2E58"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_endBL" Offset="0x2E60"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_endBR" Offset="0x2E68"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_startA" Offset="0x2E70"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_startB" Offset="0x2E78"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_upL" Offset="0x2E80"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_upR" Offset="0x2E88"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_climb_up" Offset="0x2E90"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_damage_run_free" Offset="0x2E98"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_defense" Offset="0x2EA0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_defense_end" Offset="0x2EA8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_defense_end_free" Offset="0x2EB0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_defense_free" Offset="0x2EB8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_defense_hit" Offset="0x2EC0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_defense_kiru" Offset="0x2EC8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_defense_wait" Offset="0x2ED0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_defense_wait_free" Offset="0x2ED8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_down_slope_slip" Offset="0x2EE0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_down_slope_slip_end" Offset="0x2EE8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_down_slope_slip_end_free" Offset="0x2EF0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_down_slope_slip_end_long" Offset="0x2EF8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_electric_shock" Offset="0x2F00"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_electric_shock_end" Offset="0x2F08"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_fall" Offset="0x2F10"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_fall_up" Offset="0x2F18"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_fall_up_free" Offset="0x2F20"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_fall_wait" Offset="0x2F28"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_fighter2free" Offset="0x2F30"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_free2bom" Offset="0x2F38"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_free2fighter_free" Offset="0x2F40"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_free2freeB" Offset="0x2F48"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_free2free" Offset="0x2F50"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_front_downA" Offset="0x2F58"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_front_downB" Offset="0x2F60"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_front_down_wake" Offset="0x2F68"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_front_hit" Offset="0x2F70"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_front_shitR" Offset="0x2F78"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_front_shit" Offset="0x2F80"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_give_other" Offset="0x2F88"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_hang_up_down" Offset="0x2F90"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_heavy_carry" Offset="0x2F98"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_heavy_carry_end" Offset="0x2FA0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_heavy_run" Offset="0x2FA8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_heavy_run_free" Offset="0x2FB0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_hip_down" Offset="0x2FB8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_hip_down_free" Offset="0x2FC0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_hip_down_long" Offset="0x2FC8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_ice_down" Offset="0x2FD0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump2landing" Offset="0x2FD8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump" Offset="0x2FE0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump_climb_hold" Offset="0x2FE8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump_climb_hold_free" Offset="0x2FF0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump_climb_up" Offset="0x2FF8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump_climb_up_free" Offset="0x3000"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump_climb_wait" Offset="0x3008"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump_climb_wait_free" Offset="0x3010"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_jump_up" Offset="0x3018"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_landing" Offset="0x3020"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_landing_free" Offset="0x3028"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_landing_roll" Offset="0x3030"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_landing_roll_free" Offset="0x3038"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_landing_wait" Offset="0x3040"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_light_bom" Offset="0x3048"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_light_bom_end" Offset="0x3050"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_long2bom" Offset="0x3058"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_nocarry_free" Offset="0x3060"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_nocarry_free_end" Offset="0x3068"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_nocarry_free_wait" Offset="0x3070"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_normal2bom" Offset="0x3078"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_normal2fighter" Offset="0x3080"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_normal2fighter_free" Offset="0x3088"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_normal2free" Offset="0x3090"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_okarina_end" Offset="0x3098"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_okarina_start" Offset="0x30A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_okarina_swing" Offset="0x30A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_pull_end" Offset="0x30B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_pull_end_free" Offset="0x30B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_pull_start" Offset="0x30C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_pull_start_free" Offset="0x30C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_pulling" Offset="0x30D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_pulling_free" Offset="0x30D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_push_end" Offset="0x30E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_push_fall" Offset="0x30E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_push_start" Offset="0x30F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_push_wait" Offset="0x30F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_push_wait_end" Offset="0x3100"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_pushing" Offset="0x3108"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_put" Offset="0x3110"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_put_free" Offset="0x3118"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_re_dead_attack" Offset="0x3120"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_re_dead_attack_wait" Offset="0x3128"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_rebound" Offset="0x3130"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_run" Offset="0x3138"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_run_free" Offset="0x3140"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_run_jump" Offset="0x3148"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_run_jump_end" Offset="0x3150"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_run_jump_water_fall" Offset="0x3158"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_run_jump_water_fall_wait" Offset="0x3160"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_short_landing" Offset="0x3168"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_short_landing_free" Offset="0x3170"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_side_walkL_free" Offset="0x3178"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_side_walkR_free" Offset="0x3180"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_side_walk" Offset="0x3188"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_side_walk_free" Offset="0x3190"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_take_out" Offset="0x3198"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_talk_free" Offset="0x31A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_talk_free_wait" Offset="0x31A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_talk_navi" Offset="0x31B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_talk_navi_wait" Offset="0x31B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_throw" Offset="0x31C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_throw_free" Offset="0x31C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_up_slope_slip" Offset="0x31D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_up_slope_slip_end" Offset="0x31D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_up_slope_slip_end_free" Offset="0x31E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_up_slope_slip_end_long" Offset="0x31E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_wait2waitL" Offset="0x31F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_wait2waitR" Offset="0x31F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_waitF_typeA_20f" Offset="0x3200"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_waitF_typeB_20f" Offset="0x3208"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_waitF_typeC_20f" Offset="0x3210"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_waitL2wait" Offset="0x3218"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_waitL_free" Offset="0x3220"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_waitR2wait" Offset="0x3228"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_waitR_free" Offset="0x3230"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_wait" Offset="0x3238"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_wait_free" Offset="0x3240"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_wait_typeA_20f" Offset="0x3248"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_wait_typeB_20f" Offset="0x3250"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_wait_typeC_20f" Offset="0x3258"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_wakeup" Offset="0x3260"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_walk" Offset="0x3268"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_walk_endL" Offset="0x3270"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_walk_endL_free" Offset="0x3278"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_walk_endR" Offset="0x3280"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_walk_endR_free" Offset="0x3288"/>
+        <PlayerAnimation Name="gPlayerAnim_link_normal_walk_free" Offset="0x3290"/>
+        <PlayerAnimation Name="gPlayerAnim_link_okarina_warp_goal" Offset="0x3298"/>
+        <PlayerAnimation Name="gPlayerAnim_link_okiru_demo" Offset="0x32A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_shagamu_demo" Offset="0x32A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_silver_carry" Offset="0x32B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_silver_throw" Offset="0x32B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_silver_wait" Offset="0x32C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_Lside_swim" Offset="0x32C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_Rside_swim" Offset="0x32D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_back_swim" Offset="0x32D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_land2swim_wait" Offset="0x32E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim_15step_up" Offset="0x32E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim" Offset="0x32F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim_dead" Offset="0x32F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim_deep_end" Offset="0x3300"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim_deep_start" Offset="0x3308"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim_down" Offset="0x3310"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim_get" Offset="0x3318"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim_hit" Offset="0x3320"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_swim_wait" Offset="0x3328"/>
+        <PlayerAnimation Name="gPlayerAnim_link_swimer_wait2swim_wait" Offset="0x3330"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_fastrun" Offset="0x3338"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_fastrun_muti" Offset="0x3340"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_jump100" Offset="0x3348"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_jump200" Offset="0x3350"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_slowrun" Offset="0x3358"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_slowrun_muti" Offset="0x3360"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_stand" Offset="0x3368"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_stop" Offset="0x3370"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_walk2" Offset="0x3378"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_walk" Offset="0x3380"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_anim_walk_muti" Offset="0x3388"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_left_down" Offset="0x3390"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_left_up" Offset="0x3398"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_right_down" Offset="0x33A0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_right_up" Offset="0x33A8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_stop_muti" Offset="0x33B0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_wait_1" Offset="0x33B8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_wait_2" Offset="0x33C0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_uma_wait_3" Offset="0x33C8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_waitF_heat1_20f" Offset="0x33D0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_waitF_heat2_20f" Offset="0x33D8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_waitF_itemA_20f" Offset="0x33E0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_waitF_itemB_20f" Offset="0x33E8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_waitF_typeD_20f" Offset="0x33F0"/>
+        <PlayerAnimation Name="gPlayerAnim_link_wait_heat1_20f" Offset="0x33F8"/>
+        <PlayerAnimation Name="gPlayerAnim_link_wait_heat2_20f" Offset="0x3400"/>
+        <PlayerAnimation Name="gPlayerAnim_link_wait_itemA_20f" Offset="0x3408"/>
+        <PlayerAnimation Name="gPlayerAnim_link_wait_itemB_20f" Offset="0x3410"/>
+        <PlayerAnimation Name="gPlayerAnim_link_wait_itemC_20f" Offset="0x3418"/>
+        <PlayerAnimation Name="gPlayerAnim_link_wait_itemD1_20f" Offset="0x3420"/>
+        <PlayerAnimation Name="gPlayerAnim_link_wait_itemD2_20f" Offset="0x3428"/>
+        <PlayerAnimation Name="gPlayerAnim_link_wait_typeD_20f" Offset="0x3430"/>
+        <PlayerAnimation Name="gPlayerAnim_lkt_nwait" Offset="0x3438"/>
+        <PlayerAnimation Name="gPlayerAnim_nw_modoru" Offset="0x3440"/>
+        <PlayerAnimation Name="gPlayerAnim_o_get_ato" Offset="0x3448"/>
+        <PlayerAnimation Name="gPlayerAnim_o_get_mae" Offset="0x3450"/>
+        <PlayerAnimation Name="gPlayerAnim_om_get" Offset="0x3458"/>
+        <PlayerAnimation Name="gPlayerAnim_om_get_mae" Offset="0x3460"/>
+        <PlayerAnimation Name="gPlayerAnim_sude_nwait" Offset="0x3468"/>
+        <PlayerAnimation Name="gPlayerAnim_L_1kyoro" Offset="0x3470"/>
+        <PlayerAnimation Name="gPlayerAnim_L_2kyoro" Offset="0x3478"/>
+        <PlayerAnimation Name="gPlayerAnim_L_bouzen" Offset="0x3480"/>
+        <PlayerAnimation Name="gPlayerAnim_L_hajikareru" Offset="0x3488"/>
+        <PlayerAnimation Name="gPlayerAnim_L_kamaeru" Offset="0x3490"/>
+        <PlayerAnimation Name="gPlayerAnim_L_ken_miru" Offset="0x3498"/>
+        <PlayerAnimation Name="gPlayerAnim_L_kennasi_w" Offset="0x34A0"/>
+        <PlayerAnimation Name="gPlayerAnim_L_kw" Offset="0x34A8"/>
+        <PlayerAnimation Name="gPlayerAnim_L_mukinaoru" Offset="0x34B0"/>
+        <PlayerAnimation Name="gPlayerAnim_L_okarina_get" Offset="0x34B8"/>
+        <PlayerAnimation Name="gPlayerAnim_L_sagaru" Offset="0x34C0"/>
+        <PlayerAnimation Name="gPlayerAnim_Link_ha" Offset="0x34C8"/>
+        <PlayerAnimation Name="gPlayerAnim_Link_m_wait" Offset="0x34D0"/>
+        <PlayerAnimation Name="gPlayerAnim_Link_miageru" Offset="0x34D8"/>
+        <PlayerAnimation Name="gPlayerAnim_Link_muku" Offset="0x34E0"/>
+        <PlayerAnimation Name="gPlayerAnim_Link_otituku_w" Offset="0x34E8"/>
+        <PlayerAnimation Name="gPlayerAnim_Link_ue_wait" Offset="0x34F0"/>
+
+        <!-- Probably a file boundary here. -->
+
+        <Array Name="gDebugPyramidVtx" Count="12" Offset="0x3500">
+            <Vtx/>
+        </Array>
+        <DList Name="gDebugPyramidDL" Offset="0x35C0"/>
+        <Texture Name="gDebugCircleTex" Format="i8" Width="16" Height="16" Offset="0x35F0"/>
+        <Texture Name="gDebugBallTex" Format="i8" Width="16" Height="16" Offset="0x36F0"/>
+        <Texture Name="gDebugCursorTex" Format="i8" Width="16" Height="16" Offset="0x37F0"/>
+        <Texture Name="gDebugCrossTex" Format="i8" Width="16" Height="16" Offset="0x38F0"/>
+        <DList Name="gDebugArrowDL" Offset="0x39F0"/>
+        <Array Name="gDebugArrowVtx" Count="36" Offset="0x3A50">
+            <Vtx/>
+        </Array>
+        <DList Name="gDebugCameraDL" Offset="0x3C90"/>
+        <Array Name="gDebugCameraVtx" Count="40" Offset="0x3D08">
+            <Vtx/>
+        </Array>
+        <Array Name="gDebugCheckeredFloorVtx" Count="4" Offset="0x3F88">
+            <Vtx/>
+        </Array>
+        <DList Name="gDebugCheckeredFloorDL" Offset="0x3FC8"/>
+        <Texture Name="gDebugCheckeredFloorTex" Format="ia4" Width="32" Height="32" Offset="0x4058"/>
+        <Array Name="gDebugSpriteVtx" Count="4" Offset="0x4258">
+            <Vtx/>
+        </Array>
+        <DList Name="gDebugSpriteDL" Offset="0x4298"/>
+        <Animation Name="gArrow1_Anim" Offset="0x4310"/>
+        <Animation Name="gArrow2_Anim" Offset="0x436C"/>
+        <Texture Name="gArrowShaftTex" Format="rgba16" Width="16" Height="128" Offset="0x4380"/>
+        <Texture Name="gArrowFletchingTex" Format="rgba16" Width="32" Height="16" Offset="0x5380"/>
+        <Array Name="gArrowNearVtx" Count="50" Offset="0x5780">
+            <Vtx/>
+        </Array>
+        <DList Name="gArrowNearDL" Offset="0x5AA0"/>
+        <Array Name="gArrowFarVtx" Count="26" Offset="0x5C80">
+            <Vtx/>
+        </Array>
+        <DList Name="gArrowFarDL" Offset="0x5E20"/>
+        <Limb Name="gArrowSkelLimb_0" LimbType="LOD" EnumName="ARROW_LIMB_0" Offset="0x5FC0"/>
+        <Limb Name="gArrowSkelLimb_1" LimbType="LOD" EnumName="ARROW_LIMB_1" Offset="0x5FD0"/>
+        <Limb Name="gArrowSkelLimb_2" LimbType="LOD" EnumName="ARROW_LIMB_2" Offset="0x5FE0"/>
+        <Limb Name="gArrowSkelLimb_3" LimbType="LOD" EnumName="ARROW_LIMB_3" Offset="0x5FF0"/>
+        <Skeleton Name="gArrowSkel" Type="Normal" LimbType="LOD" Offset="0x6010"/> <!-- fix pointer for this! where? -->
+        <Texture Name="gUnknownEffBlureTex" Format="i8" Width="64" Height="32" Offset="0x6020"/>
+        <Texture Name="gBombBodyTex" Format="ia8" Width="64" Height="64" Offset="0x6820"/>
+        <Array Name="gBombBodyVtx" Count="4" Offset="0x7820">
+            <Vtx/>
+        </Array>
+        <DList Name="gBombBodyDL" Offset="0x7860"/>
+        <Texture Name="gBombCapTex" Format="rgba16" Width="8" Height="8" Offset="0x78F0"/>
+        <Array Name="gBombCapVtx" Count="14" Offset="0x7970">
+            <Vtx/>
+        </Array>
+        <DList Name="gBombCapDL" Offset="0x7A50"/>
+        <Texture Name="gBombchuBodyTex" Format="rgba16" Width="8" Height="8" Offset="0x7B10"/>
+        <Array Name="gBombchuVtx" Count="40" Offset="0x7B90">
+            <Vtx/>
+        </Array>
+        <DList Name="gBombchuDL" Offset="0x7E10"/>
+        <Texture Name="gEffBombExplosion1Tex" Format="ia16" Width="32" Height="32" Offset="0x7F80"/>
+        <Texture Name="gEffBombExplosion2Tex" Format="ia16" Width="32" Height="32" Offset="0x8780"/>
+        <Texture Name="gEffBombExplosion3Tex" Format="ia16" Width="32" Height="32" Offset="0x8F80"/>
+        <Texture Name="gEffBombExplosion4Tex" Format="ia16" Width="32" Height="32" Offset="0x9780"/>
+        <Texture Name="gEffBombExplosion5Tex" Format="ia16" Width="32" Height="32" Offset="0x9F80"/>
+        <Texture Name="gEffBombExplosion6Tex" Format="ia16" Width="32" Height="32" Offset="0xA780"/>
+        <Texture Name="gEffBombExplosion7Tex" Format="ia16" Width="32" Height="32" Offset="0xAF80"/>
+        <Texture Name="gEffBombExplosion8Tex" Format="ia16" Width="32" Height="32" Offset="0xB780"/>
+        <DList Name="gEffBombExplosion1DL" Offset="0xBF80"/>
+        <DList Name="gEffBombExplosion2DL" Offset="0xBFE8"/>
+        <DList Name="gEffBombExplosion3DL" Offset="0xC040"/>
+        <Array Name="gEffBombExplosionVtx" Count="4" Offset="0xC058">
+            <Vtx/>
+        </Array>
+        <Array Name="gEffFragments1Vtx" Count="3" Offset="0xC0A0">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffFragments1DL" Offset="0xC0D0"/>
+        <Texture Name="gWitheredLeafTex" Format="rgba16" Width="16" Height="16" Offset="0xC160"/>
+        <Array Name="gBoomerangVtx" Count="51" Offset="0xC360">
+            <Vtx/>
+        </Array>
+        <DList Name="gUnknownBlankDL" Offset="0xC690"/>
+        <DList Name="gBoomerangDL" Offset="0xC698"/>
+        <DList Name="gBoomerangRefDL" Offset="0xC808"/>
+        <DList Name="gCompassArrowDL" Offset="0xC820"/>
+
+        <Array Name="gCompassArrowVtx" Count="3" Offset="0xC848">
+            <Vtx/>
+        </Array>
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Array Name="gameplay_keep_Vtx_00C880" Count="3" Offset="0xC880">
+                <Vtx/>
+            </Array>
+            <DList Name="gGameplayKeepDL_C8B0" Offset="0xC8B0" Length="14"/>
+        </Version>
+
+        <Version Pattern="pal-.*|gc-eu.*">
+            <Blob Name="gameplay_keep_padding_C878" Size="0x8"/>
+        </Version>
+
+        <Array Name="gLockOnArrowVtx" Count="47">
+            <Vtx/>
+        </Array>
+        <DList Name="gLockOnArrowDL" Length="34"/>
+        <Texture Name="gHilite3Tex" Format="i8" Width="8" Height="8"/>
+        <Array Name="gEffFragments2Vtx" Count="12">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffFragments2DL" Length="7"/>
+
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Texture Name="gGameplayKeepTex_CE60" Format="ia8" Width="32" Height="32" Offset=".+0x8"/>
+        </Version>
+
+        <Version Pattern="pal-.*|gc-eu.*">
+            <Blob Name="gameplay_keep_padding_CDB8" Size="0x8"/>
+        </Version>
+
+        <Texture Name="gSelectionCursorTex" Format="ia4" Width="16" Height="16"/>
+        <Texture Name="gControlStickTex" Format="ia8" Width="16" Height="16"/>
+        <Texture Name="gArrowCursorTex" Format="ia8" Width="16" Height="24"/>
+        <Array Name="gUnusedRockFragmentVtx" Count="24">
+            <Vtx/>
+        </Array>
+        <DList Name="gUnusedRockFragmentDL" Length="32"/>
+        <DList Name="gBoulderFragmentsDL" Length="27"/>
+        <Array Name="gBoulderFragmentsVtx" Count="12">
+            <Vtx/>
+        </Array>
+        <Texture Name="gRockFragment1Tex" Format="rgba16" Width="32" Height="32" Offset=".+0x8"/>
+        <Texture Name="gRockFragment2Tex" Format="rgba16" Width="32" Height="32"/>
+        <Animation Name="gDoorChildOpeningLeftAnim" Offset=".+0xD4"/>
+        <Animation Name="gDoorChildOpeningRightAnim" Offset=".+0xDC"/>
+        <Animation Name="gDoorAdultOpeningLeftAnim" Offset=".+0xA8"/>
+        <Array Name="gDoorLeftVtx" Count="34" Offset=".+0x8">
+            <Vtx/>
+        </Array>
+        <Array Name="gDoorRightVtx" Count="34">
+            <Vtx/>
+        </Array>
+        <Array Name="gDoorFrameVtx" Count="8">
+            <Vtx/>
+        </Array>
+        <DList Name="gDoorFrameDL" Length="17"/>
+        <DList Name="gDoorLeftDL" Length="41"/>
+        <DList Name="gDoorRightDL" Length="39"/>
+        <Texture Name="gWoodenDoorTex" Format="rgba16" Width="32" Height="64"/>
+        <Limb Name="gDoorSkelLimb_0" LimbType="Standard" EnumName="DOOR_LIMB_0"/>
+        <Limb Name="gDoorSkelLimb_1" LimbType="Standard" EnumName="DOOR_LIMB_1"/>
+        <Limb Name="gDoorSkelLimb_2" LimbType="Standard" EnumName="DOOR_LIMB_2"/>
+        <Limb Name="gDoorSkelLimb_3" LimbType="Standard" EnumName="DOOR_LIMB_3"/>
+        <Skeleton Name="gDoorSkel" Type="Normal" LimbType="Standard" Offset=".+0x10"/>
+        <Animation Name="gDoorAdultOpeningRightAnim" Offset=".+0xB8"/>
+        <DList Name="gEffDustDL" Offset=".+0x8" Length="11"/>
+        <Array Name="gEffDustVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Array Name="gEffFlashVtx" Count="4" Offset=".+0x8">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffFlash1DL" Length="15"/>
+        <DList Name="gEffFlash2DL" Length="16"/>
+        <Texture Name="gFlashTex" Format="i8" Width="64" Height="64"/>
+        <Texture Name="gSpinAttackFireTex" Format="i8" Width="64" Height="32" Offset=".+0x8"/>
+        <Texture Name="gSpinAttackMagicTex" Format="i8" Width="64" Height="32"/>
+        <Array Name="gSpinAttack1Vtx" Count="26">
+            <Vtx/>
+        </Array>
+        <Array Name="gSpinAttack2Vtx" Count="26">
+            <Vtx/>
+        </Array>
+        <DList Name="gSpinAttack1DL" Length="36"/>
+        <DList Name="gSpinAttack2DL" Length="36"/>
+        <Array Name="gSpinAttack3Vtx" Count="26">
+            <Vtx/>
+        </Array>
+        <Array Name="gSpinAttack4Vtx" Count="26">
+            <Vtx/>
+        </Array>
+        <DList Name="gSpinAttack3DL" Length="36"/>
+        <DList Name="gSpinAttack4DL" Length="36"/>
+        <Texture Name="gSpinAttackCharging1Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gSpinAttackCharging2Tex" Format="i8" Width="32" Height="32"/>
+        <Array Name="gSpinAttackChargingVtx" Count="14">
+            <Vtx/>
+        </Array>
+        <DList Name="gSpinAttackChargingDL" Length="29"/>
+        <Texture Name="gEffUnknown2Tex" Format="i8" Width="32" Height="64" Offset=".+0x8"/>
+        <Texture Name="gEffUnknown3Tex" Format="i8" Width="32" Height="64"/>
+        <Array Name="gUnusedBeamBladeVtx" Count="44">
+            <Vtx/>
+        </Array>
+        <DList Name="gUnusedBeamBladeDL" Length="37"/>
+        <Animation Name="gFairyAnim" Offset=".+0xBC"/>
+        <Texture Name="gFairyWingTex" Format="i8" Width="32" Height="64" Offset=".+0xC"/>
+        <Array Name="gFairyWing1Vtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gFairyWing1DL" Length="17"/>
+        <Array Name="gFairyWing2Vtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gFairyWing2DL" Length="17"/>
+        <Array Name="gFairyWing3Vtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gFairyWing3DL" Length="17"/>
+        <Array Name="gFairyWing4Vtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gFairyWing4DL" Length="17"/>
+        <Array Name="gGlowCircleVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gGlowCircleTextureLoadDL" Length="8"/>
+        <DList Name="gGlowCircleDL" Length="4"/>
+        <DList Name="gGlowCircleSmallDL" Length="45"/>
+        <Array Name="gGlowCircleSmallVtx" Count="8">
+            <Vtx/>
+        </Array>
+        <Texture Name="gUnusedFairyWingTex" Format="rgba16" Width="32" Height="64"/>
+        <Limb Name="gFairySkelLimb_0" LimbType="Standard" EnumName="FAIRY_LIMB_0"/>
+        <Limb Name="gFairySkelLimb_1" LimbType="Standard" EnumName="FAIRY_LIMB_1"/>
+        <Limb Name="gFairySkelLimb_2" LimbType="Standard" EnumName="FAIRY_LIMB_2"/>
+        <Limb Name="gFairySkelLimb_3" LimbType="Standard" EnumName="FAIRY_LIMB_3"/>
+        <Limb Name="gFairySkelLimb_4" LimbType="Standard" EnumName="FAIRY_LIMB_4"/>
+        <Limb Name="gFairySkelLimb_5" LimbType="Standard" EnumName="FAIRY_LIMB_5"/>
+        <Limb Name="gFairySkelLimb_6" LimbType="Standard" EnumName="FAIRY_LIMB_6"/>
+        <Limb Name="gFairySkelLimb_7" LimbType="Standard" EnumName="FAIRY_LIMB_7"/>
+        <Limb Name="gFairySkelLimb_8" LimbType="Standard" EnumName="FAIRY_LIMB_8"/>
+        <Limb Name="gFairySkelLimb_9" LimbType="Standard" EnumName="FAIRY_LIMB_9"/>
+        <Limb Name="gFairySkelLimb_10" LimbType="Standard" EnumName="FAIRY_LIMB_10"/>
+        <Limb Name="gFairySkelLimb_11" LimbType="Standard" EnumName="FAIRY_LIMB_11"/>
+        <Limb Name="gFairySkelLimb_12" LimbType="Standard" EnumName="FAIRY_LIMB_12"/>
+        <Limb Name="gFairySkelLimb_13" LimbType="Standard" EnumName="FAIRY_LIMB_13"/>
+        <Skeleton Name="gFairySkel" Type="Normal" LimbType="Standard" Offset=".+0x38"/>
+        <Texture Name="gUnknownCircle3Tex" Format="i4" Width="16" Height="16"/>
+        <Texture Name="gUnknownCircle4Tex" Format="i8" Width="16" Height="16"/>
+        <Texture Name="gHilite4Tex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gEffUnknown4Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffUnknown5Tex" Format="i8" Width="32" Height="64"/>
+        <Array Name="gEffFireCircleVtx" Count="14">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffFireCircleDL" Length="30"/>
+        <Animation Name="gFishInAirAnim" Offset=".+0x5C"/>
+        <Array Name="gameplay_keep_Vtx_018610" Count="4" Offset=".+0x4">
+            <Vtx/>
+        </Array>
+        <Array Name="gameplay_keep_Vtx_018650" Count="16">
+            <Vtx/>
+        </Array>
+        <Array Name="gameplay_keep_Vtx_018750" Count="22">
+            <Vtx/>
+        </Array>
+        <DList Name="gameplay_keep_0188B0_DL" Length="20"/>
+        <DList Name="gameplay_keep_018950_DL" Length="35"/>
+        <DList Name="gameplay_keep_018A68_DL" Length="35"/>
+        <Texture Name="gFishTailTex" Format="rgba16" Width="16" Height="16"/>
+        <Texture Name="gFishBodyTex" Format="rgba16" Width="32" Height="8"/>
+        <Limb Name="gFishSkelLimb_0" LimbType="Standard" EnumName="FISH_LIMB_0"/>
+        <Limb Name="gFishSkelLimb_1" LimbType="Standard" EnumName="FISH_LIMB_1"/>
+        <Limb Name="gFishSkelLimb_2" LimbType="Standard" EnumName="FISH_LIMB_2"/>
+        <Limb Name="gFishSkelLimb_3" LimbType="Standard" EnumName="FISH_LIMB_3"/>
+        <Limb Name="gFishSkelLimb_4" LimbType="Standard" EnumName="FISH_LIMB_4"/>
+        <Limb Name="gFishSkelLimb_5" LimbType="Standard" EnumName="FISH_LIMB_5"/>
+        <Skeleton Name="gFishSkel" Type="Flex" LimbType="Standard" Offset=".+0x18"/>
+        <Animation Name="gFishInWaterAnim" Offset=".+0xB0"/>
+        <Texture Name="gEffShockwaveTex" Format="i8" Width="64" Height="64" Offset=".+0x4"/>
+        <DList Name="gEffShockwaveDL" Length="14"/>
+        <Array Name="gGameplayKeepVtx_01A120" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffBubbleDL" Length="15"/>
+        <Array Name="gEffBubbleVtx" Count="4">
+            <Vtx/>
+        </Array>
+
+        <Texture Name="gEffFireFootprint1Tex" Format="ia8" Width="32" Height="32" Offset=".+0x8"/>
+        <Texture Name="gEffFireFootprint2Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffFireFootprint3Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffFireFootprint4Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffFireFootprint5Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffFireFootprint6Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffFireFootprint7Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffFireFootprint8Tex" Format="ia8" Width="32" Height="32"/>
+        <DList Name="gEffFireFootprintDL" Length="12"/>
+        <Array Name="gEffFireFootprintVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gEffUnusedBubbles1Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffUnusedBubbles2Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffUnusedBubbles3Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffUnusedBubbles4Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffUnusedBubbles5Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffUnusedBubbles6Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffUnusedBubbles7Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gEffUnusedBubbles8Tex" Format="ia8" Width="32" Height="32"/>
+        <DList Name="gEffUnusedBubblesDL" Length="14"/>
+        <Array Name="gEffUnusedBubblesVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gLensOfTruthMaskTex" Format="i8" Width="64" Height="64"/>
+        <Texture Name="gEffHitMark1Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark2Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark3Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark4Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark5Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark6Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark7Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark8Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark9Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark10Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark11Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark12Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark13Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark14Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark15Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark16Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark17Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark18Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark19Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark20Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark21Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark22Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark23Tex" Format="i4" Width="32" Height="24"/>
+        <Texture Name="gEffHitMark24Tex" Format="i4" Width="32" Height="24"/>
+        <DList Name="gEffHitMarkDL" Length="11"/>
+        <Array Name="gEffHitMarkVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gEffUnknown6Tex" Format="i8" Width="32" Height="64" Offset=".+0x8"/>
+        <Texture Name="gEffFleckTex" Format="i4" Width="64" Height="64"/>
+        <Texture Name="gEffUnknown8Tex" Format="i8" Width="64" Height="64"/>
+        <Texture Name="gEffMagmaBubble1Tex" Format="ia8" Width="16" Height="24"/>
+        <Texture Name="gEffMagmaBubble2Tex" Format="ia8" Width="16" Height="24"/>
+        <Texture Name="gEffMagmaBubble3Tex" Format="ia8" Width="16" Height="24"/>
+        <Texture Name="gEffMagmaBubble4Tex" Format="ia8" Width="16" Height="24"/>
+        <Texture Name="gEffMagmaBubble5Tex" Format="ia8" Width="16" Height="24"/>
+        <Texture Name="gEffMagmaBubble6Tex" Format="ia8" Width="16" Height="24"/>
+        <Texture Name="gEffMagmaBubble7Tex" Format="ia8" Width="16" Height="24"/>
+        <Texture Name="gEffMagmaBubble8Tex" Format="ia8" Width="16" Height="24"/>
+        <DList Name="gEffMagmaBubbleDL" Length="12"/>
+        <Array Name="gEffMagmaBubbleVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gEffWaterRippleTex" Format="i8" Width="64" Height="64"/>
+        <DList Name="gEffWaterRippleDL" Length="12"/>
+        <Array Name="gEffWaterRippleVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffSparkDL" Length="12"/>
+        <Array Name="gEffSparkVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gEffWaterSplash1Tex" Format="i8" Width="32" Height="40"/>
+        <Texture Name="gEffWaterSplash2Tex" Format="i8" Width="32" Height="40"/>
+        <Texture Name="gEffWaterSplash3Tex" Format="i8" Width="32" Height="40"/>
+        <Texture Name="gEffWaterSplash4Tex" Format="i8" Width="32" Height="40"/>
+        <Texture Name="gEffWaterSplash5Tex" Format="i8" Width="32" Height="40"/>
+        <Texture Name="gEffWaterSplash6Tex" Format="i8" Width="32" Height="40"/>
+        <Texture Name="gEffWaterSplash7Tex" Format="i8" Width="32" Height="40"/>
+        <Texture Name="gEffWaterSplash8Tex" Format="i8" Width="32" Height="40"/>
+        <DList Name="gEffWaterSplashDL" Length="12"/>
+        <Array Name="gEffWaterSplashVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gUnknownEffStone1Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gUnknownEffStone2Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gUnknownEffStone3Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gUnknownEffStone4Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gUnknownEffStone5Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gUnknownEffStone6Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gUnknownEffStone7Tex" Format="ia8" Width="32" Height="32"/>
+        <Texture Name="gUnknownEffStone8Tex" Format="ia8" Width="32" Height="32"/>
+        <DList Name="gUnknownEffStoneDL" Length="12"/>
+        <Array Name="gUnknownEffStoneVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gEffLightning1Tex" Format="i8" Width="16" Height="96"/>
+        <Texture Name="gEffLightning2Tex" Format="i8" Width="16" Height="96"/>
+        <Texture Name="gEffLightning3Tex" Format="i8" Width="16" Height="96"/>
+        <Texture Name="gEffLightning4Tex" Format="i8" Width="16" Height="96"/>
+        <Texture Name="gEffLightning5Tex" Format="i8" Width="16" Height="96"/>
+        <Texture Name="gEffLightning6Tex" Format="i8" Width="16" Height="96"/>
+        <Texture Name="gEffLightning7Tex" Format="i8" Width="16" Height="96"/>
+        <Texture Name="gEffLightning8Tex" Format="i8" Width="16" Height="96"/>
+        <DList Name="gEffLightningDL" Length="13"/>
+        <Array Name="gEffLightningVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gEffEnemyDeathFlame1Tex" Format="i8" Width="32" Height="64" Offset=".+0x8"/>
+        <Texture Name="gEffEnemyDeathFlame2Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffEnemyDeathFlame3Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffEnemyDeathFlame4Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffEnemyDeathFlame5Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffEnemyDeathFlame6Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffEnemyDeathFlame7Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffEnemyDeathFlame8Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffEnemyDeathFlame9Tex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffEnemyDeathFlame10Tex" Format="i8" Width="32" Height="64"/>
+        <DList Name="gEffEnemyDeathFlameDL" Length="13"/>
+        <Array Name="gEffEnemyDeathFlameVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gEffUnknown9Tex" Format="i8" Width="32" Height="32" Offset=".+0x8"/>
+        <Texture Name="gEffUnknown10Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gEffUnknown11Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gEffUnknown12Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gUnknownWoodBoardTex" Format="i8" Width="32" Height="32"/>
+        <Array Name="gEffIceFragmentVtx" Count="41">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffIceFragment1DL" Length="31"/>
+        <DList Name="gEffIceFragment2DL" Length="30"/>
+        <Array Name="gEffIceFragment3Vtx" Count="93" Offset=".+0x8">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffIceFragment3DL" Length="46"/>
+        <Animation Name="gBugCrawlAnim" Offset=".+0x1AC"/>
+        <DList Name="gBugLimb_1DL" Offset=".+0x4" Length="20"/>
+        <DList Name="gBugLimb_1WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_1WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_1Vtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gBugLimb_2DL" Length="20"/>
+        <DList Name="gBugLimb_2WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_2WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_2Vtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gBugLimb_3DL" Length="20"/>
+        <DList Name="gBugLimb_3WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_3WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_3Vtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gBugLimb_4DL" Length="20"/>
+        <DList Name="gBugLimb_4WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_4WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_4Vtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gBugLimb_5DL" Length="20"/>
+        <DList Name="gBugLimb_5WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_5WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_5Vtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gBugLimb_6DL" Length="20"/>
+        <DList Name="gBugLimb_6WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_6WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_6Vtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gBugLimb_7DL" Length="20"/>
+        <DList Name="gBugLimb_7WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_7WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_7Vtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gBugLimb_8DL" Length="20"/>
+        <DList Name="gBugLimb_8WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_8WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_8Vtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gBugLimb_9DL" Length="22"/>
+        <DList Name="gBugLimb_9WrapperDL" Length="2"/>
+        <DList Name="gBugLimb_9WrapperWrapperDL" Length="2"/>
+        <Array Name="gBugLimb_9Vtx" Count="12">
+            <Vtx/>
+        </Array>
+        <Texture Name="gBugBodyTex" Format="rgba16" Width="16" Height="64"/>
+        <Texture Name="gBugLegTex" Format="rgba16" Width="8" Height="16"/>
+        <Limb Name="gBugSkelLimb_0" LimbType="Standard" EnumName="BUG_LIMB_0"/>
+        <Limb Name="gBugSkelLimb_1" LimbType="Standard" EnumName="BUG_LIMB_1"/>
+        <Limb Name="gBugSkelLimb_2" LimbType="Standard" EnumName="BUG_LIMB_2"/>
+        <Limb Name="gBugSkelLimb_3" LimbType="Standard" EnumName="BUG_LIMB_3"/>
+        <Limb Name="gBugSkelLimb_4" LimbType="Standard" EnumName="BUG_LIMB_4"/>
+        <Limb Name="gBugSkelLimb_5" LimbType="Standard" EnumName="BUG_LIMB_5"/>
+        <Limb Name="gBugSkelLimb_6" LimbType="Standard" EnumName="BUG_LIMB_6"/>
+        <Limb Name="gBugSkelLimb_7" LimbType="Standard" EnumName="BUG_LIMB_7"/>
+        <Limb Name="gBugSkelLimb_8" LimbType="Standard" EnumName="BUG_LIMB_8"/>
+        <Limb Name="gBugSkelLimb_9" LimbType="Standard" EnumName="BUG_LIMB_9"/>
+        <Limb Name="gBugSkelLimb_10" LimbType="Standard" EnumName="BUG_LIMB_10"/>
+        <Limb Name="gBugSkelLimb_11" LimbType="Standard" EnumName="BUG_LIMB_11"/>
+        <Limb Name="gBugSkelLimb_12" LimbType="Standard" EnumName="BUG_LIMB_12"/>
+        <Limb Name="gBugSkelLimb_13" LimbType="Standard" EnumName="BUG_LIMB_13"/>
+        <Limb Name="gBugSkelLimb_14" LimbType="Standard" EnumName="BUG_LIMB_14"/>
+        <Limb Name="gBugSkelLimb_15" LimbType="Standard" EnumName="BUG_LIMB_15"/>
+        <Limb Name="gBugSkelLimb_16" LimbType="Standard" EnumName="BUG_LIMB_16"/>
+        <Limb Name="gBugSkelLimb_17" LimbType="Standard" EnumName="BUG_LIMB_17"/>
+        <Limb Name="gBugSkelLimb_18" LimbType="Standard" EnumName="BUG_LIMB_18"/>
+        <Limb Name="gBugSkelLimb_19" LimbType="Standard" EnumName="BUG_LIMB_19"/>
+        <Limb Name="gBugSkelLimb_20" LimbType="Standard" EnumName="BUG_LIMB_20"/>
+        <Limb Name="gBugSkelLimb_21" LimbType="Standard" EnumName="BUG_LIMB_21"/>
+        <Limb Name="gBugSkelLimb_22" LimbType="Standard" EnumName="BUG_LIMB_22"/>
+        <Skeleton Name="gBugSkel" Type="Normal" LimbType="Standard" Offset=".+0x5C"/>
+        <Array Name="gCuttableShrubStalkVtx" Count="4" Offset=".+0x8">
+            <Vtx/>
+        </Array>
+        <DList Name="gCuttableShrubStalkDL" Length="18"/>
+        <Array Name="gCuttableShrubTipVtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gCuttableShrubTipDL" Length="18"/>
+        <Texture Name="gCuttableShrubLeafTFragmentTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gCuttableShrubTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gLensFlareCircleTex" Format="i4" Width="64" Height="64"/>
+        <Texture Name="gLensFlareRingTex" Format="i4" Width="64" Height="64"/>
+        <DList Name="gLensFlareCircleDL" Length="13"/>
+        <DList Name="gLensFlareRingDL" Length="13"/>
+        <Array Name="gLensFlareVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Array Name="gEffSparklesVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffSparklesDL" Length="12"/>
+        <Texture Name="gEffSparklesTex" Format="i4" Width="16" Height="16"/>
+        <Texture Name="gEffUnknown13Tex" Format="i8" Width="16" Height="32"/>
+        <Texture Name="gEffUnknown14Tex" Format="i8" Width="16" Height="32"/>
+        <Array Name="gHoverBootsCircleVtx" Count="13">
+            <Vtx/>
+        </Array>
+        <DList Name="gHoverBootsCircleDL" Length="26"/>
+        <Texture Name="gMoonTex" Format="ia8" Width="64" Height="64"/>
+        <DList Name="gMoonDL" Length="14"/>
+        <Array Name="gMoonVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gUnknownCircle6Tex" Format="i8" Width="32" Height="32"/>
+
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Array Name="gameplay_keep_Vtx_039850" Count="4">
+                <Vtx/>
+            </Array>
+            <DList Name="gGameplayKeepDL_39890" Length="27"/>
+            <Array Name="gUnusedBombIconVtx" Count="4" Offset=".+0x8">
+                <Vtx/>
+            </Array>
+            <DList Name="gUnusedBombIconDL" Length="17"/>
+            <Array Name="gUnusedHeartIconVtx" Count="4" Offset=".+0x8">
+                <Vtx/>
+            </Array>
+            <DList Name="gUnusedHeartIconDL" Length="17"/>
+            <Array Name="gUnusedArrowIconVtx" Count="4" Offset=".+0x8">
+                <Vtx/>
+            </Array>
+            <DList Name="gUnusedArrowIconDL" Length="17"/>
+            <Blob Name="gameplay_keep_padding_39BD8" Size="0x8"/>
+        </Version>
+
+        <Collision Name="gLargerCubeCol" Offset=".+0x100"/> <!-- unused in game -->
+        <Array Name="gLiftableRockVtx" Count="24" Offset=".+0x4">
+            <Vtx/>
+        </Array>
+        <DList Name="gLiftableRockDL" Length="22"/>
+
+        <!-- unused in game -->
+        <Array Name="gUnusedRockRectangularPrism1Vtx" Count="24">
+            <Vtx/>
+        </Array>
+        <DList Name="gUnusedRockRectangularPrism1DL" Length="22"/>
+        <Collision Name="gWideTallBlockCol" Offset=".+0x108"/>
+        <Array Name="gFlatBlockVtx" Count="24" Offset=".+0xC">
+            <Vtx/>
+        </Array>
+        <DList Name="gFlatBlockDL" Length="23"/>
+        <Collision Name="gTallBlockCol" Offset=".+0x108"/>
+        <Array Name="gUnusedRockRectangularPrism3Vtx" Count="24" Offset=".+0x4">
+            <Vtx/>
+        </Array>
+        <DList Name="gUnusedRockRectangularPrism3DL" Length="22"/>
+        <Collision Name="gSmallerFlatBlockCol" Offset=".+0x100"/>
+        <Array Name="gFlatRotBlockVtx" Count="24" Offset=".+0x4">
+            <Vtx/>
+        </Array>
+        <DList Name="gFlatRotBlockDL" Length="22"/>
+        <Collision Name="gLargerFlatBlockCol" Offset=".+0x100"/>
+        <Array Name="gSmallCubeVtx" Count="24" Offset=".+0x4">
+            <Vtx/>
+        </Array>
+        <DList Name="gSmallCubeDL" Length="23"/>
+        <Collision Name="gSmallerCubeCol" Offset=".+0x108"/>
+        <Array Name="gTreeStumpVtx" Count="25" Offset=".+0x4">
+            <Vtx/>
+        </Array>
+        <DList Name="gTreeStumpDL" Length="34"/>
+        <Array Name="gGrassBladesVtx" Count="12">
+            <Vtx/>
+        </Array>
+        <DList Name="gGrassBladesDL" Length="21"/>
+
+        <Texture Name="gHeartShapeTex" Format="i8" Width="16" Height="16" Offset=".+0x8"/>
+        <Array Name="gHeartPieceInteriorVtx" Count="48">
+            <Vtx/>
+        </Array>
+        <DList Name="gHeartPieceInteriorDL" Length="53"/>
+        <Array Name="gHeartPieceExteriorVtx" Count="80" Offset=".+0x8">
+            <Vtx/>
+        </Array>
+        <Array Name="gHeartContainerInteriorVtx" Count="76">
+            <Vtx/>
+        </Array>
+        <DList Name="gHeartPieceExteriorDL" Length="39"/>
+        <DList Name="gHeartContainerInteriorDL" Length="33"/>
+
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Array Name="gameplay_keep_Vtx_03C610" Count="80">
+                <Vtx/>
+            </Array>
+            <Array Name="gameplay_keep_Vtx_03CB10" Count="76">
+                <Vtx/>
+            </Array>
+            <DList Name="gGameplayKeepDL_3CFD0" Length="39"/>
+            <DList Name="gGameplayKeepDL_3D108" Length="34"/>
+            <Array Name="gUnusedHeartContainerIconVtx" Count="4" Offset=".+0x8">
+                <Vtx/>
+            </Array>
+            <DList Name="gUnusedHeartContainerIconDL" Length="17"/>
+            <Blob Name="gameplay_keep_padding_3D2E8" Size="0x8"/>
+        </Version>
+
+        <Array Name="gSignRectangularVtx" Count="39">
+            <Vtx/>
+        </Array>
+        <DList Name="gSignRectangularDL" Length="81"/>
+        <Array Name="gSignDirectionalVtx" Count="45" Offset=".+0x8">
+            <Vtx/>
+        </Array>
+        <DList Name="gSignDirectionalDL" Length="88"/>
+        <Texture Name="gDropArrows2Tex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gDropArrows1Tex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gDropArrows3Tex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gDropBombTex" Format="rgba16" Width="32" Height="32"/>
+
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Texture Name="gUnusedBombchuIconTex" Format="rgba16" Width="32" Height="32"/>
+            <Texture Name="gGameplayKeepTex_40580" Format="rgba16" Width="32" Height="32"/>
+        </Version>
+
+        <Texture Name="gDropRecoveryHeartTex" Format="rgba16" Width="32" Height="32"/>
+
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Texture Name="gUnusedHeartPieceIconTex" Format="rgba16" Width="32" Height="32"/>
+        </Version>
+
+        <DList Name="gItemDropDL" Length="17"/>
+        <Array Name="gItemDropVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <Texture Name="gDropKeySmallTex" Format="rgba16" Width="32" Height="32" Offset=".+0x8"/>
+        <Texture Name="gDropMagicSmallTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gDropDekuNutTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gDropDekuSeedsTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gDropDekuStickTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gDropMagicLargeTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gRupeeGreenTex" Format="rgba16" Width="4" Height="4"/>
+        <Texture Name="gRupeeBlueTex" Format="rgba16" Width="4" Height="4"/>
+        <Texture Name="gRupeeRedTex" Format="rgba16" Width="4" Height="4"/>
+        <Texture Name="gRupeeOrangeTex" Format="rgba16" Width="4" Height="4"/>
+        <Texture Name="gRupeePinkTex" Format="rgba16" Width="4" Height="4"/>
+        <Texture Name="gRupeeSilverTex" Format="rgba16" Width="4" Height="4"/>
+        <Array Name="gRupeeVtx" Count="36">
+            <Vtx/>
+        </Array>
+        <DList Name="gRupeeDL" Length="26"/>
+
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Texture Name="gUnusedHeartIconTex" Format="rgba16" Width="32" Height="32"/>
+            <Texture Name="gUnusedBombIconTex" Format="rgba16" Width="32" Height="32"/>
+            <Texture Name="gUnusedArrowIconTex" Format="rgba16" Width="32" Height="32"/>
+        </Version>
+
+        <Texture Name="gRupeeLightRedTex" Format="rgba16" Width="4" Height="4"/>
+
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Texture Name="gGameplayKeepTex_46A40" Format="rgba16" Width="4" Height="4"/>
+            <Texture Name="gUnusedHeartContainerIconTex" Format="rgba16" Width="32" Height="32"/>
+            <Texture Name="gUnusedTreeBarkTex" Format="rgba16" Width="32" Height="32"/>
+        </Version>
+
+        <Texture Name="gUnknownStone1Tex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gUnknownStone2Tex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gUnusedTreeStumpTopTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gUnusedTreeStumpBarkTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gUnusedGrassBladesTex" Format="rgba16" Width="64" Height="32"/>
+        <Texture Name="gUnusedStoneHookshotTargetTex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gUnknownStone3Tex" Format="rgba16" Width="32" Height="32"/>
+        <Texture Name="gSignRectangularSideTex" Format="rgba16" Width="32" Height="16"/>
+        <Texture Name="gSignRectangularFrontTex" Format="rgba16" Width="32" Height="16"/>
+        <Texture Name="gSignPostWoodTex" Format="rgba16" Width="64" Height="8"/>
+        <Texture Name="gSignLetteringTex" Format="rgba16" Width="64" Height="32"/>
+        <Array Name="gRaindropVtx" Count="3">
+            <Vtx/>
+        </Array>
+        <DList Name="gRaindropDL" Length="4"/>
+        <DList Name="gFootShadowDL" Length="12"/>
+        <Array Name="gFootShadowVtx" Count="3">
+            <Vtx/>
+        </Array>
+        <Texture Name="gFootShadowTex" Format="ia16" Width="32" Height="64"/>
+        <DList Name="gCircleShadowDL" Length="10"/>
+        <Array Name="gCircleShadowVtx" Count="3">
+            <Vtx/>
+        </Array>
+        <Texture Name="gCircleShadowTex" Format="ia16" Width="32" Height="32"/>
+        <Array Name="gHorseShadowVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gHorseShadowDL" Length="10"/>
+        <Texture Name="gHorseShadowTex" Format="i8" Width="16" Height="64"/>
+        <Array Name="gDungeonDoorVtx" Count="12">
+            <Vtx/>
+        </Array>
+        <DList Name="gDungeonDoorDL" Length="21"/>
+        <Texture Name="gDoorMetalBarsTex" Format="ia8" Width="32" Height="128" Offset=".+0x8"/>
+        <Array Name="gDoorMetalBarsVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gDoorMetalBarsDL" Length="18"/>
+        <Texture Name="gGenericDungeonDoorTex" Format="rgba16" Width="32" Height="64"/>
+        <Texture Name="gSun1Tex" Format="i4" Width="64" Height="31"/>
+        <Texture Name="gSun2Tex" Format="i4" Width="64" Height="16"/>
+        <Texture Name="gSun3Tex" Format="i4" Width="64" Height="16"/>
+        <Texture Name="gSunEvening1Tex" Format="i4" Width="64" Height="31" Offset=".+0x20"/>
+        <Texture Name="gSunEvening2Tex" Format="i4" Width="64" Height="16"/>
+        <Texture Name="gSunEvening3Tex" Format="i4" Width="64" Height="16"/>
+        <DList Name="gKokiriDustMoteMaterialDL" Offset=".+0x20" Length="9"/>
+        <DList Name="gKokiriDustMoteModelDL" Length="3"/>
+        <DList Name="gSunDL" Length="49"/>
+        <Array Name="gSunVtx" Count="12">
+            <Vtx/>
+        </Array>
+        <Array Name="gKokiriDustMoteModelVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gLockOnReticleTriangleDL" Offset=".+0x8" Length="3"/>
+        <Array Name="gLockOnReticleTriangleVtx" Count="3">
+            <Vtx/>
+        </Array>
+        <Array Name="gEffFireVtx" Count="4" Offset=".+0x8">
+            <Vtx/>
+        </Array>
+        <DList Name="gEffFire1DL" Length="24"/>
+        <DList Name="gEffFire2DL" Length="24"/>
+        <Texture Name="gEffFire1Tex" Format="i4" Width="32" Height="128"/>
+        <Texture Name="gEffFire2Tex" Format="i8" Width="32" Height="64"/>
+        <Array Name="gUnusedUnknownShape1Vtx" Count="197">
+            <Vtx/>
+        </Array>
+        <DList Name="gUnusedUnknownShape1DL" Length="112"/>
+        <DList Name="gUnusedUnknownShape1RefDL" Length="2"/>
+        <Array Name="gUnusedUnknownShape2Vtx" Count="202">
+            <Vtx/>
+        </Array>
+        <DList Name="gUnusedUnknownShape2DL" Length="100"/>
+        <DList Name="gUnusedUnknownShape2RefDL" Length="2"/>
+        <Array Name="gUnusedUnknownShape3Vtx" Count="199">
+            <Vtx/>
+        </Array>
+        <DList Name="gUnusedUnknownShape3DL" Length="99"/>
+        <DList Name="gUnusedUnknownShape3RefDL" Length="2"/>
+        <Texture Name="gUnusedUpsideDownZeldaTex" Format="i8" Width="64" Height="32" Offset=".+0x8"/>
+        <Texture Name="gDust1Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gDust2Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gDust3Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gDust4Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gDust5Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gDust6Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gDust7Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gDust8Tex" Format="i8" Width="32" Height="32"/>
+        <Texture Name="gCircleGlowLTex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gCircleGlowRTex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gCircleGlowSLTex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gCircleGlowSRTex" Format="i8" Width="32" Height="64"/>
+        <Texture Name="gEffBubble1Tex" Format="i8" Width="16" Height="16"/>
+        <Texture Name="gEffBubble2Tex" Format="i8" Width="16" Height="16"/>
+        <Texture Name="gEffSpark1Tex" Format="i4" Width="32" Height="32"/>
+        <Texture Name="gEffSpark2Tex" Format="i4" Width="32" Height="32"/>
+        <Texture Name="gEffSpark3Tex" Format="i4" Width="32" Height="32"/>
+        <Texture Name="gEffSpark4Tex" Format="i4" Width="32" Height="32"/>
+    </File>
+</Root>

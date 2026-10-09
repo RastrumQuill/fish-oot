@@ -1,0 +1,22 @@
+<Root>
+    <File Name="object_tp" Segment="6">
+        <DList Name="gTailpasaranBodyElemDL" Offset="0x0"/>
+        <Array Name="gTailpasaranBodyElemVtx" Count="4" Offset="0x70">
+            <Vtx/>
+        </Array>
+        <Array Name="gTailpasaranHeadBodyVtx" Count="70" Offset="0xB0">
+            <Vtx/>
+        </Array>
+        <Array Name="gTailpasaranHeadElectricityVtx" Count="24" Offset="0x510">
+            <Vtx/>
+        </Array>
+        <DList Name="gTailpasaranHeadBodyDL" Offset="0x690"/>
+        <DList Name="gTailpasaranHeadElectricityDL" Offset="0x840"/>
+        <DList Name="gTailpasaranHeadDL" Offset="0x8D0"/>
+        <Texture Name="gTailpasaranHeadBackTex" Format="rgba16" Width="8" Height="16" Offset="0x8E8"/>
+        <Texture Name="gTailpasaranHeadCoreTex" Format="rgba16" Width="8" Height="8" Offset="0x9E8"/>
+        <Texture Name="gTailpasaranHeadClawTex" Format="rgba16" Width="16" Height="16" Offset="0xA68"/>
+        <Texture Name="gTailpasaranBodyElemTex" Format="ia8" Width="64" Height="64" Offset="0xC68"/>
+        <Texture Name="gTailpasaranHeadElectricityTex" Format="rgba16" Width="8" Height="8" Offset="0x1C68"/>
+    </File>
+</Root>

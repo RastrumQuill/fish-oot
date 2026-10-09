@@ -1,0 +1,6 @@
+<Root>
+    <File Name="ovl_En_Bili">
+        <DList Name="sBiriCoreInvertTexCombinerDL" Offset="0x0"/>
+        <DList Name="sBiriCoreNormalCombinerDL" Offset="0x10"/>
+    </File>
+</Root>

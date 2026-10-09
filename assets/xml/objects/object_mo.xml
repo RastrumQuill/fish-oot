@@ -1,0 +1,231 @@
+<Root>
+    <File Name="object_mo" Segment="6">
+        <Texture Name="object_mo_000000_Tex" Format="ia8" Width="16" Height="16" Offset="0x0"/>
+
+        <!-- Vertices and DLists for Morpha's particles 1 -->
+        <Array Name="gMorphaBubbleVtx" Count="4" Offset="0x100">
+            <Vtx/>
+        </Array>
+        <DList Name="gMorphaBubbleDL" Offset="0x140"/>
+
+        <Array Name="object_mo_Vtx_0001B0" Count="58" Offset="0x1B0">
+            <Vtx/>
+        </Array>
+        <DList Name="gMorphaDL_000550" Offset="0x550"/> <!-- This is the dlist for EnVbBall for some reason. -->
+
+        <Texture Name="object_mo_000680_Tex" Format="rgba16" Width="32" Height="32" Offset="0x680"/>
+
+        <Array Name="object_mo_Vtx_000E80" Count="4" Offset="0xE80">
+            <Vtx/>
+        </Array>
+        <DList Name="gMorphaDL_000EC0" Offset="0xEC0"/>
+        <DList Name="gMorphaDL_000EF8" Offset="0xEF8"/>
+
+        <!-- Vertices and DLists for Morpha's particles 2 -->
+        <DList Name="gMorphaDropletMaterialDL" Offset="0xF20"/>
+        <DList Name="gMorphaDropletModelDL" Offset="0xF70"/>
+        <Array Name="gMorphaDropletModelVtx" Count="4" Offset="0xF88">
+            <Vtx/>
+        </Array>
+        <DList Name="gMorphaWetSpotModelDL" Offset="0xFC8"/>
+        <Array Name="gMorphaWetSpotModelVtx" Count="3" Offset="0xFE0">
+            <Vtx/>
+        </Array>
+
+        <!-- Morpha's Title Card -->
+        <Version Pattern="ntsc-.*|gc-jp.*|gc-us.*|ique-cn">
+            <Texture Name="gMorphaTitleCardTex" Format="ia8" Width="128" Height="80" Offset="0x1010"/>
+        </Version>
+        <Version Pattern="pal-.*|gc-eu.*">
+            <Texture Name="gMorphaTitleCardTex" Format="ia8" Width="128" Height="120" Offset="0x1010"/>
+        </Version>
+
+        <!-- Vertices and DList for the water in the room and in front of the camera -->
+        <Array Name="gMorphaWaterVtx" Count="4">
+            <Vtx/>
+        </Array>
+        <DList Name="gMorphaWaterDL" Length="25"/>
+
+        <Texture Name="object_mo_003920_Tex" Format="ia16" Width="32" Height="32" Offset=".+0x8"/>
+        <Texture Name="object_mo_004120_Tex" Format="ia16" Width="32" Height="32"/>
+        <Texture Name="object_mo_004920_Tex" Format="ia16" Width="32" Height="32"/>
+
+        <!-- Vertices and DLists for Morpha's Core -->
+        <Array Name="gMorphaCoreMembraneVtx" Count="15">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaCoreNucleusVtx" Count="15">
+            <Vtx/>
+        </Array>
+        <DList Name="gMorphaCoreMembraneDL" Length="39"/>
+        <DList Name="gMorphaCoreNucleusDL" Length="32"/>
+
+        <Array Name="gMorphaVtx_006938" Count="14">
+            <Vtx/>
+        </Array>
+
+        <!-- Vertices for Morpha's tentacle segments -->
+        <Array Name="gMorphaTentaclePart1Vtx" Count="14">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart2Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart3Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart4Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart5Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart6Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart7Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart8Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart9Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart10Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart11Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart12Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart13Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart14Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart15Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart16Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart17Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart18Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart19Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart20Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart21Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart22Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart23Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart24Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart25Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart26Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart27Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart28Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart29Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart30Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart31Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart32Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart33Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart34Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart35Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart36Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentaclePart37Vtx" Count="7">
+            <Vtx/>
+        </Array>
+        <Array Name="gMorphaTentacleVtx" Count="20">
+            <Vtx/>
+        </Array>
+
+        <DList Name="gMorphaDL_007BF8" Length="1"/>
+
+        <!-- DLists for Morpha's tentacle segments -->
+        <DList Name="gMorphaTentacleBaseDL" Length="15"/>
+        <DList Name="gMorphaTentaclePart0DL" Length="24"/>
+        <DList Name="gMorphaTentaclePart1DL" Length="10"/>
+        <DList Name="gMorphaTentaclePart2DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart3DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart4DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart5DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart6DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart7DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart8DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart9DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart10DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart11DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart12DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart13DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart14DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart15DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart16DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart17DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart18DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart19DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart20DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart21DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart22DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart23DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart24DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart25DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart26DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart27DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart28DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart29DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart30DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart31DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart32DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart33DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart34DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart35DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart36DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart37DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart38DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart39DL" Length="9"/>
+        <DList Name="gMorphaTentaclePart40DL" Length="6"/>
+
+        <Texture Name="gMorphaWaterTex" Format="rgba16" Width="32" Height="32" Offset=".+0x8"/>
+    </File>
+</Root>

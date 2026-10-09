@@ -1,0 +1,92 @@
+<Root>
+    <File Name="object_firefly" Segment="6">
+        <Animation Name="gKeeseFlyAnim" Offset="0x17C"/>
+
+        <Skeleton Name="gKeeseSkel" Type="Normal" LimbType="Standard" LimbNone="KEESE_LIMB_NONE" LimbMax="KEESE_LIMB_MAX" EnumName="KeeseLimb" Offset="0x18B8"/>
+
+        <DList Name="gKeeseEyesDL" Offset="0x1678"/>
+
+        <Texture Name="gKeeseEyeTex" Format="rgba16" Width="8" Height="8" Offset="0x190"/>
+        <Texture Name="gKeeseBodyTex" Format="rgba16" Width="8" Height="8" Offset="0x590"/>
+        <Texture Name="gKeeseTalonTex" Format="rgba16" Width="8" Height="16" Offset="0x610"/>
+        <Texture Name="gKeeseWingTex" Format="rgba16" Width="4" Height="16" Offset="0x710"/>
+        <Texture Name="gKeeseEarTex" Format="rgba16" Width="16" Height="8" Offset="0x790"/>
+
+        <Texture Name="gFireKeeseBodyTex" Format="rgba16" Width="8" Height="8" Offset="0x210"/>
+        <Texture Name="gFireKeeseEyeTex" Format="rgba16" Width="8" Height="8" Offset="0x290"/>
+        <Texture Name="gFireKeeseEarTex" Format="rgba16" Width="16" Height="8" Offset="0x310"/>
+        <Texture Name="gFireKeeseTalonTex" Format="rgba16" Width="8" Height="16" Offset="0x410"/>
+        <Texture Name="gFireKeeseWingTex" Format="rgba16" Width="4" Height="16" Offset="0x510"/>
+
+        <Array Name="gKeeseHeadVtx" Count="26" Offset="0x890">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseBodyVtx" Count="17" Offset="0xA30">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseLeftTalonVtx" Count="3" Offset="0xB40">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseRightTalonVtx" Count="4" Offset="0xB70">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseRightWingStartVtx" Count="3" Offset="0xBB0">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseRightWingMiddleVtx" Count="3" Offset="0xBE0">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseRightWingEndVtx" Count="3" Offset="0xC10">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseLeftWingEndVtx" Count="3" Offset="0xC40">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseLeftWingMiddleVtx" Count="3" Offset="0xC70">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseLeftWingStartVtx" Count="3" Offset="0xCA0">
+            <Vtx/>
+        </Array>
+        <Array Name="gKeeseEyesVtx" Count="6" Offset="0xCD0">
+            <Vtx/>
+        </Array>
+        <DList Name="gKeeseHeadDL" Offset="0xD30"/>
+        <DList Name="gKeeseBodyDL" Offset="0xF40"/>
+        <DList Name="gKeeseLeftTalonDL" Offset="0x1038"/>
+        <DList Name="gKeeseRightTalonDL" Offset="0x1100"/>
+        <DList Name="gKeeseRightWingStartDL" Offset="0x11C8"/>
+        <DList Name="gKeeseRightWingMiddleDL" Offset="0x1290"/>
+        <DList Name="gKeeseRightWingEndDL" Offset="0x1358"/>
+        <DList Name="gKeeseLeftWingEndDL" Offset="0x1420"/>
+        <DList Name="gKeeseLeftWingMiddleDL" Offset="0x14E8"/>
+        <DList Name="gKeeseLeftWingStartDL" Offset="0x15B0"/>
+        <Limb Name="gKeeseRootRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_ROOT_ROOT" Offset="0x1708"/>
+        <Limb Name="gKeeseRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_ROOT" Offset="0x1714"/>
+        <Limb Name="gKeeseTalonsRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_TALONS_ROOT" Offset="0x1720"/>
+        <Limb Name="gKeeseRightTalonRootRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_TALON_ROOT_ROOT" Offset="0x172C"/>
+        <Limb Name="gKeeseRightTalonRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_TALON_ROOT" Offset="0x1738"/>
+        <Limb Name="gKeeseRightTalonLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_TALON" Offset="0x1744"/>
+        <Limb Name="gKeeseLeftTalonRootRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_TALON_ROOT_ROOT" Offset="0x1750"/>
+        <Limb Name="gKeeseLeftTalonRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_TALON_ROOT" Offset="0x175C"/>
+        <Limb Name="gKeeseLeftTalonLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_TALON" Offset="0x1768"/>
+        <Limb Name="gKeeseBodyLimb" LimbType="Standard" EnumName="KEESE_LIMB_BODY" Offset="0x1774"/>
+        <Limb Name="gKeeseLeftWingRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_WING_ROOT" Offset="0x1780"/>
+        <Limb Name="gKeeseLeftWingStartRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_WING_START_ROOT" Offset="0x178C"/>
+        <Limb Name="gKeeseLeftWingMiddleRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_WING_MIDDLE_ROOT" Offset="0x1798"/>
+        <Limb Name="gKeeseLeftWingEndRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_WING_END_ROOT" Offset="0x17A4"/>
+        <Limb Name="gKeeseLeftWingEndLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_WING_END" Offset="0x17B0"/>
+        <Limb Name="gKeeseLeftWingMiddleLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_WING_MIDDLE" Offset="0x17BC"/>
+        <Limb Name="gKeeseLeftWingStartLimb" LimbType="Standard" EnumName="KEESE_LIMB_LEFT_WING_START" Offset="0x17C8"/>
+        <Limb Name="gKeeseRightWingRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_WING_ROOT" Offset="0x17D4"/>
+        <Limb Name="gKeeseRightWingStartRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_WING_START_ROOT" Offset="0x17E0"/>
+        <Limb Name="gKeeseRightWingMiddleRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_WING_MIDDLE_ROOT" Offset="0x17EC"/>
+        <Limb Name="gKeeseRightWingEndRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_WING_END_ROOT" Offset="0x17F8"/>
+        <Limb Name="gKeeseRightWingEndLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_WING_END" Offset="0x1804"/>
+        <Limb Name="gKeeseRightWingMiddleLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_WING_MIDDLE" Offset="0x1810"/>
+        <Limb Name="gKeeseRightWingStartLimb" LimbType="Standard" EnumName="KEESE_LIMB_RIGHT_WING_START" Offset="0x181C"/>
+        <Limb Name="gKeeseHeadRootRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_HEAD_ROOT_ROOT" Offset="0x1828"/>
+        <Limb Name="gKeeseHeadRootLimb" LimbType="Standard" EnumName="KEESE_LIMB_HEAD_ROOT" Offset="0x1834"/>
+        <Limb Name="gKeeseHeadLimb" LimbType="Standard" EnumName="KEESE_LIMB_HEAD" Offset="0x1840"/>
+    </File>
+</Root>
