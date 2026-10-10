@@ -149,6 +149,7 @@ typedef struct FishmodRodInfo {
     /* 0x08 */ u16 caught; // fish landed this session
     /* 0x0A */ u16 lost;
     /* 0x0C */ f32 castPower;
+    /* 0x10 */ u8 choice; // after a catch: 1 keep or release, 2 release only
 } FishmodRodInfo;
 
 extern FishmodRodInfo gFishmodRodInfo;
