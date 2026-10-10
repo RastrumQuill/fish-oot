@@ -369,6 +369,53 @@ void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size) {
     *length = p - buf;
 }
 
+#if FISHMOD_TESTMODE
+#define OWN_EQUIP(type, inv) ((1 << (inv)) << ((type) * 4))
+
+void Fishmod_InitTestSave(void) {
+    Inventory* inv = &gSaveContext.save.info.inventory;
+    s32 i;
+
+    gSaveContext.save.cutsceneIndex = CS_INDEX_NONE; // no Deku Tree / Navi intro
+
+    // Saria and Mido already met, as on the debug save
+    gSaveContext.save.info.infTable[INFTABLE_INDEX_0] |= INFTABLE_MASK(INFTABLE_SARIA_GREETED_LINK) |
+                                                         INFTABLE_MASK(INFTABLE_SARIA_WAS_TOLD_ABOUT_MIDO) |
+                                                         INFTABLE_MASK(INFTABLE_0C) | INFTABLE_MASK(INFTABLE_0E);
+
+    // three empty bottles and one with bugs, for bait and catches
+    for (i = SLOT_BOTTLE_1; i <= SLOT_BOTTLE_4; i++) {
+        inv->items[i] = ITEM_BOTTLE_EMPTY;
+    }
+    inv->items[SLOT_BOTTLE_4] = ITEM_BOTTLE_BUG;
+
+    // the slingshot knocks down beehives for larvae
+    inv->items[SLOT_SLINGSHOT] = ITEM_SLINGSHOT;
+    Inventory_ChangeUpgrade(UPG_BULLET_BAG, 1);
+    inv->ammo[SLOT_SLINGSHOT] = 30;
+    inv->items[SLOT_DEKU_NUT] = ITEM_DEKU_NUT;
+    inv->ammo[SLOT_DEKU_NUT] = 20;
+    Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 1);
+    inv->items[SLOT_DEKU_STICK] = ITEM_DEKU_STICK;
+    inv->ammo[SLOT_DEKU_STICK] = 10;
+    Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 1);
+
+    // the Goron's Bracelet lifts rocks for bugs (and lengthens the cast)
+    Inventory_ChangeUpgrade(UPG_STRENGTH, 1);
+    Inventory_ChangeUpgrade(UPG_WALLET, 1);
+    gSaveContext.save.info.playerData.rupees = 200;
+
+    // Kokiri Sword and Deku Shield, equipped
+    inv->equipment |= OWN_EQUIP(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_KOKIRI) |
+                      OWN_EQUIP(EQUIP_TYPE_SHIELD, EQUIP_INV_SHIELD_DEKU);
+    gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_KOKIRI;
+    Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI);
+    Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_DEKU);
+    gSaveContext.save.info.equips.buttonItems[1] = ITEM_SLINGSHOT;
+    gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_SLINGSHOT;
+}
+#endif
+
 s32 Fishmod_CanUseRod(PlayState* play) {
     return (gFishmodRod != NULL) && (Fishmod_GetSceneSpawns(play->sceneId) != NULL);
 }

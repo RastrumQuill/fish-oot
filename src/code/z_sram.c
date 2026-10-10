@@ -15,6 +15,7 @@
 #include "ocarina.h"
 #include "printf.h"
 #include "save.h"
+#include "fishmod.h"
 #include "scene.h"
 #include "ss_sram.h"
 #include "terminal.h"
@@ -874,6 +875,10 @@ void Sram_InitSave(FileSelectState* fileSelect, SramContext* sramCtx) {
     if (fileSelect->buttonIndex == 0) {
         gSaveContext.save.cutsceneIndex = CS_INDEX_NONE;
     }
+#endif
+#if FISHMOD_TESTMODE
+    // fishmod test mode: no intro, and the things fishing tests need
+    Fishmod_InitTestSave();
 #endif
 
     for (offset = 0; offset < 8; offset++) {

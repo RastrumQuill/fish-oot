@@ -21,6 +21,7 @@
 #include "gfx.h"
 #include "item.h"
 #include "play_state.h"
+#include "pause.h"
 #include "player.h"
 #include "save.h"
 #include "sequence.h"
@@ -303,6 +304,19 @@ void Fishmod_DebugBoot(void) {
     sPlacedPlayer = false;
 }
 
+s32 Fishmod_DebugNormalBoot(void) {
+#ifdef FISHMOD_SCRIPT_NORMAL_BOOT
+    // the script plays from power-on: through the title and file select, and Link is never moved
+    sScriptStepIndex = 0;
+    sScriptStepFrame = 0;
+    sScriptActive = true;
+    sPlacedPlayer = true;
+    return true;
+#else
+    return false;
+#endif
+}
+
 OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
 
 /**
@@ -446,6 +460,40 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     }
 
     step = &sScriptSteps[sScriptStepIndex];
+    if (step->untilPause != 0) {
+        if ((gameState->main == Play_Main) && (((PlayState*)gameState)->pauseCtx.state == step->untilPause - 1)) {
+            sScriptStepFrame = 0;
+            sScriptStepIndex++;
+            return;
+        }
+        input->prev = input->cur;
+        input->cur.button = ((sScriptStepFrame++ % step->frames) == 0) ? step->button : 0;
+        buttonDiff = input->prev.button ^ input->cur.button;
+        input->press.button = input->cur.button & buttonDiff;
+        input->rel.button = input->prev.button & buttonDiff;
+        return;
+    }
+#ifdef FISHMOD_SCRIPT_NORMAL_BOOT
+    {
+        // what the last scripted button press met: which step, and the pause menu's state then
+        static u16 sLastButton;
+        static s32 sLastStep;
+        static s32 sLastPause;
+
+        if (step->button != 0) {
+            sLastButton = step->button;
+            sLastStep = sScriptStepIndex;
+            sLastPause = (gameState->main == Play_Main) ? ((PlayState*)gameState)->pauseCtx.state * 100 +
+                                                              ((PlayState*)gameState)->pauseCtx.mainState
+                                                        : -1;
+        }
+        Fishmod_DebugPrintf(3, "step %d/%d btn %04X@%d pause %d now %d", sScriptStepIndex,
+                            (s32)ARRAY_COUNT(sScriptSteps), sLastButton, sLastStep, sLastPause,
+                            (gameState->main == Play_Main) ? ((PlayState*)gameState)->pauseCtx.state * 100 +
+                                                                 ((PlayState*)gameState)->pauseCtx.mainState
+                                                           : -1);
+    }
+#endif
 
     input->prev = input->cur;
     input->cur.button = step->button;
@@ -458,6 +506,15 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     input->press.stick_x = input->cur.stick_x - input->prev.stick_x;
     input->press.stick_y = input->cur.stick_y - input->prev.stick_y;
 
+    if (step->inPlay) {
+        // only frames where Play ran since the last call count
+        static s32 sLastPlayFrames;
+
+        if (sPlayFrames == sLastPlayFrames) {
+            return;
+        }
+        sLastPlayFrames = sPlayFrames;
+    }
     if (++sScriptStepFrame >= step->frames) {
         sScriptStepFrame = 0;
         sScriptStepIndex++;
