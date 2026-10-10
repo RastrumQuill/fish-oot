@@ -45,6 +45,7 @@ BASE_TEXTURES = {
         "back": "gFishingFishTex_0016D0",
         "belly": "gFishingFishTex_0018D0",
         "head": "gFishingFishTex_001AD0",
+        "side": "gFishingFishTex_0014D0",  # the bass has no side texture; this slot is its tail fin
         "fin": "gFishingFishTex_0022D0",
     },
     "loach": {
