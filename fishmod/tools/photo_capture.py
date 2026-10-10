@@ -21,7 +21,7 @@ from PIL import Image
 
 # Must match sPhotoSpecies / PHOTO_POSES in src/code/fishmod_debug.c
 PHOTOS = []
-for sp in ["greengill", "hyrule_bass", "ordon_catfish", "hylian_loach", "sanke_carp"]:
+for sp in ["greengill", "hyrule_bass", "ordon_catfish", "hylian_loach", "sanke_carp", "hyrule_minnow"]:
     PHOTOS.append(sp)
     PHOTOS.append(sp + "_34")
 PHOTOS.append("lineup")

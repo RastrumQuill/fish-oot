@@ -196,6 +196,78 @@
       }
     },
     {
+      "id": "HYRULE_MINNOW",
+      "name": "Hyrule Minnow",
+      "origin": "Ocarina of Time (the fish you can catch in a bottle)",
+      "status": "in-game",
+      "base": "small",
+      "shape": [
+        1.0,
+        0.9,
+        1.0
+      ],
+      "tint": [
+        255,
+        255,
+        255
+      ],
+      "length": {
+        "min": 2,
+        "typical": 4,
+        "max": 7
+      },
+      "weightCoef": 0.004,
+      "rarity": 1,
+      "price": 2,
+      "depth": "surface",
+      "activeTimes": [
+        "dawn",
+        "day",
+        "dusk"
+      ],
+      "behavior": {
+        "curiosity": 95,
+        "aggression": 80,
+        "wariness": 30,
+        "strength": 10,
+        "stamina": 15,
+        "speed": 70,
+        "jumpiness": 20,
+        "nibbles": 3,
+        "biteWindow": 12
+      },
+      "bait": {
+        "none": 1.2,
+        "bee_larva": 1.4,
+        "bug": 1.2,
+        "worm": 1.3
+      },
+      "scenes": {
+        "KOKIRI_FOREST": 45
+      },
+      "flavor": "The little fish that darts around Hyrule's shallows, the same kind that ends up in so many bottles. Quick, curious and always hungry. Bigger fish think it makes a fine meal.",
+      "tips": "Pecks at the bait many times; strike on the real tug. A tiny fight. Planned: use one as live bait for big predators.",
+      "look": {
+        "parts": {
+          "tail": {
+            "scale": [
+              1.1,
+              1.0,
+              1.0
+            ]
+          }
+        },
+        "textures": {
+          "back": [
+            {
+              "op": "brightness",
+              "factor": 1.05
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "HYRULE_BASS",
       "name": "Hyrule Bass",
       "origin": "Twilight Princess, Ocarina of Time (Fishing Pond)",

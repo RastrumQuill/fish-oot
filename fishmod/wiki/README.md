@@ -10,11 +10,12 @@ Twilight Princess-style overworld fishing for Ocarina of Time (N64). Pages are g
 
 <img src="img/lineup.jpg" width="60%">
 
-*Kokiri Forest fish at typical size, to scale. Top to bottom: Greengill, Hylian Loach, Hyrule Bass, Sanke Carp, Ordon Catfish.*
+*Kokiri Forest fish at typical size, to scale. Top to bottom: Hyrule Minnow, Greengill, Hylian Loach, Hyrule Bass, Sanke Carp, Ordon Catfish.*
 
 | | Fish | Rarity | Length | Where | Status |
 |---|---|---|---|---|---|
 | <img src="img/greengill.jpg" width="120"> | [Greengill](species/greengill.md) | Common | 4–16 in | Kokiri Forest | in game |
+|  | [Hyrule Minnow](species/hyrule_minnow.md) | Common | 2–7 in | Kokiri Forest | in game |
 | <img src="img/hyrule_bass.jpg" width="120"> | [Hyrule Bass](species/hyrule_bass.md) | Uncommon | 8–24 in | Kokiri Forest | in game |
 | <img src="img/ordon_catfish.jpg" width="120"> | [Ordon Catfish](species/ordon_catfish.md) | Rare | 10–28 in | Kokiri Forest | in game |
 | <img src="img/hylian_loach.jpg" width="120"> | [Hylian Loach](species/hylian_loach.md) | Legendary | 8–36 in | Kokiri Forest | in game |

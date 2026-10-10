@@ -13,6 +13,7 @@
 | Fish | Bare hook | Bee Larva | Bug | Worm | Coral Earring |
 |---|---|---|---|---|---|
 | [Greengill](species/greengill.md) | ×1.0 | ×1.6 | ×1.4 | ×1.5 | – |
+| [Hyrule Minnow](species/hyrule_minnow.md) | ×1.2 | ×1.4 | ×1.2 | ×1.3 | – |
 | [Hyrule Bass](species/hyrule_bass.md) | ×0.8 | ×1.3 | ×1.6 | ×1.4 | – |
 | [Ordon Catfish](species/ordon_catfish.md) | ×0.4 | ×1.0 | ×0.8 | ×1.8 | – |
 | [Hylian Loach](species/hylian_loach.md) | ×0.2 | ×0.8 | ×1.2 | ×1.0 | – |

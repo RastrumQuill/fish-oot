@@ -35,6 +35,7 @@ from PIL import Image
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DATA = os.path.join(ROOT, "fishmod", "data", "species.json")
 OBJ = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "objects", "object_fish")
+KEEP = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "objects", "gameplay_keep")
 OUT_C = os.path.join(ROOT, "src", "overlays", "actors", "ovl_En_Fishmod", "fishmod_textures.inc.c")
 OUT_PREVIEW = os.path.join(ROOT, "fishmod", "out", "textures_preview.png")
 
@@ -55,11 +56,17 @@ BASE_TEXTURES = {
         "head": "gFishingLoachTex_010528",
         "fin": "gFishingLoachTex_010DA8",
     },
+    "small": {
+        "back": "gFishBodyTex",
+        "side": "gFishTailTex",  # tail fin, as for the bass
+    },
 }
 
 
 def load(sym):
     path = os.path.join(OBJ, sym + ".rgba16.png")
+    if not os.path.exists(path):
+        path = os.path.join(KEEP, sym + ".rgba16.png")
     return Image.open(path).convert("RGBA")
 
 

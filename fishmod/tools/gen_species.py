@@ -18,7 +18,7 @@ DATA = os.path.join(ROOT, "fishmod", "data", "species.json")
 HEADER = os.path.join(ROOT, "include", "fishmod_species_data.h")
 WIKI = os.path.join(ROOT, "fishmod", "wiki")
 
-BASES = {"bass": "FISHMOD_BASE_BASS", "loach": "FISHMOD_BASE_LOACH", "jabu": "FISHMOD_BASE_JABU"}
+BASES = {"bass": "FISHMOD_BASE_BASS", "loach": "FISHMOD_BASE_LOACH", "jabu": "FISHMOD_BASE_JABU", "small": "FISHMOD_BASE_SMALL"}
 DEPTHS = {"surface": "FISHMOD_DEPTH_SURFACE", "mid": "FISHMOD_DEPTH_MID", "bottom": "FISHMOD_DEPTH_BOTTOM"}
 TIMES = ["dawn", "day", "dusk", "night"]
 BAITS = ["none", "bee_larva", "bug", "worm", "coral_earring", "fish"]
@@ -207,8 +207,8 @@ def gen_index(data):
     if os.path.exists(os.path.join(WIKI, "img", "lineup.jpg")):
         lines.append('<img src="img/lineup.jpg" width="60%">')
         lines.append("")
-        lines.append("*Kokiri Forest fish at typical size, to scale. Top to bottom: Greengill, Hylian Loach, "
-                     "Hyrule Bass, Sanke Carp, Ordon Catfish.*")
+        lines.append("*Kokiri Forest fish at typical size, to scale. Top to bottom: Hyrule Minnow, Greengill, "
+                     "Hylian Loach, Hyrule Bass, Sanke Carp, Ordon Catfish.*")
         lines.append("")
     lines.append("| | Fish | Rarity | Length | Where | Status |")
     lines.append("|---|---|---|---|---|---|")
