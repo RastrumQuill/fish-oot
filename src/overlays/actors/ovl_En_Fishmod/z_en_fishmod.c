@@ -362,7 +362,7 @@ static Vec3f sWhiskerWorld[4][3];
 static void EnFishmod_UpdateWhiskers(EnFishmod* this) {
     f32 dx = this->boundsMax.x - this->boundsMin.x;
     f32 dz = this->boundsMax.z - this->boundsMin.z;
-    f32 length = sqrtf(SQ(dx) + SQ(dz)) * 1.2f;
+    f32 length = sqrtf(SQ(dx) + SQ(dz)) * 1.9f;
     f32 fwdX = Math_SinS(this->actor.shape.rot.y);
     f32 fwdZ = Math_CosS(this->actor.shape.rot.y);
     s32 i;
@@ -495,7 +495,8 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
     const u8* shape;
 
-    if (gFishmodPhoto.active) {
+    if (gFishmodPhoto.active && (gFishmodPhoto.backdropFrame != play->gameplayFrames)) {
+        gFishmodPhoto.backdropFrame = play->gameplayFrames;
         EnFishmod_DrawPhotoBackdrop(play);
     }
 

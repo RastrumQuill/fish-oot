@@ -134,7 +134,8 @@ typedef struct FishmodPhoto {
     /* 0x04 */ s16 pitch;
     /* 0x08 */ Vec3f center; // set by the fish while drawing: middle of its limbs
     /* 0x14 */ f32 extent;   // and the distance between its farthest limbs
-} FishmodPhoto; // size = 0x18
+    /* 0x18 */ u32 backdropFrame; // frame the backdrop was last drawn, so only the first fish draws it
+} FishmodPhoto; // size = 0x1C
 
 extern FishmodPhoto gFishmodPhoto;
 
