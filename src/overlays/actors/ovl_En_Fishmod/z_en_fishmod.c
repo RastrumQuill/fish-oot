@@ -687,10 +687,17 @@ static s32 EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target,
     }
     next.y = this->actor.world.pos.y + CLAMP(dy * 0.08f, -0.8f, 0.8f);
 
+    // Stuck in a spot too tight for it (against a bank, or pushed into one): step straight along the way out
+    // rather than along its heading, which still points at the bank.
+    if (this->blocked && (this->detourTimer > 0)) {
+        next.x = this->actor.world.pos.x + Math_SinS(this->detourYaw) * 0.6f;
+        next.z = this->actor.world.pos.z + Math_CosS(this->detourYaw) * 0.6f;
+    }
+
     if (EnFishmod_ProbeWater(this, play, &next, this->actor.shape.rot.y)) {
         next.y = EnFishmod_ClampY(this, next.y);
         this->actor.world.pos = next;
-    } else if (EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) &&
+    } else if (EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) && ((surface - floor) > 1.0f) &&
                (((surface - floor) > EnFishmod_ShallowDepth(this, play)) ||
                 // following a detour out of a tight spot: water a little shallow is fine, land isn't
                 ((this->detourTimer > 0) && ((surface - floor) > this->halfHeight * 1.2f)))) {
@@ -710,7 +717,8 @@ static s32 EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target,
         this->target.z = this->actor.world.pos.z + Math_CosS(open) * (this->halfLength * 2.0f + 30.0f);
         this->target.y = this->actor.world.pos.y;
         Math_SmoothStepToS(&this->actor.shape.rot.y, open, 2, 0x800, 0x100);
-        this->speed *= 0.5f;
+        // slow down, but not to a stop, or it could never get away from the bank
+        this->speed = CLAMP_MIN(this->speed * 0.5f, 0.4f);
         moved = false;
     }
 
