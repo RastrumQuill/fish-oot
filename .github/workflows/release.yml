@@ -1,0 +1,30 @@
+name: Release
+
+# Pushing a tag like kokiri-test1 publishes a GitHub release with the matching patch from releases/ attached.
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          patch="releases/fish-oot-${TAG}.bps"
+          if [ ! -f "$patch" ]; then
+            echo "No $patch for tag $TAG"
+            exit 1
+          fi
+          gh release create "$TAG" "$patch" \
+            --title "fish-oot $TAG" \
+            --notes-file releases/README.md \
+            --prerelease
