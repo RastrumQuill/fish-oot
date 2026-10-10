@@ -1,3 +1,4 @@
+#include "fishmod.h"
 #include "libu64/gfxprint.h"
 #include "array_count.h"
 #include "attributes.h"
@@ -2666,6 +2667,13 @@ void Message_OpenText(PlayState* play, u16 textId) {
             } else {
                 DMA_REQUEST_SYNC(MSG_BUF, (uintptr_t)_nes_message_data_staticSegmentRomStart + font->msgOffset,
                                  font->msgLength, "../z_message_PAL.c", UNK_LINE);
+                // fishmod: the records plaque in Link's house gets the fishing journal
+                {
+                    u16 length = font->msgLength;
+
+                    Fishmod_ExtendMessage(textId, font->msgBuf, &length, sizeof(font->msgBuf));
+                    font->msgLength = msgCtx->msgLength = length;
+                }
             }
 #else
             DMA_REQUEST_SYNC(MSG_BUF, (uintptr_t)_nes_message_data_staticSegmentRomStart + font->msgOffset,

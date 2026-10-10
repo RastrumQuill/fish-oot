@@ -275,7 +275,20 @@ void Fishmod_DebugBoot(void) {
 
     gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
         gSaveContext.buttonStatus[3] = gSaveContext.buttonStatus[4] = BTN_ENABLED;
+#ifdef FISHMOD_SCRIPT_ENTRANCE
+    gSaveContext.save.entranceIndex = FISHMOD_SCRIPT_ENTRANCE;
+#else
     gSaveContext.save.entranceIndex = ENTR_KOKIRI_FOREST_0;
+#endif
+#ifdef FISHMOD_JOURNAL_TEST
+    // a few catches for the journal pages
+    FISHMOD_SAVE->records[FISHMOD_SPECIES_GREENGILL].count = 7;
+    FISHMOD_SAVE->records[FISHMOD_SPECIES_GREENGILL].bestTenths = 94;
+    FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_BASS].count = 2;
+    FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_BASS].bestTenths = 168;
+    FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].count = 12;
+    FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].bestTenths = 41;
+#endif
     gSaveContext.respawnFlag = 0;
     gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = ENTR_LOAD_OPENING;
     gSaveContext.seqId = (u8)NA_BGM_DISABLED;

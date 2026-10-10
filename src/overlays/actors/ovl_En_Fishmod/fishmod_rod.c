@@ -437,7 +437,12 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     }
 
     // where the fish wants to go
-    pullSpeed = (0.8f + b->strength * 0.025f) * (0.25f + staminaFrac * 0.75f);
+    // Bigger and stronger fish pull harder, a fresh fish harder than a tired one, and a run (stateTimer) much
+    // harder: faster than the reel, so the line goes tight and the drag pays out.
+    pullSpeed = (0.7f + b->strength * 0.02f + fish->lengthInches * 0.02f) * (0.35f + staminaFrac * 0.65f);
+    if (fish->stateTimer > 0) {
+        pullSpeed *= 2.2f;
+    }
     if (fish->jumping) {
         pullSpeed *= 0.3f;
     }
@@ -473,7 +478,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
 
     // reel drag pays out line instead of snapping right away
     if ((ROD->tension > 85.0f) && (taut > 0.0f)) {
-        ROD->lineOut += 0.7f;
+        ROD->lineOut += pullSpeed * 0.8f; // the fish takes line, but against the drag
         Sfx_PlaySfxCentered(NA_SE_IT_FISHING_REEL_HIGH - SFX_FLAG);
     }
 
@@ -927,8 +932,11 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         static const char* sStateNames[] = { "none", "held", "windup", "flying", "float", "ground", "fight", "land" };
 
         Fishmod_DebugPrintf(2, "rod %s line %d", sStateNames[ROD->state], (s32)ROD->lineOut);
-        Fishmod_DebugPrintf(3, "ten %d stam %d bite %d", (s32)ROD->tension,
-                            (ROD->fish != NULL) ? (s32)ROD->fish->stamina : -1, ROD->biting);
+        Fishmod_DebugPrintf(3, "ten %d stam %d bite %d hold st%d d%d", (s32)ROD->tension,
+                            (ROD->fish != NULL) ? (s32)ROD->fish->stamina : -1, ROD->biting,
+                            (ROD->fish != NULL) ? ROD->fish->fishState : -1,
+                            (ROD->fish != NULL) ? (s32)Math_Vec3f_DistXZ(&ROD->fish->actor.world.pos, &ROD->bobberPos)
+                                                : -1);
         Fishmod_DebugPrintf(4, "bob %d %d %d t%d p%d v%d %d", (s32)ROD->bobberPos.x, (s32)ROD->bobberPos.y,
                             (s32)ROD->bobberPos.z, ROD->timer, (s32)(ROD->castPower * 100.0f),
                             (s32)(ROD->bobberVel.x * 10.0f), (s32)(ROD->bobberVel.z * 10.0f));
