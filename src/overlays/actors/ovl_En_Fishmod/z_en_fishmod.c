@@ -431,7 +431,6 @@ static s32 EnFishmod_ProbeWater(EnFishmod* this, PlayState* play, Vec3f* pos, s1
     if (!EnFishmod_WaterAt(play, pos->x, pos->z, &surface, &floor) ||
         !EnFishmod_WaterAt(play, pos->x + Math_SinS(yaw) * this->halfLength,
                            pos->z + Math_CosS(yaw) * this->halfLength, &noseSurface, &noseFloor)) {
-        this->floorY = this->waterY; // no water: no depth
         return false;
     }
     this->waterY = CLAMP_MAX(surface, noseSurface);
@@ -552,6 +551,8 @@ void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
 /** Steers toward target at the given speed, staying inside the water. */
 static void EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target, f32 speed, s16 turnStep) {
     Vec3f next;
+    f32 surface;
+    f32 floor;
     s16 yaw = Math_Vec3f_Yaw(&this->actor.world.pos, target);
     f32 dy = target->y - this->actor.world.pos.y;
 
@@ -565,8 +566,11 @@ static void EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target
     if (EnFishmod_ProbeWater(this, play, &next, this->actor.shape.rot.y)) {
         next.y = EnFishmod_ClampY(this, next.y);
         this->actor.world.pos = next;
-    } else if ((this->waterY - this->floorY) > EnFishmod_ShallowDepth(this, play)) {
+    } else if (EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) &&
+               ((surface - floor) > EnFishmod_ShallowDepth(this, play))) {
         // stranded somewhere too shallow (released or dragged there): anywhere deeper is better
+        this->waterY = surface;
+        this->floorY = floor;
         next.y = EnFishmod_ClampY(this, next.y);
         this->actor.world.pos = next;
     } else {
@@ -914,19 +918,30 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         f32 dist = Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
         static s32 sClipFrames;
         static f32 sClipMax;
+        static s32 sClipState;
+        static s32 sClipSize;
 
         // how far any fish's body pokes out of the water or into the floor
         if ((this->fishState != FISH_STATE_CAUGHT) && (this->fishState != FISH_STATE_PHOTO) && !this->jumping &&
             !(this->fishState == FISH_STATE_HOOKED && (this->waterY - this->floorY) < this->halfHeight * 2.0f)) {
-            f32 out = CLAMP_MIN(this->actor.world.pos.y + this->halfHeight - this->waterY,
-                                this->floorY - (this->actor.world.pos.y - this->halfHeight));
+            f32 surface;
+            f32 floor;
+            f32 out = 0.0f;
 
+            if (EnFishmod_WaterAt(play, this->actor.world.pos.x, this->actor.world.pos.z, &surface, &floor)) {
+                out = CLAMP_MIN(this->actor.world.pos.y + this->halfHeight - surface,
+                                floor - (this->actor.world.pos.y - this->halfHeight));
+            }
             if (out > 1.0f) {
                 sClipFrames++;
-                sClipMax = CLAMP_MIN(sClipMax, out);
+                if (out > sClipMax) {
+                    sClipMax = out;
+                    sClipState = this->fishState;
+                    sClipSize = (s32)this->lengthInches;
+                }
             }
         }
-        Fishmod_DebugPrintf(8, "fish clip %d max %d", sClipFrames, (s32)sClipMax);
+        Fishmod_DebugPrintf(8, "fish clip %d max %d st%d %din", sClipFrames, (s32)sClipMax, sClipState, sClipSize);
 
         if (sFrame != play->gameplayFrames) {
             sFrame = play->gameplayFrames;
