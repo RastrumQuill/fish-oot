@@ -220,13 +220,19 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
     dist = sqrtf(SQ(toFocus.x) + SQ(toFocus.z));
     yaw = Math_Atan2S(toFocus.z, toFocus.x);
 
-    // over Link's shoulder, a bit behind and above
-    eyeTarget.x = player->actor.world.pos.x - Math_SinS(yaw) * 70.0f + Math_CosS(yaw) * 25.0f;
-    eyeTarget.y = player->actor.world.pos.y + 60.0f;
-    eyeTarget.z = player->actor.world.pos.z - Math_CosS(yaw) * 70.0f - Math_SinS(yaw) * 25.0f;
+    // over Link's shoulder, a bit behind and above; further back while fighting so Link and the fish both fit
+    {
+        f32 back = (ROD->state == ROD_STATE_FIGHT) ? 120.0f : 75.0f;
+        f32 side = (ROD->state == ROD_STATE_FIGHT) ? 45.0f : 28.0f;
+        f32 up = (ROD->state == ROD_STATE_FIGHT) ? 85.0f : 60.0f;
+
+        eyeTarget.x = player->actor.world.pos.x - Math_SinS(yaw) * back + Math_CosS(yaw) * side;
+        eyeTarget.y = player->actor.world.pos.y + up;
+        eyeTarget.z = player->actor.world.pos.z - Math_CosS(yaw) * back - Math_SinS(yaw) * side;
+    }
 
     // zooming moves the eye along the line toward the focus
-    zoom = sZoomFactors[ROD->zoom];
+    zoom = (ROD->state == ROD_STATE_FIGHT) ? 0.0f : sZoomFactors[ROD->zoom];
     if ((ROD->state == ROD_STATE_FLOAT) && ROD->biting) {
         zoom += 0.1f; // lean in on a bite
     }
