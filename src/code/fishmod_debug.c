@@ -208,6 +208,43 @@ static void Fishmod_PhotoUpdate(PlayState* play) {
 }
 #endif
 
+Vec3f gFishmodDebugFocus;
+s16 gFishmodDebugFocusYaw;
+
+#ifdef FISHMOD_VIEW
+// Fixed camera for watching the pond (FISHMOD_VIEW in a script defines sViewEye / sViewAt)
+static s16 sViewCamId = SUB_CAM_ID_DONE;
+
+static void Fishmod_ViewUpdate(PlayState* play) {
+    if (sViewCamId == SUB_CAM_ID_DONE) {
+        sViewCamId = Play_CreateSubCamera(play);
+        Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STAT_WAIT);
+        Play_ChangeCameraStatus(play, sViewCamId, CAM_STAT_ACTIVE);
+    }
+#ifdef FISHMOD_VIEW_FOLLOW
+    // chase the nearest fish from behind and above
+    {
+        static Vec3f sEye;
+        static Vec3f sAt;
+        Vec3f eye;
+
+        eye.x = gFishmodDebugFocus.x - Math_SinS(gFishmodDebugFocusYaw) * 45.0f;
+        eye.y = gFishmodDebugFocus.y + 35.0f;
+        eye.z = gFishmodDebugFocus.z - Math_CosS(gFishmodDebugFocusYaw) * 45.0f;
+        Math_ApproachF(&sEye.x, eye.x, 0.1f, 10.0f);
+        Math_ApproachF(&sEye.y, eye.y, 0.1f, 10.0f);
+        Math_ApproachF(&sEye.z, eye.z, 0.1f, 10.0f);
+        Math_ApproachF(&sAt.x, gFishmodDebugFocus.x, 0.2f, 10.0f);
+        Math_ApproachF(&sAt.y, gFishmodDebugFocus.y, 0.2f, 10.0f);
+        Math_ApproachF(&sAt.z, gFishmodDebugFocus.z, 0.2f, 10.0f);
+        Play_SetCameraAtEye(play, sViewCamId, &sAt, &sEye);
+        return;
+    }
+#endif
+    Play_SetCameraAtEye(play, sViewCamId, &sViewAt, &sViewEye);
+}
+#endif
+
 static s32 sScriptStepIndex;
 static s32 sScriptStepFrame;
 static s32 sScriptActive;
@@ -266,13 +303,19 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #endif
     }
 
+#ifdef FISHMOD_VIEW
+    if (sPlacedPlayer && (sPlayFrames > 40)) {
+        Fishmod_ViewUpdate(play);
+    }
+#endif
 #ifdef FISHMOD_PHOTO
     if (sPlacedPlayer && (sPlayFrames > 60)) {
         Fishmod_PhotoUpdate(play);
     }
 #endif
 
-    Fishmod_DebugPrintf(0, "F%d S%d/%d", sPlayFrames, sScriptStepIndex, (s32)ARRAY_COUNT(sScriptSteps));
+    Fishmod_DebugPrintf(0, "F%d S%d/%d caught %d lost %d", sPlayFrames, sScriptStepIndex,
+                        (s32)ARRAY_COUNT(sScriptSteps), gFishmodRodInfo.caught, gFishmodRodInfo.lost);
     if (player != NULL) {
         Fishmod_DebugPrintf(1, "P %d %d %d y%04X", (s32)player->actor.world.pos.x, (s32)player->actor.world.pos.y,
                             (s32)player->actor.world.pos.z, (u16)player->actor.shape.rot.y);
@@ -283,6 +326,56 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     Input* input = &inputs[0];
     FishmodAutoplayStep* step;
     u16 buttonDiff;
+
+#ifdef FISHMOD_AUTO_ANGLER
+    // after the script: play the fishing game from the rod's state (for testing the whole loop)
+    if (!sScriptActive && sPlacedPlayer && (sScriptStepIndex >= (s32)ARRAY_COUNT(sScriptSteps))) {
+        static s32 sAnglerTimer;
+        u16 button = 0;
+        s8 stickY = 0;
+
+        sAnglerTimer++;
+        switch (gFishmodRodInfo.state) {
+            case 0: // rod away
+                if ((sAnglerTimer % 40) == 0) {
+                    button = BTN_CLEFT;
+                }
+                break;
+            case 1: // held: cast every so often
+                if ((sAnglerTimer % 60) == 0) {
+                    button = BTN_CLEFT;
+                }
+                break;
+            case 2: // wind-up: medium cast
+                stickY = 0;
+                break;
+            case 4: // float: strike on a real bite
+                if (gFishmodRodInfo.biting && ((sAnglerTimer % 4) == 0)) {
+                    button = BTN_B;
+                }
+                break;
+            case 5: // on the ground: reel back
+                button = BTN_A;
+                break;
+            case 6: // fight: reel while the tension is comfortable
+                if (gFishmodRodInfo.tension < 60.0f) {
+                    button = BTN_A;
+                }
+                break;
+        }
+        input->prev = input->cur;
+        input->cur.button = button;
+        input->cur.stick_x = 0;
+        input->cur.stick_y = stickY;
+        buttonDiff = input->prev.button ^ input->cur.button;
+        input->press.button = input->cur.button & buttonDiff;
+        input->rel.button = input->prev.button & buttonDiff;
+        PadUtils_UpdateRelXY(input);
+        input->press.stick_x = 0;
+        input->press.stick_y = 0;
+        return;
+    }
+#endif
 
     if (!sScriptActive) {
         return;

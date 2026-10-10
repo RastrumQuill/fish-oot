@@ -140,6 +140,23 @@ typedef struct FishmodPhoto {
 
 extern FishmodPhoto gFishmodPhoto;
 
+// Rod status published every frame by the fishing controller (for the debug auto-angler and the HUD)
+typedef struct FishmodRodInfo {
+    /* 0x00 */ u8 state;  // FishmodRodState
+    /* 0x01 */ u8 biting;
+    /* 0x02 */ u8 nibbling;
+    /* 0x04 */ f32 tension;
+    /* 0x08 */ u16 caught; // fish landed this session
+    /* 0x0A */ u16 lost;
+} FishmodRodInfo;
+
+extern FishmodRodInfo gFishmodRodInfo;
+
+#if FISHMOD_DEBUG
+extern Vec3f gFishmodDebugFocus; // the fish nearest to Link, for the follow camera
+extern s16 gFishmodDebugFocusYaw;
+#endif
+
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */
 
 #define FISHMOD_DEBUG_LINES 8

@@ -14,11 +14,52 @@
 #include "player.h"
 #include "segmented_address.h"
 #include "actor_profile.h"
+#include "controller.h"
+#include "interface.h"
+#include "item.h"
+#include "message.h"
+#include "save.h"
+#include "sfx.h"
+#include "z_lib.h"
 
 s32 Object_LoadPersistent(ObjectContext* objectCtx, s16 objectId);
 
 Actor* gFishmodRod = NULL;
+
+// The rod rides on B while fishing (like in the Fishing Pond); L puts it there and back.
+static u8 sRodOnB = false;
+static u8 sSavedBItem = ITEM_NONE;
+
+static void Fishmod_RestoreB(PlayState* play) {
+    if (gSaveContext.save.info.equips.buttonItems[0] == ITEM_FISHING_POLE) {
+        u8 item = sSavedBItem;
+
+        if ((item == ITEM_NONE) || (item == ITEM_FISHING_POLE)) {
+            // lost track (e.g. after a reset): give back the equipped sword
+            switch (CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD)) {
+                case EQUIP_VALUE_SWORD_KOKIRI:
+                    item = ITEM_SWORD_KOKIRI;
+                    break;
+                case EQUIP_VALUE_SWORD_MASTER:
+                    item = ITEM_SWORD_MASTER;
+                    break;
+                case EQUIP_VALUE_SWORD_BIGGORON:
+                    item = ITEM_SWORD_BIGGORON;
+                    break;
+                default:
+                    item = ITEM_NONE;
+                    break;
+            }
+        }
+        gSaveContext.save.info.equips.buttonItems[0] = item;
+        if (play != NULL && item != ITEM_NONE) {
+            Interface_LoadItemIcon1(play, 0);
+        }
+    }
+    sRodOnB = false;
+}
 FishmodPhoto gFishmodPhoto;
+FishmodRodInfo gFishmodRodInfo;
 
 const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId) {
     s32 i;
@@ -38,6 +79,11 @@ const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId) {
 void Fishmod_OnSceneLoad(PlayState* play) {
     gFishmodRod = NULL;
 
+    // never carry the rod-on-B swap into another scene
+    if (play->sceneId != SCENE_FISHING_POND) {
+        Fishmod_RestoreB(NULL);
+    }
+
     if (Fishmod_GetSceneSpawns(play->sceneId) == NULL) {
         return;
     }
@@ -52,6 +98,24 @@ void Fishmod_OnSceneLoad(PlayState* play) {
  */
 void Fishmod_PlayUpdate(PlayState* play) {
     Actor* rod;
+
+    // L: rod on B / back to the sword
+    if ((Fishmod_GetSceneSpawns(play->sceneId) != NULL) && (gFishmodRod != NULL) &&
+        CHECK_BTN_ALL(play->state.input[0].press.button, BTN_L) && (play->pauseCtx.state == 0) &&
+        (Message_GetState(&play->msgCtx) == TEXT_STATE_NONE) && !Play_InCsMode(play)) {
+        if (!sRodOnB) {
+            if (gSaveContext.save.info.equips.buttonItems[0] != ITEM_FISHING_POLE) {
+                sSavedBItem = gSaveContext.save.info.equips.buttonItems[0];
+                gSaveContext.save.info.equips.buttonItems[0] = ITEM_FISHING_POLE;
+                Interface_LoadItemIcon1(play, 0);
+            }
+            sRodOnB = true;
+            Sfx_PlaySfxCentered(NA_SE_SY_CAMERA_ZOOM_UP);
+        } else {
+            Fishmod_RestoreB(play);
+            Sfx_PlaySfxCentered(NA_SE_SY_CAMERA_ZOOM_DOWN);
+        }
+    }
 
     if ((gFishmodRod != NULL) || (Fishmod_GetSceneSpawns(play->sceneId) == NULL) || (GET_PLAYER(play) == NULL)) {
         return;

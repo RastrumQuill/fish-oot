@@ -340,6 +340,7 @@ static void Rod_StartFight(PlayState* play, Player* player) {
 static void Rod_LoseFish(PlayState* play, Player* player, const char* why) {
     EnFishmod* fish = ROD->fish;
 
+    gFishmodRodInfo.lost++;
     if (fish != NULL) {
         EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
     }
@@ -472,6 +473,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     if ((ROD->lineOut <= LINE_MIN + 2.0f) || (Math_Vec3f_DistXZ(&player->actor.world.pos, &fish->actor.world.pos) < 32.0f)) {
         ROD->state = ROD_STATE_LANDING;
         ROD->timer = 110;
+        gFishmodRodInfo.caught++;
         player->unk_860 = 3; // catch animation
         EnFishmod_FishSetState(fish, FISH_STATE_CAUGHT);
         Rumble_Override(0.0f, 120, 10, 5);
@@ -647,13 +649,13 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
             ROD->castYaw = -input->rel.stick_x * 80;
             if (--ROD->timer <= 0) {
                 s16 yaw = player->actor.shape.rot.y + ROD->castYaw;
-                f32 speed = 6.0f + ROD->castPower * 9.0f;
+                f32 speed = 2.5f + ROD->castPower * 5.5f;
 
                 ROD->state = ROD_STATE_FLYING;
                 ROD->bobberPos = ROD->tipPos;
                 ROD->bobberVel.x = Math_SinS(yaw) * speed;
                 ROD->bobberVel.z = Math_CosS(yaw) * speed;
-                ROD->bobberVel.y = 5.0f + ROD->castPower * 3.0f;
+                ROD->bobberVel.y = 4.0f + ROD->castPower * 2.5f;
                 ROD->dip = ROD->dipTarget = 0.0f;
                 ROD->zoom = 1;
                 Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
@@ -792,6 +794,11 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         player->unk_85C = CLAMP(player->unk_85C, -1.0f, 1.0f);
         player->unk_858 = CLAMP(player->unk_858, -1.0f, 1.0f);
     }
+
+    gFishmodRodInfo.state = ROD->state;
+    gFishmodRodInfo.biting = ROD->biting;
+    gFishmodRodInfo.nibbling = (ROD->fish != NULL) && (ROD->fish->fishState == FISH_STATE_NIBBLE);
+    gFishmodRodInfo.tension = ROD->tension;
 
 #if FISHMOD_DEBUG
     {

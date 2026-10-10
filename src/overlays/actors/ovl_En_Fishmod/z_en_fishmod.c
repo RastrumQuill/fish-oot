@@ -811,6 +811,34 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
 
     EnFishmod_FishAI(this, play);
     EnFishmod_UpdateSwim(this);
+
+#if FISHMOD_DEBUG
+    {
+        // nearest fish to the camera focus, for testing
+        static const char* sStateNames[] = { "wander", "approach", "inspect", "nibble", "bite",
+                                             "hooked", "caught",   "flee",    "photo" };
+        static u32 sFrame;
+        static f32 sBestDist;
+        static s32 sCount;
+        Player* player = GET_PLAYER(play);
+        f32 dist = Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
+
+        if (sFrame != play->gameplayFrames) {
+            sFrame = play->gameplayFrames;
+            sBestDist = 99999.0f;
+            sCount = 0;
+        }
+        sCount++;
+        if (dist < sBestDist) {
+            sBestDist = dist;
+            gFishmodDebugFocus = this->actor.world.pos;
+            gFishmodDebugFocusYaw = this->actor.shape.rot.y;
+            Fishmod_DebugPrintf(5, "fish%d %s %s", sCount, this->species->name, sStateNames[this->fishState]);
+            Fishmod_DebugPrintf(6, " %d %d %d d%d", (s32)this->actor.world.pos.x, (s32)this->actor.world.pos.y,
+                                (s32)this->actor.world.pos.z, (s32)dist);
+        }
+    }
+#endif
 }
 
 s32 EnFishmod_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx) {
