@@ -83,7 +83,9 @@ static u8 sLoachLimbParts[] = {
 
 // Pond textures for each role (back, belly, head, side, fin); must match BASE_TEXTURES in gen_textures.py
 static void* sTextureRoles[2][FISHMOD_TEX_ROLE_MAX] = {
-    { gFishingFishTex_0016D0, gFishingFishTex_0018D0, gFishingFishTex_001AD0, NULL, gFishingFishTex_0022D0 },
+    // the bass has no side texture, so its "side" slot is the tail fin
+    { gFishingFishTex_0016D0, gFishingFishTex_0018D0, gFishingFishTex_001AD0, gFishingFishTex_0014D0,
+      gFishingFishTex_0022D0 },
     { gFishingLoachTex_00ED28, gFishingLoachTex_00F528, gFishingLoachTex_010528, gFishingLoachTex_00FD28,
       gFishingLoachTex_010DA8 },
 };
@@ -345,14 +347,45 @@ s32 EnFishmod_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
     return false;
 }
 
-// Whisker roots and tips in head limb space: { root, middle, tip }, mirrored on z for the other side.
-// In this space -x points forward out of the snout, +z to the side and -y down.
+// Whiskers in fish space, as fractions of the fish's length: { forward, up, side } for root, middle, tip.
+// Mirrored on the side axis for the other whisker of each pair.
 static Vec3f sWhiskerPoints[][3] = {
-    { { 900.0f, -150.0f, 350.0f }, { 600.0f, -500.0f, 1600.0f }, { 1100.0f, -1300.0f, 2600.0f } },  // long upper pair
-    { { 750.0f, -450.0f, 200.0f }, { 600.0f, -1100.0f, 600.0f }, { 900.0f, -1800.0f, 1000.0f } },   // short chin pair
+    { { 0.00f, -0.01f, 0.03f }, { 0.04f, -0.05f, 0.12f }, { -0.02f, -0.13f, 0.20f } }, // long upper pair
+    { { 0.00f, -0.03f, 0.015f }, { 0.02f, -0.08f, 0.04f }, { -0.01f, -0.14f, 0.06f } }, // short chin pair
 };
 
 static Vec3f sWhiskerWorld[4][3];
+
+/**
+ * Places the whiskers at the snout using the fish's facing, so they hang forward and down like barbels.
+ */
+static void EnFishmod_UpdateWhiskers(EnFishmod* this) {
+    f32 dx = this->boundsMax.x - this->boundsMin.x;
+    f32 dz = this->boundsMax.z - this->boundsMin.z;
+    f32 length = sqrtf(SQ(dx) + SQ(dz)) * 1.2f;
+    f32 fwdX = Math_SinS(this->actor.shape.rot.y);
+    f32 fwdZ = Math_CosS(this->actor.shape.rot.y);
+    s32 i;
+    s32 k;
+    s32 side;
+
+    for (i = 0; i < 2; i++) {
+        for (k = 0; k < 3; k++) {
+            Vec3f* p = &sWhiskerPoints[i][k];
+            f32 sway = Math_SinS(this->timer * 0x500 + k * 0x2400) * 0.01f * k;
+
+            for (side = 0; side < 2; side++) {
+                f32 sideAmt = (side == 0) ? p->z : -p->z;
+                Vec3f* out = &sWhiskerWorld[i * 2 + side][k];
+
+                // snout: the head limb origin pushed forward a little
+                out->x = this->headPos.x + (fwdX * (p->x + 0.03f) + fwdZ * (sideAmt + sway)) * length;
+                out->y = this->headPos.y + p->y * length;
+                out->z = this->headPos.z + (fwdZ * (p->x + 0.03f) - fwdX * (sideAmt + sway)) * length;
+            }
+        }
+    }
+}
 
 void EnFishmod_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
     EnFishmod* this = (EnFishmod*)thisx;
@@ -379,19 +412,6 @@ void EnFishmod_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* 
 
     this->headPos = limbPos;
 
-    if (this->species->lookFlags & FISHMOD_LOOK_WHISKERS) {
-        for (i = 0; i < ARRAY_COUNT(sWhiskerPoints); i++) {
-            for (k = 0; k < 3; k++) {
-                Vec3f p = sWhiskerPoints[i][k];
-
-                // droop the whiskers a little with the swim motion
-                p.y += Math_SinS(this->timer * 0x600 + k * 0x2000) * 120.0f * k;
-                Matrix_MultVec3f(&p, &sWhiskerWorld[i * 2][k]);
-                p.z = -p.z;
-                Matrix_MultVec3f(&p, &sWhiskerWorld[i * 2 + 1][k]);
-            }
-        }
-    }
 }
 
 static void EnFishmod_DrawWhiskers(EnFishmod* this, PlayState* play) {
@@ -418,7 +438,7 @@ static void EnFishmod_DrawWhiskers(EnFishmod* this, PlayState* play) {
             Matrix_Translate(a->x, a->y, a->z, MTXMODE_NEW);
             Matrix_RotateY(Math_FAtan2F(dx, dz), MTXMODE_APPLY);
             Matrix_RotateX(-Math_FAtan2F(dy, distXZ), MTXMODE_APPLY);
-            Matrix_Scale(0.012f * this->actor.scale.z * 300.0f * (1.0f - k * 0.45f), 1.0f, dist * 0.001f,
+            Matrix_Scale(0.005f * this->actor.scale.z * 300.0f * (1.0f - k * 0.45f), 1.0f, dist * 0.001f,
                          MTXMODE_APPLY);
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
             gSPDisplayList(POLY_OPA_DISP++, gFishingLineModelDL);
@@ -526,6 +546,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
                           EnFishmod_OverrideLimbDraw, EnFishmod_PostLimbDraw, this);
 
     if (this->species->lookFlags & FISHMOD_LOOK_WHISKERS) {
+        EnFishmod_UpdateWhiskers(this);
         EnFishmod_DrawWhiskers(this, play);
     }
 
