@@ -2,7 +2,7 @@
 
 *Very rare · from Breath of the Wild · In game*
 
-*(render pending)*
+*(render pending: this fish is not in the game yet)*
 
 > An ornamental carp with red and white markings, kept in sacred waters since ancient times. The Kokiri say they swim in the forest for luck.
 

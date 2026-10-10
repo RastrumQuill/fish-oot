@@ -2,7 +2,7 @@
 
 *Common · from Twilight Princess · In game*
 
-*(render pending)*
+*(render pending: this fish is not in the game yet)*
 
 > A small, bright fish found in almost every pond and creek in Hyrule. It nibbles at anything that drifts by, which makes it the first catch of many young anglers.
 

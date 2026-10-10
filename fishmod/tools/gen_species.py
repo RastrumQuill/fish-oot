@@ -199,10 +199,17 @@ def gen_index(data):
                  "behavior and sizes match the game.")
     lines.append("")
     lines.append("- [How the fish are modeled](modeling.md)")
+    lines.append("- [Research notes and sources](research.md)")
     lines.append("- [Bait](baits.md)")
     lines.append("")
     lines.append("## Fish")
     lines.append("")
+    if os.path.exists(os.path.join(WIKI, "img", "lineup.jpg")):
+        lines.append('<img src="img/lineup.jpg" width="60%">')
+        lines.append("")
+        lines.append("*Kokiri Forest fish at typical size, to scale. Top to bottom: Greengill, Hylian Loach, "
+                     "Hyrule Bass, Sanke Carp, Ordon Catfish.*")
+        lines.append("")
     lines.append("| | Fish | Rarity | Length | Where | Status |")
     lines.append("|---|---|---|---|---|---|")
     for sp in data["species"]:

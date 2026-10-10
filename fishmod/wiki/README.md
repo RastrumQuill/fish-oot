@@ -2,7 +2,8 @@
 
 Twilight Princess-style overworld fishing for Ocarina of Time (N64). Pages are generated from [`fishmod/data/species.json`](../data/species.json); behavior and sizes match the game.
 
-- [How fishing works](mechanics.md)
+- [How the fish are modeled](modeling.md)
+- [Research notes and sources](research.md)
 - [Bait](baits.md)
 
 ## Fish

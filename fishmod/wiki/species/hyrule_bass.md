@@ -2,7 +2,7 @@
 
 *Uncommon · from Twilight Princess, Ocarina of Time (Fishing Pond) · In game*
 
-*(render pending)*
+*(render pending: this fish is not in the game yet)*
 
 > The classic Hylian game fish. It hunts from cover and strikes hard, and the big ones are known to leap clear of the water to throw the hook.
 
