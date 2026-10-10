@@ -245,7 +245,7 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
  * Fish population
  */
 
-static void Rod_SpawnFish(EnFishmod* this, PlayState* play) {
+static void Rod_SpawnFish(EnFishmod* this, PlayState* play, s32 count) {
     const FishmodSceneSpawns* spawns = Fishmod_GetSceneSpawns(play->sceneId);
     WaterBox* boxes = play->colCtx.colHeader->waterBoxes;
     s32 numBoxes = play->colCtx.colHeader->numWaterBoxes;
@@ -262,7 +262,7 @@ static void Rod_SpawnFish(EnFishmod* this, PlayState* play) {
         totalWeight += spawns->entries[i].weight;
     }
 
-    for (n = 0; n < FISH_COUNT; n++) {
+    for (n = 0; n < count; n++) {
         WaterBox* box = &boxes[(s32)Rand_ZeroFloat(numBoxes - 0.01f)];
         Vec3f center;
         Vec3f pos;
@@ -294,6 +294,24 @@ static void Rod_SpawnFish(EnFishmod* this, PlayState* play) {
     }
 }
 
+/** Keeps the water stocked: every so often, adds a fish if some were caught. */
+static void Rod_MaintainPopulation(EnFishmod* this, PlayState* play) {
+    Actor* actor;
+    s32 count = 0;
+
+    if (gFishmodPhoto.active || ((play->gameplayFrames % 300) != 150)) {
+        return;
+    }
+    for (actor = play->actorCtx.actorLists[ACTORCAT_NPC].head; actor != NULL; actor = actor->next) {
+        if ((actor->id == ACTOR_EN_FISHMOD) && (FISHMOD_GET_TYPE(actor->params) == FISHMOD_TYPE_FISH)) {
+            count++;
+        }
+    }
+    if (count < FISH_COUNT) {
+        Rod_SpawnFish(this, play, 1);
+    }
+}
+
 /* ---------------------------------------------------------------------------------------------------------------
  * Init / update
  */
@@ -306,7 +324,7 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
 
     if (!gFishmodPhoto.active) {
-        Rod_SpawnFish(this, play);
+        Rod_SpawnFish(this, play, FISH_COUNT);
     }
 }
 
@@ -482,11 +500,16 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
             static char sLine1[40];
             static char sLine2[40];
             f32 weight = fish->species->weightCoef * fish->lengthInches * fish->lengthInches *
-                         fish->lengthInches * 0.00001f;
+                         fish->lengthInches * 0.000001f;
 
             sprintf(sLine1, "%s!", fish->species->name);
-            sprintf(sLine2, "%d.%d in   %d.%d lbs", (s32)fish->lengthInches,
-                    (s32)(fish->lengthInches * 10.0f) % 10, (s32)weight, (s32)(weight * 10.0f) % 10);
+            if (weight < 1.0f) {
+                sprintf(sLine2, "%d.%d in   %d oz", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
+                        (s32)(weight * 16.0f + 0.5f));
+            } else {
+                sprintf(sLine2, "%d.%d in   %d.%d lbs", (s32)fish->lengthInches,
+                        (s32)(fish->lengthInches * 10.0f) % 10, (s32)weight, (s32)(weight * 10.0f) % 10);
+            }
             EnFishmod_RodMessage(1, sLine1, sLine2);
             ROD->messageTimer = 110;
         }
@@ -605,6 +628,8 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
     if (ROD->messageTimer > 0) {
         ROD->messageTimer--;
     }
+
+    Rod_MaintainPopulation(this, play);
 
     // stop everything if the rod was put away (or Link got hit, entered water...)
     if (!holding || (player->stateFlags1 & (PLAYER_STATE1_27 | PLAYER_STATE1_DEAD))) {
@@ -793,10 +818,13 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
 
         case ROD_STATE_LANDING:
             if (--ROD->timer <= 0) {
-                if (ROD->fish != NULL) {
-                    // released for now; bottling comes later
-                    EnFishmod_FishSetState(ROD->fish, FISH_STATE_FLEE);
-                    Actor_Kill(&ROD->fish->actor);
+                EnFishmod* fish = ROD->fish;
+
+                if (fish != NULL) {
+                    // released for now; bottling comes later. (FLEE releases it from the rod, which clears
+                    // ROD->fish, so keep our own pointer.)
+                    EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
+                    Actor_Kill(&fish->actor);
                 }
                 ROD->fish = NULL;
                 Rod_EndCast(play, player);

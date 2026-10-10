@@ -22,7 +22,7 @@
         "typical": 7,
         "max": 16
       },
-      "weightCoef": 0.0042,
+      "weightCoef": 0.001,
       "rarity": 1,
       "price": 5,
       "depth": "mid",
@@ -216,7 +216,7 @@
         "typical": 4,
         "max": 7
       },
-      "weightCoef": 0.004,
+      "weightCoef": 0.0006,
       "rarity": 1,
       "price": 2,
       "depth": "surface",
@@ -288,7 +288,7 @@
         "typical": 13,
         "max": 24
       },
-      "weightCoef": 0.005,
+      "weightCoef": 0.00062,
       "rarity": 2,
       "price": 20,
       "depth": "mid",
@@ -419,7 +419,7 @@
         "typical": 16,
         "max": 28
       },
-      "weightCoef": 0.006,
+      "weightCoef": 0.00055,
       "rarity": 3,
       "price": 40,
       "depth": "bottom",
@@ -636,7 +636,7 @@
         "typical": 12,
         "max": 36
       },
-      "weightCoef": 0.0024,
+      "weightCoef": 0.0003,
       "rarity": 5,
       "price": 150,
       "depth": "bottom",
@@ -690,7 +690,7 @@
         "typical": 15,
         "max": 26
       },
-      "weightCoef": 0.0048,
+      "weightCoef": 0.0009,
       "rarity": 4,
       "price": 80,
       "depth": "surface",
@@ -929,7 +929,7 @@
         "typical": 22,
         "max": 40
       },
-      "weightCoef": 0.003,
+      "weightCoef": 0.00035,
       "rarity": 3,
       "price": 50,
       "depth": "mid",
@@ -985,7 +985,7 @@
         "typical": 14,
         "max": 22
       },
-      "weightCoef": 0.0046,
+      "weightCoef": 0.0007,
       "rarity": 5,
       "price": 200,
       "depth": "mid",
@@ -1043,7 +1043,7 @@
         "typical": 18,
         "max": 30
       },
-      "weightCoef": 0.0055,
+      "weightCoef": 0.0008,
       "rarity": 4,
       "price": 90,
       "depth": "mid",
@@ -1098,7 +1098,7 @@
         "typical": 9,
         "max": 14
       },
-      "weightCoef": 0.009,
+      "weightCoef": 0.002,
       "rarity": 5,
       "price": 250,
       "depth": "surface",
