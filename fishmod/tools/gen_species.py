@@ -37,6 +37,10 @@ def weight(sp, length):
     return sp["weightCoef"] * length ** 3
 
 
+def fmt_weight(lb):
+    return f"{lb * 16:.0f} oz" if lb < 1.0 else f"{lb:.1f} lbs"
+
+
 def gen_header(data):
     species = data["species"]
     out = []
@@ -61,7 +65,7 @@ def gen_header(data):
         out.append(f"        {{ {', '.join(str(int(round(v * 100))) for v in sp['shape'])} }},")
         out.append(f"        {{ {', '.join(str(v) for v in sp['tint'])} }},")
         out.append(f"        {sp['length']['min']}, {sp['length']['typical']}, {sp['length']['max']},")
-        out.append(f"        {sp['weightCoef'] * 100000:.0f}, /* weight = coef * length^3 / 100000 lbs */")
+        out.append(f"        {sp['weightCoef'] * 1000000:.0f}, /* weight = coef * length^3 / 1000000 lbs */")
         out.append(
             f"        {{ {b['curiosity']}, {b['aggression']}, {b['wariness']}, {b['strength']}, {b['stamina']}, "
             f"{b['speed']}, {b['jumpiness']}, {b['nibbles']}, {b['biteWindow']} }},"
@@ -119,7 +123,7 @@ def fmt_range(sp):
     l = sp["length"]
     return (
         f"{l['min']}–{l['max']} in (typically ~{l['typical']} in)",
-        f"{weight(sp, l['min']):.1f}–{weight(sp, l['max']):.1f} lbs",
+        f"{fmt_weight(weight(sp, l['min']))} – {fmt_weight(weight(sp, l['max']))}",
     )
 
 

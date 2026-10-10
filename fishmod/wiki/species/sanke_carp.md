@@ -13,7 +13,7 @@
 | | |
 |---|---|
 | Length | 10–26 in (typically ~15 in) |
-| Weight | 4.8–84.4 lbs |
+| Weight | 14 oz – 15.8 lbs |
 | Rarity | Very rare (4/5) |
 | Sell price | 80 rupees (more for bigger fish) |
 | Depth | surface |

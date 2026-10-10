@@ -86,7 +86,7 @@ typedef struct FishmodSpecies {
     /* 0x11 */ u8 lengthMin;   // inches
     /* 0x12 */ u8 lengthTypical;
     /* 0x13 */ u8 lengthMax;
-    /* 0x14 */ u16 weightCoef; // weight (lbs) = weightCoef * length^3 / 100000
+    /* 0x14 */ u16 weightCoef; // weight (lbs) = weightCoef * length^3 / 1000000
     /* 0x16 */ FishmodBehavior behavior;
     /* 0x1F */ u8 bait[FISHMOD_BAIT_MAX]; // interest multiplier percent per bait
     /* 0x25 */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part

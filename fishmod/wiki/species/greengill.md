@@ -13,7 +13,7 @@
 | | |
 |---|---|
 | Length | 4–16 in (typically ~7 in) |
-| Weight | 0.3–17.2 lbs |
+| Weight | 1 oz – 4.1 lbs |
 | Rarity | Common (1/5) |
 | Sell price | 5 rupees (more for bigger fish) |
 | Depth | mid |
