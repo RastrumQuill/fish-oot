@@ -14,6 +14,7 @@
 #include "array_count.h"
 #include "libc64/math64.h"
 #include "gfx.h"
+#include "ultra64/libc.h"
 #include "gfx_setupdl.h"
 #include "ichain.h"
 #include "rand.h"
@@ -137,6 +138,44 @@ static u8* EnFishmod_PartMap(const FishmodSpecies* species) {
  * commands from the copy of object_fish in RAM so each fish can set its own tint per limb.
  * Idempotent, so it is safe to run for every fish.
  */
+#if FISHMOD_OPT >= 2
+/**
+ * Turns the RGBA16 texture load starting at `g` (gsDPLoadTextureBlock: SETTIMG, SETTILE, LOADSYNC, LOADBLOCK,
+ * PIPESYNC, SETTILE, SETTILESIZE) into a CI8 load with palette 0, and the palette mode set just before it
+ * (gsDPSetTextureLUT) to RGBA16 palettes. The species' palette is loaded before each fish is drawn.
+ */
+static void EnFishmod_LoadToCI8(Gfx* g, Gfx* dlStart) {
+    u32 w;
+    u32 h;
+    u32 words;
+
+    if (((g[1].words.w0 >> 24) != G_SETTILE) || ((g[3].words.w0 >> 24) != G_LOADBLOCK) ||
+        ((g[5].words.w0 >> 24) != G_SETTILE) || ((g[6].words.w0 >> 24) != G_SETTILESIZE)) {
+        return;
+    }
+    w = ((g[6].words.w1 >> 12) & 0xFFF) / 4 + 1;
+    h = (g[6].words.w1 & 0xFFF) / 4 + 1;
+    words = (w + 7) / 8; // 64-bit words per row at 8 bits per texel
+    if (words == 0) {
+        words = 1;
+    }
+
+    g[0].words.w0 = (g[0].words.w0 & ~(7 << 21)) | (G_IM_FMT_CI << 21);
+    g[1].words.w0 = (g[1].words.w0 & ~(7 << 21)) | (G_IM_FMT_CI << 21);
+    g[3].words.w1 = (g[3].words.w1 & 0xFF000000) | (((((w * h) + 1) >> 1) - 1) << 12) |
+                    (((1 << G_TX_DXT_FRAC) + words - 1) / words);
+    g[5].words.w0 = (G_SETTILE << 24) | (G_IM_FMT_CI << 21) | (G_IM_SIZ_8b << 19) | (((w + 7) >> 3) << 9) |
+                    (g[5].words.w0 & 0x1FF);
+    g[5].words.w1 &= ~(0xF << 20);
+
+    // gsDPSetTextureLUT(G_TT_NONE) just before the load
+    if ((g > dlStart) && ((g[-1].words.w0 >> 24) == G_SETOTHERMODE_H) &&
+        (((g[-1].words.w0 >> 8) & 0xFF) == (32 - G_MDSFT_TEXTLUT - 2))) {
+        g[-1].words.w1 = G_TT_RGBA16;
+    }
+}
+#endif
+
 static void EnFishmod_PatchSkeleton(FlexSkeletonHeader* skelHeader, s32 texSet) {
     void** limbs = SEGMENTED_TO_VIRTUAL(skelHeader->sh.segment);
     s32 i;
@@ -167,6 +206,9 @@ static void EnFishmod_PatchSkeleton(FlexSkeletonHeader* skelHeader, s32 texSet) 
                     if ((sTextureRoles[texSet][role] != NULL) &&
                         (gfx->words.w1 == (uintptr_t)sTextureRoles[texSet][role])) {
                         gfx->words.w1 = (u32)(0x08 + role) << 24;
+#if FISHMOD_OPT >= 2
+                        EnFishmod_LoadToCI8(gfx, SEGMENTED_TO_VIRTUAL(limb->dList));
+#endif
                         break;
                     }
                 }
@@ -211,6 +253,18 @@ static void EnFishmod_PrepareSmallDLs(void) {
                     if ((sTextureRoles[TEXSET_SMALL][role] != NULL) &&
                         (dst[n].words.w1 == (uintptr_t)sTextureRoles[TEXSET_SMALL][role])) {
                         dst[n].words.w1 = (u32)(0x08 + role) << 24;
+#if FISHMOD_OPT >= 2
+                        // the rest of the load block hasn't been copied yet
+                        {
+                            s32 k;
+
+                            for (k = 1; k <= 6; k++) {
+                                dst[n + k] = src[n + k];
+                            }
+                            EnFishmod_LoadToCI8(&dst[n], dst);
+                            n += 6; // keep the converted commands
+                        }
+#endif
                         break;
                     }
                 }
@@ -219,6 +273,13 @@ static void EnFishmod_PrepareSmallDLs(void) {
     }
     sSmallDLsReady = true;
 }
+
+typedef enum EnFishmodLimbMode {
+    LIMB_MODE_PLAIN,       // no part scaling to apply here
+    LIMB_MODE_OWN_SCALE,   // scaled, parent isn't: translate/rotate, then scale
+    LIMB_MODE_UNDO_PARENT, // not scaled, parent is: undo the parent's scale, let the skeleton translate/rotate
+    LIMB_MODE_FULL         // both
+} EnFishmodLimbMode;
 
 static void EnFishmod_InitLimbData(EnFishmod* this, FlexSkeletonHeader* skelHeader) {
     void** limbs = SEGMENTED_TO_VIRTUAL(skelHeader->sh.segment);
@@ -254,6 +315,29 @@ static void EnFishmod_InitLimbData(EnFishmod* this, FlexSkeletonHeader* skelHead
             this->limbScale[i].x = this->species->partScale[part][0] * 0.01f;
             this->limbScale[i].y = this->species->partScale[part][1] * 0.01f;
             this->limbScale[i].z = this->species->partScale[part][2] * 0.01f;
+        }
+    }
+
+    for (i = 0; i < this->limbCount; i++) {
+        Vec3f* s = &this->limbScale[i];
+        Vec3f one = { 1.0f, 1.0f, 1.0f };
+        Vec3f* p = (this->limbParent[i] != 0xFF) ? &this->limbScale[this->limbParent[i]] : &one;
+        s32 ownScaled = (s->x != 1.0f) || (s->y != 1.0f) || (s->z != 1.0f);
+        s32 parentScaled = (p->x != 1.0f) || (p->y != 1.0f) || (p->z != 1.0f);
+
+        if (!ownScaled && !parentScaled) {
+            this->limbMode[i] = LIMB_MODE_PLAIN;
+#if FISHMOD_OPT >= 1
+        } else if ((s->x == p->x) && (s->y == p->y) && (s->z == p->z) && (s->x == s->y) && (s->y == s->z)) {
+            // the same uniform scale as the parent: the plain path already gives the same matrix
+            this->limbMode[i] = LIMB_MODE_PLAIN;
+        } else if (!parentScaled) {
+            this->limbMode[i] = LIMB_MODE_OWN_SCALE;
+        } else if (!ownScaled) {
+            this->limbMode[i] = LIMB_MODE_UNDO_PARENT;
+#endif
+        } else {
+            this->limbMode[i] = LIMB_MODE_FULL;
         }
     }
 }
@@ -918,6 +1002,24 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         return;
     }
 
+#if FISHMOD_OPT >= 2
+    // far from Link and the bobber, a wandering fish thinks every other frame and glides on in between
+    if ((this->fishState == FISH_STATE_WANDER) && (this->timer & 1) && !gFishmodPhoto.active &&
+        (Math_Vec3f_DistXZ(&this->actor.world.pos, &GET_PLAYER(play)->actor.world.pos) > 500.0f) &&
+        (!EnFishmod_RodBobberInWater() ||
+         (Math_Vec3f_DistXZ(&this->actor.world.pos, &gFishmodRodState.bobberPos) > 300.0f))) {
+        this->actor.world.pos.x += Math_SinS(this->actor.shape.rot.y) * this->speed;
+        this->actor.world.pos.z += Math_CosS(this->actor.shape.rot.y) * this->speed;
+        if (this->stateTimer > 0) {
+            this->stateTimer--;
+        }
+        if (this->cooldown > 0) {
+            this->cooldown--;
+        }
+        EnFishmod_UpdateSwim(this);
+        return;
+    }
+#endif
     EnFishmod_FishAI(this, play);
     EnFishmod_UpdateSwim(this);
 
@@ -1028,8 +1130,15 @@ s32 EnFishmod_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
 
     // color
     part = partMap[li];
+#if FISHMOD_OPT >= 1
+    if ((part != FISHMOD_PART_NONE) && (part != this->lastTintPart)) {
+        const u8* tint = this->species->partTint[part];
+
+        this->lastTintPart = part;
+#else
     if (part != FISHMOD_PART_NONE) {
         const u8* tint = this->species->partTint[part];
+#endif
 
         OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, tint[0], tint[1], tint[2], 255);
@@ -1045,8 +1154,27 @@ s32 EnFishmod_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
         parentScale.x = parentScale.y = parentScale.z = 1.0f;
     }
 
-    if ((parentScale.x != 1.0f) || (parentScale.y != 1.0f) || (parentScale.z != 1.0f) || (scale->x != 1.0f) ||
-        (scale->y != 1.0f) || (scale->z != 1.0f)) {
+#if FISHMOD_OPT >= 1
+    switch (this->limbMode[li]) {
+        case LIMB_MODE_OWN_SCALE:
+            Matrix_TranslateRotateZYX(pos, rot);
+            Matrix_Scale(scale->x, scale->y, scale->z, MTXMODE_APPLY);
+            pos->x = pos->y = pos->z = 0.0f;
+            rot->x = rot->y = rot->z = 0;
+            return false;
+        case LIMB_MODE_UNDO_PARENT:
+            Matrix_Scale(1.0f / parentScale.x, 1.0f / parentScale.y, 1.0f / parentScale.z, MTXMODE_APPLY);
+            pos->x *= parentScale.x;
+            pos->y *= parentScale.y;
+            pos->z *= parentScale.z;
+            return false;
+        case LIMB_MODE_PLAIN:
+            return false;
+        default:
+            break;
+    }
+#endif
+    if (this->limbMode[li] != LIMB_MODE_PLAIN) {
         Matrix_Scale(1.0f / parentScale.x, 1.0f / parentScale.y, 1.0f / parentScale.z, MTXMODE_APPLY);
         pos->x *= parentScale.x;
         pos->y *= parentScale.y;
@@ -1204,6 +1332,64 @@ static void EnFishmod_DrawPhotoBackdrop(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
 }
 
+#if FISHMOD_OPT >= 2
+/**
+ * Draws the skeleton. A distant fish that's just swimming around redraws the pose it had last frame every other
+ * frame: the limb matrices and the commands that drew them are kept, copied into this frame and pointed at the
+ * copied matrices, which skips all the limb math. It moves slowly and is small on screen, so the half-rate
+ * animation doesn't show.
+ */
+static void EnFishmod_DrawPose(EnFishmod* this, PlayState* play) {
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    Gfx* start;
+    s32 reuse = false;
+
+    if (!gFishmodPhoto.active && (this->poseFrame + 1 == play->gameplayFrames) && (this->poseGfxCount != 0) &&
+        ((this->fishState == FISH_STATE_WANDER) || (this->fishState == FISH_STATE_FLEE)) &&
+        (Math_Vec3f_DistXYZ(&this->actor.world.pos, &play->view.eye) > 350.0f)) {
+        reuse = true;
+    }
+
+    OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+
+    if (reuse) {
+        u32 size = this->poseMtxCount * sizeof(Mtx);
+        Mtx* mtx = GRAPH_ALLOC(gfxCtx, size);
+        u32 oldBase = this->poseGfx[0].words.w1; // the segment 0x0D command points at the old matrices
+        s32 i;
+
+        bcopy(this->poseMtx, mtx, size);
+        for (i = 0; i < this->poseGfxCount; i++) {
+            Gfx g = this->poseGfx[i];
+            u8 op = g.words.w0 >> 24;
+
+            if (((op == G_MTX) || ((op == G_MOVEWORD) && (((g.words.w0 >> 16) & 0xFF) == G_MW_SEGMENT))) &&
+                (g.words.w1 >= oldBase) && (g.words.w1 < oldBase + size)) {
+                g.words.w1 = g.words.w1 - oldBase + (u32)mtx;
+            }
+            *(POLY_OPA_DISP++) = g;
+        }
+        // draw it properly next frame
+        this->poseFrame = 0;
+    } else {
+        start = POLY_OPA_DISP;
+        SkelAnime_DrawFlexOpa(play, this->skelAnime.skeleton, this->skelAnime.jointTable,
+                              this->skelAnime.dListCount, EnFishmod_OverrideLimbDraw, EnFishmod_PostLimbDraw, this);
+        this->poseGfxCount = 0;
+        if (((POLY_OPA_DISP - start) <= EN_FISHMOD_POSE_GFX_MAX) &&
+            (this->skelAnime.dListCount <= EN_FISHMOD_MAX_LIMBS + 1) && ((start[0].words.w0 >> 24) == G_MOVEWORD)) {
+            this->poseGfxCount = POLY_OPA_DISP - start;
+            this->poseMtxCount = this->skelAnime.dListCount;
+            bcopy(start, this->poseGfx, this->poseGfxCount * sizeof(Gfx));
+            bcopy((void*)start[0].words.w1, this->poseMtx, this->poseMtxCount * sizeof(Mtx));
+            this->poseFrame = play->gameplayFrames;
+        }
+    }
+
+    CLOSE_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+}
+#endif
+
 void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
     const u8* shape;
@@ -1229,6 +1415,20 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
         OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
         // every species draws the same display lists with its own textures behind the segments
         IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_OPA_DISP++, speciesIndex);
+#if FISHMOD_OPT >= 2
+        // palette textures: every role has one, and the species' palette goes into the upper half of TMEM
+        if (sSpeciesPalettes[speciesIndex] != NULL) {
+            gDPLoadTLUT_pal256(POLY_OPA_DISP++, sSpeciesPalettes[speciesIndex]);
+        }
+        for (role = 0; role < FISHMOD_TEX_ROLE_MAX; role++) {
+            void* tex = sSpeciesTexturesCI[speciesIndex][role];
+
+            if (tex != NULL) {
+                gSPSegment(POLY_OPA_DISP++, 0x08 + role, tex);
+            }
+        }
+        (void)texSet;
+#else
         for (role = 0; role < FISHMOD_TEX_ROLE_MAX; role++) {
             void* tex = sSpeciesTextures[speciesIndex][role];
 
@@ -1241,6 +1441,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
             }
             gSPSegment(POLY_OPA_DISP++, 0x08 + role, tex);
         }
+#endif
         CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
     }
 
@@ -1269,8 +1470,13 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
         Matrix_Translate(-2300.0f, -300.0f, 0.0f, MTXMODE_APPLY);
     }
 
+    this->lastTintPart = 0xFE;
+#if FISHMOD_OPT >= 2
+    EnFishmod_DrawPose(this, play);
+#else
     SkelAnime_DrawFlexOpa(play, this->skelAnime.skeleton, this->skelAnime.jointTable, this->skelAnime.dListCount,
                           EnFishmod_OverrideLimbDraw, EnFishmod_PostLimbDraw, this);
+#endif
 
     if (this->species->lookFlags & FISHMOD_LOOK_WHISKERS) {
         EnFishmod_UpdateWhiskers(this);

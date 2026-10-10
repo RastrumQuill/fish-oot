@@ -984,6 +984,51 @@ static void Rod_DrawRod(PlayState* play, Player* player) {
     Matrix_Scale(0.70000005f, 0.70000005f, 0.70000005f, MTXMODE_APPLY);
     Matrix_Translate(0.0f, 0.0f, -1300.0f, MTXMODE_APPLY);
 
+#if FISHMOD_OPT >= 2
+    // At rest the rod is nearly straight: draw its segments in pairs, the second of each pair from the first's
+    // matrix times a fixed one-segment offset (the segments are 500 long, scaled 0.52 along the rod). The pair's
+    // two bends are applied together, so the tip still ends up where the line is attached.
+    if (ABS(bend) < 0.08f) {
+        static Mtx sNextSegment;
+        static s32 sNextSegmentReady = false;
+
+        if (!sNextSegmentReady) {
+            guTranslate(&sNextSegment, 0.0f, 0.0f, 500.0f / 0.52f);
+            sNextSegmentReady = true;
+        }
+        for (i = 0; i < 22; i += 2) {
+            s32 k;
+
+            Matrix_RotateX(bend * (sRodBendRatios[i] + sRodBendRatios[i + 1]) * 0.5f, MTXMODE_APPLY);
+            Matrix_Push();
+            Matrix_Scale(sRodScales[i], sRodScales[i], 0.52f, MTXMODE_APPLY);
+            MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+            for (k = i; k < i + 2; k++) {
+                if (k == i + 1) {
+                    gSPMatrix(POLY_OPA_DISP++, &sNextSegment, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
+                }
+                if (k < 5) {
+                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentBlackTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
+                                        8, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD,
+                                        G_TX_NOLOD);
+                } else if ((k < 8) || ((k % 2) == 0)) {
+                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentWhiteTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
+                                        8, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD,
+                                        G_TX_NOLOD);
+                } else {
+                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentStripTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
+                                        8, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD,
+                                        G_TX_NOLOD);
+                }
+                gSPDisplayList(POLY_OPA_DISP++, gFishingRodSegmentDL);
+            }
+            Matrix_Pop();
+            Matrix_Translate(0.0f, 0.0f, 1000.0f, MTXMODE_APPLY);
+        }
+        Matrix_MultVec3f(&sZero, &ROD->tipPos);
+    } else
+#endif
+
     for (i = 0; i < 22; i++) {
         Matrix_RotateX(bend * sRodBendRatios[i] * 0.5f, MTXMODE_APPLY);
 
@@ -1101,6 +1146,60 @@ static void Rod_DrawLine(PlayState* play) {
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 90);
 
     Rod_LineShape(&end, &sag);
+#if FISHMOD_OPT >= 1
+    // The whole line lies in one vertical plane, so it's one flat strip under a single matrix (the same 0.3-unit
+    // wide horizontal ribbon the per-segment model drew). Vertices are relative to the rod tip in 1/32 units.
+    {
+        Vtx* vtx = GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * 2 * (LINE_SEGMENTS + 1));
+        f32 yaw = Math_FAtan2F(end.x - ROD->tipPos.x, end.z - ROD->tipPos.z);
+        s16 sideX = (s16)(cosf(yaw) * 0.15f * 32.0f + ((cosf(yaw) < 0.0f) ? -0.5f : 0.5f));
+        s16 sideZ = (s16)(-sinf(yaw) * 0.15f * 32.0f + ((sinf(yaw) > 0.0f) ? -0.5f : 0.5f));
+
+        if ((sideX == 0) && (sideZ == 0)) {
+            sideX = 5;
+        }
+        for (i = 0; i <= LINE_SEGMENTS; i++) {
+            Vtx* v = &vtx[2 * i];
+            s32 k;
+
+            if (i == 0) {
+                cur = ROD->tipPos;
+            } else if (i < LINE_SEGMENTS) {
+                Rod_LinePoint(&end, sag, (f32)i / LINE_SEGMENTS, &cur);
+#if FISHMOD_DEBUG
+                if (cur.y < ROD->lineFloor[i]) {
+                    sLineDraped++;
+                }
+#endif
+                cur.y = CLAMP_MIN(cur.y, ROD->lineFloor[i]);
+            } else {
+                cur = end;
+            }
+            for (k = 0; k < 2; k++) {
+                s16 sign = (k == 0) ? -1 : 1;
+
+                v[k].v.ob[0] = (s16)((cur.x - ROD->tipPos.x) * 32.0f) + sign * sideX;
+                v[k].v.ob[1] = (s16)((cur.y - ROD->tipPos.y) * 32.0f);
+                v[k].v.ob[2] = (s16)((cur.z - ROD->tipPos.z) * 32.0f) + sign * sideZ;
+                v[k].v.flag = 0;
+                v[k].v.tc[0] = v[k].v.tc[1] = 0;
+                v[k].v.cn[0] = v[k].v.cn[1] = v[k].v.cn[2] = v[k].v.cn[3] = 255;
+            }
+        }
+
+        Matrix_Translate(ROD->tipPos.x, ROD->tipPos.y, ROD->tipPos.z, MTXMODE_NEW);
+        Matrix_Scale(1.0f / 32.0f, 1.0f / 32.0f, 1.0f / 32.0f, MTXMODE_APPLY);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+        // the vertex buffer holds 32: points 0-15 first, then 15-16
+        gSPVertex(POLY_XLU_DISP++, vtx, 32, 0);
+        for (i = 0; i < 15; i++) {
+            gSP2Triangles(POLY_XLU_DISP++, 2 * i, 2 * i + 1, 2 * i + 3, 0, 2 * i, 2 * i + 3, 2 * i + 2, 0);
+        }
+        gSPVertex(POLY_XLU_DISP++, &vtx[30], 4, 0);
+        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 3, 0, 0, 3, 2, 0);
+        (void)prev;
+    }
+#else
     prev = ROD->tipPos;
     for (i = 1; i <= LINE_SEGMENTS; i++) {
         if (i < LINE_SEGMENTS) {
@@ -1117,6 +1216,7 @@ static void Rod_DrawLine(PlayState* play) {
         Rod_DrawLineSegment(play, &prev, &cur, 0.0015f);
         prev = cur;
     }
+#endif
 
     // leader from the bobber down to the hook
     if ((ROD->state == ROD_STATE_FLOAT) || (ROD->state == ROD_STATE_GROUND) || (ROD->state == ROD_STATE_FLYING)) {
