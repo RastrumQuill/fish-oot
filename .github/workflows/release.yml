@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag; releases/fish-oot-<tag>.bps must exist"
+        description: "Release tag; releases/fish-oot-<tag>.bps must exist (fish-oot-<tag>-*.bps are attached too)"
         required: true
 
 permissions:
@@ -35,7 +35,9 @@ jobs:
           if [ ! -f "$notes" ]; then
             notes=releases/README.md
           fi
-          gh release create "$TAG" "$patch" \
+          # extra patches for the same release, e.g. releases/fish-oot-<tag>-testmode.bps
+          extra=$(ls releases/fish-oot-${TAG}-*.bps 2>/dev/null || true)
+          gh release create "$TAG" "$patch" $extra \
             --title "fish-oot $TAG" \
             --notes-file "$notes" \
             --target "$TARGET" \
