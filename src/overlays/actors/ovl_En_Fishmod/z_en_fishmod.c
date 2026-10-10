@@ -687,6 +687,19 @@ static s32 EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target,
     }
     next.y = this->actor.world.pos.y + CLAMP(dy * 0.08f, -0.8f, 0.8f);
 
+    // Somehow inside a bank (its spot reads as dry): push straight out toward open water. No checks: from inside
+    // the bank, every step looks like land.
+    if (EnFishmod_WaterAt(play, this->actor.world.pos.x, this->actor.world.pos.z, &surface, &floor) &&
+        ((surface - floor) <= 1.0f)) {
+        s16 out = EnFishmod_OpenWaterYaw(this, play, this->actor.shape.rot.y);
+
+        this->actor.world.pos.x += Math_SinS(out) * 1.5f;
+        this->actor.world.pos.z += Math_CosS(out) * 1.5f;
+        Math_SmoothStepToS(&this->actor.shape.rot.y, out, 2, 0x800, 0x100);
+        this->blocked = true;
+        return false;
+    }
+
     // Stuck in a spot too tight for it (against a bank, or pushed into one): step straight along the way out
     // rather than along its heading, which still points at the bank.
     if (this->blocked && (this->detourTimer > 0)) {
