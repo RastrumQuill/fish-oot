@@ -32,6 +32,9 @@ Options 1 and 2 are the target. 3 and 4 only if they pass the performance rule.
 - **Fireflies:** a new bait. Small glowing bugs (fairy-style glow without the wings) that can be caught in a bottle.
 - **Strength and casting:** the strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) raise the
   longest possible cast.
+- **Line tension:** it feels like a hair trigger. Re-check after the new fight choreography (it may already feel
+  better) and in larger waters than Kokiri Forest. If it still needs a change, scale the tension by the fish's
+  weight.
 
 ## Moonshot goals
 
