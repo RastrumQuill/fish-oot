@@ -1,10 +1,16 @@
 name: Release
 
-# Pushing a tag like kokiri-test1 publishes a GitHub release with the matching patch from releases/ attached.
+# Publishes a GitHub release with the matching patch from releases/ attached: run it by hand with a tag name like
+# kokiri-test1 (the tag is created on the chosen branch), or push that tag.
 on:
   push:
     tags:
       - "*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag; releases/fish-oot-<tag>.bps must exist"
+        required: true
 
 permissions:
   contents: write
@@ -17,7 +23,8 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          TARGET: ${{ github.sha }}
         run: |
           patch="releases/fish-oot-${TAG}.bps"
           if [ ! -f "$patch" ]; then
@@ -27,4 +34,5 @@ jobs:
           gh release create "$TAG" "$patch" \
             --title "fish-oot $TAG" \
             --notes-file releases/README.md \
+            --target "$TARGET" \
             --prerelease
