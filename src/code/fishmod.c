@@ -32,26 +32,27 @@ Actor* gFishmodRod = NULL;
 static u8 sRodOnB = false;
 static u8 sSavedBItem = ITEM_NONE;
 
+/** What B holds normally: the equipped sword, or nothing. */
+static u8 Fishmod_SwordBItem(void) {
+    switch (CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD)) {
+        case EQUIP_VALUE_SWORD_KOKIRI:
+            return ITEM_SWORD_KOKIRI;
+        case EQUIP_VALUE_SWORD_MASTER:
+            return ITEM_SWORD_MASTER;
+        case EQUIP_VALUE_SWORD_BIGGORON:
+            return ITEM_SWORD_BIGGORON;
+        default:
+            return ITEM_NONE;
+    }
+}
+
 static void Fishmod_RestoreB(PlayState* play) {
     if (gSaveContext.save.info.equips.buttonItems[0] == ITEM_FISHING_POLE) {
         u8 item = sSavedBItem;
 
         if ((item == ITEM_NONE) || (item == ITEM_FISHING_POLE)) {
             // lost track (e.g. after a reset): give back the equipped sword
-            switch (CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD)) {
-                case EQUIP_VALUE_SWORD_KOKIRI:
-                    item = ITEM_SWORD_KOKIRI;
-                    break;
-                case EQUIP_VALUE_SWORD_MASTER:
-                    item = ITEM_SWORD_MASTER;
-                    break;
-                case EQUIP_VALUE_SWORD_BIGGORON:
-                    item = ITEM_SWORD_BIGGORON;
-                    break;
-                default:
-                    item = ITEM_NONE;
-                    break;
-            }
+            item = Fishmod_SwordBItem();
         }
         gSaveContext.save.info.equips.buttonItems[0] = item;
         if (play != NULL && item != ITEM_NONE) {
@@ -100,6 +101,14 @@ void Fishmod_OnSceneLoad(PlayState* play) {
  */
 void Fishmod_PlayUpdate(PlayState* play) {
     Actor* rod;
+
+    // Repair files saved with the old rod bug that left a Deku Stick on B (vanilla never puts it there)
+    if (gSaveContext.save.info.equips.buttonItems[0] == ITEM_DEKU_STICK) {
+        gSaveContext.save.info.equips.buttonItems[0] = Fishmod_SwordBItem();
+        if (gSaveContext.save.info.equips.buttonItems[0] != ITEM_NONE) {
+            Interface_LoadItemIcon1(play, 0);
+        }
+    }
 
     // L: rod on B / back to the sword
     if ((Fishmod_GetSceneSpawns(play->sceneId) != NULL) && (gFishmodRod != NULL) &&
