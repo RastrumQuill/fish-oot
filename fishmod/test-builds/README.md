@@ -1,6 +1,8 @@
 # Performance test builds
 
-Not releases: two builds of v0.1.1 with different sets of the CPU optimizations, to compare. Apply either to the
+Not releases: two builds with different sets of the CPU optimizations, to compare. Both also include the latest
+fixes: fish hold steady at the bobber, put up a real fight, keep off the land (also after being released), and
+the records plaque in Link's house continues into a fishing journal. Apply either to the
 same **Ocarina of Time NTSC 1.2 (US)** `.z64` ROM as the releases (MD5 `57a9719ad547c516342e1a15d5c28c3d`).
 
 | Patch | Build flag | Optimizations |
