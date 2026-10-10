@@ -177,6 +177,10 @@ typedef struct FishmodSaveData {
 s32 Fishmod_RecordCatch(s32 species, f32 lengthInches);
 // Adds the fishing journal to the records plaque in Link's house (called by the message system)
 void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size);
+// The catch textbox: the reused vanilla text id it shows under, and the call that opens it
+#define FISHMOD_CATCH_TEXT_ID 0x4083
+void Fishmod_ShowCatchMessage(struct PlayState* play, const char* name, const char* size, s32 newRecord,
+                              s32 canKeep);
 
 #if FISHMOD_DEBUG
 // CPU time spent per frame, for the debug timing line

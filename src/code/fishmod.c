@@ -22,6 +22,7 @@
 #include "save.h"
 #include "sfx.h"
 #include "z_lib.h"
+#include "string.h"
 
 s32 Object_LoadPersistent(ObjectContext* objectCtx, s16 objectId);
 
@@ -207,6 +208,65 @@ static s32 Journal_Species(u8* out) {
     return count;
 }
 
+// The catch textbox's text, built when a fish is landed and swapped in when its message loads
+static u8 sCatchMsg[160];
+static s32 sCatchMsgLength;
+
+static u8* Msg_PutString(u8* p, u8* end, const char* str) {
+    while ((*str != '\0') && (p < end)) {
+        *p++ = (u8)*str++;
+    }
+    return p;
+}
+
+/**
+ * Opens the textbox for a landed fish: its name and size, a new record, and the choice to keep it (in an empty
+ * bottle) or let it go. Without an empty bottle there's no choice; it goes back. The answer is
+ * play->msgCtx.choiceIndex (0 keep, 1 release) once the choice is made.
+ */
+void Fishmod_ShowCatchMessage(PlayState* play, const char* name, const char* size, s32 newRecord, s32 canKeep) {
+    u8* p = sCatchMsg;
+    u8* end = sCatchMsg + sizeof(sCatchMsg) - 1;
+
+    p = Msg_PutString(p, end, "You caught a ");
+    p = Journal_PutColor(p, end, TEXT_COLOR_RED);
+    p = Msg_PutString(p, end, name);
+    p = Journal_PutColor(p, end, TEXT_COLOR_DEFAULT);
+    p = Msg_PutString(p, end, "!");
+    if (p < end) {
+        *p++ = MESSAGE_NEWLINE;
+    }
+    p = Msg_PutString(p, end, size);
+    if (newRecord) {
+        p = Msg_PutString(p, end, "  ");
+        p = Journal_PutColor(p, end, TEXT_COLOR_YELLOW);
+        p = Msg_PutString(p, end, "New record!");
+        p = Journal_PutColor(p, end, TEXT_COLOR_DEFAULT);
+    }
+    if (p < end) {
+        *p++ = MESSAGE_NEWLINE;
+    }
+    if (canKeep) {
+        p = Msg_PutString(p, end, "Keep it in a bottle?");
+        if (p + 2 < end) {
+            *p++ = MESSAGE_NEWLINE;
+            *p++ = MESSAGE_TWO_CHOICE;
+        }
+        p = Journal_PutColor(p, end, TEXT_COLOR_ADJUSTABLE);
+        p = Msg_PutString(p, end, "Yes");
+        if (p < end) {
+            *p++ = MESSAGE_NEWLINE;
+        }
+        p = Msg_PutString(p, end, "No, let it go");
+        p = Journal_PutColor(p, end, TEXT_COLOR_DEFAULT);
+    } else {
+        p = Msg_PutString(p, end, "No empty bottle, so you let it go.");
+    }
+    *p++ = MESSAGE_END;
+    sCatchMsgLength = p - sCatchMsg;
+    Message_StartTextbox(play, FISHMOD_CATCH_TEXT_ID, NULL);
+}
+
 /**
  * Called when message `textId` has just been loaded into `buf` (`*length` bytes, room for `size`). After the
  * vanilla "Link's Records" page, adds the fishing journal: kinds caught, then for each species how many and the
@@ -221,6 +281,15 @@ void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size) {
     u8* end = buf + size - 2;
     s32 last;
 
+    if ((textId == FISHMOD_CATCH_TEXT_ID) && (sCatchMsgLength != 0)) {
+        // a catch textbox, once; the Fishing Pond's own use of this message is left alone
+        if (sCatchMsgLength <= size) {
+            memcpy(buf, sCatchMsg, sCatchMsgLength);
+            *length = sCatchMsgLength;
+        }
+        sCatchMsgLength = 0;
+        return;
+    }
     if (textId != 0x22A) {
         return;
     }

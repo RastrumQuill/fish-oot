@@ -40,6 +40,9 @@
 #include "save.h"
 #include "actor_profile.h"
 #include "ultra64/libc.h"
+#include "audio.h"
+#include "message.h"
+#include "sequence.h"
 
 FishmodRod gFishmodRodState;
 
@@ -213,6 +216,10 @@ static void Rod_CameraStop(PlayState* play) {
     ROD->camId = SUB_CAM_ID_DONE;
 }
 
+// what the catch textbox says, filled in when the fish is landed
+static char sCatchSize[32];
+static s32 sCatchRecord;
+
 static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
     static f32 sZoomFactors[] = { 0.0f, 0.35f, 0.6f };
     Vec3f eyeTarget;
@@ -239,6 +246,25 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
         eyeTarget.x = player->actor.world.pos.x - Math_SinS(yaw) * back + Math_CosS(yaw) * side;
         eyeTarget.y = player->actor.world.pos.y + up;
         eyeTarget.z = player->actor.world.pos.z - Math_CosS(yaw) * back - Math_SinS(yaw) * side;
+    }
+
+    if (ROD->state == ROD_STATE_LANDING) {
+        // swing round to the front of Link to see the fish he's holding up, going round him, not through him
+        s16 eyeYaw = Math_Vec3f_Yaw(&player->actor.world.pos, &ROD->camEye);
+        f32 height = LINK_IS_CHILD ? 30.0f : 45.0f;
+        Vec3f at;
+
+        Math_SmoothStepToS(&eyeYaw, player->actor.shape.rot.y, 4, 0x900, 0x100);
+        ROD->camEye.x = player->actor.world.pos.x + Math_SinS(eyeYaw) * 85.0f;
+        ROD->camEye.z = player->actor.world.pos.z + Math_CosS(eyeYaw) * 85.0f;
+        Math_ApproachF(&ROD->camEye.y, player->actor.world.pos.y + height + 10.0f, 0.2f, 10.0f);
+        at = player->actor.world.pos;
+        at.y += height;
+        Math_ApproachF(&ROD->camAt.x, at.x, 0.25f, 20.0f);
+        Math_ApproachF(&ROD->camAt.y, at.y, 0.25f, 20.0f);
+        Math_ApproachF(&ROD->camAt.z, at.z, 0.25f, 20.0f);
+        Play_SetCameraAtEye(play, ROD->camId, &ROD->camAt, &ROD->camEye);
+        return;
     }
 
     // zooming moves the eye along the line toward the focus
@@ -518,33 +544,28 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     // landed
     if ((ROD->lineOut <= LINE_MIN + 2.0f) || fish->beached ||
         (Math_Vec3f_DistXZ(&player->actor.world.pos, &fish->actor.world.pos) < 32.0f)) {
+        f32 weight = fish->species->weightCoef * fish->lengthInches * fish->lengthInches * fish->lengthInches *
+                     0.000001f;
+
         ROD->state = ROD_STATE_LANDING;
-        ROD->timer = 200;
+        ROD->timer = 25; // Link holds it up before the textbox opens
+        ROD->tension = 0.0f; // the rod relaxes once the fish is out of the water
+        ROD->choice = 0;
+        ROD->messageTimer = 0;
         gFishmodRodInfo.caught++;
         player->unk_860 = 3; // catch animation
         EnFishmod_FishSetState(fish, FISH_STATE_CAUGHT);
         Rumble_Override(0.0f, 120, 10, 5);
         Sfx_PlaySfxCentered(NA_SE_EV_JUMP_OUT_WATER);
-        {
-            static char sLine1[40];
-            static char sLine2[40];
-            f32 weight = fish->species->weightCoef * fish->lengthInches * fish->lengthInches *
-                         fish->lengthInches * 0.000001f;
+        Audio_PlayFanfare(NA_BGM_ITEM_GET | 0x900);
 
-            if (Fishmod_RecordCatch(fish->species - gFishmodSpecies, fish->lengthInches)) {
-                sprintf(sLine1, "%s! New record!", fish->species->name);
-            } else {
-                sprintf(sLine1, "%s!", fish->species->name);
-            }
-            if (weight < 1.0f) {
-                sprintf(sLine2, "%d.%d in   %d oz", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
-                        (s32)(weight * 16.0f + 0.5f));
-            } else {
-                sprintf(sLine2, "%d.%d in   %d.%d lbs", (s32)fish->lengthInches,
-                        (s32)(fish->lengthInches * 10.0f) % 10, (s32)weight, (s32)(weight * 10.0f) % 10);
-            }
-            EnFishmod_RodMessage(1, sLine1, sLine2);
-            ROD->messageTimer = 200;
+        sCatchRecord = Fishmod_RecordCatch(fish->species - gFishmodSpecies, fish->lengthInches);
+        if (weight < 1.0f) {
+            sprintf(sCatchSize, "%d.%d in, %d oz", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
+                    (s32)(weight * 16.0f + 0.5f));
+        } else {
+            sprintf(sCatchSize, "%d.%d in, %d.%d lbs", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
+                    (s32)weight, (s32)(weight * 10.0f) % 10);
         }
     }
 }
@@ -858,17 +879,26 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
             break;
 
         case ROD_STATE_LANDING: {
-            // Show the fish off, then keep it (A, into an empty bottle) or release it (B, or wait).
+            // Link holds the fish up to the fanfare, then a textbox names it and asks whether to keep it (into an
+            // empty bottle) or let it go. Without an empty bottle it just goes back.
             EnFishmod* fish = ROD->fish;
             s32 decided = 0; // 1 keep, 2 release
+            u8 textState = Message_GetState(&play->msgCtx);
 
             ROD->timer--;
-            if (ROD->timer < 80) {
+            if (ROD->timer == 0) {
                 ROD->choice = Inventory_HasEmptyBottle() ? 1 : 2;
-                if ((ROD->choice == 1) && CHECK_BTN_ALL(input->press.button, BTN_A)) {
-                    decided = 1;
-                } else if (CHECK_BTN_ALL(input->press.button, BTN_B) || (ROD->timer <= 0)) {
+                Fishmod_ShowCatchMessage(play, (fish != NULL) ? fish->species->name : "fish", sCatchSize, sCatchRecord,
+                                         ROD->choice == 1);
+            } else if (ROD->timer < 0) {
+                if ((ROD->choice == 1) && (textState == TEXT_STATE_CHOICE) && Message_ShouldAdvance(play)) {
+                    decided = (play->msgCtx.choiceIndex == 0) ? 1 : 2;
+                    Message_CloseTextbox(play);
+                } else if ((ROD->choice == 2) && (textState == TEXT_STATE_DONE) && Message_ShouldAdvance(play)) {
                     decided = 2;
+                    Message_CloseTextbox(play);
+                } else if ((textState == TEXT_STATE_NONE) && (ROD->timer < -10)) {
+                    decided = 2; // the textbox went away some other way
                 }
             }
 
@@ -1425,15 +1455,6 @@ static void Rod_DrawHud(PlayState* play) {
                 GfxPrint_SetColor(&printer, 220, 220, 220, 200);
                 GfxPrint_SetPos(&printer, 20 - strlen(hint) / 2, 26);
                 GfxPrint_Printf(&printer, "%s", hint);
-            }
-        }
-        if (ROD->choice != 0) {
-            GfxPrint_SetColor(&printer, 255, 255, 255, 255);
-            GfxPrint_SetPos(&printer, 9, 23);
-            if (ROD->choice == 1) {
-                GfxPrint_Printf(&printer, "A: Keep in bottle  B: Release");
-            } else {
-                GfxPrint_Printf(&printer, "B: Release");
             }
         }
         if (ROD->messageTimer > 0) {
