@@ -3520,6 +3520,7 @@ void BossVa_DrawEffects(BossVaEffect* effect, PlayState* play) {
     u8 materialFlag = 0;
     BossVaEffect* effectHead = effect;
     Camera* subCam = Play_GetCamera(play, sSubCamId);
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
 
     OPEN_DISPS(gfxCtx, "../z_boss_va.c", 4953);
 
@@ -3558,6 +3559,7 @@ void BossVa_DrawEffects(BossVaEffect* effect, PlayState* play) {
             MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx, "../z_boss_va.c", 5002);
             gDPPipeSync(POLY_XLU_DISP++);
             gSPSegment(POLY_XLU_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sSparkBallTex[effect->mode]));
+            IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_XLU_DISP++, effect->mode);
             gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, effect->primColor[0], effect->primColor[1], effect->primColor[2],
                             effect->primColor[3]);
             gDPPipeSync(POLY_XLU_DISP++);

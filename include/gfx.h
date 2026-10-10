@@ -164,4 +164,25 @@ _DW({                                                                   \
         (lrt) << G_TEXTURE_IMAGE_FRAC);                                 \
 })
 
+#if ENABLE_F3DEX3
+// F3DEX3 skips a texture load when it matches the last one loaded, comparing the load commands. Code that draws
+// the same display list several times in a row with different textures (a different segment, or a texture
+// swapped in by index) has to tell it not to skip. (From HackerOoT.)
+// (a declaration in both builds, so it can sit among other declarations in C89)
+#define IF_F3DEX3_DONT_SKIP_TEX_INIT() static s32 _lastTexIndex = -1
+
+#define IF_F3DEX3_DONT_SKIP_TEX_HERE(pkt, texIndex) \
+    if ((s32)(texIndex) != _lastTexIndex) {         \
+        gSPDontSkipTexLoadsAcross(pkt);             \
+        _lastTexIndex = (s32)(texIndex);            \
+    }                                               \
+    (void)0
+
+#define IF_F3DEX3_ALWAYS_DONT_SKIP_TEX(pkt) gSPDontSkipTexLoadsAcross(pkt)
+#else
+#define IF_F3DEX3_DONT_SKIP_TEX_INIT() typedef int _f3dex3SkipTexUnused
+#define IF_F3DEX3_DONT_SKIP_TEX_HERE(pkt, texIndex) (void)0
+#define IF_F3DEX3_ALWAYS_DONT_SKIP_TEX(pkt) (void)0
+#endif
+
 #endif

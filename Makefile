@@ -216,6 +216,13 @@ endif
 
 # fishmod: FISHMOD_DEBUG=1 boots straight into a test scene with debug text;
 # FISHMOD_SCRIPT=<name> also plays the autoplay input script fishmod/scripts/<name>.inc.c
+# Use the F3DEX3 graphics microcode (faster RSP; needs real hardware or an LLE emulator such as ares)
+F3DEX3 ?= 0
+ifeq ($(F3DEX3),1)
+  CPP_DEFINES += -DENABLE_F3DEX3=1
+  COMPARE := 0
+endif
+
 FISHMOD_DEBUG ?= 0
 FISHMOD_SCRIPT ?=
 ifeq ($(FISHMOD_DEBUG),1)
@@ -1024,6 +1031,14 @@ else
 	$(CCAS) -c $(CCASFLAGS) $(MIPS_VERSION) $(ASOPTFLAGS) -o $@ $<
 endif
 	$(OBJDUMP_CMD)
+
+# F3DEX3: patched from the ROM's own F3DZEX2 (see fishmod/f3dex3)
+FLIPS ?= flips
+$(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Text: fishmod/f3dex3/F3DEX3_BrW_NOC.code.bps $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoText
+	$(FLIPS) --apply $< $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoText $@
+$(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Data: fishmod/f3dex3/F3DEX3_BrW_NOC.data.bps $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoData
+	$(FLIPS) --apply $< $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoData $@
+$(BUILD_DIR)/data/gspF3DEX3.fifo.o: $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Data
 
 $(BUILD_DIR)/src/makerom/ipl3.o: $(EXTRACTED_DIR)/incbin/ipl3
 	$(OBJCOPY) -I binary -O $(LD_OFORMAT) --rename-section .data=.text $< $@

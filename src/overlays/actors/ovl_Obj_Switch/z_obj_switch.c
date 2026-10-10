@@ -777,12 +777,14 @@ void ObjSwitch_DrawEye(Actor* thisx, PlayState* play) {
     };
     ObjSwitch* this = (ObjSwitch*)thisx;
     s32 subType = OBJSWITCH_SUBTYPE(&this->dyna.actor);
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
 
     OPEN_DISPS(play->state.gfxCtx, "../z_obj_switch.c", 1459);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_obj_switch.c", 1462);
     gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(eyeTextures[subType][this->eyeTexIndex]));
+    IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_OPA_DISP++, 4 * subType + this->eyeTexIndex);
     gSPDisplayList(POLY_OPA_DISP++, eyeSwitchDLs[subType]);
 
     CLOSE_DISPS(play->state.gfxCtx, "../z_obj_switch.c", 1471);
@@ -806,6 +808,7 @@ void ObjSwitch_DrawCrystal(Actor* thisx, PlayState* play) {
     ObjSwitch* this = (ObjSwitch*)thisx;
     STACK_PAD(s32);
     s32 subType = OBJSWITCH_SUBTYPE(&this->dyna.actor);
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
 
     func_8002ED80(&this->dyna.actor, play, 0);
 
@@ -824,6 +827,7 @@ void ObjSwitch_DrawCrystal(Actor* thisx, PlayState* play) {
 
     if (subType == OBJSWITCH_SUBTYPE_TOGGLE) {
         gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(this->crystalSubtype1texture));
+        IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_OPA_DISP++, this->crystalSubtype1texture);
     }
 
     gDPSetEnvColor(POLY_OPA_DISP++, this->crystalColor.r, this->crystalColor.g, this->crystalColor.b, 128);

@@ -2,6 +2,16 @@
 #ifndef ULTRA64_GBI_H
 #define ULTRA64_GBI_H
 
+#if ENABLE_F3DEX3
+/* fish-oot: F3DEX3 microcode (build with F3DEX3=1). Its GBI replaces this one. */
+#define REQUIRE_SEMICOLONS_AFTER_GBI_COMMANDS
+#include "gbi.f3dex3.h"
+
+/* F3DEX3 flips the viewport Y scale and uses a larger Z range; see View_ViewportToVp */
+#undef G_MAXZ
+#define G_MAXZ G_NEW_MAXZ
+#else
+
 #include "mbi.h"
 #include "ultratypes.h"
 
@@ -5181,5 +5191,7 @@ _DW({                                                   \
 #endif /* GBI_DEBUG */
 
 #endif
+
+#endif /* ENABLE_F3DEX3 */
 
 #endif

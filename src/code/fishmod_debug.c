@@ -31,6 +31,8 @@
 #include "camera.h"
 #include "interface.h"
 #include "z_lib.h"
+#include "speed_meter.h"
+#include "ultra64/convert.h"
 
 void Sram_InitDebugSave(void);
 
@@ -288,10 +290,41 @@ void Fishmod_DebugBoot(void) {
     sPlacedPlayer = false;
 }
 
+OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
+
+/**
+ * Averages over 60 frames, in tenths of a millisecond: RSP graphics and RDP time, the CPU time of Play_Update,
+ * Play_Draw and the fishmod actors, and the whole frame.
+ */
+static void Fishmod_DebugTiming(void) {
+    static u32 sSum[2 + FISHMOD_CPU_MAX + 1];
+    static u32 sShown[2 + FISHMOD_CPU_MAX + 1];
+    static s32 sCount;
+    s32 i;
+
+    sSum[0] += (u32)OS_CYCLES_TO_USEC(gRSPGfxTimeTotal);
+    sSum[1] += (u32)OS_CYCLES_TO_USEC(gRDPTimeTotal);
+    for (i = 0; i < FISHMOD_CPU_MAX; i++) {
+        sSum[2 + i] += (u32)OS_CYCLES_TO_USEC(gFishmodCpuTime[i]);
+        gFishmodCpuTime[i] = 0;
+    }
+    sSum[2 + FISHMOD_CPU_MAX] += (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
+    if (++sCount >= 60) {
+        for (i = 0; i < ARRAY_COUNT(sSum); i++) {
+            sShown[i] = sSum[i] / (sCount * 100);
+            sSum[i] = 0;
+        }
+        sCount = 0;
+    }
+    Fishmod_DebugPrintf(9, "r%d up%d dr%d f%d/%d r%d/%d F%d", sShown[1], sShown[2], sShown[3], sShown[4],
+                        sShown[5], sShown[6], sShown[7], sShown[8]);
+}
+
 void Fishmod_DebugPlayUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     sPlayFrames++;
+    Fishmod_DebugTiming();
 
     // Wait for the scene transition to finish, then place Link at the test spot and start the script.
     if (!sPlacedPlayer && (player != NULL) && (sPlayFrames > 20) && (play->transitionTrigger == TRANS_TRIGGER_OFF) &&

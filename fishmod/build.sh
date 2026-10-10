@@ -2,9 +2,10 @@
 # Builds the modded ROM and creates fish-oot.bps against the original
 # NTSC 1.2 (US) ROM in baseroms/ntsc-1.2/.
 #
-# Usage: fishmod/build.sh [--debug] [--script NAME] [extra make args]
+# Usage: fishmod/build.sh [--debug] [--script NAME] [--f3dex3] [extra make args]
 #   --debug        build the debug harness (boots straight into Kokiri, debug text)
 #   --script NAME  (implies --debug) play fishmod/scripts/NAME.inc.c as autoplay input
+#   --f3dex3       use the F3DEX3 graphics microcode (see fishmod/f3dex3); outputs get an -f3dex3 suffix
 # Needs `flips` on PATH (or FLIPS=/path/to/flips) for the release patch.
 set -euo pipefail
 
@@ -19,11 +20,13 @@ FLIPS="${FLIPS:-flips}"
 
 DEBUG=0
 SCRIPT=""
+F3DEX3=0
 MAKE_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --debug) DEBUG=1 ;;
         --script) DEBUG=1; SCRIPT="$2"; shift ;;
+        --f3dex3) F3DEX3=1 ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
     shift
@@ -51,7 +54,7 @@ mkdir -p "$OUT_DIR"
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG"
+MODE="debug=$DEBUG f3dex3=$F3DEX3"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -64,15 +67,19 @@ if [ -n "$SCRIPT" ]; then
     touch "fishmod/scripts/$SCRIPT.inc.c"
 fi
 
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
 echo "$MODE" > "$STAMP"
 echo "$SCRIPT" > "$SCRIPT_STAMP"
+SUFFIX=""
+if [ "$F3DEX3" = 1 ]; then
+    SUFFIX="-f3dex3"
+fi
 
 if [ "$DEBUG" = 1 ]; then
-    name="fish-oot-debug${SCRIPT:+-$SCRIPT}"
+    name="fish-oot-debug${SCRIPT:+-$SCRIPT}$SUFFIX"
     cp "build/$VERSION/oot-$VERSION-compressed.z64" "$OUT_DIR/$name.z64"
     echo "Built $OUT_DIR/$name.z64"
     exit 0
@@ -80,9 +87,10 @@ fi
 
 # The patch is always made against a big-endian .z64, whatever the input byte order.
 python3 fishmod/tools/to_z64.py "$baserom" "$OUT_DIR/original.z64"
-cp "build/$VERSION/oot-$VERSION-compressed.z64" "$OUT_DIR/fish-oot.z64"
-rm -f "$OUT_DIR/fish-oot.bps"
-"$FLIPS" --create --bps "$OUT_DIR/original.z64" "$OUT_DIR/fish-oot.z64" "$OUT_DIR/fish-oot.bps" || true
-test -f "$OUT_DIR/fish-oot.bps"
+name="fish-oot$SUFFIX"
+cp "build/$VERSION/oot-$VERSION-compressed.z64" "$OUT_DIR/$name.z64"
+rm -f "$OUT_DIR/$name.bps"
+"$FLIPS" --create --bps "$OUT_DIR/original.z64" "$OUT_DIR/$name.z64" "$OUT_DIR/$name.bps" || true
+test -f "$OUT_DIR/$name.bps"
 
-echo "Built $OUT_DIR/fish-oot.z64 and $OUT_DIR/fish-oot.bps"
+echo "Built $OUT_DIR/$name.z64 and $OUT_DIR/$name.bps"

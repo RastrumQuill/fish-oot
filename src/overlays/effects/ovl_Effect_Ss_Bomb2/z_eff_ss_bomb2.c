@@ -84,6 +84,7 @@ void EffectSsBomb2_DrawFade(PlayState* play, u32 index, EffectSs* this) {
     STACK_PAD(s32);
     f32 scale;
 
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
     OPEN_DISPS(gfxCtx, "../z_eff_ss_bomb2.c", 298);
 
     scale = this->rScale * 0.01f;
@@ -101,6 +102,7 @@ void EffectSsBomb2_DrawFade(PlayState* play, u32 index, EffectSs* this) {
                         this->rPrimColorA);
         gDPSetEnvColor(POLY_XLU_DISP++, this->rEnvColorR, this->rEnvColorG, this->rEnvColorB, 0);
         gSPSegment(POLY_XLU_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(textures[this->rTexIndex]));
+        IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_XLU_DISP++, this->rTexIndex);
         gSPDisplayList(POLY_XLU_DISP++, this->gfx);
     }
 

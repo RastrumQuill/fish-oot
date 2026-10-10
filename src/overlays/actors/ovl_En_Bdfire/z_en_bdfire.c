@@ -208,6 +208,7 @@ void EnBdfire_DrawFire(EnBdfire* this, PlayState* play) {
     s16 texIndex;
     STACK_PAD(s32);
 
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
     OPEN_DISPS(play->state.gfxCtx, "../z_en_bdfire.c", 612);
     texIndex = this->unk_156 & 7;
     Matrix_ReplaceRotation(&play->billboardMtxF);
@@ -220,6 +221,7 @@ void EnBdfire_DrawFire(EnBdfire* this, PlayState* play) {
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 100, (s8)this->unk_18C);
     gDPSetEnvColor(POLY_XLU_DISP++, 200, 0, 0, 0);
     gSPSegment(POLY_XLU_DISP++, 8, SEGMENTED_TO_VIRTUAL(D_809BCB10[texIndex]));
+    IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_XLU_DISP++, texIndex);
     Matrix_Translate(0.0f, 11.0f, 0.0f, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx, "../z_en_bdfire.c", 647);
     gSPDisplayList(POLY_XLU_DISP++, object_kingdodongo_DL_01D950);

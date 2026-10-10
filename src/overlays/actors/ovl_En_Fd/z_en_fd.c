@@ -908,6 +908,7 @@ void EnFd_DrawEffectsFlames(EnFd* this, PlayState* play) {
     STACK_PAD(s16);
     s16 materialFlag;
     EnFdEffect* eff = this->effects;
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
 
     OPEN_DISPS(play->state.gfxCtx, "../z_en_fd.c", 1969);
 
@@ -934,6 +935,7 @@ void EnFd_DrawEffectsFlames(EnFd* this, PlayState* play) {
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx, "../z_en_fd.c", 2006);
         idx = eff->timer * (8.0f / eff->initialTimer);
         gSPSegment(POLY_XLU_DISP++, 0x8, SEGMENTED_TO_VIRTUAL(dustTextures[idx]));
+        IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_XLU_DISP++, idx);
         gSPDisplayList(POLY_XLU_DISP++, gFlareDancerSquareParticleDL);
     }
 

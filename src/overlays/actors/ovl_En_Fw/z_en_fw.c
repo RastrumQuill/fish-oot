@@ -472,6 +472,7 @@ void EnFw_DrawEffects(EnFw* this, PlayState* play) {
     s16 alpha;
     s16 i;
     s16 idx;
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
 
     OPEN_DISPS(play->state.gfxCtx, "../z_en_fw.c", 1191);
 
@@ -499,6 +500,7 @@ void EnFw_DrawEffects(EnFw* this, PlayState* play) {
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx, "../z_en_fw.c", 1229);
         idx = eff->timer * (8.0f / eff->initialTimer);
         gSPSegment(POLY_XLU_DISP++, 0x8, SEGMENTED_TO_VIRTUAL(dustTextures[idx]));
+        IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_XLU_DISP++, idx);
         gSPDisplayList(POLY_XLU_DISP++, gFlareDancerSquareParticleDL);
     }
 

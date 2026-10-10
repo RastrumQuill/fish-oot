@@ -106,6 +106,7 @@ void guLookAtHiliteF(f32 mf[4][4], LookAt* l, Hilite* h, f32 xEye, f32 yEye, f32
     l->l[1].l.dir[0] = FTOFRAC8(xUp);
     l->l[1].l.dir[1] = FTOFRAC8(yUp);
     l->l[1].l.dir[2] = FTOFRAC8(zUp);
+#if !ENABLE_F3DEX3 // F3DEX3's LookAt has no colors
     l->l[0].l.col[0] = 0x00;
     l->l[0].l.col[1] = 0x00;
     l->l[0].l.col[2] = 0x00;
@@ -122,6 +123,7 @@ void guLookAtHiliteF(f32 mf[4][4], LookAt* l, Hilite* h, f32 xEye, f32 yEye, f32
     l->l[1].l.colc[1] = 0x80;
     l->l[1].l.colc[2] = 0x00;
     l->l[1].l.pad2 = 0x00;
+#endif
 
     mf[0][0] = xRight;
     mf[1][0] = yRight;

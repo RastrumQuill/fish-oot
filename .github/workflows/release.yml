@@ -31,8 +31,12 @@ jobs:
             echo "No $patch for tag $TAG"
             exit 1
           fi
+          notes="releases/notes-${TAG}.md"
+          if [ ! -f "$notes" ]; then
+            notes=releases/README.md
+          fi
           gh release create "$TAG" "$patch" \
             --title "fish-oot $TAG" \
-            --notes-file releases/README.md \
+            --notes-file "$notes" \
             --target "$TARGET" \
             --prerelease
