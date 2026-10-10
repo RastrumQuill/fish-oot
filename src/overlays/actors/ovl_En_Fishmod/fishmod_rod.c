@@ -35,6 +35,8 @@
 #include "z_lib.h"
 #include "play_state.h"
 #include "player.h"
+#include "interface.h"
+#include "item.h"
 #include "save.h"
 #include "actor_profile.h"
 #include "ultra64/libc.h"
@@ -490,7 +492,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     // landed
     if ((ROD->lineOut <= LINE_MIN + 2.0f) || (Math_Vec3f_DistXZ(&player->actor.world.pos, &fish->actor.world.pos) < 32.0f)) {
         ROD->state = ROD_STATE_LANDING;
-        ROD->timer = 110;
+        ROD->timer = 200;
         gFishmodRodInfo.caught++;
         player->unk_860 = 3; // catch animation
         EnFishmod_FishSetState(fish, FISH_STATE_CAUGHT);
@@ -502,7 +504,11 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
             f32 weight = fish->species->weightCoef * fish->lengthInches * fish->lengthInches *
                          fish->lengthInches * 0.000001f;
 
-            sprintf(sLine1, "%s!", fish->species->name);
+            if (Fishmod_RecordCatch(fish->species - gFishmodSpecies, fish->lengthInches)) {
+                sprintf(sLine1, "%s! New record!", fish->species->name);
+            } else {
+                sprintf(sLine1, "%s!", fish->species->name);
+            }
             if (weight < 1.0f) {
                 sprintf(sLine2, "%d.%d in   %d oz", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
                         (s32)(weight * 16.0f + 0.5f));
@@ -511,7 +517,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
                         (s32)(fish->lengthInches * 10.0f) % 10, (s32)weight, (s32)(weight * 10.0f) % 10);
             }
             EnFishmod_RodMessage(1, sLine1, sLine2);
-            ROD->messageTimer = 110;
+            ROD->messageTimer = 200;
         }
     }
 }
@@ -816,22 +822,50 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
             }
             break;
 
-        case ROD_STATE_LANDING:
-            if (--ROD->timer <= 0) {
-                EnFishmod* fish = ROD->fish;
+        case ROD_STATE_LANDING: {
+            // Show the fish off, then keep it (A, into an empty bottle) or release it (B, or wait).
+            EnFishmod* fish = ROD->fish;
+            s32 decided = 0; // 1 keep, 2 release
 
+            ROD->timer--;
+            if (ROD->timer < 80) {
+                ROD->choice = Inventory_HasEmptyBottle() ? 1 : 2;
+                if ((ROD->choice == 1) && CHECK_BTN_ALL(input->press.button, BTN_A)) {
+                    decided = 1;
+                } else if (CHECK_BTN_ALL(input->press.button, BTN_B) || (ROD->timer <= 0)) {
+                    decided = 2;
+                }
+            }
+
+            if (decided != 0) {
+                ROD->choice = 0;
                 if (fish != NULL) {
-                    // released for now; bottling comes later. (FLEE releases it from the rod, which clears
-                    // ROD->fish, so keep our own pointer.)
-                    EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
-                    Actor_Kill(&fish->actor);
+                    if (decided == 1) {
+                        Item_Give(play, ITEM_BOTTLE_FISH);
+                        Sfx_PlaySfxCentered(NA_SE_SY_GET_ITEM);
+                        EnFishmod_RodMessage(1, "Into the bottle!", NULL);
+                        // FLEE releases it from the rod (clearing ROD->fish), so use our own pointer
+                        EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
+                        Actor_Kill(&fish->actor);
+                    } else {
+                        // back into the water where it was hooked
+                        fish->actor.world.pos.x = ROD->bobberPos.x;
+                        fish->actor.world.pos.z = ROD->bobberPos.z;
+                        fish->actor.world.pos.y = ROD->waterY - 8.0f;
+                        fish->actor.shape.rot.z = 0;
+                        EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
+                        Rod_Splash(play, &ROD->bobberPos, true);
+                        Actor_PlaySfx(&this->actor, NA_SE_EV_DIVE_INTO_WATER_L);
+                        EnFishmod_RodMessage(0, "Released.", NULL);
+                    }
                 }
                 ROD->fish = NULL;
                 Rod_EndCast(play, player);
-            } else if (ROD->fish != NULL) {
-                Rod_CameraUpdate(play, player, &ROD->fish->actor.world.pos);
+            } else if (fish != NULL) {
+                Rod_CameraUpdate(play, player, &fish->actor.world.pos);
             }
             break;
+        }
     }
 
     // stick drives Link's reel animation like in the pond
@@ -1091,7 +1125,8 @@ static void Rod_DrawHud(PlayState* play) {
     }
 
     // messages
-    if ((ROD->messageTimer > 0) || (ROD->state == ROD_STATE_FIGHT) || ((ROD->state == ROD_STATE_WINDUP) && ROD->castHolding)) {
+    if ((ROD->messageTimer > 0) || (ROD->state == ROD_STATE_FIGHT) || (ROD->choice != 0) ||
+        ((ROD->state == ROD_STATE_WINDUP) && ROD->castHolding)) {
         GfxPrint_Init(&printer);
         GfxPrint_Open(&printer, gfx);
         if (ROD->state == ROD_STATE_FIGHT) {
@@ -1102,6 +1137,15 @@ static void Rod_DrawHud(PlayState* play) {
             GfxPrint_SetColor(&printer, 255, 255, 255, 255);
             GfxPrint_SetPos(&printer, 13, 23);
             GfxPrint_Printf(&printer, "CAST");
+        }
+        if (ROD->choice != 0) {
+            GfxPrint_SetColor(&printer, 255, 255, 255, 255);
+            GfxPrint_SetPos(&printer, 9, 23);
+            if (ROD->choice == 1) {
+                GfxPrint_Printf(&printer, "A: Keep in bottle  B: Release");
+            } else {
+                GfxPrint_Printf(&printer, "B: Release");
+            }
         }
         if (ROD->messageTimer > 0) {
             if (ROD->messageColor == 1) {
