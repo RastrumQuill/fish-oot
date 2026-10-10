@@ -25,6 +25,14 @@ Make every fish look a little different from others of its species, cheapest opt
 
 Options 1 and 2 are the target. 3 and 4 only if they pass the performance rule.
 
+## Notes for later
+
+- **More fishing spots:** some grottos have large bodies of water (at least one known), and the Water Temple could
+  be interesting.
+- **Fireflies:** a new bait. Small glowing bugs (fairy-style glow without the wings) that can be caught in a bottle.
+- **Strength and casting:** the strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) raise the
+  longest possible cast.
+
 ## Moonshot goals
 
 ### 1. Underwater habitats
