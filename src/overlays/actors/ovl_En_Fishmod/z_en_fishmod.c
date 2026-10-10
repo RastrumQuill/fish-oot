@@ -271,6 +271,12 @@ void EnFishmod_SetLength(EnFishmod* this, f32 lengthInches) {
     } else {
         Actor_SetScale(&this->actor, cm * 15.0f * 0.00001f);
     }
+
+    // all the models come out at about 1.6 world units per inch; bodies are about a quarter as deep as long
+    // (the loach is a slim eel)
+    this->halfLength = lengthInches * 0.85f;
+    this->halfHeight = lengthInches * ((this->species->base == FISHMOD_BASE_LOACH) ? 0.12f : 0.22f);
+    this->halfHeight = CLAMP_MIN(this->halfHeight, 1.5f);
 }
 
 void EnFishmod_Init(Actor* thisx, PlayState* play) {
@@ -391,22 +397,73 @@ s32 EnFishmod_FindWaterPoint(PlayState* play, Vec3f* center, f32 radius, f32 min
     return false;
 }
 
-/** Updates waterY/floorY under the fish. Returns false if it is not over water. */
-static s32 EnFishmod_ProbeWater(EnFishmod* this, PlayState* play, Vec3f* pos) {
-    f32 surface;
+/** Water surface and floor at a point. Returns false if there's no water there. */
+static s32 EnFishmod_WaterAt(PlayState* play, f32 x, f32 z, f32* surface, f32* floor) {
     WaterBox* waterBox;
     CollisionPoly* poly;
     Vec3f probe;
 
-    if (!BgCheck_GetWaterSurface(play, &play->colCtx, pos->x, pos->z, &surface, &waterBox)) {
+    if (!BgCheck_GetWaterSurface(play, &play->colCtx, x, z, surface, &waterBox)) {
         return false;
     }
-    probe.x = pos->x;
-    probe.y = surface;
-    probe.z = pos->z;
-    this->floorY = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &probe);
-    this->waterY = surface;
-    return (surface - this->floorY) > 6.0f;
+    probe.x = x;
+    probe.y = *surface;
+    probe.z = z;
+    *floor = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &probe);
+    return true;
+}
+
+/** Water depth the whole body needs: its height, more when it is pitched up or down. */
+static f32 EnFishmod_BodyClearance(EnFishmod* this) {
+    return this->halfHeight + ABS(Math_SinS(this->actor.shape.rot.x)) * this->halfLength + 1.0f;
+}
+
+/**
+ * Updates waterY/floorY for a fish centered at pos and facing yaw: the floor is the highest under its center
+ * and its nose, so it turns away from a bank before its head goes in. Returns false if it doesn't fit there.
+ */
+static s32 EnFishmod_ProbeWater(EnFishmod* this, PlayState* play, Vec3f* pos, s16 yaw) {
+    f32 surface;
+    f32 floor;
+    f32 noseSurface;
+    f32 noseFloor;
+
+    if (!EnFishmod_WaterAt(play, pos->x, pos->z, &surface, &floor) ||
+        !EnFishmod_WaterAt(play, pos->x + Math_SinS(yaw) * this->halfLength,
+                           pos->z + Math_CosS(yaw) * this->halfLength, &noseSurface, &noseFloor)) {
+        this->floorY = this->waterY; // no water: no depth
+        return false;
+    }
+    this->waterY = CLAMP_MAX(surface, noseSurface);
+    this->floorY = CLAMP_MIN(floor, noseFloor);
+    return (this->waterY - this->floorY) > (this->halfHeight * 2.0f + 2.0f);
+}
+
+/**
+ * Water depth where the fish is now, if that is too shallow for it (stranded), or a depth no probe will beat if
+ * it is swimming freely.
+ */
+static f32 EnFishmod_ShallowDepth(EnFishmod* this, PlayState* play) {
+    f32 surface;
+    f32 floor;
+
+    if (EnFishmod_WaterAt(play, this->actor.world.pos.x, this->actor.world.pos.z, &surface, &floor) &&
+        ((surface - floor) < this->halfHeight * 2.0f + 2.0f)) {
+        return (surface - floor) + 0.5f;
+    }
+    return 100000.0f;
+}
+
+/** Keeps the body between the floor and the surface. */
+static f32 EnFishmod_ClampY(EnFishmod* this, f32 y) {
+    f32 clearance = EnFishmod_BodyClearance(this);
+    f32 lo = this->floorY + clearance;
+    f32 hi = this->waterY - clearance;
+
+    if (lo > hi) {
+        return (this->floorY + this->waterY) * 0.5f;
+    }
+    return CLAMP(y, lo, hi);
 }
 
 static f32 EnFishmod_DepthY(EnFishmod* this, f32 surface, f32 floor) {
@@ -449,7 +506,9 @@ static void EnFishmod_PickWanderTarget(EnFishmod* this, PlayState* play) {
     f32 surface;
     f32 floor;
 
-    if (EnFishmod_FindWaterPoint(play, &this->actor.home.pos, 130.0f, 12.0f, &point, &surface, &floor)) {
+    if (EnFishmod_FindWaterPoint(play, &this->actor.home.pos, 130.0f,
+                                 CLAMP_MIN(12.0f, this->halfHeight * 2.0f + this->halfLength * 0.5f), &point,
+                                 &surface, &floor)) {
         point.y = EnFishmod_DepthY(this, surface, floor);
         this->target = point;
     } else {
@@ -480,6 +539,7 @@ void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
             this->runTimer = 0;
             this->jumping = false;
             this->runYaw = this->actor.shape.rot.y;
+            this->beached = false;
             break;
         case FISH_STATE_FLEE:
             this->stateTimer = 50;
@@ -502,8 +562,12 @@ static void EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target
     next.z = this->actor.world.pos.z + Math_CosS(this->actor.shape.rot.y) * this->speed;
     next.y = this->actor.world.pos.y + CLAMP(dy * 0.08f, -0.8f, 0.8f);
 
-    if (EnFishmod_ProbeWater(this, play, &next)) {
-        next.y = CLAMP(next.y, this->floorY + 3.0f, this->waterY - 3.0f);
+    if (EnFishmod_ProbeWater(this, play, &next, this->actor.shape.rot.y)) {
+        next.y = EnFishmod_ClampY(this, next.y);
+        this->actor.world.pos = next;
+    } else if ((this->waterY - this->floorY) > EnFishmod_ShallowDepth(this, play)) {
+        // stranded somewhere too shallow (released or dragged there): anywhere deeper is better
+        next.y = EnFishmod_ClampY(this, next.y);
         this->actor.world.pos = next;
     } else {
         // shore ahead: turn back toward home
@@ -684,11 +748,19 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             // rod has computed where the line lets it go
             next = this->target;
             if (this->jumping) {
+                f32 surface;
+                f32 floor;
+
+                if (!EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) || (floor > surface - 4.0f)) {
+                    // don't leap out over the bank
+                    next.x = this->actor.world.pos.x;
+                    next.z = this->actor.world.pos.z;
+                }
                 this->vel.y -= 0.7f;
                 next.y = this->actor.world.pos.y + this->vel.y;
                 if (next.y < this->waterY - 2.0f) {
                     this->jumping = false;
-                    next.y = this->waterY - 4.0f;
+                    next.y = EnFishmod_ClampY(this, this->waterY - 4.0f);
                     {
                         Vec3f splash = next;
 
@@ -700,28 +772,46 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                 }
                 this->actor.shape.rot.x = -(s16)(this->vel.y * 1500.0f);
                 this->actor.world.pos = next;
-            } else if (EnFishmod_ProbeWater(this, play, &next)) {
-                next.y = this->actor.world.pos.y;
-                Math_ApproachF(&next.y, this->waterY - 8.0f, 0.1f, 1.0f);
-                next.y = CLAMP(next.y, this->floorY + 3.0f, this->waterY - 3.0f);
-                this->actor.world.pos = next;
-                this->actor.shape.rot.x = 0;
-
-                // leap
-                if ((gFishmodRodState.tension > 45.0f) && (this->stamina > this->staminaMax * 0.2f) &&
-                    (Rand_ZeroOne() < b->jumpiness * 0.0004f)) {
-                    Vec3f splash = this->actor.world.pos;
-
-                    this->jumping = true;
-                    this->vel.y = 6.0f + b->strength * 0.04f;
-                    splash.y = this->waterY;
-                    EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
-                    Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
-                }
             } else {
-                // can't go that way: shore
-                this->runYaw += 0x4000;
-                this->runTimer = 20;
+                f32 surface;
+                f32 floor;
+                s32 fits = EnFishmod_ProbeWater(this, play, &next, this->runYaw);
+                // the line drags it toward Link, even through water too shallow to swim in
+                s32 reeledIn = Math_Vec3f_DistXZ(&next, &player->actor.world.pos) <
+                               Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
+
+                if (fits) {
+                    next.y = this->actor.world.pos.y;
+                    Math_ApproachF(&next.y, this->waterY - 8.0f, 0.1f, 1.0f);
+                    next.y = EnFishmod_ClampY(this, next.y);
+                    this->actor.world.pos = next;
+                    this->actor.shape.rot.x = 0;
+
+                    // leap
+                    if ((gFishmodRodState.tension > 45.0f) && (this->stamina > this->staminaMax * 0.2f) &&
+                        (Rand_ZeroOne() < b->jumpiness * 0.0004f)) {
+                        Vec3f splash = this->actor.world.pos;
+
+                        this->jumping = true;
+                        this->vel.y = 6.0f + b->strength * 0.04f;
+                        splash.y = this->waterY;
+                        EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
+                        Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
+                    }
+                } else if (reeledIn && EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor)) {
+                    // thrashing in the shallows, belly on the bottom
+                    this->waterY = surface;
+                    this->floorY = floor;
+                    next.y = CLAMP_MIN(floor + this->halfHeight, (floor + surface) * 0.5f);
+                    this->actor.world.pos = next;
+                    this->actor.shape.rot.x = 0;
+                } else if (reeledIn) {
+                    this->beached = true;
+                } else {
+                    // can't go that way: shore
+                    this->runYaw += 0x4000;
+                    this->runTimer = 20;
+                }
             }
 
             Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 3, 0x1000, 0x100);
@@ -822,6 +912,21 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         static s32 sCount;
         Player* player = GET_PLAYER(play);
         f32 dist = Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
+        static s32 sClipFrames;
+        static f32 sClipMax;
+
+        // how far any fish's body pokes out of the water or into the floor
+        if ((this->fishState != FISH_STATE_CAUGHT) && (this->fishState != FISH_STATE_PHOTO) && !this->jumping &&
+            !(this->fishState == FISH_STATE_HOOKED && (this->waterY - this->floorY) < this->halfHeight * 2.0f)) {
+            f32 out = CLAMP_MIN(this->actor.world.pos.y + this->halfHeight - this->waterY,
+                                this->floorY - (this->actor.world.pos.y - this->halfHeight));
+
+            if (out > 1.0f) {
+                sClipFrames++;
+                sClipMax = CLAMP_MIN(sClipMax, out);
+            }
+        }
+        Fishmod_DebugPrintf(8, "fish clip %d max %d", sClipFrames, (s32)sClipMax);
 
         if (sFrame != play->gameplayFrames) {
             sFrame = play->gameplayFrames;
