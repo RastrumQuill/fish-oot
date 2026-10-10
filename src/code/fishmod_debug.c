@@ -27,6 +27,7 @@
 #include "seqcmd.h"
 #include "game.h"
 #include "actor_profile.h"
+#include "z_actor_dlftbls.h"
 #include "camera.h"
 #include "interface.h"
 #include "z_lib.h"
@@ -317,6 +318,11 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     Fishmod_DebugPrintf(0, "F%d S%d/%d caught %d lost %d", sPlayFrames, sScriptStepIndex,
                         (s32)ARRAY_COUNT(sScriptSteps), gFishmodRodInfo.caught, gFishmodRodInfo.lost);
     if (player != NULL) {
+        Fishmod_DebugPrintf(1, "P %d %d %d y%04X ovl%08X", (s32)player->actor.world.pos.x,
+                            (s32)player->actor.world.pos.y, (s32)player->actor.world.pos.z,
+                            (u16)player->actor.shape.rot.y, (u32)gActorOverlayTable[ACTOR_EN_FISHMOD].loadedRamAddr);
+    }
+    if (0) {
         Fishmod_DebugPrintf(1, "P %d %d %d y%04X", (s32)player->actor.world.pos.x, (s32)player->actor.world.pos.y,
                             (s32)player->actor.world.pos.z, (u16)player->actor.shape.rot.y);
     }
