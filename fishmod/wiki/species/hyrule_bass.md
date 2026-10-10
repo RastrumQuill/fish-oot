@@ -2,7 +2,9 @@
 
 *Uncommon · from Twilight Princess, Ocarina of Time (Fishing Pond) · In game*
 
-*(render pending: this fish is not in the game yet)*
+<img src="../img/hyrule_bass.jpg" width="49%"> <img src="../img/hyrule_bass_34.jpg" width="49%">
+
+*In-game renders at a typical size (13 in), captured in ares.*
 
 > The classic Hylian game fish. It hunts from cover and strikes hard, and the big ones are known to leap clear of the water to throw the hook.
 
