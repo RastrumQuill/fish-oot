@@ -955,12 +955,31 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             this->jawRot = 3000;
             // Now and then it makes a run: away from Link, veering left or right, toward open water, with a burst
             // of speed at the start (stateTimer counts the burst down; the rod pulls harder while it lasts).
+            // Runs come in three kinds so the fight has a rhythm: off away from Link, a sweep across the line
+            // (left or right, swinging the rod over), or, while still fresh, a charge back toward Link that throws
+            // slack into the line.
             if (--this->runTimer <= 0) {
-                this->runYaw = EnFishmod_OpenWaterYaw(this, play,
-                                                      Math_Vec3f_Yaw(&player->actor.world.pos, &this->actor.world.pos) +
-                                                          (s16)Rand_CenteredFloat(0x7000));
+                s16 awayYaw = Math_Vec3f_Yaw(&player->actor.world.pos, &this->actor.world.pos);
+                f32 fresh = this->stamina / this->staminaMax;
+                f32 roll = Rand_ZeroOne();
+                s16 yaw;
+
+                if ((fresh > 0.5f) && (roll < 0.15f)) {
+                    this->runKind = FISH_RUN_CHARGE;
+                    yaw = awayYaw + 0x8000 + (s16)Rand_CenteredFloat(0x3000);
+                } else if (roll < 0.55f) {
+                    this->runKind = FISH_RUN_ACROSS;
+                    yaw = awayYaw + ((Rand_ZeroOne() < 0.5f) ? 0x3800 : -0x3800) + (s16)Rand_CenteredFloat(0x1000);
+                } else {
+                    this->runKind = FISH_RUN_AWAY;
+                    yaw = awayYaw + (s16)Rand_CenteredFloat(0x3000);
+                }
+                this->runYaw = EnFishmod_OpenWaterYaw(this, play, yaw);
                 this->runTimer = 40 + (s16)Rand_ZeroFloat(70.0f);
-                this->stateTimer = (s16)((12.0f + b->strength * 0.3f) * (0.3f + 0.7f * this->stamina / this->staminaMax));
+                this->stateTimer = (s16)((12.0f + b->strength * 0.3f) * (0.3f + 0.7f * fresh));
+                if (this->runKind == FISH_RUN_CHARGE) {
+                    this->stateTimer = this->stateTimer * 2 / 3;
+                }
             }
 
             // rod has computed where the line lets it go
@@ -999,8 +1018,14 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                                Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
 
                 if (fits) {
+                    // up near the surface while it runs, sounding deep while it holds against the line
+                    f32 depthY = (this->stateTimer > 0)
+                                     ? this->waterY - 8.0f
+                                     : CLAMP_MIN(this->waterY - 8.0f - (this->waterY - this->floorY) * 0.5f,
+                                                 this->floorY + this->halfHeight + 2.0f);
+
                     next.y = this->actor.world.pos.y;
-                    Math_ApproachF(&next.y, this->waterY - 8.0f, 0.1f, 1.0f);
+                    Math_ApproachF(&next.y, depthY, 0.1f, 1.0f);
                     next.y = EnFishmod_ClampY(this, next.y);
                     this->actor.world.pos = next;
                     this->actor.shape.rot.x = 0;

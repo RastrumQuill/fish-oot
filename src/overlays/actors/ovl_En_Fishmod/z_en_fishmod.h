@@ -80,6 +80,7 @@ typedef struct EnFishmod {
     /* 0x3CD */ u8 blocked;                        // the last SwimToward hit the shore (debug display)
     /* 0x3CE */ s16 detourYaw;                     // heading around a bank that was in the way
     /* 0x3D0 */ s16 detourTimer;                   // frames left to follow detourYaw
+    /* 0x3D2 */ u8 runKind;                        // EnFishmodRunKind of the current or last run when hooked
 #if FISHMOD_OPT >= 2
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
@@ -102,6 +103,12 @@ typedef enum FishmodRodState {
     /* 6 */ ROD_STATE_FIGHT,   // fish on
     /* 7 */ ROD_STATE_LANDING  // fish caught, Link holds it up
 } FishmodRodState;
+
+typedef enum EnFishmodRunKind {
+    /* 0 */ FISH_RUN_AWAY,   // straight off, away from Link
+    /* 1 */ FISH_RUN_ACROSS, // a sweep across the line, bending the rod sideways
+    /* 2 */ FISH_RUN_CHARGE  // back toward Link: the line goes slack, reel fast
+} EnFishmodRunKind;
 
 typedef struct FishmodRod {
     /* 0x00 */ u8 state;
@@ -135,6 +142,8 @@ typedef struct FishmodRod {
     /* 0xC2 */ u8 castHolding;      // charging a cast
     /* 0xC3 */ u8 choice;           // after a catch: 1 = keep or release, 2 = release only (no empty bottle)
     /* 0xC4 */ f32 lineFloor[17];    // lowest each point along the line can hang: the ground, or the water it rests on
+    /* 0x108 */ f32 bendRoll;       // which way the rod bends around its own axis (radians), toward the pull
+    /* 0x10C */ f32 bendPull;       // how much of the tension bends the rod: more when the pull is across it
 } FishmodRod;
 
 extern FishmodRod gFishmodRodState;

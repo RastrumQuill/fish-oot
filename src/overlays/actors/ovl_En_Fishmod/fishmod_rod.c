@@ -913,8 +913,16 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
 
     // stick drives Link's reel animation like in the pond
     if ((ROD->state == ROD_STATE_FLOAT) || (ROD->state == ROD_STATE_FIGHT)) {
+        f32 lean = input->rel.stick_x * 0.02f;
+
         Math_SmoothStepToF(&player->unk_85C, input->rel.stick_y * 0.02f, 0.3f, 5.0f, 0.0f);
-        Math_SmoothStepToF(&player->unk_858, input->rel.stick_x * 0.02f, 0.3f, 5.0f, 0.0f);
+        if ((ROD->state == ROD_STATE_FIGHT) && (ROD->fish != NULL)) {
+            // the pull drags Link's arms toward the fish's side
+            s16 rel = Math_Vec3f_Yaw(&player->actor.world.pos, &ROD->fish->actor.world.pos) - player->actor.shape.rot.y;
+
+            lean -= Math_SinS(rel) * CLAMP(ROD->tension * 0.01f, 0.0f, 1.0f) * 0.6f;
+        }
+        Math_SmoothStepToF(&player->unk_858, lean, 0.3f, 5.0f, 0.0f);
         player->unk_85C = CLAMP(player->unk_85C, -1.0f, 1.0f);
         player->unk_858 = CLAMP(player->unk_858, -1.0f, 1.0f);
     }
@@ -965,6 +973,57 @@ static f32 sRodBendRatios[22] = {
     0.42f, 0.48f, 0.54f, 0.60f, 0.60f, 0.5142f, 0.4285f, 0.3428f, 0.2571f, 0.1714f, 0.0857f,
 };
 
+/**
+ * Turns the rod's bend toward the fish. The segments bend about their local x axis, which curls the tip toward
+ * local -y; rolling the rod about its own axis (z) first points that curl wherever the line pulls. A pull straight
+ * along the rod barely bends it, a pull across it bends it fully. Uses the current matrix (the rod's base).
+ */
+static void Rod_AimBend(PlayState* play) {
+    f32 rollTarget = 0.0f;
+    f32 pullTarget = 1.0f;
+
+    if ((ROD->state == ROD_STATE_FIGHT) && (ROD->tension > 1.0f)) {
+        MtxF mf;
+        f32 dx = ROD->bobberPos.x - ROD->tipPos.x;
+        f32 dy = ROD->bobberPos.y - ROD->tipPos.y;
+        f32 dz = ROD->bobberPos.z - ROD->tipPos.z;
+        f32 lx;
+        f32 ly;
+        f32 lz;
+        f32 across;
+
+        Matrix_Get(&mf);
+        // the pull in the rod's own axes (the axes share one scale, so no need to normalize)
+        lx = dx * mf.xx + dy * mf.yx + dz * mf.zx;
+        ly = dx * mf.xy + dy * mf.yy + dz * mf.zy;
+        lz = dx * mf.xz + dy * mf.yz + dz * mf.zz;
+        across = sqrtf(SQ(lx) + SQ(ly));
+        if (across > 0.0f) {
+            // roll so local -y faces (lx, ly): rotating about z by r takes -y to (sin r, -cos r)
+            rollTarget = Math_FAtan2F(lx, -ly);
+            pullTarget = 0.3f + 0.7f * (across / sqrtf(SQ(across) + SQ(lz)));
+        }
+    }
+    // turn the shorter way round, and not instantly
+    {
+        f32 diff = rollTarget - ROD->bendRoll;
+
+        while (diff > M_PI) {
+            diff -= 2.0f * M_PI;
+        }
+        while (diff < -M_PI) {
+            diff += 2.0f * M_PI;
+        }
+        ROD->bendRoll += diff * 0.2f;
+        if (ROD->bendRoll > M_PI) {
+            ROD->bendRoll -= 2.0f * M_PI;
+        } else if (ROD->bendRoll < -M_PI) {
+            ROD->bendRoll += 2.0f * M_PI;
+        }
+    }
+    Math_ApproachF(&ROD->bendPull, pullTarget, 0.2f, 0.1f);
+}
+
 static void Rod_DrawRod(PlayState* play, Player* player) {
     static Vec3f sZero = { 0.0f, 0.0f, 0.0f };
     f32 bend;
@@ -973,9 +1032,13 @@ static void Rod_DrawRod(PlayState* play, Player* player) {
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
 
     // the rod bends with the line tension and the reel stick
-    bend = -0.03f + (ROD->tension * 0.012f) + player->unk_85C * -0.15f;
+    bend = -0.03f + (ROD->tension * 0.012f * ROD->bendPull) + player->unk_85C * -0.15f;
     if (ROD->state == ROD_STATE_WINDUP) {
         bend += 0.6f;
+    }
+    if ((ROD->state == ROD_STATE_FIGHT) && (ROD->fish != NULL) && (ROD->fish->stateTimer > 0)) {
+        // a running fish shakes the tip
+        bend += Math_SinS(play->gameplayFrames * 0x3800) * ROD->tension * 0.0012f;
     }
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
@@ -994,6 +1057,8 @@ static void Rod_DrawRod(PlayState* play, Player* player) {
     Matrix_RotateX((20.0f) * 0.01f * M_PI, MTXMODE_APPLY);
     Matrix_Scale(0.70000005f, 0.70000005f, 0.70000005f, MTXMODE_APPLY);
     Matrix_Translate(0.0f, 0.0f, -1300.0f, MTXMODE_APPLY);
+    Rod_AimBend(play);
+    Matrix_RotateZ(ROD->bendRoll, MTXMODE_APPLY);
 
 #if FISHMOD_OPT >= 2
     // At rest the rod is nearly straight: draw its segments in pairs, the second of each pair from the first's
