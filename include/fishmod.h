@@ -153,6 +153,28 @@ typedef struct FishmodRodInfo {
 
 extern FishmodRodInfo gFishmodRodInfo;
 
+/*
+ * Saved fishing data. The save file has scene flags for 124 scenes but the game only has SCENE_ID_MAX (110),
+ * so the last 14 entries (392 bytes) are never used by anything; fishmod keeps its data there. Old saves
+ * read as all zeros, which means "nothing caught yet".
+ */
+#define FISHMOD_SAVE_SPECIES_MAX 32
+
+typedef struct FishmodSpeciesRecord {
+    /* 0x00 */ u16 count;        // fish of this species landed
+    /* 0x02 */ u16 bestTenths;   // longest, in tenths of an inch
+} FishmodSpeciesRecord; // size = 0x4
+
+typedef struct FishmodSaveData {
+    /* 0x00 */ u32 flags;
+    /* 0x04 */ FishmodSpeciesRecord records[FISHMOD_SAVE_SPECIES_MAX];
+} FishmodSaveData; // size = 0x84
+
+#define FISHMOD_SAVE ((FishmodSaveData*)&gSaveContext.save.info.sceneFlags[SCENE_ID_MAX])
+
+/** Records a catch. Returns true if it is a new size record for its species. */
+s32 Fishmod_RecordCatch(s32 species, f32 lengthInches);
+
 #if FISHMOD_DEBUG
 extern Vec3f gFishmodDebugFocus; // the fish nearest to Link, for the follow camera
 extern s16 gFishmodDebugFocusYaw;

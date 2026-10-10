@@ -116,6 +116,7 @@ typedef struct FishmodRod {
     /* 0xC0 */ u8 messageColor;     // 0 neutral, 1 good, 2 bad
     /* 0xC1 */ u8 splashed;         // set the frame the bobber hits the water
     /* 0xC2 */ u8 castHolding;      // charging a cast
+    /* 0xC3 */ u8 choice;           // after a catch: 1 = keep or release, 2 = release only (no empty bottle)
 } FishmodRod;
 
 extern FishmodRod gFishmodRodState;

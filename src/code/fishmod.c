@@ -129,6 +129,26 @@ void Fishmod_PlayUpdate(PlayState* play) {
     }
 }
 
+s32 Fishmod_RecordCatch(s32 species, f32 lengthInches) {
+    FishmodSpeciesRecord* record;
+    u16 tenths = (u16)(lengthInches * 10.0f);
+
+    if ((species < 0) || (species >= FISHMOD_SAVE_SPECIES_MAX)) {
+        return false;
+    }
+    record = &FISHMOD_SAVE->records[species];
+    if (record->count < 0xFFFF) {
+        record->count++;
+    }
+    if (tenths > record->bestTenths) {
+        s32 isFirst = (record->bestTenths == 0);
+
+        record->bestTenths = tenths;
+        return !isFirst; // the first catch of a species isn't announced as a record
+    }
+    return false;
+}
+
 s32 Fishmod_CanUseRod(PlayState* play) {
     return (gFishmodRod != NULL) && (Fishmod_GetSceneSpawns(play->sceneId) != NULL);
 }
