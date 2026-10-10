@@ -11,7 +11,7 @@ It ships as a `.bps` patch for your own ROM and runs on real hardware (no Expans
 emulators like [ares](https://ares-emu.net/).
 
 > **Status:** early. Kokiri Forest only for now; the fishing loop is being tuned there before any other area
-> gets fish.
+> gets fish. Longer-term goals are in the [roadmap](fishmod/ROADMAP.md).
 
 <img src="fishmod/wiki/img/lineup.jpg" width="420">
 
