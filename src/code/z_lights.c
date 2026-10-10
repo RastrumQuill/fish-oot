@@ -70,6 +70,17 @@ void Lights_Draw(Lights* lights, GraphicsContext* gfxCtx) {
 
     OPEN_DISPS(gfxCtx, "../z_lights.c", 339);
 
+#if ENABLE_F3DEX3
+    // F3DEX3 loads all the lights at once, with the ambient light in the slot after the last one
+    lights->l.l[lights->numLights].l.col[0] = lights->l.l[lights->numLights].l.colc[0] = lights->l.a.l.col[0];
+    lights->l.l[lights->numLights].l.col[1] = lights->l.l[lights->numLights].l.colc[1] = lights->l.a.l.col[1];
+    lights->l.l[lights->numLights].l.col[2] = lights->l.l[lights->numLights].l.colc[2] = lights->l.a.l.col[2];
+
+    gSPSetLights(POLY_OPA_DISP++, lights->numLights, lights->l);
+    gSPSetLights(POLY_XLU_DISP++, lights->numLights, lights->l);
+    (void)light;
+    (void)i;
+#else
     gSPNumLights(POLY_OPA_DISP++, (u32)lights->numLights);
     gSPNumLights(POLY_XLU_DISP++, (u32)lights->numLights);
 
@@ -84,12 +95,17 @@ void Lights_Draw(Lights* lights, GraphicsContext* gfxCtx) {
     // ambient light is total number of lights + 1
     gSPLight(POLY_OPA_DISP++, &lights->l.a, ++i);
     gSPLight(POLY_XLU_DISP++, &lights->l.a, i);
+#endif
 
     CLOSE_DISPS(gfxCtx, "../z_lights.c", 352);
 }
 
 Light* Lights_FindSlot(Lights* lights) {
+#if ENABLE_F3DEX3
+    if (lights->numLights >= 9) {
+#else
     if (lights->numLights >= 7) {
+#endif
         return NULL;
     } else {
         return &lights->l.l[lights->numLights++];
@@ -120,6 +136,14 @@ void Lights_BindPoint(Lights* lights, LightParams* params, Vec3f* vec) {
                 scale = posDiff / scale;
                 scale = 1 - SQ(scale);
 
+#if ENABLE_F3DEX3
+                // these were padding bytes before F3DEX3: type 0 is a directional light
+                light->l.type = 0;
+                light->l.size = (params->point.radius > 1000) ? 1
+                                : (params->point.radius > 500) ? 2
+                                : (params->point.radius > 250) ? 3
+                                                               : 4;
+#endif
                 light->l.col[0] = light->l.colc[0] = params->point.color[0] * scale;
                 light->l.col[1] = light->l.colc[1] = params->point.color[1] * scale;
                 light->l.col[2] = light->l.colc[2] = params->point.color[2] * scale;
@@ -138,6 +162,10 @@ void Lights_BindDirectional(Lights* lights, LightParams* params, UNUSED Vec3f* v
     Light* light = Lights_FindSlot(lights);
 
     if (light != NULL) {
+#if ENABLE_F3DEX3
+        light->l.type = 0;
+        light->l.size = 3;
+#endif
         light->l.col[0] = light->l.colc[0] = params->dir.color[0];
         light->l.col[1] = light->l.colc[1] = params->dir.color[1];
         light->l.col[2] = light->l.colc[2] = params->dir.color[2];
@@ -294,6 +322,10 @@ Lights* Lights_NewAndDraw(GraphicsContext* gfxCtx, u8 ambientR, u8 ambientG, u8 
     lights->numLights = numLights;
 
     for (i = 0; i < numLights; i++) {
+#if ENABLE_F3DEX3
+        lights->l.l[i].l.type = 0;
+        lights->l.l[i].l.size = 3;
+#endif
         lights->l.l[i].l.col[0] = lights->l.l[i].l.colc[0] = r;
         lights->l.l[i].l.col[1] = lights->l.l[i].l.colc[1] = g;
         lights->l.l[i].l.col[2] = lights->l.l[i].l.colc[2] = b;

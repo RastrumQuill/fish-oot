@@ -17,7 +17,7 @@ emulators like [ares](https://ares-emu.net/).
 
 ## Playing
 
-1. Get the newest patch from [`releases/`](releases/) (or build it, below).
+1. Get the newest patch from the [releases page](https://github.com/RastrumQuill/fish-oot/releases) (or build it, below).
 2. Apply it to an **Ocarina of Time NTSC 1.2 (US)** ROM in big-endian `.z64` order with
    [Flips](https://github.com/Alcaro/Flips) or the [online patcher](https://www.marcrobledo.com/RomPatcher.js/).
    - Expected input MD5: `57a9719ad547c516342e1a15d5c28c3d`.
@@ -76,10 +76,11 @@ To check the toolchain on an unmodified tree, `make VERSION=ntsc-1.2 REGION=US r
 | | |
 |---|---|
 | `fishmod/data/species.json` | every species: looks, sizes, behavior, bait, flavor text. `fishmod/tools/gen_species.py` and `gen_textures.py` turn it into game data and the wiki |
-| `src/overlays/actors/ovl_En_Fishmod/` | the fish (`z_en_fishmod.c`) and the fishing controller: rod, bobber, camera, fight (`fishmod_rod.c`) |
+| `src/overlays/actors/ovl_En_Fishmod/` | the fish (`z_en_fishmod.c`), the fishing controller: rod, bobber, camera, fight (`fishmod_rod.c`), and the cached ground height under the water (`fishmod_water.c`) |
 | `src/code/fishmod.c` | which scenes have fishing, loading the fish model there, the rod on L |
 | `fishmod/build.sh --debug` | debug build: boots straight into Kokiri with the rod and shows debug text |
-| `fishmod/build.sh --script NAME` | debug build that plays `fishmod/scripts/NAME.inc.c`: `angler` (a bot that fishes by itself), `follow` (camera chases a fish), `photo` (wiki renders), `cast` |
+| `fishmod/build.sh --f3dex3` | build with the [F3DEX3](fishmod/f3dex3/README.md) graphics microcode (off by default: no measurable gain in Kokiri, and it doesn't run on HLE emulators) |
+| `fishmod/build.sh --script NAME` | debug build that plays `fishmod/scripts/NAME.inc.c`: `angler` (a bot that fishes by itself), `shore` (the bot, standing back from the water), `follow` (camera chases a fish), `photo` (wiki renders), `cast` |
 | `fishmod/tools/photo_capture.py` | captures the wiki renders from the photo build in ares |
 | `fishmod/tools/water_map.py` | maps fishable water and shore spots in a scene |
 | `fishmod/tools/model_preview.py` | renders a model's limbs offline to identify parts |

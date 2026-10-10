@@ -1,7 +1,13 @@
 #include "ultra64.h"
 #include "sys_ucode.h"
 
-#ifndef F3DEX_GBI_PL
+#if ENABLE_F3DEX3
+extern u64 gspF3DEX3_fifoTextStart[];
+extern u64 gspF3DEX3_fifoDataStart[];
+
+u64* sDefaultGSPUCodeText = gspF3DEX3_fifoTextStart;
+u64* sDefaultGSPUCodeData = gspF3DEX3_fifoDataStart;
+#elif !defined(F3DEX_GBI_PL)
 u64* sDefaultGSPUCodeText = gspF3DZEX2_NoN_fifoTextStart;
 u64* sDefaultGSPUCodeData = gspF3DZEX2_NoN_fifoDataStart;
 #else

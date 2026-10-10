@@ -139,6 +139,11 @@ void EnFishmod_RodMessage(s32 color, const char* line1, const char* line2);
 
 // Fish (z_en_fishmod.c), called by the rod
 void EnFishmod_FishSetState(struct EnFishmod* this, s32 state);
+// Water floor cache (fishmod_water.c)
+void EnFishmod_WaterGridInit(struct PlayState* play);
+void EnFishmod_WaterGridDestroy(struct PlayState* play);
+s32 EnFishmod_WaterFloor(struct PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative);
+
 s32 EnFishmod_FindWaterPoint(struct PlayState* play, Vec3f* center, f32 radius, f32 minDepth, Vec3f* out,
                              f32* outSurface, f32* outFloor);
 

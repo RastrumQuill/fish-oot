@@ -394,6 +394,7 @@ void EnExRuppy_Draw(Actor* thisx, PlayState* play) {
     static void* rupeeTextures[] = {
         gRupeeGreenTex, gRupeeBlueTex, gRupeeRedTex, gRupeePinkTex, gRupeeOrangeTex,
     };
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
     STACK_PAD(s32);
     EnExRuppy* this = (EnExRuppy*)thisx;
 
@@ -404,6 +405,7 @@ void EnExRuppy_Draw(Actor* thisx, PlayState* play) {
         func_8002EBCC(thisx, play, 0);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_en_ex_ruppy.c", 780);
         gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(rupeeTextures[this->colorIdx]));
+        IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_OPA_DISP++, this->colorIdx);
         gSPDisplayList(POLY_OPA_DISP++, gRupeeDL);
 
         CLOSE_DISPS(play->state.gfxCtx, "../z_en_ex_ruppy.c", 784);

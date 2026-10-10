@@ -2011,7 +2011,9 @@ void Player_DrawPauseImpl(PlayState* play, void* gameplayKeep, void* linkObject,
     }
 
     gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, 0, 0, width, height);
+#if !ENABLE_F3DEX3
     gSPClipRatio(POLY_OPA_DISP++, FRUSTRATIO_1);
+#endif
 
     gDPSetColorImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, depthFrameBuffer);
     gDPSetCycleType(POLY_OPA_DISP++, G_CYC_FILL);
@@ -2033,6 +2035,9 @@ void Player_DrawPauseImpl(PlayState* play, void* gameplayKeep, void* linkObject,
 
     viewport.vp.vscale[0] = viewport.vp.vtrans[0] = width * ((1 << 2) / 2);
     viewport.vp.vscale[1] = viewport.vp.vtrans[1] = height * ((1 << 2) / 2);
+#if ENABLE_F3DEX3
+    viewport.vp.vscale[1] = -viewport.vp.vscale[1];
+#endif
     gSPViewport(POLY_OPA_DISP++, &viewport);
 
     guPerspective(perspMtx, &perspNorm, fovy, (f32)width / (f32)height, 10.0f, 4000.0f, 1.0f);

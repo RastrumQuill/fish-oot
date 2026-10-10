@@ -177,13 +177,24 @@ typedef struct FishmodSaveData {
 s32 Fishmod_RecordCatch(s32 species, f32 lengthInches);
 
 #if FISHMOD_DEBUG
+// CPU time spent per frame, for the debug timing line
+typedef enum FishmodCpuTimer {
+    FISHMOD_CPU_UPDATE, // all of Play_Update
+    FISHMOD_CPU_DRAW,   // all of Play_Draw (building display lists)
+    FISHMOD_CPU_FISH_UPDATE,
+    FISHMOD_CPU_FISH_DRAW,
+    FISHMOD_CPU_ROD_UPDATE,
+    FISHMOD_CPU_ROD_DRAW,
+    FISHMOD_CPU_MAX
+} FishmodCpuTimer;
+extern OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
 extern Vec3f gFishmodDebugFocus; // the fish nearest to Link, for the follow camera
 extern s16 gFishmodDebugFocusYaw;
 #endif
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */
 
-#define FISHMOD_DEBUG_LINES 9
+#define FISHMOD_DEBUG_LINES 10
 #define FISHMOD_DEBUG_LINE_LEN 40
 
 typedef struct FishmodAutoplayStep {

@@ -335,6 +335,11 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         EnFishmod_SetLength(this, lo + (hi - lo) * f);
         this->fishState = FISH_STATE_WANDER;
         this->stateTimer = 0;
+        // don't draw fish that are off screen or far away (they still swim)
+        this->actor.flags &= ~ACTOR_FLAG_DRAW_CULLING_DISABLED;
+        this->actor.cullingVolumeDistance = 900.0f;
+        this->actor.cullingVolumeScale = this->halfLength * 2.0f + 20.0f;
+        this->actor.cullingVolumeDownward = this->halfLength * 2.0f + 20.0f;
     }
     this->staminaMax = 60.0f + this->species->behavior.stamina * 3.0f + this->lengthInches * 4.0f;
     this->stamina = this->staminaMax;
@@ -374,16 +379,12 @@ s32 EnFishmod_FindWaterPoint(PlayState* play, Vec3f* center, f32 radius, f32 min
         Vec3f probe;
         f32 surface;
         f32 floor;
-        WaterBox* waterBox;
-        CollisionPoly* poly;
 
         probe.x = center->x + Rand_CenteredFloat(2.0f * radius);
         probe.z = center->z + Rand_CenteredFloat(2.0f * radius);
-        if (!BgCheck_GetWaterSurface(play, &play->colCtx, probe.x, probe.z, &surface, &waterBox)) {
+        if (!EnFishmod_WaterFloor(play, probe.x, probe.z, &surface, &floor, true)) {
             continue;
         }
-        probe.y = surface;
-        floor = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &probe);
         if ((floor <= BGCHECK_Y_MIN) || ((surface - floor) < minDepth)) {
             continue;
         }
@@ -397,20 +398,9 @@ s32 EnFishmod_FindWaterPoint(PlayState* play, Vec3f* center, f32 radius, f32 min
     return false;
 }
 
-/** Water surface and floor at a point. Returns false if there's no water there. */
+/** Water surface and floor at a point (from the cache, erring high). Returns false if there's no water there. */
 static s32 EnFishmod_WaterAt(PlayState* play, f32 x, f32 z, f32* surface, f32* floor) {
-    WaterBox* waterBox;
-    CollisionPoly* poly;
-    Vec3f probe;
-
-    if (!BgCheck_GetWaterSurface(play, &play->colCtx, x, z, surface, &waterBox)) {
-        return false;
-    }
-    probe.x = x;
-    probe.y = *surface;
-    probe.z = z;
-    *floor = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &probe);
-    return true;
+    return EnFishmod_WaterFloor(play, x, z, surface, floor, true);
 }
 
 /** Water depth the whole body needs: its height, more when it is pitched up or down. */
@@ -892,6 +882,31 @@ static void EnFishmod_UpdateSwim(EnFishmod* this) {
     this->finYaw = (Math_SinS(this->timer * 0x900) * 1800.0f) + 1800.0f;
 }
 
+#if FISHMOD_DEBUG
+static void EnFishmod_UpdateImpl(Actor* thisx, PlayState* play);
+static void EnFishmod_DrawImpl(Actor* thisx, PlayState* play);
+
+void EnFishmod_Update(Actor* thisx, PlayState* play) {
+    OSTime start = osGetTime();
+
+    EnFishmod_UpdateImpl(thisx, play);
+    gFishmodCpuTime[(((EnFishmod*)thisx)->type == FISHMOD_TYPE_ROD) ? FISHMOD_CPU_ROD_UPDATE
+                                                                    : FISHMOD_CPU_FISH_UPDATE] +=
+        osGetTime() - start;
+}
+
+void EnFishmod_Draw(Actor* thisx, PlayState* play) {
+    OSTime start = osGetTime();
+
+    EnFishmod_DrawImpl(thisx, play);
+    gFishmodCpuTime[(((EnFishmod*)thisx)->type == FISHMOD_TYPE_ROD) ? FISHMOD_CPU_ROD_DRAW : FISHMOD_CPU_FISH_DRAW] +=
+        osGetTime() - start;
+}
+
+#define EnFishmod_Update EnFishmod_UpdateImpl
+#define EnFishmod_Draw EnFishmod_DrawImpl
+#endif
+
 void EnFishmod_Update(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
 
@@ -1209,8 +1224,11 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
         s32 texSet = EnFishmod_TexSet(this->species);
         s32 speciesIndex = this->species - gFishmodSpecies;
         s32 role;
+        IF_F3DEX3_DONT_SKIP_TEX_INIT();
 
         OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+        // every species draws the same display lists with its own textures behind the segments
+        IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_OPA_DISP++, speciesIndex);
         for (role = 0; role < FISHMOD_TEX_ROLE_MAX; role++) {
             void* tex = sSpeciesTextures[speciesIndex][role];
 

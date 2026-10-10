@@ -340,6 +340,7 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     ROD->state = ROD_STATE_NONE;
     ROD->bait = FISHMOD_BAIT_NONE;
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
+    EnFishmod_WaterGridInit(play);
 
     if (!gFishmodPhoto.active) {
         Rod_SpawnFish(this, play, FISH_COUNT);
@@ -348,6 +349,7 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
 
 void EnFishmod_RodDestroy(EnFishmod* this, PlayState* play) {
     Rod_CameraStop(play);
+    EnFishmod_WaterGridDestroy(play);
 }
 
 static void Rod_EndCast(PlayState* play, Player* player) {
@@ -1068,14 +1070,18 @@ static void Rod_UpdateLineFloor(PlayState* play) {
     Rod_LineShape(&end, &sag);
     top = CLAMP_MIN(ROD->tipPos.y, end.y) + 10.0f;
     for (i = 1; i < LINE_SEGMENTS; i++) {
-        CollisionPoly* poly;
-
         Rod_LinePoint(&end, sag, (f32)i / LINE_SEGMENTS, &point);
-        // cast from above the whole line so a point already inside a bank still finds the bank's top
-        point.y = top;
-        floorY = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &point) + 0.8f;
-        if (Rod_WaterY(play, &point, &waterY) && (waterY > floorY)) {
-            floorY = waterY + 0.3f; // a slack line floats
+        if (EnFishmod_WaterFloor(play, point.x, point.z, &waterY, &floorY, false)) {
+            floorY += 0.8f;
+            if (waterY > floorY) {
+                floorY = waterY + 0.3f; // a slack line floats
+            }
+        } else {
+            CollisionPoly* poly;
+
+            // cast from above the whole line so a point already inside a bank still finds the bank's top
+            point.y = top;
+            floorY = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &point) + 0.8f;
         }
         ROD->lineFloor[i] = floorY;
     }

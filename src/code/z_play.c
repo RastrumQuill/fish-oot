@@ -1480,13 +1480,25 @@ void Play_Main(GameState* thisx) {
         R_PLAY_INIT = HREG_MODE_PLAY;
     }
 
+#if FISHMOD_DEBUG
+    {
+        OSTime start = osGetTime();
+#endif
     if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_RUN_UPDATE) {
         Play_Update(this);
     }
+#if FISHMOD_DEBUG
+        gFishmodCpuTime[FISHMOD_CPU_UPDATE] += osGetTime() - start;
+        start = osGetTime();
+#endif
 
     PLAY_LOG(4583);
 
     Play_Draw(this);
+#if FISHMOD_DEBUG
+        gFishmodCpuTime[FISHMOD_CPU_DRAW] += osGetTime() - start;
+    }
+#endif
 
     PLAY_LOG(4587);
 }

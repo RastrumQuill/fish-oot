@@ -93,6 +93,7 @@ void EffectSsGSpk_Draw(PlayState* play, u32 index, EffectSs* this) {
     f32 scale;
     STACK_PAD(s32);
 
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
     OPEN_DISPS(gfxCtx, "../z_eff_ss_g_spk.c", 208);
 
     scale = this->rScale * 0.0025f;
@@ -106,6 +107,7 @@ void EffectSsGSpk_Draw(PlayState* play, u32 index, EffectSs* this) {
     if (mtx != NULL) {
         gSPMatrix(POLY_XLU_DISP++, mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         gSPSegment(POLY_XLU_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sparkTextures[this->rTexIndex]));
+        IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_XLU_DISP++, this->rTexIndex);
         Gfx_SetupDL_60NoCDXlu(gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, this->rPrimColorR, this->rPrimColorG, this->rPrimColorB, 255);
         gDPSetEnvColor(POLY_XLU_DISP++, this->rEnvColorR, this->rEnvColorG, this->rEnvColorB, this->rEnvColorA);

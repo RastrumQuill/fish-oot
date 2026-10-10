@@ -68,6 +68,7 @@ void EffectSsStone1_Draw(PlayState* play, u32 index, EffectSs* this) {
     f32 viewDepth;
     f32 scale;
 
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
     OPEN_DISPS(gfxCtx, "../z_eff_ss_stone1.c", 154);
 
     // Grow the effect with distance (when above 1500 units) so as to keep a roughly constant on-screen size when far
@@ -80,6 +81,7 @@ void EffectSsStone1_Draw(PlayState* play, u32 index, EffectSs* this) {
 
     Gfx_SetupDL_61Xlu(gfxCtx);
     gSPSegment(POLY_XLU_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(drawParams->texture));
+    IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_XLU_DISP++, this->life);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, drawParams->primColor.r, drawParams->primColor.g, drawParams->primColor.b,
                     255);
     gDPSetEnvColor(POLY_XLU_DISP++, drawParams->envColor.r, drawParams->envColor.g, drawParams->envColor.b, 255);

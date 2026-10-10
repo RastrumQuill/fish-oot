@@ -497,6 +497,7 @@ static void* sRupeeTextures[] = {
 void EnGSwitch_DrawRupee(Actor* thisx, PlayState* play) {
     PlayState* play2 = (PlayState*)play;
     EnGSwitch* this = (EnGSwitch*)thisx;
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
 
     if (!this->broken) {
         OPEN_DISPS(play->state.gfxCtx, "../z_en_g_switch.c", 951);
@@ -504,6 +505,7 @@ void EnGSwitch_DrawRupee(Actor* thisx, PlayState* play) {
         func_8002EBCC(&this->actor, play, 0);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_en_g_switch.c", 957);
         gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sRupeeTextures[this->colorIdx]));
+        IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_OPA_DISP++, this->colorIdx);
         gSPDisplayList(POLY_OPA_DISP++, gRupeeDL);
         CLOSE_DISPS(play->state.gfxCtx, "../z_en_g_switch.c", 961);
     }
@@ -575,6 +577,7 @@ void EnGSwitch_DrawEffects(EnGSwitch* this, PlayState* play) {
     f32 scale;
     STACK_PAD(s32);
 
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
     OPEN_DISPS(gfxCtx, "../z_en_g_switch.c", 1073);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     for (i = 0; i < this->numEffects; i++, effect++) {
@@ -587,6 +590,7 @@ void EnGSwitch_DrawEffects(EnGSwitch* this, PlayState* play) {
             Matrix_RotateZ(effect->rot.z, MTXMODE_APPLY);
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_en_g_switch.c", 1088);
             gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sRupeeTextures[effect->colorIdx]));
+            IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_OPA_DISP++, effect->colorIdx);
             gSPDisplayList(POLY_OPA_DISP++, gRupeeDL);
         }
     }
