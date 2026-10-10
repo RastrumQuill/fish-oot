@@ -634,34 +634,48 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 // Link started the cast animation
                 ROD->state = ROD_STATE_WINDUP;
                 ROD->timer = WINDUP_FRAMES;
-                ROD->castPower = 0.65f;
+                ROD->castPower = 0.0f;
                 ROD->castYaw = 0;
             }
             break;
 
-        case ROD_STATE_WINDUP:
-            // stick during the wind-up: up = far, down = short, left/right = aim
-            if (input->rel.stick_y > 40) {
-                Math_ApproachF(&ROD->castPower, 1.0f, 1.0f, 0.05f);
-            } else if (input->rel.stick_y < -40) {
-                Math_ApproachF(&ROD->castPower, 0.3f, 1.0f, 0.05f);
+        case ROD_STATE_WINDUP: {
+            // Hold the rod's button to charge the cast, release to throw. A tap lobs it a few steps; a full
+            // charge reaches about 350 units. The stick aims left/right while charging.
+            static u16 sItemButtons[] = { BTN_B, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT };
+            u16 rodButton = sItemButtons[CLAMP(player->heldItemButton, 0, 3)];
+            s32 charging = CHECK_BTN_ALL(input->cur.button, rodButton) && (ROD->castPower < 1.0f + 0.5f);
+
+            ROD->castYaw = -input->rel.stick_x * 60;
+            if (charging && (ROD->timer <= WINDUP_FRAMES - 8)) {
+                // hold Link wound back while charging
+                player->skelAnime.playSpeed = 0.0f;
+                Math_ApproachF(&ROD->castPower, 1.0f, 1.0f, 1.0f / 28.0f);
+                if ((ROD->castPower >= 1.0f) && ((play->gameplayFrames % 8) == 0)) {
+                    Sfx_PlaySfxCentered(NA_SE_SY_CURSOR);
+                }
+                ROD->castHolding = true;
+                break;
             }
-            ROD->castYaw = -input->rel.stick_x * 80;
+            player->skelAnime.playSpeed = 1.0f;
+            ROD->castHolding = false;
             if (--ROD->timer <= 0) {
                 s16 yaw = player->actor.shape.rot.y + ROD->castYaw;
-                f32 speed = 2.5f + ROD->castPower * 5.5f;
+                f32 power = CLAMP(ROD->castPower, 0.0f, 1.0f);
+                f32 speed = 1.5f + power * 13.0f;
 
                 ROD->state = ROD_STATE_FLYING;
                 ROD->bobberPos = ROD->tipPos;
                 ROD->bobberVel.x = Math_SinS(yaw) * speed;
                 ROD->bobberVel.z = Math_CosS(yaw) * speed;
-                ROD->bobberVel.y = 4.0f + ROD->castPower * 2.5f;
+                ROD->bobberVel.y = 3.0f + power * 4.0f;
                 ROD->dip = ROD->dipTarget = 0.0f;
-                ROD->zoom = 1;
+                ROD->zoom = (power > 0.6f) ? 1 : 0;
                 Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
                 Rod_CameraStart(play);
             }
             break;
+        }
 
         case ROD_STATE_FLYING: {
             Vec3f prev = ROD->bobberPos;
@@ -1028,14 +1042,29 @@ static void Rod_DrawHud(PlayState* play) {
         Rod_FillRect(&gfx, x0, y, fill, y + 6, r, g, 40);
     }
 
+    // cast power while charging
+    if ((ROD->state == ROD_STATE_WINDUP) && ROD->castHolding) {
+        s32 x0 = 110;
+        s32 x1 = 210;
+        s32 y = 200;
+        s32 fill = x0 + (s32)(CLAMP(ROD->castPower, 0.0f, 1.0f) * 100.0f);
+
+        Rod_FillRect(&gfx, x0 - 2, y - 2, x1 + 2, y + 8, 20, 20, 30);
+        Rod_FillRect(&gfx, x0, y, fill, y + 6, 90, 170, 255);
+    }
+
     // messages
-    if ((ROD->messageTimer > 0) || (ROD->state == ROD_STATE_FIGHT)) {
+    if ((ROD->messageTimer > 0) || (ROD->state == ROD_STATE_FIGHT) || ((ROD->state == ROD_STATE_WINDUP) && ROD->castHolding)) {
         GfxPrint_Init(&printer);
         GfxPrint_Open(&printer, gfx);
         if (ROD->state == ROD_STATE_FIGHT) {
             GfxPrint_SetColor(&printer, 255, 255, 255, 255);
             GfxPrint_SetPos(&printer, 13, 23);
             GfxPrint_Printf(&printer, "TENSION");
+        } else if (ROD->state == ROD_STATE_WINDUP) {
+            GfxPrint_SetColor(&printer, 255, 255, 255, 255);
+            GfxPrint_SetPos(&printer, 13, 23);
+            GfxPrint_Printf(&printer, "CAST");
         }
         if (ROD->messageTimer > 0) {
             if (ROD->messageColor == 1) {

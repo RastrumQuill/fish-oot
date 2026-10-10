@@ -115,6 +115,7 @@ typedef struct FishmodRod {
     /* 0x70 */ char message[2][40]; // banner text
     /* 0xC0 */ u8 messageColor;     // 0 neutral, 1 good, 2 bad
     /* 0xC1 */ u8 splashed;         // set the frame the bobber hits the water
+    /* 0xC2 */ u8 castHolding;      // charging a cast
 } FishmodRod;
 
 extern FishmodRod gFishmodRodState;

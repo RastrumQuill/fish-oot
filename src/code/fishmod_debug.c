@@ -346,8 +346,10 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
                     button = BTN_CLEFT;
                 }
                 break;
-            case 2: // wind-up: medium cast
-                stickY = 0;
+            case 2: // wind-up: hold the rod button for a medium cast
+                if ((sAnglerTimer % 30) < 14) {
+                    button = BTN_CLEFT;
+                }
                 break;
             case 4: // float: strike on a real bite
                 if (gFishmodRodInfo.biting && ((sAnglerTimer % 4) == 0)) {
