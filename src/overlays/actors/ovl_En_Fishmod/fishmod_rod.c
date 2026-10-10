@@ -123,6 +123,7 @@ void EnFishmod_RodNibble(EnFishmod* fish) {
     ROD->fish = fish;
     ROD->dip = 4.0f; // quick tick down
     ROD->dipTarget = 0.0f;
+    Sfx_PlaySfxAtPos(&gFishmodRod->projectedPos, NA_SE_EV_LURE_MOVE_W);
 }
 
 void EnFishmod_RodBite(EnFishmod* fish) {
@@ -133,6 +134,8 @@ void EnFishmod_RodBite(EnFishmod* fish) {
     ROD->biting = true;
     ROD->dipTarget = 14.0f;
     ROD->biteTimer = fish->species->behavior.biteWindow + 4; // + the frames it takes to pull the bobber down
+    Sfx_PlaySfxAtPos(&gFishmodRod->projectedPos, NA_SE_EV_DIVE_WATER);
+    Rumble_Override(0.0f, 100, 6, 20);
 }
 
 void EnFishmod_RodRelease(EnFishmod* fish) {
@@ -651,6 +654,14 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         return;
     }
 
+    // Link was knocked out of his fishing pose (damage, a cutscene...) while the line was out: end the cast
+    if ((ROD->state >= ROD_STATE_FLYING) && (ROD->state != ROD_STATE_LANDING) && (player->unk_860 <= 0)) {
+        if (ROD->fish != NULL) {
+            EnFishmod_FishSetState(ROD->fish, FISH_STATE_FLEE);
+        }
+        Rod_EndCast(play, player);
+    }
+
     // sound and effects come from the bobber
     this->actor.world.pos = ROD->bobberPos;
 
@@ -1125,8 +1136,7 @@ static void Rod_DrawHud(PlayState* play) {
     }
 
     // messages
-    if ((ROD->messageTimer > 0) || (ROD->state == ROD_STATE_FIGHT) || (ROD->choice != 0) ||
-        ((ROD->state == ROD_STATE_WINDUP) && ROD->castHolding)) {
+    if (true) {
         GfxPrint_Init(&printer);
         GfxPrint_Open(&printer, gfx);
         if (ROD->state == ROD_STATE_FIGHT) {
@@ -1137,6 +1147,32 @@ static void Rod_DrawHud(PlayState* play) {
             GfxPrint_SetColor(&printer, 255, 255, 255, 255);
             GfxPrint_SetPos(&printer, 13, 23);
             GfxPrint_Printf(&printer, "CAST");
+        }
+        if (ROD->messageTimer == 0) {
+            const char* hint = NULL;
+
+            switch (ROD->state) {
+                case ROD_STATE_HELD:
+                    hint = "Hold the rod button to cast";
+                    break;
+                case ROD_STATE_WINDUP:
+                    hint = "Release to cast  Stick: aim";
+                    break;
+                case ROD_STATE_FLOAT:
+                    hint = "A:Reel  B:Set hook  Z:Zoom";
+                    break;
+                case ROD_STATE_GROUND:
+                    hint = "A: Reel in";
+                    break;
+                case ROD_STATE_FIGHT:
+                    hint = "A:Reel  Stick: pull against it";
+                    break;
+            }
+            if (hint != NULL) {
+                GfxPrint_SetColor(&printer, 220, 220, 220, 200);
+                GfxPrint_SetPos(&printer, 20 - strlen(hint) / 2, 26);
+                GfxPrint_Printf(&printer, "%s", hint);
+            }
         }
         if (ROD->choice != 0) {
             GfxPrint_SetColor(&printer, 255, 255, 255, 255);
