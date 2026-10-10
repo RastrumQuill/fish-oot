@@ -346,8 +346,8 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
                     button = BTN_CLEFT;
                 }
                 break;
-            case 2: // wind-up: hold the rod button for a medium cast
-                if ((sAnglerTimer % 30) < 14) {
+            case 2: // wind-up: hold the rod button until half power
+                if (gFishmodRodInfo.castPower < 0.6f) {
                     button = BTN_CLEFT;
                 }
                 break;

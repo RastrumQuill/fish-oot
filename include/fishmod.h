@@ -148,6 +148,7 @@ typedef struct FishmodRodInfo {
     /* 0x04 */ f32 tension;
     /* 0x08 */ u16 caught; // fish landed this session
     /* 0x0A */ u16 lost;
+    /* 0x0C */ f32 castPower;
 } FishmodRodInfo;
 
 extern FishmodRodInfo gFishmodRodInfo;

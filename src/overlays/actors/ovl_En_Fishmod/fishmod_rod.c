@@ -665,7 +665,11 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 f32 speed = 1.5f + power * 13.0f;
 
                 ROD->state = ROD_STATE_FLYING;
-                ROD->bobberPos = ROD->tipPos;
+                ROD->timer = 0;
+                // launch from where the rod tip ends up after the swing: ahead of and above Link
+                ROD->bobberPos.x = player->actor.world.pos.x + Math_SinS(yaw) * 30.0f;
+                ROD->bobberPos.y = player->actor.world.pos.y + (LINK_IS_CHILD ? 55.0f : 80.0f);
+                ROD->bobberPos.z = player->actor.world.pos.z + Math_CosS(yaw) * 30.0f;
                 ROD->bobberVel.x = Math_SinS(yaw) * speed;
                 ROD->bobberVel.z = Math_CosS(yaw) * speed;
                 ROD->bobberVel.y = 3.0f + power * 4.0f;
@@ -698,8 +702,9 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
             ROD->bobberVel.z *= 0.985f;
 
             // walls and trees stop it
-            if (BgCheck_EntityLineTest1(&play->colCtx, &prev, &ROD->bobberPos, &result, &poly, true, false, true,
-                                        true, &bgId)) {
+            ROD->timer++;
+            if ((ROD->timer > 3) && BgCheck_EntityLineTest1(&play->colCtx, &prev, &ROD->bobberPos, &result, &poly,
+                                                            true, false, false, true, &bgId)) {
                 ROD->bobberPos.x = result.x - ROD->bobberVel.x * 0.5f;
                 ROD->bobberPos.z = result.z - ROD->bobberVel.z * 0.5f;
                 ROD->bobberVel.x = ROD->bobberVel.z = 0.0f;
@@ -813,6 +818,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
     gFishmodRodInfo.biting = ROD->biting;
     gFishmodRodInfo.nibbling = (ROD->fish != NULL) && (ROD->fish->fishState == FISH_STATE_NIBBLE);
     gFishmodRodInfo.tension = ROD->tension;
+    gFishmodRodInfo.castPower = ROD->castPower;
 
 #if FISHMOD_DEBUG
     {
@@ -821,7 +827,10 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         Fishmod_DebugPrintf(2, "rod %s line %d", sStateNames[ROD->state], (s32)ROD->lineOut);
         Fishmod_DebugPrintf(3, "ten %d stam %d bite %d", (s32)ROD->tension,
                             (ROD->fish != NULL) ? (s32)ROD->fish->stamina : -1, ROD->biting);
-        Fishmod_DebugPrintf(4, "bob %d %d %d", (s32)ROD->bobberPos.x, (s32)ROD->bobberPos.y, (s32)ROD->bobberPos.z);
+        Fishmod_DebugPrintf(4, "bob %d %d %d t%d p%d v%d %d", (s32)ROD->bobberPos.x, (s32)ROD->bobberPos.y,
+                            (s32)ROD->bobberPos.z, ROD->timer, (s32)(ROD->castPower * 100.0f),
+                            (s32)(ROD->bobberVel.x * 10.0f), (s32)(ROD->bobberVel.z * 10.0f));
+        Fishmod_DebugPrintf(7, "tip %d %d %d", (s32)ROD->tipPos.x, (s32)ROD->tipPos.y, (s32)ROD->tipPos.z);
     }
 #endif
 }
