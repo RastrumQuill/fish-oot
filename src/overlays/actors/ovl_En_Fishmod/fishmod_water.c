@@ -34,6 +34,16 @@ typedef struct FishmodWaterGrid {
     s16* floor;
 } FishmodWaterGrid;
 
+// Exact floors near banks, cached by 4-unit spot
+#define EXACT_CACHE_SIZE 64
+typedef struct {
+    s16 x;
+    s16 z;
+    s16 floor;
+    s16 used;
+} FishmodExactFloor;
+static FishmodExactFloor sExactCache[EXACT_CACHE_SIZE];
+
 static FishmodWaterGrid sGrids[GRID_MAX_BOXES];
 static s32 sGridCount;
 
@@ -119,15 +129,6 @@ static s32 EnFishmod_GridCorner(PlayState* play, FishmodWaterGrid* grid, s32 ix,
     return *corner;
 }
 
-// Exact floors near banks, cached by 4-unit spot
-#define EXACT_CACHE_SIZE 64
-typedef struct {
-    s16 x;
-    s16 z;
-    s16 floor;
-    s16 used;
-} FishmodExactFloor;
-static FishmodExactFloor sExactCache[EXACT_CACHE_SIZE];
 
 static f32 EnFishmod_ExactFloor(PlayState* play, f32 x, f32 z, f32 surface) {
     s16 kx = (s16)((s32)x >> 2);

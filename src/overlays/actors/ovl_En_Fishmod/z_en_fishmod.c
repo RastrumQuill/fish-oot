@@ -1226,7 +1226,7 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
             gFishmodDebugFocus = this->actor.world.pos;
             gFishmodDebugFocusYaw = this->actor.shape.rot.y;
             Fishmod_DebugPrintf(5, "fish%d %s %s", sCount, this->species->name, sStateNames[this->fishState]);
-            Fishmod_DebugPrintf(6, " d%d blk%d det%d cd%d", (s32)dist, this->blocked, this->detourTimer, this->cooldown);
+            Fishmod_DebugPrintf(6, " %d %d %d w%d f%d hh%d hl%d b%d", (s32)this->actor.world.pos.x, (s32)this->actor.world.pos.y, (s32)this->actor.world.pos.z, (s32)this->waterY, (s32)this->floorY, (s32)this->halfHeight, (s32)this->halfLength, this->blocked);
         }
     }
 #endif
