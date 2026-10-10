@@ -370,6 +370,11 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
                     button = BTN_A;
                 }
                 break;
+            case 7: // landed: keep it if there's an empty bottle, else release
+                if ((gFishmodRodInfo.choice != 0) && ((sAnglerTimer % 8) == 0)) {
+                    button = (gFishmodRodInfo.choice == 1) ? BTN_A : BTN_B;
+                }
+                break;
         }
         input->prev = input->cur;
         input->cur.button = button;

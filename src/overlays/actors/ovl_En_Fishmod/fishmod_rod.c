@@ -898,6 +898,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
     gFishmodRodInfo.nibbling = (ROD->fish != NULL) && (ROD->fish->fishState == FISH_STATE_NIBBLE);
     gFishmodRodInfo.tension = ROD->tension;
     gFishmodRodInfo.castPower = ROD->castPower;
+    gFishmodRodInfo.choice = ROD->choice;
 
 #if FISHMOD_DEBUG
     {
