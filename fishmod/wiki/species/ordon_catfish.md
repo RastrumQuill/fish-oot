@@ -2,7 +2,7 @@
 
 *Rare · from Twilight Princess · In game*
 
-*(render pending)*
+*(render pending: this fish is not in the game yet)*
 
 > A whiskered bottom-feeder first described by the villagers of Ordon. It lurks in the deepest, muddiest part of a pond and pulls like a stubborn goat once hooked.
 

@@ -346,9 +346,10 @@ s32 EnFishmod_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
 }
 
 // Whisker roots and tips in head limb space: { root, middle, tip }, mirrored on z for the other side.
+// In this space -x points forward out of the snout, +z to the side and -y down.
 static Vec3f sWhiskerPoints[][3] = {
-    { { 300.0f, -200.0f, 450.0f }, { -600.0f, -450.0f, 1700.0f }, { -1500.0f, -1300.0f, 2700.0f } },
-    { { 450.0f, -500.0f, 250.0f }, { 0.0f, -1200.0f, 700.0f }, { -400.0f, -2100.0f, 1100.0f } },
+    { { 900.0f, -150.0f, 350.0f }, { 600.0f, -500.0f, 1600.0f }, { 1100.0f, -1300.0f, 2600.0f } },  // long upper pair
+    { { 750.0f, -450.0f, 200.0f }, { 600.0f, -1100.0f, 600.0f }, { 900.0f, -1800.0f, 1000.0f } },   // short chin pair
 };
 
 static Vec3f sWhiskerWorld[4][3];
@@ -417,7 +418,7 @@ static void EnFishmod_DrawWhiskers(EnFishmod* this, PlayState* play) {
             Matrix_Translate(a->x, a->y, a->z, MTXMODE_NEW);
             Matrix_RotateY(Math_FAtan2F(dx, dz), MTXMODE_APPLY);
             Matrix_RotateX(-Math_FAtan2F(dy, distXZ), MTXMODE_APPLY);
-            Matrix_Scale(0.006f * this->actor.scale.z * 300.0f * (1.0f - k * 0.45f), 1.0f, dist * 0.001f,
+            Matrix_Scale(0.012f * this->actor.scale.z * 300.0f * (1.0f - k * 0.45f), 1.0f, dist * 0.001f,
                          MTXMODE_APPLY);
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
             gSPDisplayList(POLY_OPA_DISP++, gFishingLineModelDL);

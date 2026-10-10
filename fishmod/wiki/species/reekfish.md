@@ -2,7 +2,7 @@
 
 *Legendary · from Twilight Princess · Planned (not in the game yet)*
 
-*(render pending)*
+*(render pending: this fish is not in the game yet)*
 
 > A red fish with a smell so strong it can be tracked by nose. It lives only near the Zoras' home and ignores ordinary bait.
 

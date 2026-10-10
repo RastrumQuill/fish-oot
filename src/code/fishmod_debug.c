@@ -60,6 +60,14 @@ static u8 sPhotoSpecies[] = {
 static s32 sPhotoIndex = -1;
 static s32 sPhotoTimer;
 static Actor* sPhotoFish;
+// Size line-up after the portraits: every species at its typical size, smallest at the top.
+static u8 sLineupOrder[] = {
+    FISHMOD_SPECIES_GREENGILL,  FISHMOD_SPECIES_HYLIAN_LOACH,  FISHMOD_SPECIES_HYRULE_BASS,
+    FISHMOD_SPECIES_SANKE_CARP, FISHMOD_SPECIES_ORDON_CATFISH,
+};
+static Actor* sLineupFish[ARRAY_COUNT(sLineupOrder)];
+static f32 sMeasuredExtent[FISHMOD_SPECIES_MAX];
+static Vec3f sMeasuredOffset[FISHMOD_SPECIES_MAX]; // drawn center minus home position
 static s16 sPhotoCamId = SUB_CAM_ID_DONE;
 static Vec3f sPhotoEye;
 static Vec3f sPhotoAt;
@@ -85,21 +93,88 @@ static void Fishmod_PhotoUpdate(PlayState* play) {
     Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_NOTHING);
 
     if ((sPhotoIndex < 0) || (++sPhotoTimer >= PHOTO_FRAMES)) {
+        s32 numPortraits = (s32)ARRAY_COUNT(sPhotoSpecies) * PHOTO_POSES;
+        s32 i;
+
+        // remember how big each fish drew, for the line-up
+        if ((sPhotoIndex >= 0) && (sPhotoIndex < numPortraits) && (gFishmodPhoto.extent > 0.0f) &&
+            (sPhotoFish != NULL)) {
+            s32 sp = sPhotoSpecies[sPhotoIndex / PHOTO_POSES];
+
+            sMeasuredExtent[sp] = gFishmodPhoto.extent;
+            sMeasuredOffset[sp].x = gFishmodPhoto.center.x - sPhotoFish->world.pos.x;
+            sMeasuredOffset[sp].y = gFishmodPhoto.center.y - sPhotoFish->world.pos.y;
+            sMeasuredOffset[sp].z = gFishmodPhoto.center.z - sPhotoFish->world.pos.z;
+        }
+
         sPhotoTimer = 0;
         sPhotoIndex++;
-        if (sPhotoIndex >= (s32)ARRAY_COUNT(sPhotoSpecies) * PHOTO_POSES) {
+        if (sPhotoIndex > numPortraits) {
             sPhotoIndex = 0;
         }
         if (sPhotoFish != NULL) {
             Actor_Kill(sPhotoFish);
+            sPhotoFish = NULL;
         }
-        sPhotoFish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sPhotoPos.x, sPhotoPos.y, sPhotoPos.z, 0,
-                                 0, 0, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sPhotoSpecies[sPhotoIndex / PHOTO_POSES]));
-        if (sPhotoFish != NULL) {
-            sPhotoFish->room = -1;
+        for (i = 0; i < ARRAY_COUNT(sLineupFish); i++) {
+            if (sLineupFish[i] != NULL) {
+                Actor_Kill(sLineupFish[i]);
+                sLineupFish[i] = NULL;
+            }
+        }
+
+        if (sPhotoIndex < numPortraits) {
+            sPhotoFish =
+                Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sPhotoPos.x, sPhotoPos.y, sPhotoPos.z, 0, 0, 0,
+                            FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sPhotoSpecies[sPhotoIndex / PHOTO_POSES]));
+            if (sPhotoFish != NULL) {
+                sPhotoFish->room = -1;
+            }
+        } else {
+            f32 rowY = sPhotoPos.y;
+
+            for (i = 0; i < ARRAY_COUNT(sLineupOrder); i++) {
+                s32 sp = sLineupOrder[i];
+                f32 rowHeight = sMeasuredExtent[sp] * 0.35f + 4.0f;
+
+                rowY -= rowHeight;
+                sLineupFish[i] = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sPhotoPos.x - sMeasuredOffset[sp].x,
+                                             rowY - sMeasuredOffset[sp].y, sPhotoPos.z - sMeasuredOffset[sp].z, 0, 0, 0,
+                                             FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sp));
+                if (sLineupFish[i] != NULL) {
+                    sLineupFish[i]->room = -1;
+                }
+                rowY -= rowHeight;
+            }
         }
         gFishmodPhoto.marker = sPhotoIndex + 1;
         gFishmodPhoto.extent = 0.0f;
+    }
+
+    if (sPhotoIndex >= (s32)ARRAY_COUNT(sPhotoSpecies) * PHOTO_POSES) {
+        // line-up: frame the whole column
+        f32 top = sPhotoPos.y;
+        f32 bottom = sPhotoPos.y;
+        f32 widest = 0.0f;
+        s32 i;
+
+        for (i = 0; i < ARRAY_COUNT(sLineupOrder); i++) {
+            s32 sp = sLineupOrder[i];
+
+            bottom -= 2.0f * (sMeasuredExtent[sp] * 0.35f + 4.0f);
+            widest = CLAMP_MIN(widest, sMeasuredExtent[sp]);
+        }
+        gFishmodPhoto.yaw = sPhotoYaw;
+        gFishmodPhoto.pitch = 0;
+        sPhotoAt.x = sPhotoPos.x;
+        sPhotoAt.y = (top + bottom) * 0.5f;
+        sPhotoAt.z = sPhotoPos.z;
+        dist = CLAMP_MIN(widest * 1.25f * 1.35f, (top - bottom) * 1.05f);
+        sPhotoEye.x = sPhotoAt.x;
+        sPhotoEye.y = sPhotoAt.y;
+        sPhotoEye.z = sPhotoAt.z + dist;
+        Play_SetCameraAtEye(play, sPhotoCamId, &sPhotoAt, &sPhotoEye);
+        return;
     }
 
     species = &gFishmodSpecies[sPhotoSpecies[sPhotoIndex / PHOTO_POSES]];

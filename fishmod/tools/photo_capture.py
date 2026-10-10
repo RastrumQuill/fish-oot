@@ -24,6 +24,7 @@ PHOTOS = []
 for sp in ["greengill", "hyrule_bass", "ordon_catfish", "hylian_loach", "sanke_carp"]:
     PHOTOS.append(sp)
     PHOTOS.append(sp + "_34")
+PHOTOS.append("lineup")
 
 # Game area of the ares window on the 1280x960 virtual display
 GAME_BOX = (246, 178, 246 + 750, 178 + 570)
