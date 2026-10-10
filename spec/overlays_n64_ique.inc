@@ -3238,3 +3238,10 @@ beginseg
     flags OVERLAY
     include "$(BUILD_DIR)/src/overlays/actors/ovl_Obj_Warp2block/z_obj_warp2block.o"
 endseg
+
+beginseg
+    name "ovl_En_Fishmod"
+    compress
+    flags OVERLAY
+    include "$(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/z_en_fishmod.o"
+endseg
