@@ -77,6 +77,9 @@ typedef struct EnFishmod {
     /* 0x3B8 */ f32 halfHeight;
     /* 0x3BC */ u8 limbMode[EN_FISHMOD_MAX_LIMBS]; // EnFishmodLimbMode: the cheapest way to apply the part scales
     /* 0x3CC */ u8 lastTintPart;                   // during a draw: the part whose tint is currently set
+    /* 0x3CD */ u8 blocked;                        // the last SwimToward hit the shore (debug display)
+    /* 0x3CE */ s16 detourYaw;                     // heading around a bank that was in the way
+    /* 0x3D0 */ s16 detourTimer;                   // frames left to follow detourYaw
 #if FISHMOD_OPT >= 2
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];

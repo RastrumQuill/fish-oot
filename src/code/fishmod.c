@@ -18,6 +18,7 @@
 #include "interface.h"
 #include "item.h"
 #include "message.h"
+#include "message_data_fmt.h"
 #include "save.h"
 #include "sfx.h"
 #include "z_lib.h"
@@ -147,6 +148,156 @@ s32 Fishmod_RecordCatch(s32 species, f32 lengthInches) {
         return !isFirst; // the first catch of a species isn't announced as a record
     }
     return false;
+}
+
+/* ---------------------------------------------------------------------------------------------------------------
+ * Fishing journal: extra pages on the records plaque in Link's house (message 0x22A)
+ */
+
+static u8* Journal_Put(u8* p, u8* end, const char* str) {
+    while ((*str != '\0') && (p < end)) {
+        *p++ = (u8)*str++;
+    }
+    return p;
+}
+
+static u8* Journal_PutNum(u8* p, u8* end, u32 value) {
+    char digits[10];
+    s32 n = 0;
+
+    do {
+        digits[n++] = '0' + (value % 10);
+        value /= 10;
+    } while ((value != 0) && (n < ARRAY_COUNT(digits)));
+    while ((n > 0) && (p < end)) {
+        *p++ = (u8)digits[--n];
+    }
+    return p;
+}
+
+static u8* Journal_PutColor(u8* p, u8* end, u8 color) {
+    if (p + 2 <= end) {
+        *p++ = MESSAGE_COLOR;
+        *p++ = 0x40 | color;
+    }
+    return p;
+}
+
+/** Every species that can be caught somewhere, in spawn table order. Returns how many. */
+static s32 Journal_Species(u8* out) {
+    s32 count = 0;
+    s32 i;
+    s32 j;
+    s32 k;
+
+    for (i = 0; i < gFishmodSceneSpawnsCount; i++) {
+        for (j = 0; j < gFishmodSceneSpawns[i].count; j++) {
+            u8 species = gFishmodSceneSpawns[i].entries[j].species;
+
+            for (k = 0; k < count; k++) {
+                if (out[k] == species) {
+                    break;
+                }
+            }
+            if ((k == count) && (count < FISHMOD_SPECIES_MAX)) {
+                out[count++] = species;
+            }
+        }
+    }
+    return count;
+}
+
+/**
+ * Called when message `textId` has just been loaded into `buf` (`*length` bytes, room for `size`). After the
+ * vanilla "Link's Records" page, adds the fishing journal: kinds caught, then for each species how many and the
+ * biggest, or ??? until one is caught.
+ */
+void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size) {
+    u8 species[FISHMOD_SPECIES_MAX];
+    s32 numSpecies;
+    s32 caughtKinds = 0;
+    s32 i;
+    u8* p;
+    u8* end = buf + size - 2;
+    s32 last;
+
+    if (textId != 0x22A) {
+        return;
+    }
+    // messages are padded after their end code
+    last = *length - 1;
+    while ((last > 0) && (buf[last] == 0)) {
+        last--;
+    }
+    if ((last <= 0) || (buf[last] != MESSAGE_END)) {
+        return;
+    }
+    *length = last + 1;
+
+    numSpecies = Journal_Species(species);
+    for (i = 0; i < numSpecies; i++) {
+        if (FISHMOD_SAVE->records[species[i]].count != 0) {
+            caughtKinds++;
+        }
+    }
+
+    // replace the end of the vanilla page with a box break and keep going
+    p = buf + *length - 1;
+    *p++ = MESSAGE_BOX_BREAK;
+    *p++ = MESSAGE_QUICKTEXT_ENABLE;
+    p = Journal_PutColor(p, end, TEXT_COLOR_RED);
+    p = Journal_Put(p, end, "Fishing Journal");
+    p = Journal_PutColor(p, end, TEXT_COLOR_DEFAULT);
+    *p++ = MESSAGE_NEWLINE;
+    p = Journal_Put(p, end, "Kinds of fish caught: ");
+    p = Journal_PutNum(p, end, caughtKinds);
+    p = Journal_Put(p, end, " of ");
+    p = Journal_PutNum(p, end, numSpecies);
+
+    // two species per box
+    for (i = 0; i < numSpecies; i++) {
+        const FishmodSpecies* sp = &gFishmodSpecies[species[i]];
+        FishmodSpeciesRecord* record = &FISHMOD_SAVE->records[species[i]];
+
+        if (p + 64 > end) {
+            break;
+        }
+        *p++ = ((i % 2) == 0) ? MESSAGE_BOX_BREAK : MESSAGE_NEWLINE;
+        if (record->count == 0) {
+            p = Journal_PutColor(p, end, TEXT_COLOR_BLUE);
+            p = Journal_Put(p, end, "???");
+            p = Journal_PutColor(p, end, TEXT_COLOR_DEFAULT);
+            *p++ = MESSAGE_NEWLINE;
+            p = Journal_Put(p, end, "  Not caught yet");
+        } else {
+            f32 inches = record->bestTenths * 0.1f;
+            f32 pounds = sp->weightCoef * inches * inches * inches * 0.000001f;
+
+            p = Journal_PutColor(p, end, TEXT_COLOR_YELLOW);
+            p = Journal_Put(p, end, sp->name);
+            p = Journal_PutColor(p, end, TEXT_COLOR_DEFAULT);
+            *p++ = MESSAGE_NEWLINE;
+            p = Journal_Put(p, end, "  Caught ");
+            p = Journal_PutNum(p, end, record->count);
+            p = Journal_Put(p, end, ", best ");
+            p = Journal_PutNum(p, end, record->bestTenths / 10);
+            p = Journal_Put(p, end, ".");
+            p = Journal_PutNum(p, end, record->bestTenths % 10);
+            p = Journal_Put(p, end, " in, ");
+            if (pounds < 1.0f) {
+                p = Journal_PutNum(p, end, (u32)(pounds * 16.0f + 0.5f));
+                p = Journal_Put(p, end, " oz");
+            } else {
+                p = Journal_PutNum(p, end, (u32)pounds);
+                p = Journal_Put(p, end, ".");
+                p = Journal_PutNum(p, end, (u32)(pounds * 10.0f) % 10);
+                p = Journal_Put(p, end, " lbs");
+            }
+        }
+    }
+    *p++ = MESSAGE_QUICKTEXT_DISABLE;
+    *p++ = MESSAGE_END;
+    *length = p - buf;
 }
 
 s32 Fishmod_CanUseRod(PlayState* play) {

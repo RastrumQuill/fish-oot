@@ -175,6 +175,8 @@ typedef struct FishmodSaveData {
 
 /** Records a catch. Returns true if it is a new size record for its species. */
 s32 Fishmod_RecordCatch(s32 species, f32 lengthInches);
+// Adds the fishing journal to the records plaque in Link's house (called by the message system)
+void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size);
 
 #if FISHMOD_DEBUG
 // CPU time spent per frame, for the debug timing line
