@@ -177,6 +177,10 @@ typedef struct FishmodSaveData {
 s32 Fishmod_RecordCatch(s32 species, f32 lengthInches);
 // Adds the fishing journal to the records plaque in Link's house (called by the message system)
 void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size);
+#if FISHMOD_TESTMODE
+// A new file in a test-mode build skips the intro and starts with bottles, a slingshot, the Goron's Bracelet etc.
+void Fishmod_InitTestSave(void);
+#endif
 // The catch textbox: the reused vanilla text id it shows under, and the call that opens it
 #define FISHMOD_CATCH_TEXT_ID 0x4083
 void Fishmod_ShowCatchMessage(struct PlayState* play, const char* name, const char* size, s32 newRecord,
@@ -208,10 +212,16 @@ typedef struct FishmodAutoplayStep {
     /* 0x02 */ u16 button;
     /* 0x04 */ s8 stickX;
     /* 0x05 */ s8 stickY;
-} FishmodAutoplayStep; // size = 0x6
+    /* 0x06 */ u8 inPlay; // count only frames of gameplay (not menus or loading), e.g. to wait for Link to be in
+    // If set: instead of holding the button, press it every `frames` frames until the pause menu's state is
+    // untilPause - 1 (e.g. PAUSE_STATE_MAIN + 1: until the pause menu is open and ready)
+    /* 0x07 */ u8 untilPause;
+} FishmodAutoplayStep; // size = 0x8
 
 #if FISHMOD_DEBUG
 void Fishmod_DebugBoot(void);
+// True if the autoplay script wants a normal boot (logo, title, file select) instead of going straight to Kokiri
+s32 Fishmod_DebugNormalBoot(void);
 void Fishmod_AutoplayInput(struct GameState* gameState, Input* inputs);
 void Fishmod_DebugPlayUpdate(struct PlayState* play);
 void Fishmod_DebugDrawText(struct GameState* gameState, Gfx** gfxP);

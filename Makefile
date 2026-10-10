@@ -231,6 +231,13 @@ ifneq ($(FISHMOD_OPT),0)
   COMPARE := 0
 endif
 
+# FISHMOD_TESTMODE=1: new files skip the intro and start with testing items (bottles, slingshot, bracelet...)
+FISHMOD_TESTMODE ?= 0
+ifeq ($(FISHMOD_TESTMODE),1)
+  CPP_DEFINES += -DFISHMOD_TESTMODE=1
+  COMPARE := 0
+endif
+
 FISHMOD_DEBUG ?= 0
 FISHMOD_SCRIPT ?=
 ifeq ($(FISHMOD_DEBUG),1)

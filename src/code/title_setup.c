@@ -12,11 +12,13 @@ void Setup_InitImpl(SetupState* this) {
     SaveContext_Init();
     this->state.running = false;
 #if FISHMOD_DEBUG
-    Fishmod_DebugBoot();
-    SET_NEXT_GAMESTATE(&this->state, Play_Init, PlayState);
-#else
-    SET_NEXT_GAMESTATE(&this->state, ConsoleLogo_Init, ConsoleLogoState);
+    if (!Fishmod_DebugNormalBoot()) {
+        Fishmod_DebugBoot();
+        SET_NEXT_GAMESTATE(&this->state, Play_Init, PlayState);
+        return;
+    }
 #endif
+    SET_NEXT_GAMESTATE(&this->state, ConsoleLogo_Init, ConsoleLogoState);
 }
 
 void Setup_Destroy(UNUSED GameState* thisx) {

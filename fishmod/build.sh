@@ -7,6 +7,7 @@
 #   --script NAME  (implies --debug) play fishmod/scripts/NAME.inc.c as autoplay input
 #   --f3dex3       use the F3DEX3 graphics microcode (see fishmod/f3dex3); outputs get an -f3dex3 suffix
 #   --opt N        performance test set N (1 or 2, see the Makefile); outputs get an -optN suffix
+#   --testmode     new files skip the intro and start with testing items; outputs get a -test suffix
 # Needs `flips` on PATH (or FLIPS=/path/to/flips) for the release patch.
 set -euo pipefail
 
@@ -23,6 +24,7 @@ DEBUG=0
 SCRIPT=""
 F3DEX3=0
 OPT=0
+TESTMODE=0
 MAKE_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -30,6 +32,7 @@ while [ $# -gt 0 ]; do
         --script) DEBUG=1; SCRIPT="$2"; shift ;;
         --f3dex3) F3DEX3=1 ;;
         --opt) OPT="$2"; shift ;;
+        --testmode) TESTMODE=1 ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
     shift
@@ -57,7 +60,7 @@ mkdir -p "$OUT_DIR"
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT testmode=$TESTMODE"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -70,7 +73,7 @@ if [ -n "$SCRIPT" ]; then
     touch "fishmod/scripts/$SCRIPT.inc.c"
 fi
 
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -82,6 +85,9 @@ if [ "$F3DEX3" = 1 ]; then
 fi
 if [ "$OPT" != 0 ]; then
     SUFFIX="$SUFFIX-opt$OPT"
+fi
+if [ "$TESTMODE" = 1 ]; then
+    SUFFIX="$SUFFIX-test"
 fi
 
 if [ "$DEBUG" = 1 ]; then
