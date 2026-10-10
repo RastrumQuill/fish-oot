@@ -1,3 +1,4 @@
+#include "fishmod.h"
 #include "libc64/os_malloc.h"
 #include "libc64/sleep.h"
 #include "libc64/sprintf.h"
@@ -456,6 +457,11 @@ void Fault_WaitForButtonCombo(void) {
     s32 y;
     s32 count;
     STACK_PADS(s32, 4);
+
+#if FISHMOD_DEBUG
+    // fishmod debug builds show the crash screen right away
+    return;
+#endif
 
     // "KeyWaitB (L R Z Up Down Up Down Left Left Right Right B A START)"
     osSyncPrintf(VT_FGCOL(WHITE) T("KeyWaitB (ＬＲＺ ", "KeyWaitB (L R Z ") VT_FGCOL(WHITE) T("上", "Up ")
