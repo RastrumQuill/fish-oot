@@ -381,7 +381,13 @@ void EnFishmod_RodDestroy(EnFishmod* this, PlayState* play) {
     EnFishmod_WaterGridDestroy(play);
 }
 
+/** The area's music comes back after the fish-on music (it only restores if the fish-on music is playing). */
+static void Rod_StopFightMusic(void) {
+    func_800F5B58();
+}
+
 static void Rod_EndCast(PlayState* play, Player* player) {
+    Rod_StopFightMusic();
     ROD->state = ROD_STATE_HELD;
     ROD->biting = false;
     ROD->fish = NULL;
@@ -402,12 +408,14 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     Rumble_Override(0.0f, 180, 20, 10);
     Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
     EnFishmod_RodMessage(1, "Hooked!", NULL);
+    func_800F5ACC(NA_BGM_FISHMOD_FIGHT); // fish-on music in place of the area's, until the fight ends
 }
 
 static void Rod_LoseFish(PlayState* play, Player* player, const char* why) {
     EnFishmod* fish = ROD->fish;
 
     gFishmodRodInfo.lost++;
+    Rod_StopFightMusic();
     if (fish != NULL) {
         EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
     }
@@ -557,6 +565,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         EnFishmod_FishSetState(fish, FISH_STATE_CAUGHT);
         Rumble_Override(0.0f, 120, 10, 5);
         Sfx_PlaySfxCentered(NA_SE_EV_JUMP_OUT_WATER);
+        Rod_StopFightMusic();
         Audio_PlayFanfare(NA_BGM_ITEM_GET | 0x900);
 
         sCatchRecord = Fishmod_RecordCatch(fish->species - gFishmodSpecies, fish->lengthInches);
