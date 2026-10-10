@@ -20,7 +20,8 @@ struct GfxPrint;
 typedef enum FishmodBaseModel {
     /* 0 */ FISHMOD_BASE_BASS,
     /* 1 */ FISHMOD_BASE_LOACH,
-    /* 2 */ FISHMOD_BASE_JABU
+    /* 2 */ FISHMOD_BASE_JABU,
+    /* 3 */ FISHMOD_BASE_SMALL // the generic fish from gameplay_keep (the one you can put in a bottle)
 } FishmodBaseModel;
 
 typedef enum FishmodDepth {

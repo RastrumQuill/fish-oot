@@ -4,6 +4,7 @@
  * Description: Link
  */
 
+#include "fishmod.h"
 #include "src/overlays/actors/ovl_Bg_Heavy_Block/z_bg_heavy_block.h"
 #include "src/overlays/actors/ovl_Demo_Kankyo/z_demo_kankyo.h"
 #include "src/overlays/actors/ovl_En_Boom/z_en_boom.h"
@@ -6635,7 +6636,10 @@ s32 func_8083C6B8(PlayState* play, Player* this) {
 #if OOT_VERSION < NTSC_1_1
             if (BgCheck_SphVsFirstPoly(&play->colCtx, &rodCheckPos, 20.0f))
 #else
-            if (!(this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) || (this->actor.world.pos.z > 1300.0f) ||
+            // fishmod: outside the pond, casting needs the fishing controller of a fishing scene
+            if (!(this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) ||
+                ((play->sceneId == SCENE_FISHING_POND) ? (this->actor.world.pos.z > 1300.0f)
+                                                       : !Fishmod_CanUseRod(play)) ||
                 BgCheck_SphVsFirstPoly(&play->colCtx, &rodCheckPos, 20.0f))
 #endif
             {

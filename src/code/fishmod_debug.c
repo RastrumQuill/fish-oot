@@ -52,7 +52,7 @@ static FishmodAutoplayStep sScriptSteps[] = {
  */
 static u8 sPhotoSpecies[] = {
     FISHMOD_SPECIES_GREENGILL,    FISHMOD_SPECIES_HYRULE_BASS, FISHMOD_SPECIES_ORDON_CATFISH,
-    FISHMOD_SPECIES_HYLIAN_LOACH, FISHMOD_SPECIES_SANKE_CARP,
+    FISHMOD_SPECIES_HYLIAN_LOACH, FISHMOD_SPECIES_SANKE_CARP,  FISHMOD_SPECIES_HYRULE_MINNOW,
 };
 #define PHOTO_POSES 2
 #define PHOTO_FRAMES 100
@@ -62,7 +62,7 @@ static s32 sPhotoTimer;
 static Actor* sPhotoFish;
 // Size line-up after the portraits: every species at its typical size, smallest at the top.
 static u8 sLineupOrder[] = {
-    FISHMOD_SPECIES_GREENGILL,  FISHMOD_SPECIES_HYLIAN_LOACH,  FISHMOD_SPECIES_HYRULE_BASS,
+    FISHMOD_SPECIES_HYRULE_MINNOW, FISHMOD_SPECIES_GREENGILL,  FISHMOD_SPECIES_HYLIAN_LOACH,  FISHMOD_SPECIES_HYRULE_BASS,
     FISHMOD_SPECIES_SANKE_CARP, FISHMOD_SPECIES_ORDON_CATFISH,
 };
 static Actor* sLineupFish[ARRAY_COUNT(sLineupOrder)];
@@ -135,7 +135,7 @@ static void Fishmod_PhotoUpdate(PlayState* play) {
 
             for (i = 0; i < ARRAY_COUNT(sLineupOrder); i++) {
                 s32 sp = sLineupOrder[i];
-                f32 rowHeight = sMeasuredExtent[sp] * 0.35f + 4.0f;
+                f32 rowHeight = sMeasuredExtent[sp] * 0.25f + 2.0f;
 
                 rowY -= rowHeight;
                 sLineupFish[i] = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sPhotoPos.x - sMeasuredOffset[sp].x,
@@ -161,7 +161,7 @@ static void Fishmod_PhotoUpdate(PlayState* play) {
         for (i = 0; i < ARRAY_COUNT(sLineupOrder); i++) {
             s32 sp = sLineupOrder[i];
 
-            bottom -= 2.0f * (sMeasuredExtent[sp] * 0.35f + 4.0f);
+            bottom -= 2.0f * (sMeasuredExtent[sp] * 0.25f + 2.0f);
             widest = CLAMP_MIN(widest, sMeasuredExtent[sp]);
         }
         gFishmodPhoto.yaw = sPhotoYaw;

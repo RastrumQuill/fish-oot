@@ -3244,4 +3244,5 @@ beginseg
     compress
     flags OVERLAY
     include "$(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/z_en_fishmod.o"
+    include "$(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/fishmod_rod.o"
 endseg

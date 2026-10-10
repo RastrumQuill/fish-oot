@@ -22,6 +22,21 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 100, 100, 100 }, { 100, 115, 100 }, { 100, 100, 100 }, { 85, 100, 100 }, { 100, 120, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
     },
+    /* FISHMOD_SPECIES_HYRULE_MINNOW */ {
+        "Hyrule Minnow",
+        FISHMOD_BASE_SMALL,
+        FISHMOD_DEPTH_SURFACE,
+        1, 2, 0x7,
+        { 100, 90, 100 },
+        { 255, 255, 255 },
+        2, 4, 7,
+        400, /* weight = coef * length^3 / 100000 lbs */
+        { 95, 80, 30, 10, 15, 70, 20, 3, 12 },
+        { 120, 140, 120, 130, 0, 0 },
+        { { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 } },
+        { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 110, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
+        0,
+    },
     /* FISHMOD_SPECIES_HYRULE_BASS */ {
         "Hyrule Bass",
         FISHMOD_BASE_BASS,
@@ -146,6 +161,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
 
 static const FishmodSpawnEntry sFishmodSpawns_KOKIRI_FOREST[] = {
     { FISHMOD_SPECIES_GREENGILL, 60 },
+    { FISHMOD_SPECIES_HYRULE_MINNOW, 45 },
     { FISHMOD_SPECIES_HYRULE_BASS, 25 },
     { FISHMOD_SPECIES_ORDON_CATFISH, 10 },
     { FISHMOD_SPECIES_HYLIAN_LOACH, 2 },
