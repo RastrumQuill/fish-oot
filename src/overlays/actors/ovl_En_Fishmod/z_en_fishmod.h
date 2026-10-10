@@ -6,6 +6,7 @@
 #include "fishmod.h"
 
 #define EN_FISHMOD_MAX_LIMBS 16
+#define EN_FISHMOD_POSE_GFX_MAX 72
 
 // Texture roles: each is drawn from its own segment (0x08 + role) so species can swap in patterned textures.
 typedef enum FishmodTexRole {
@@ -74,6 +75,16 @@ typedef struct EnFishmod {
     /* 0x3B3 */ u8 beached;     // reeled up onto the bank: it counts as landed
     /* 0x3B4 */ f32 halfLength; // body size in world units, for keeping it inside the water
     /* 0x3B8 */ f32 halfHeight;
+    /* 0x3BC */ u8 limbMode[EN_FISHMOD_MAX_LIMBS]; // EnFishmodLimbMode: the cheapest way to apply the part scales
+    /* 0x3CC */ u8 lastTintPart;                   // during a draw: the part whose tint is currently set
+#if FISHMOD_OPT >= 2
+    // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
+    Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
+    Gfx poseGfx[EN_FISHMOD_POSE_GFX_MAX];
+    u16 poseGfxCount;
+    u16 poseMtxCount;
+    u32 poseFrame; // gameplay frame the pose was captured on
+#endif
 } EnFishmod;
 
 /* Rod controller (fishmod_rod.c) */

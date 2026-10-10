@@ -1,3 +1,6 @@
+#if FISHMOD_OPT >= 1
+#include "ultra64/libc.h"
+#endif
 #include "libu64/debug.h"
 #include "array_count.h"
 #include "attributes.h"
@@ -3942,11 +3945,16 @@ void func_800418D0(CollisionContext* colCtx, PlayState* play) {
  * Reset SSNodeList polyCheckTbl
  */
 void BgCheck_ResetPolyCheckTbl(SSNodeList* nodeList, s32 numPolys) {
+#if FISHMOD_OPT >= 1
+    // fishmod: same result, cleared in large chunks instead of a byte at a time
+    bzero(nodeList->polyCheckTbl, numPolys);
+#else
     u8* t;
 
     for (t = nodeList->polyCheckTbl; t < nodeList->polyCheckTbl + numPolys; t++) {
         *t = 0;
     }
+#endif
 }
 
 /**
