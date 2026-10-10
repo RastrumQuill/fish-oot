@@ -48,7 +48,10 @@ FishmodRod gFishmodRodState;
 #define FISH_COUNT 10
 #define WINDUP_FRAMES 18
 #define LINE_MIN 28.0f
-#define LINE_MAX 420.0f
+#define LINE_MAX_BASE 460.0f
+// Strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) let Link cast further and play out more line
+#define STRENGTH_CAST_SCALE() (1.0f + 0.2f * CUR_UPG_VALUE(UPG_STRENGTH))
+#define LINE_MAX (LINE_MAX_BASE * STRENGTH_CAST_SCALE())
 #define LINE_SEGMENTS 16
 
 static void Rod_UpdateLineFloor(PlayState* play);
@@ -725,7 +728,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
             if (--ROD->timer <= 0) {
                 s16 yaw = player->actor.shape.rot.y + ROD->castYaw;
                 f32 power = CLAMP(ROD->castPower, 0.0f, 1.0f);
-                f32 speed = 1.5f + power * 13.0f;
+                f32 speed = (2.0f + power * 16.0f) * STRENGTH_CAST_SCALE();
 
                 ROD->state = ROD_STATE_FLYING;
                 ROD->timer = 0;
@@ -735,7 +738,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->bobberPos.z = player->actor.world.pos.z + Math_CosS(yaw) * 30.0f;
                 ROD->bobberVel.x = Math_SinS(yaw) * speed;
                 ROD->bobberVel.z = Math_CosS(yaw) * speed;
-                ROD->bobberVel.y = 3.0f + power * 4.0f;
+                ROD->bobberVel.y = 4.0f + power * 5.0f;
                 ROD->dip = ROD->dipTarget = 0.0f;
                 ROD->zoom = (power > 0.6f) ? 1 : 0;
                 Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
