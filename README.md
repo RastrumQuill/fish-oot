@@ -1,203 +1,92 @@
-# The Legend of Zelda: Ocarina of Time
+# fish-oot
 
-[![Build Status][gha-badge]][gha] [![Decompilation Progress][progress-badge]][progress] [![Contributors][contributors-badge]][contributors] [![Discord Channel][discord-badge]][discord]
+**Twilight Princess-style fishing for Ocarina of Time on the N64.**
 
-[gha]: https://github.com/zeldaret/oot/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush
-[gha-badge]: https://img.shields.io/github/actions/workflow/status/zeldaret/oot/ci.yml
+Fish swim in the overworld's ponds and rivers. Cast a bobber anywhere there's water, read the nibbles, set
+the hook on the real bite, and fight the fish on a tension gauge in the style of Sega Bass Fishing. Every
+species is modeled on the fish of Twilight Princess, Ocarina of Time and Breath of the Wild, and each has its
+own size range, habits and favorite bait.
 
-[progress]: https://zelda.deco.mp/games/oot
-[progress-badge]: https://img.shields.io/endpoint?url=https://zelda.deco.mp/assets/csv/progress-oot-shield.json
+It ships as a `.bps` patch for your own ROM and runs on real hardware (no Expansion Pak needed) and in accurate
+emulators like [ares](https://ares-emu.net/).
 
-[contributors]: https://github.com/zeldaret/oot/graphs/contributors
-[contributors-badge]: https://img.shields.io/github/contributors/zeldaret/oot
+> **Status:** early. Kokiri Forest only for now; the fishing loop is being tuned there before any other area
+> gets fish.
 
-[discord]: https://discord.zelda.deco.mp
-[discord-badge]: https://img.shields.io/discord/688807550715560050?color=%237289DA&logo=discord&logoColor=%23FFFFFF
+<img src="fishmod/wiki/img/lineup.jpg" width="420">
 
-```diff
-- WARNING! -
+## Playing
 
-This repository is a work in progress, and while it can be used to make certain changes, it's still
-constantly evolving. If you use it for modding purposes in its current state, please be aware that
-the codebase can drastically change at any time. Also note that some parts of the ROM may not be
-'shiftable' yet, so modifying them could be difficult at this point.
-```
+1. Get `fish-oot.bps` from a release (or build it, below).
+2. Apply it to an **Ocarina of Time NTSC 1.2 (US)** ROM in big-endian `.z64` order with
+   [Flips](https://github.com/Alcaro/Flips) or the [online patcher](https://www.marcrobledo.com/RomPatcher.js/).
+   - Expected input MD5: `57a9719ad547c516342e1a15d5c28c3d`.
+   - `.v64` / `.n64` ROMs: convert first with `python3 fishmod/tools/to_z64.py in.v64 out.z64`.
+3. Play on an emulator or on a flashcart.
 
-This is a WIP **decompilation** of ***The Legend of Zelda: Ocarina of Time***. The purpose of the project is to recreate a source code base for the game from scratch, using information found inside the game along with static and/or dynamic analysis. **It is not producing a PC port.** For more information you can get in touch with the team on our [Discord server][discord].
+### Controls
 
-It builds the following versions:
+| | |
+|---|---|
+| **L** (in Kokiri Forest) | Put the fishing rod on B / back to your sword |
+| **B** (hold, release) | Take out the rod; hold to charge a cast, release to throw. The stick aims |
+| **A** (while the bobber flies) | Brake the line for a shorter cast |
+| **Stick flick** | Twitch the bobber to draw fish in |
+| **B** | Set the hook when the bobber is pulled under (not on the little nibbles!) |
+| **A** / **R + A** | Reel in / reel in fast |
+| **Stick** (while fighting) | Hold against the fish's run to tire it faster |
+| **Z** | Zoom the camera on the bobber |
 
-| Name         | Build timestamp   | Description                               | MD5 hash of input ROM(s) |
-|--------------|-------------------|-------------------------------------------|--------------------------|
-| ntsc-1.0     | 98-10-21 04:56:31 | NTSC 1.0 (Japan/US)                       | `9f04c8e68534b870f707c247fa4b50fc`<br>`5bd1fe107bf8106b2ab6650abecd54d6` |
-| ntsc-1.1     | 98-10-26 10:58:45 | NTSC 1.1 (Japan/US)                       | `1bf5f42b98c3e97948f01155f12e2d88`<br>`721fdcc6f5f34be55c43a807f2a16af4` |
-| pal-1.0      | 98-11-10 14:34:22 | PAL 1.0 (Europe)                          | `e040de91a74b61e3201db0e2323f768a` |
-| ntsc-1.2     | 98-11-12 18:17:03 | NTSC 1.2 (Japan/US)                       | `2258052847bdd056c8406a9ef6427f13`<br>`57a9719ad547c516342e1a15d5c28c3d` |
-| pal-1.1      | 98-11-18 17:36:49 | PAL 1.1 (Europe)                          | `d714580dd74c2c033f5e1b6dc0aeac77` |
-| gc-jp        | 02-10-29 23:49:53 | GameCube Japan                            | `33fb7852c180b18ea0b9620b630f413f` |
-| gc-jp-mq     | 02-10-30 00:15:15 | GameCube Japan Master Quest               | `69895c5c78442260f6eafb2506dc482a` |
-| gc-us        | 02-12-19 13:28:09 | GameCube US                               | `cd09029edcfb7c097ac01986a0f83d3f` |
-| gc-us-mq     | 02-12-19 14:05:42 | GameCube US Master Quest                  | `da35577fe54579f6a266931cc75f512d` |
-| gc-eu-dbg-2  | 03-02-13 19:46:49 | GameCube Europe/PAL Debug (earlier build) | `ab1ca59d0039e3b34d82db650b54d7b9`<br>`2814fde8d6cfe23a220de6be955b4196` |
-| gc-eu-mq-dbg | 03-02-21 00:16:31 | GameCube Europe/PAL Master Quest Debug    | `75e344f41c26ec2ec5ad92caa9e25629`<br>`8ca71e87de4ce5e9f6ec916202a623e9`<br>`f751d1a097764e2337b1ac9ba1e27699`<br>`dde376d47187b931820d5b2957cded14` |
-| gc-eu-dbg    | 03-02-21 00:49:18 | GameCube Europe/PAL Debug                 | `3c10b67a76616ae2c162def7528724cf`<br>`382dc484e317d6522745c95387e7d5b9` |
-| gc-eu        | 03-02-21 20:12:23 | GameCube Europe/PAL                       | `2c27b4e000e85fd78dbca551f1b1c965` |
-| gc-eu-mq     | 03-02-21 20:37:19 | GameCube Europe/PAL Master Quest          | `1618403427e4344a57833043db5ce3c3` |
-| gc-jp-ce     | 03-10-08 21:53:00 | GameCube Japan (Collector's Edition Disc) | `0c13e0449a28ea5b925cdb8af8d29768` |
-| ique-cn      | 03-10-22 16:23:19 | iQue Player (Simplified Chinese)          | `0ab48b2d44a74b3bb2d384f6170c2742` |
+While fighting, keep the **tension** gauge in the green: too high and the line snaps, too slack and the fish
+shakes the hook. Reel a tired fish in to land it.
 
-The default version is `gc-eu-mq-dbg`, i.e. the GameCube Europe/PAL Master Quest Debug ROM.
+## Fish
 
-**Note: This repository does not include any of the assets necessary to build the ROM. A prior copy of the game is required to extract the needed assets.**
+See the **[wiki](fishmod/wiki/README.md)** for every species with in-game renders, flavor text, size and
+weight ranges, behavior and bait, plus [how the fish are modeled](fishmod/wiki/modeling.md) and the
+[research notes](fishmod/wiki/research.md).
 
-**Website:** <https://zelda.deco.mp>
+| Kokiri Forest | |
+|---|---|
+| Hyrule Minnow | tiny, curious, everywhere |
+| Greengill | the classic first catch |
+| Hyrule Bass | strikes hard, jumps |
+| Sanke Carp | ornamental koi, rare |
+| Ordon Catfish | bottom-dweller, night, long fights |
+| Hylian Loach | legendary, very wary |
 
-**Discord:** <https://discord.zelda.deco.mp>
+## Building
 
-## Installation
-
-We recommend using WSL on Windows, or native Linux, which the rest of this readme describes. We currently have instructions for
-
-* [Windows](#Windows), with and without WSL
-* [macOS](docs/BUILDING_MACOS.md)
-* [Linux](#Linux-Native-or-under-WSL--VM), natively or using WSL / VM
-* [Docker](docs/BUILDING_DOCKER.md)
-
-(These will also depend on the Linux instructions.)
-Some of these may also be out of date or unmaintained; usually our contributors use WSL, Linux, and macOS, so these instructions should be up to date.
-
-### Windows
-
-For Windows 10 or 11, install WSL and a distribution by following this
-[WSL Installation Guide](https://learn.microsoft.com/en-us/windows/wsl/install).
-We recommend using Ubuntu as the Linux distribution.
-
-For older versions of Windows, install a Linux VM or refer to [Docker](docs/BUILDING_DOCKER.md) instructions.
-
-
-### Linux (Native or under WSL / VM)
-
-#### 1. Install build dependencies
-
-The build process has the following package requirements:
-
-* git
-* build-essential
-* curl
-* python3
-* python3-pip
-* python3-venv
-* libxml2-dev
-
-Python 3.10+ is required.
-
-Under Debian / Ubuntu (which we recommend using), you can install them with the following commands:
+The mod is built on the [zeldaret/oot](https://github.com/zeldaret/oot) decompilation; this repository is
+the decomp (imported unmodified in its first commit) with the mod's changes on top. Follow the decomp's setup
+in [docs/DECOMP_README.md](docs/DECOMP_README.md) for version `ntsc-1.2` (Linux or WSL), then:
 
 ```bash
-sudo apt-get update
-sudo apt-get install git build-essential curl python3 python3-pip python3-venv libxml2-dev
+cp /path/to/your/rom baseroms/ntsc-1.2/baserom.z64   # .z64, .v64 or .n64
+make setup VERSION=ntsc-1.2
+fishmod/build.sh                                     # -> fishmod/out/fish-oot.z64 and fish-oot.bps
 ```
 
-In addition to these packages, a MIPS binutils installation is required. The project aims to support a couple of commonly-encountered MIPS toolchains out-of-the-box, only one is required and is automatically detected:
+`fishmod/build.sh` needs [Flips](https://github.com/Alcaro/Flips) on `PATH` (or `FLIPS=/path/to/flips`).
+To check the toolchain on an unmodified tree, `make VERSION=ntsc-1.2 REGION=US rom compress` should end with
+`oot-ntsc-1.2-compressed.z64: OK`.
 
-* mips64-ultra-elf- or mips64- from the [practicerom toolchain](https://github.com/PracticeROM/packages)
-* mips64-elf- from the [libdragon n64 homebrew library](https://github.com/DragonMinded/libdragon/releases/tag/toolchain-continuous-prerelease)
-* mips-linux-gnu- or mips64-linux-gnu- found in common distribution package managers as e.g. `binutils-mips-linux-gnu`
+### Development
 
-If none of these are available to install, the makefile exposes `MIPS_BINUTILS_PREFIX` as a means to set your own toolchain prefix. Otherwise, consider building one of the first two options from source.
+| | |
+|---|---|
+| `fishmod/data/species.json` | every species: looks, sizes, behavior, bait, flavor text. `fishmod/tools/gen_species.py` and `gen_textures.py` turn it into game data and the wiki |
+| `src/overlays/actors/ovl_En_Fishmod/` | the fish (`z_en_fishmod.c`) and the fishing controller: rod, bobber, camera, fight (`fishmod_rod.c`) |
+| `src/code/fishmod.c` | which scenes have fishing, loading the fish model there, the rod on L |
+| `fishmod/build.sh --debug` | debug build: boots straight into Kokiri with the rod and shows debug text |
+| `fishmod/build.sh --script NAME` | debug build that plays `fishmod/scripts/NAME.inc.c`: `angler` (a bot that fishes by itself), `follow` (camera chases a fish), `photo` (wiki renders), `cast` |
+| `fishmod/tools/photo_capture.py` | captures the wiki renders from the photo build in ares |
+| `fishmod/tools/water_map.py` | maps fishable water and shore spots in a scene |
+| `fishmod/tools/model_preview.py` | renders a model's limbs offline to identify parts |
 
-If you are using GCC as the compiler for Ocarina of Time, you will also need the corresponding gcc compiler for the chosen toolchain. For the first two options above, gcc is included automatically. For mips-linux-gnu- or mips64-linux-gnu- it is often a separate package, e.g. `gcc-mips-linux-gnu`.
+## Credits
 
-#### 2. Clone the repository
-
-**N.B.** If using WSL, we strongly encourage you to clone into WSL's Linux filesystem using Linux's `git`.
-Cloning into the Windows filesystem will result in much slower read/write speeds, and often causes issues when Windows copies the files with the wrong line endings, which the compiler IDO cannot handle correctly.
-
-Clone `https://github.com/zeldaret/oot.git` where you wish to have the project, with a command such as:
-
-```bash
-git clone https://github.com/zeldaret/oot.git
-```
-
-This will copy the GitHub repository contents into a new folder in the current directory called `oot`. Change into this directory before doing anything else:
-
-```bash
-cd oot
-```
-
-#### 3. Prepare a base ROM
-
-First, pick the version of the game you want to build.
-The supported versions and ROM checksums can be found in the table above.
-As an example, the `ntsc-1.0` version will be used in these instructions.
-
-Place a copy of the ROM inside the `baseroms/<the-version>/` folder for your version of choice.
-For example for `ntsc-1.0`, inside the `baseroms/ntsc-1.0/` folder.
-If you are under WSL, you can run the command `explorer.exe .` to open the current directory in the Windows file explorer.
-
-Rename the file to `baserom.z64`, `baserom.n64` or `baserom.v64`, depending on the original extension.
-
-#### 4. Setup the ROM and build process
-
-Setup and extract everything from your ROM with the following command:
-
-```bash
-make setup VERSION=<the-version>
-```
-
-For example for `ntsc-1.0`, run `make setup VERSION=ntsc-1.0`.
-
-This downloads some dependencies (from pip), and compiles tools for the build process.
-Then it generates a new ROM `baseroms/<the-version>/baserom-decompressed.z64`.
-For retail (non-debug) versions, that ROM will be the decompressed equivalent of the ROM.
-For the `gc-eu-mq-dbg` version, that ROM will have the overdump removed and the header patched.
-The other debug ROMs `gc-eu-dbg-2` and `gc-eu-dbg` will also have the overdump removed.
-It will also extract the individual assets from the ROM.
-
-#### 5. Build the ROM
-
-Run make to build the ROM.
-Make sure your path to the project is not too long, otherwise this process may error.
-
-```bash
-make VERSION=<the-version>
-```
-
-For example for `ntsc-1.0`, run `make VERSION=ntsc-1.0`
-
-If all goes well, a new ROM should be built at `build/<the-version>/oot-<the-version>.z64` (for example `build/ntsc-1.0/oot-ntsc-1.0.z64`), and the following text printed:
-
-```
-build/<the-version>/oot-<the-version>.z64: OK
-```
-
-If you instead see the following:
-
-```
-build/<the-version>/oot-<the-version>.z64: FAILED
-md5sum: WARNING: 1 computed checksum did NOT match
-```
-
-This means that the built ROM isn't the same as the base one, so something went wrong or some part of the code doesn't match.
-
-**NOTE:** to speed up the build, you can either:
-
-* pass `-jN` to `make setup` and `make`, where N is the number of threads to use in the build. The generally-accepted wisdom is to use the number of virtual cores your computer has.
-* pass `-j` to `make setup` and `make`, to use as many threads as possible, but beware that this can use too much memory on lower-end systems.
-
-Both of these have the disadvantage that the ordering of the terminal output is scrambled, so for debugging it is best to stick to one thread (i.e. not pass `-j` or `-jN`).
-
-## Changing build options
-
-By default, if you don't specify a version to build with `VERSION=<the-version>` in the make commands, the `gc-eu-mq-dbg` version is used.
-This default can be changed in the Makefile.
-
-The project Makefile is fairly configurable and can also be used to prepare the repo for modding.
-See the options outlined at the top of the Makefile for more information.
-
-## Contributing
-
-All contributions are welcome. This is a group effort, and even small contributions can make a difference.
-Some tasks also don't require much knowledge to get started.
-
-Most discussions happen on our [Discord Server][discord], where you are welcome to ask if you need help getting started, or if you have any questions regarding this project and other decompilation projects.
+- The [zeldaret](https://github.com/zeldaret) team for the Ocarina of Time decompilation. Their original
+  README is in [docs/DECOMP_README.md](docs/DECOMP_README.md).
+- Fish lore from Twilight Princess, Ocarina of Time and Breath of the Wild (Nintendo); fight design inspired by
+  Sega Bass Fishing.
