@@ -2,7 +2,9 @@
 
 *Legendary · from Ocarina of Time (Fishing Pond), Twilight Princess · In game*
 
-*(render pending: this fish is not in the game yet)*
+<img src="../img/hylian_loach.jpg" width="49%"> <img src="../img/hylian_loach_34.jpg" width="49%">
+
+*In-game renders at a typical size (12 in), captured in ares.*
 
 > A long, spotted bottom-dweller that anglers whisper about. Young loaches turn up in quiet forest water now and then; the giants of legend are rarely seen anywhere.
 
