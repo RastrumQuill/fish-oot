@@ -17,7 +17,7 @@ emulators like [ares](https://ares-emu.net/).
 
 ## Playing
 
-1. Get `fish-oot.bps` from a release (or build it, below).
+1. Get the newest patch from [`releases/`](releases/) (or build it, below).
 2. Apply it to an **Ocarina of Time NTSC 1.2 (US)** ROM in big-endian `.z64` order with
    [Flips](https://github.com/Alcaro/Flips) or the [online patcher](https://www.marcrobledo.com/RomPatcher.js/).
    - Expected input MD5: `57a9719ad547c516342e1a15d5c28c3d`.
