@@ -586,6 +586,7 @@ void Play_Update(PlayState* this) {
     s32 isPaused;
     STACK_PAD(s32);
 
+    Fishmod_PlayUpdate(this);
 #if FISHMOD_DEBUG
     Fishmod_DebugPlayUpdate(this);
 #endif
@@ -1334,7 +1335,7 @@ void Play_Draw(PlayState* this) {
         }
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || (R_PLAY_DRAW_ROOM_FLAGS != 0)) {
-            if (VREG(94) == 0) {
+            if ((VREG(94) == 0) && !gFishmodPhoto.active) {
                 s32 roomDrawFlags;
 
                 if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY)) {
@@ -1604,6 +1605,7 @@ void Play_InitScene(PlayState* this, s32 spawn) {
     R_SCENE_CAM_TYPE = SCENE_CAM_TYPE_DEFAULT;
     gSaveContext.worldMapArea = WORLD_MAP_AREA_HYRULE_FIELD;
     Scene_ExecuteCommands(this, this->sceneSegment);
+    Fishmod_OnSceneLoad(this);
     Play_InitEnvironment(this, this->skyboxId);
 }
 

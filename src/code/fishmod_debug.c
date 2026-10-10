@@ -26,6 +26,10 @@
 #include "sequence.h"
 #include "seqcmd.h"
 #include "game.h"
+#include "actor_profile.h"
+#include "camera.h"
+#include "interface.h"
+#include "z_lib.h"
 
 void Sram_InitDebugSave(void);
 
@@ -38,6 +42,95 @@ static s16 sScriptStartYaw = 0x4000;
 static FishmodAutoplayStep sScriptSteps[] = {
     { 1, 0, 0, 0 },
 };
+#endif
+
+#ifdef FISHMOD_PHOTO
+/*
+ * Photo booth for wiki renders: shows each species in turn, from the side and from a three-quarter view,
+ * high above the test spot on a plain backdrop. fishmod/tools/photo_capture.py screenshots each photo
+ * using the marker color drawn in the corner.
+ */
+static u8 sPhotoSpecies[] = {
+    FISHMOD_SPECIES_GREENGILL,    FISHMOD_SPECIES_HYRULE_BASS, FISHMOD_SPECIES_ORDON_CATFISH,
+    FISHMOD_SPECIES_HYLIAN_LOACH, FISHMOD_SPECIES_SANKE_CARP,
+};
+#define PHOTO_POSES 2
+#define PHOTO_FRAMES 100
+
+static s32 sPhotoIndex = -1;
+static s32 sPhotoTimer;
+static Actor* sPhotoFish;
+static s16 sPhotoCamId = SUB_CAM_ID_DONE;
+static Vec3f sPhotoEye;
+static Vec3f sPhotoAt;
+
+static void Fishmod_PhotoUpdate(PlayState* play) {
+    const FishmodSpecies* species;
+    s32 pose;
+    f32 length;
+    f32 dist;
+
+    if (sPhotoCamId == SUB_CAM_ID_DONE) {
+        sPhotoCamId = Play_CreateSubCamera(play);
+        Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STAT_WAIT);
+        Play_ChangeCameraStatus(play, sPhotoCamId, CAM_STAT_ACTIVE);
+        gFishmodPhoto.active = true;
+    }
+
+    play->envCtx.skyboxDisabled = true;
+    play->envCtx.sunMoonDisabled = true;
+    // studio lighting: lift the ambient and key light so colors read clearly
+    play->envCtx.adjAmbientColor[0] = play->envCtx.adjAmbientColor[1] = play->envCtx.adjAmbientColor[2] = 70;
+    play->envCtx.adjLight1Color[0] = play->envCtx.adjLight1Color[1] = play->envCtx.adjLight1Color[2] = 60;
+    Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_NOTHING);
+
+    if ((sPhotoIndex < 0) || (++sPhotoTimer >= PHOTO_FRAMES)) {
+        sPhotoTimer = 0;
+        sPhotoIndex++;
+        if (sPhotoIndex >= (s32)ARRAY_COUNT(sPhotoSpecies) * PHOTO_POSES) {
+            sPhotoIndex = 0;
+        }
+        if (sPhotoFish != NULL) {
+            Actor_Kill(sPhotoFish);
+        }
+        sPhotoFish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sPhotoPos.x, sPhotoPos.y, sPhotoPos.z, 0,
+                                 0, 0, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sPhotoSpecies[sPhotoIndex / PHOTO_POSES]));
+        if (sPhotoFish != NULL) {
+            sPhotoFish->room = -1;
+        }
+        gFishmodPhoto.marker = sPhotoIndex + 1;
+        gFishmodPhoto.extent = 0.0f;
+    }
+
+    species = &gFishmodSpecies[sPhotoSpecies[sPhotoIndex / PHOTO_POSES]];
+    pose = sPhotoIndex % PHOTO_POSES;
+
+    // frame the fish from the bounds it reported in its last draw (limb origins, so pad a little)
+    length = gFishmodPhoto.extent * 1.25f;
+    if (length < 5.0f) {
+        length = 20.0f;
+    }
+    dist = length * 1.35f;
+
+    gFishmodPhoto.yaw = sPhotoYaw;
+    gFishmodPhoto.pitch = 0;
+
+    if (gFishmodPhoto.extent > 0.0f) {
+        sPhotoAt = gFishmodPhoto.center;
+    } else {
+        sPhotoAt = sPhotoPos;
+    }
+    if (pose == 0) {
+        sPhotoEye.x = sPhotoAt.x;
+        sPhotoEye.y = sPhotoAt.y + dist * 0.05f;
+        sPhotoEye.z = sPhotoAt.z + dist;
+    } else {
+        sPhotoEye.x = sPhotoAt.x - dist * 0.35f;
+        sPhotoEye.y = sPhotoAt.y + dist * 0.7f;
+        sPhotoEye.z = sPhotoAt.z + dist * 0.62f;
+    }
+    Play_SetCameraAtEye(play, sPhotoCamId, &sPhotoAt, &sPhotoEye);
+}
 #endif
 
 static s32 sScriptStepIndex;
@@ -98,6 +191,12 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #endif
     }
 
+#ifdef FISHMOD_PHOTO
+    if (sPlacedPlayer && (sPlayFrames > 60)) {
+        Fishmod_PhotoUpdate(play);
+    }
+#endif
+
     Fishmod_DebugPrintf(0, "F%d S%d/%d", sPlayFrames, sScriptStepIndex, (s32)ARRAY_COUNT(sScriptSteps));
     if (player != NULL) {
         Fishmod_DebugPrintf(1, "P %d %d %d y%04X", (s32)player->actor.world.pos.x, (s32)player->actor.world.pos.y,
@@ -157,6 +256,10 @@ void Fishmod_DebugPrintf(s32 line, const char* fmt, ...) {
 void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
     GfxPrint printer;
     s32 i;
+
+    if (gFishmodPhoto.active) {
+        return;
+    }
 
     GfxPrint_Init(&printer);
     GfxPrint_Open(&printer, *gfxP);

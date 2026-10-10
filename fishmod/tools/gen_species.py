@@ -29,6 +29,7 @@ SCENE_IDS = {
     "ZORAS_DOMAIN": "SCENE_ZORAS_DOMAIN",
     "ZORAS_FOUNTAIN": "SCENE_ZORAS_FOUNTAIN",
 }
+PARTS = ["head", "bodyFront", "bodyRear", "tail", "finDorsal", "finPectoral", "finBelly"]
 RARITY_NAMES = {1: "Common", 2: "Uncommon", 3: "Rare", 4: "Very rare", 5: "Legendary"}
 
 
@@ -45,6 +46,7 @@ def gen_header(data):
     out.append("")
     out.append('#include "fishmod.h"')
     out.append('#include "scene.h"')
+    out.append('#include "array_count.h"')
     out.append("")
     out.append("const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {")
     for sp in species:
@@ -65,6 +67,20 @@ def gen_header(data):
             f"{b['speed']}, {b['jumpiness']}, {b['nibbles']}, {b['biteWindow']} }},"
         )
         out.append(f"        {{ {bait} }},")
+        look = sp.get("look", {})
+        parts = look.get("parts", {})
+        tints = []
+        scales = []
+        for part in PARTS:
+            pp = parts.get(part, {})
+            tints.append("{ " + ", ".join(str(v) for v in pp.get("tint", sp["tint"])) + " }")
+            scales.append("{ " + ", ".join(str(int(round(v * 100))) for v in pp.get("scale", [1, 1, 1])) + " }")
+        out.append(f"        {{ {', '.join(tints)} }},")
+        out.append(f"        {{ {', '.join(scales)} }},")
+        flags = []
+        if look.get("whiskers"):
+            flags.append("FISHMOD_LOOK_WHISKERS")
+        out.append(f"        {' | '.join(flags) if flags else '0'},")
         out.append("    },")
     out.append("};")
     out.append("")
@@ -115,16 +131,22 @@ def bar(v):
 def gen_species_page(sp, data):
     length, weights = fmt_range(sp)
     b = sp["behavior"]
-    img = f"../img/{sp['id'].lower()}.png"
-    have_img = os.path.exists(os.path.join(WIKI, "img", sp["id"].lower() + ".png"))
+    img = f"../img/{sp['id'].lower()}.jpg"
+    img34 = f"../img/{sp['id'].lower()}_34.jpg"
+    have_img = os.path.exists(os.path.join(WIKI, "img", sp["id"].lower() + ".jpg"))
+    have_img34 = os.path.exists(os.path.join(WIKI, "img", sp["id"].lower() + "_34.jpg"))
     lines = [f"# {sp['name']}", ""]
     status = "In game" if sp["status"] == "in-game" else "Planned (not in the game yet)"
     lines.append(f"*{RARITY_NAMES[sp['rarity']]} · from {sp['origin']} · {status}*")
     lines.append("")
-    if have_img:
+    if have_img and have_img34:
+        lines.append(f'<img src="{img}" width="49%"> <img src="{img34}" width="49%">')
+        lines.append("")
+        lines.append(f"*In-game renders at a typical size ({sp['length']['typical']} in), captured in ares.*")
+    elif have_img:
         lines.append(f"![{sp['name']}]({img})")
     else:
-        lines.append("*(render pending)*")
+        lines.append("*(render pending: this fish is not in the game yet)*")
     lines.append("")
     lines.append(f"> {sp['flavor']}")
     lines.append("")
@@ -176,7 +198,7 @@ def gen_index(data):
                  "Pages are generated from [`fishmod/data/species.json`](../data/species.json); "
                  "behavior and sizes match the game.")
     lines.append("")
-    lines.append("- [How fishing works](mechanics.md)")
+    lines.append("- [How the fish are modeled](modeling.md)")
     lines.append("- [Bait](baits.md)")
     lines.append("")
     lines.append("## Fish")
@@ -184,8 +206,8 @@ def gen_index(data):
     lines.append("| | Fish | Rarity | Length | Where | Status |")
     lines.append("|---|---|---|---|---|---|")
     for sp in data["species"]:
-        img = os.path.join(WIKI, "img", sp["id"].lower() + ".png")
-        thumb = f"<img src=\"img/{sp['id'].lower()}.png\" width=\"96\">" if os.path.exists(img) else ""
+        img = os.path.join(WIKI, "img", sp["id"].lower() + ".jpg")
+        thumb = f"<img src=\"img/{sp['id'].lower()}.jpg\" width=\"120\">" if os.path.exists(img) else ""
         where = ", ".join(data["scenes"][s]["name"] for s in sp["scenes"])
         status = "in game" if sp["status"] == "in-game" else "planned"
         lines.append(
