@@ -71,6 +71,9 @@ typedef struct EnFishmod {
     /* 0x3AC */ f32 interest;   // builds while it watches the bobber
     /* 0x3B0 */ s16 runTimer;
     /* 0x3B2 */ u8 jumping;
+    /* 0x3B3 */ u8 beached;     // reeled up onto the bank: it counts as landed
+    /* 0x3B4 */ f32 halfLength; // body size in world units, for keeping it inside the water
+    /* 0x3B8 */ f32 halfHeight;
 } EnFishmod;
 
 /* Rod controller (fishmod_rod.c) */
@@ -117,6 +120,7 @@ typedef struct FishmodRod {
     /* 0xC1 */ u8 splashed;         // set the frame the bobber hits the water
     /* 0xC2 */ u8 castHolding;      // charging a cast
     /* 0xC3 */ u8 choice;           // after a catch: 1 = keep or release, 2 = release only (no empty bottle)
+    /* 0xC4 */ f32 lineFloor[17];    // lowest each point along the line can hang: the ground, or the water it rests on
 } FishmodRod;
 
 extern FishmodRod gFishmodRodState;

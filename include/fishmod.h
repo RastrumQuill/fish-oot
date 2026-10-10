@@ -183,7 +183,7 @@ extern s16 gFishmodDebugFocusYaw;
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */
 
-#define FISHMOD_DEBUG_LINES 8
+#define FISHMOD_DEBUG_LINES 9
 #define FISHMOD_DEBUG_LINE_LEN 40
 
 typedef struct FishmodAutoplayStep {

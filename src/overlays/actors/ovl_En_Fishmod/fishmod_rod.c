@@ -49,6 +49,13 @@ FishmodRod gFishmodRodState;
 #define WINDUP_FRAMES 18
 #define LINE_MIN 28.0f
 #define LINE_MAX 420.0f
+#define LINE_SEGMENTS 16
+
+static void Rod_UpdateLineFloor(PlayState* play);
+
+#if FISHMOD_DEBUG
+static s32 sLineDraped; // line points lifted out of the ground or water this frame
+#endif
 
 /* ---------------------------------------------------------------------------------------------------------------
  * Bobber model: a small red-over-white float built from vertex colors (no texture).
@@ -499,7 +506,8 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     }
 
     // landed
-    if ((ROD->lineOut <= LINE_MIN + 2.0f) || (Math_Vec3f_DistXZ(&player->actor.world.pos, &fish->actor.world.pos) < 32.0f)) {
+    if ((ROD->lineOut <= LINE_MIN + 2.0f) || fish->beached ||
+        (Math_Vec3f_DistXZ(&player->actor.world.pos, &fish->actor.world.pos) < 32.0f)) {
         ROD->state = ROD_STATE_LANDING;
         ROD->timer = 200;
         gFishmodRodInfo.caught++;
@@ -865,10 +873,18 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                         EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
                         Actor_Kill(&fish->actor);
                     } else {
-                        // back into the water where it was hooked
-                        fish->actor.world.pos.x = ROD->bobberPos.x;
-                        fish->actor.world.pos.z = ROD->bobberPos.z;
-                        fish->actor.world.pos.y = ROD->waterY - 8.0f;
+                        // back into the water where it was hooked, somewhere deep enough to swim off
+                        Vec3f spot;
+                        f32 surface;
+                        f32 floor;
+
+                        if (!EnFishmod_FindWaterPoint(play, &ROD->bobberPos, 40.0f, fish->halfHeight * 2.0f + 4.0f,
+                                                      &spot, &surface, &floor) &&
+                            !EnFishmod_FindWaterPoint(play, &fish->actor.home.pos, 60.0f,
+                                                      fish->halfHeight * 2.0f + 4.0f, &spot, &surface, &floor)) {
+                            spot = fish->actor.home.pos;
+                        }
+                        fish->actor.world.pos = spot;
                         fish->actor.shape.rot.z = 0;
                         EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
                         Rod_Splash(play, &ROD->bobberPos, true);
@@ -893,6 +909,10 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         player->unk_858 = CLAMP(player->unk_858, -1.0f, 1.0f);
     }
 
+    if (ROD->state >= ROD_STATE_FLYING) {
+        Rod_UpdateLineFloor(play);
+    }
+
     gFishmodRodInfo.state = ROD->state;
     gFishmodRodInfo.biting = ROD->biting;
     gFishmodRodInfo.nibbling = (ROD->fish != NULL) && (ROD->fish->fishState == FISH_STATE_NIBBLE);
@@ -910,7 +930,9 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         Fishmod_DebugPrintf(4, "bob %d %d %d t%d p%d v%d %d", (s32)ROD->bobberPos.x, (s32)ROD->bobberPos.y,
                             (s32)ROD->bobberPos.z, ROD->timer, (s32)(ROD->castPower * 100.0f),
                             (s32)(ROD->bobberVel.x * 10.0f), (s32)(ROD->bobberVel.z * 10.0f));
-        Fishmod_DebugPrintf(7, "tip %d %d %d", (s32)ROD->tipPos.x, (s32)ROD->tipPos.y, (s32)ROD->tipPos.z);
+        Fishmod_DebugPrintf(7, "tip %d %d %d drape %d", (s32)ROD->tipPos.x, (s32)ROD->tipPos.y, (s32)ROD->tipPos.z,
+                            sLineDraped);
+        sLineDraped = 0;
     }
 #endif
 }
@@ -1008,13 +1030,61 @@ static void Rod_DrawLineSegment(PlayState* play, Vec3f* a, Vec3f* b, f32 thickne
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
 }
 
-#define LINE_SEGMENTS 16
+/** Where point t (0 at the tip, 1 at the bobber) of the line hangs, before draping it over the ground. */
+static void Rod_LinePoint(Vec3f* end, f32 sag, f32 t, Vec3f* out) {
+    out->x = ROD->tipPos.x + (end->x - ROD->tipPos.x) * t;
+    out->y = ROD->tipPos.y + (end->y - ROD->tipPos.y) * t - sag * 4.0f * t * (1.0f - t);
+    out->z = ROD->tipPos.z + (end->z - ROD->tipPos.z) * t;
+}
+
+static void Rod_LineShape(Vec3f* end, f32* sag) {
+    *end = ROD->bobberPos;
+    if (ROD->state == ROD_STATE_FIGHT) {
+        end->y = CLAMP_MIN(end->y, ROD->waterY);
+    }
+
+    // a slack line sags; a tight one is straight
+    *sag = Math_Vec3f_DistXYZ(&ROD->tipPos, end) * 0.12f;
+    if (ROD->state == ROD_STATE_FIGHT) {
+        *sag *= CLAMP(1.0f - ROD->tension / 40.0f, 0.0f, 1.0f);
+    } else if (ROD->state == ROD_STATE_FLYING) {
+        *sag *= 0.3f;
+    }
+}
+
+/**
+ * Finds how low each point of the line may hang so it lies on the banks and floats on the water instead of
+ * cutting through them. Done in update (it raycasts); the draw then shapes the line from the current rod tip.
+ */
+static void Rod_UpdateLineFloor(PlayState* play) {
+    Vec3f end;
+    Vec3f point;
+    f32 sag;
+    f32 top;
+    f32 floorY;
+    f32 waterY;
+    s32 i;
+
+    Rod_LineShape(&end, &sag);
+    top = CLAMP_MIN(ROD->tipPos.y, end.y) + 10.0f;
+    for (i = 1; i < LINE_SEGMENTS; i++) {
+        CollisionPoly* poly;
+
+        Rod_LinePoint(&end, sag, (f32)i / LINE_SEGMENTS, &point);
+        // cast from above the whole line so a point already inside a bank still finds the bank's top
+        point.y = top;
+        floorY = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &point) + 0.8f;
+        if (Rod_WaterY(play, &point, &waterY) && (waterY > floorY)) {
+            floorY = waterY + 0.3f; // a slack line floats
+        }
+        ROD->lineFloor[i] = floorY;
+    }
+}
 
 static void Rod_DrawLine(PlayState* play) {
-    Vec3f end = ROD->bobberPos;
+    Vec3f end;
     Vec3f prev;
     Vec3f cur;
-    f32 chord;
     f32 sag;
     s32 i;
 
@@ -1024,26 +1094,20 @@ static void Rod_DrawLine(PlayState* play) {
     gDPSetCombineMode(POLY_XLU_DISP++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 90);
 
-    if (ROD->state == ROD_STATE_FIGHT) {
-        end.y = CLAMP_MIN(end.y, ROD->waterY);
-    }
-
-    // a slack line sags; a tight one is straight
-    chord = Math_Vec3f_DistXYZ(&ROD->tipPos, &end);
-    sag = chord * 0.12f;
-    if (ROD->state == ROD_STATE_FIGHT) {
-        sag *= CLAMP(1.0f - ROD->tension / 40.0f, 0.0f, 1.0f);
-    } else if (ROD->state == ROD_STATE_FLYING) {
-        sag *= 0.3f;
-    }
-
+    Rod_LineShape(&end, &sag);
     prev = ROD->tipPos;
     for (i = 1; i <= LINE_SEGMENTS; i++) {
-        f32 t = (f32)i / LINE_SEGMENTS;
-
-        cur.x = ROD->tipPos.x + (end.x - ROD->tipPos.x) * t;
-        cur.y = ROD->tipPos.y + (end.y - ROD->tipPos.y) * t - sag * 4.0f * t * (1.0f - t);
-        cur.z = ROD->tipPos.z + (end.z - ROD->tipPos.z) * t;
+        if (i < LINE_SEGMENTS) {
+            Rod_LinePoint(&end, sag, (f32)i / LINE_SEGMENTS, &cur);
+#if FISHMOD_DEBUG
+            if (cur.y < ROD->lineFloor[i]) {
+                sLineDraped++;
+            }
+#endif
+            cur.y = CLAMP_MIN(cur.y, ROD->lineFloor[i]);
+        } else {
+            cur = end;
+        }
         Rod_DrawLineSegment(play, &prev, &cur, 0.0015f);
         prev = cur;
     }
