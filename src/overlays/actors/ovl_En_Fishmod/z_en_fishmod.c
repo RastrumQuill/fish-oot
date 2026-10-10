@@ -739,14 +739,17 @@ static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
 static s32 EnFishmod_OpenWaterTo(EnFishmod* this, PlayState* play, Vec3f* to) {
     s32 i;
 
-    for (i = 1; i <= 6; i++) {
+    // up to just short of the target (the fish stops a body length back), with the interpolated floor: the
+    // cautious one reads the water next to a steep bank as dry
+    for (i = 1; i <= 5; i++) {
         f32 t = i / 6.0f;
         f32 surface;
         f32 floor;
 
-        if (!EnFishmod_WaterAt(play, this->actor.world.pos.x + (to->x - this->actor.world.pos.x) * t,
-                               this->actor.world.pos.z + (to->z - this->actor.world.pos.z) * t, &surface, &floor) ||
-            ((surface - floor) < this->halfHeight * 2.0f)) {
+        if (!EnFishmod_WaterFloor(play, this->actor.world.pos.x + (to->x - this->actor.world.pos.x) * t,
+                                  this->actor.world.pos.z + (to->z - this->actor.world.pos.z) * t, &surface, &floor,
+                                  false) ||
+            ((surface - floor) < this->halfHeight * 1.5f)) {
             return false;
         }
     }

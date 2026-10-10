@@ -12,6 +12,7 @@
 #include "play_state.h"
 #include "segmented_address.h"
 #include "zelda_arena.h"
+#include "ultra64/libc.h"
 
 #define GRID_MAX_BOXES 4
 #define GRID_MAX_CORNERS 12000 // all boxes together; 2 bytes each
@@ -43,6 +44,7 @@ void EnFishmod_WaterGridInit(PlayState* play) {
     s32 i;
 
     EnFishmod_WaterGridDestroy(play);
+    bzero(sExactCache, sizeof(sExactCache));
 
     for (i = 0; (i < numBoxes) && (sGridCount < GRID_MAX_BOXES); i++) {
         FishmodWaterGrid* grid = &sGrids[sGridCount];
@@ -117,6 +119,32 @@ static s32 EnFishmod_GridCorner(PlayState* play, FishmodWaterGrid* grid, s32 ix,
     return *corner;
 }
 
+// Exact floors near banks, cached by 4-unit spot
+#define EXACT_CACHE_SIZE 64
+typedef struct {
+    s16 x;
+    s16 z;
+    s16 floor;
+    s16 used;
+} FishmodExactFloor;
+static FishmodExactFloor sExactCache[EXACT_CACHE_SIZE];
+
+static f32 EnFishmod_ExactFloor(PlayState* play, f32 x, f32 z, f32 surface) {
+    s16 kx = (s16)((s32)x >> 2);
+    s16 kz = (s16)((s32)z >> 2);
+    FishmodExactFloor* e = &sExactCache[((kx * 31) ^ kz) & (EXACT_CACHE_SIZE - 1)];
+
+    if (!e->used || (e->x != kx) || (e->z != kz)) {
+        f32 floor = EnFishmod_RaycastFloor(play, x, surface + GRID_CAST_HEIGHT, z);
+
+        e->x = kx;
+        e->z = kz;
+        e->floor = (s16)CLAMP(floor, -0x7FF0, 0x7FF0);
+        e->used = true;
+    }
+    return e->floor;
+}
+
 /**
  * Water surface and floor at (x, z). Returns false if there's no water there (the floor is then not set).
  * `conservative` gives the highest of the surrounding grid corners instead of interpolating them: the floor is then
@@ -148,6 +176,15 @@ s32 EnFishmod_WaterFloor(PlayState* play, f32 x, f32 z, f32* surface, f32* floor
         s32 c11 = EnFishmod_GridCorner(play, grid, ix + 1, iz + 1);
 
         if ((c00 != GRID_NO_FLOOR) && (c10 != GRID_NO_FLOOR) && (c01 != GRID_NO_FLOOR) && (c11 != GRID_NO_FLOOR)) {
+            s32 hi = MAX(MAX(c00, c10), MAX(c01, c11));
+            s32 lo = MIN(MIN(c00, c10), MIN(c01, c11));
+
+            if (conservative && (hi > *surface) && (lo < *surface)) {
+                // The cell straddles a bank (some corners under water, some on top of it), so neither its highest
+                // corner nor a blend is right next to a steep wall: measure the spot itself, cached nearby.
+                *floor = EnFishmod_ExactFloor(play, x, z, *surface);
+                return true;
+            }
             if (conservative) {
                 *floor = MAX(MAX(c00, c10), MAX(c01, c11));
             } else {
