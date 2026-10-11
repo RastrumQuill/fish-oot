@@ -23,6 +23,7 @@
 #include "sfx.h"
 #include "z_lib.h"
 #include "string.h"
+#include "regs.h"
 #include "transition.h"
 #include "libc64/sprintf.h"
 #include "rand.h"
@@ -214,6 +215,8 @@ void Fishmod_PlayUpdate(PlayState* play) {
 }
 
 f32 gFishmodSpawnLength;
+// a fishmod fish poured out on land (the game's flopping fish stands in for it until it's bottled again)
+static FishmodBottleFish sFloppingFish;
 
 static const char* sBaitNames[FISHMOD_BAIT_MAX] = {
     "None", "Bee larva", "Bug", "Worm", "Coral earring", "Fish",
@@ -223,14 +226,68 @@ const char* Fishmod_BaitName(s32 bait) {
     return ((bait >= 0) && (bait < FISHMOD_BAIT_MAX)) ? sBaitNames[bait] : "?";
 }
 
-void Fishmod_AddBait(s32 bait, s32 count) {
-    static char sNotice[40];
-    u8* have = &FISHMOD_SAVE->baitCount[bait];
+#include "fishmod_bait_icons.inc.c"
 
-    *have = CLAMP_MAX(*have + count, FISHMOD_BAIT_POUCH_MAX);
-    sprintf(sNotice, "%s x%d (bait: %d)", Fishmod_BaitName(bait), count, *have);
-    gFishmodRodInfo.notice = sNotice;
-    Sfx_PlaySfxCentered(NA_SE_SY_GET_ITEM);
+void* Fishmod_ItemIcon(s32 item) {
+    switch (item) {
+        case ITEM_BOTTLE_LARVA_3:
+            return gFishmodBottleLarva3Tex;
+        case ITEM_BOTTLE_LARVA_2:
+            return gFishmodBottleLarva2Tex;
+        case ITEM_BOTTLE_LARVA_1:
+            return gFishmodBottleLarva1Tex;
+        default:
+            return NULL;
+    }
+}
+
+s32 Fishmod_ItemNameIndex(s32 item) {
+    // until they have name graphics of their own, bait bottles go by the bottle's name
+    return FISHMOD_IS_BAIT_ITEM(item) ? ITEM_BOTTLE_EMPTY : item;
+}
+
+/**
+ * A bottle of bait (or bugs) used from a button while Link holds the rod, before casting: one goes on the hook
+ * and the bottle has one less. Anything else about these bottles does nothing for now (there's no pouring
+ * larvae out). Returns true if it handled the item.
+ */
+s32 Fishmod_UseItem(PlayState* play, s32 item) {
+    static u8 sNextLarva[] = { ITEM_BOTTLE_LARVA_2, ITEM_BOTTLE_LARVA_1, ITEM_BOTTLE_EMPTY };
+    s32 bait;
+    s32 next;
+
+    if (FISHMOD_IS_BAIT_ITEM(item)) {
+        bait = FISHMOD_BAIT_BEE_LARVA;
+        next = sNextLarva[item - ITEM_BOTTLE_LARVA_3];
+    } else if ((item == ITEM_BOTTLE_BUG) && (gFishmodRodInfo.state != 0)) {
+        bait = FISHMOD_BAIT_BUG;
+        next = ITEM_BOTTLE_EMPTY;
+    } else {
+        return false;
+    }
+    // only onto a bare hook, with the rod held and not cast
+    if ((gFishmodRodInfo.state != 1) || (gFishmodRodInfo.bait != FISHMOD_BAIT_NONE) ||
+        (gFishmodRodInfo.baitRequest != FISHMOD_BAIT_NONE)) {
+        Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+        return true;
+    }
+    gFishmodRodInfo.baitRequest = bait;
+    Inventory_ReplaceItem(play, item, next);
+    Sfx_PlaySfxCentered(NA_SE_PL_PUT_OUT_ITEM);
+    return true;
+}
+
+static u8 sLarvaCaughtText;
+
+void Fishmod_OnBottleCatch(s32 actorId, s32 slot) {
+    if (actorId == ACTOR_EN_FISHMOD) {
+        sLarvaCaughtText = true;
+    } else if ((actorId == ACTOR_EN_FISH) && (slot >= SLOT_BOTTLE_1) && (slot <= SLOT_BOTTLE_4)) {
+        // the flopping fish poured out on land: if it was one of fishmod's, it's that fish again
+        FISHMOD_SAVE->bottleFish[slot - SLOT_BOTTLE_1] = sFloppingFish;
+        sFloppingFish.species = 0;
+        sFloppingFish.lengthTenths = 0;
+    }
 }
 
 /** Notes what just went into a bottle: the first empty one, which is where Item_Give puts a fish. */
@@ -262,19 +319,32 @@ s32 Fishmod_ReleaseBottleFish(PlayState* play, s32 slot, Vec3f* pos, s16 yaw) {
     if ((spawns == NULL) || (gFishmodRod == NULL) || (slot < SLOT_BOTTLE_1) || (slot > SLOT_BOTTLE_4)) {
         return false;
     }
-    // over water a little ahead of Link (he pours it out in front of him)
+    bottle = &FISHMOD_SAVE->bottleFish[slot - SLOT_BOTTLE_1];
+    // into real water a little ahead of Link (he pours it out in front of him): water boxes reach under the banks
+    // in places, so check there's water above the ground, deep enough to swim in
     for (i = 0; i < 3; i++) {
         f32 x = pos->x + Math_SinS(yaw) * (i * 20.0f);
         f32 z = pos->z + Math_CosS(yaw) * (i * 20.0f);
 
         if (BgCheck_GetWaterSurface(play, &play->colCtx, x, z, &surface, &waterBox) && (surface < pos->y + 20.0f)) {
-            break;
+            CollisionPoly* poly;
+            Vec3f probe;
+
+            probe.x = x;
+            probe.y = surface + 30.0f;
+            probe.z = z;
+            if (surface - BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &probe) > 10.0f) {
+                break;
+            }
         }
     }
     if (i == 3) {
+        // on land: the game's own flopping fish, which remembers what it was if it's bottled again
+        sFloppingFish = *bottle;
+        bottle->species = 0;
+        bottle->lengthTenths = 0;
         return false;
     }
-    bottle = &FISHMOD_SAVE->bottleFish[slot - SLOT_BOTTLE_1];
     if (bottle->species != 0) {
         species = bottle->species - 1;
         gFishmodSpawnLength = bottle->lengthTenths * 0.1f;
@@ -402,8 +472,9 @@ void Fishmod_ShowCatchMessage(PlayState* play, const char* name, const char* siz
         p = Msg_PutString(p, end, "New record!");
         p = Journal_PutColor(p, end, TEXT_COLOR_DEFAULT);
     }
+    // the choice gets a box of its own (a box holds four lines)
     if (p < end) {
-        *p++ = MESSAGE_NEWLINE;
+        *p++ = MESSAGE_BOX_BREAK;
     }
     if (canKeep) {
         p = Msg_PutString(p, end, "Keep it in a bottle?");
@@ -416,10 +487,14 @@ void Fishmod_ShowCatchMessage(PlayState* play, const char* name, const char* siz
         if (p < end) {
             *p++ = MESSAGE_NEWLINE;
         }
-        p = Msg_PutString(p, end, "No, let it go");
+        p = Msg_PutString(p, end, "No");
         p = Journal_PutColor(p, end, TEXT_COLOR_DEFAULT);
     } else {
-        p = Msg_PutString(p, end, "No empty bottle, so you let it go.");
+        p = Msg_PutString(p, end, "No empty bottle,");
+        if (p < end) {
+            *p++ = MESSAGE_NEWLINE;
+        }
+        p = Msg_PutString(p, end, "so you let it go.");
     }
     *p++ = MESSAGE_END;
     sCatchMsgLength = p - sCatchMsg;
@@ -440,6 +515,21 @@ void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size) {
     u8* end = buf + size - 2;
     s32 last;
 
+    if ((textId == 0x7A) && sLarvaCaughtText) {
+        // the bugs message, for a chunk of beehive scooped into a bottle
+        static const char sLarvaText[] = "You got a chunk of beehive\nwith " "\x05\x41" "bee larvae" "\x05\x40"
+                                         " in it!\nUse it with the fishing rod\nto bait the hook.";
+        s32 n = 0;
+        const char* c;
+
+        for (c = sLarvaText; (*c != '\0') && (n < size - 1); c++) {
+            buf[n++] = (*c == '\n') ? MESSAGE_NEWLINE : (u8)*c;
+        }
+        buf[n++] = MESSAGE_END;
+        *length = n;
+        sLarvaCaughtText = false;
+        return;
+    }
     if ((textId == FISHMOD_CATCH_TEXT_ID) && (sCatchMsgLength != 0)) {
         // a catch textbox, once; the Fishing Pond's own use of this message is left alone
         if (sCatchMsgLength <= size) {
@@ -583,6 +673,10 @@ void Fishmod_DrawFps(Gfx** gfxP) {
     static s32 sFpsTenths;
     GfxPrint printer;
 
+    // nothing extra in the picture the pause menu takes of the screen (it comes out as garbage)
+    if (R_PAUSE_BG_PRERENDER_STATE != PAUSE_BG_PRERENDER_OFF) {
+        return;
+    }
     sSumUsec += (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
     if (++sCount >= 20) {
         sFpsTenths = (sSumUsec != 0) ? (s32)(20u * 10000000u / sSumUsec) : 0;

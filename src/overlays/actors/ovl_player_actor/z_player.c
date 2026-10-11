@@ -3535,6 +3535,11 @@ void Player_UseItem(PlayState* play, Player* this, s32 item) {
     s32 temp;
     s32 nextAnimType;
 
+    // fishmod: a bait bottle (or bugs) used while holding the rod baits the hook
+    if (Fishmod_UseItem(play, item)) {
+        return;
+    }
+
     itemAction = Player_ItemToItemAction(item);
 
     if (((this->heldItemAction == this->itemAction) &&
@@ -14065,6 +14070,8 @@ static BottleCatchInfo sBottleCatchInfo[] = {
     { ACTOR_EN_FISH, ITEM_BOTTLE_FISH, PLAYER_IA_BOTTLE_FISH, 0x47 },          // BOTTLE_CATCH_FISH
     { ACTOR_EN_ICE_HONO, ITEM_BOTTLE_BLUE_FIRE, PLAYER_IA_BOTTLE_FIRE, 0x5D }, // BOTTLE_CATCH_BLUE_FIRE
     { ACTOR_EN_INSECT, ITEM_BOTTLE_BUG, PLAYER_IA_BOTTLE_BUG, 0x7A },          // BOTTLE_CATCH_BUGS
+    // fishmod: a chunk of a broken beehive (its message is swapped in when it loads)
+    { ACTOR_EN_FISHMOD, ITEM_BOTTLE_LARVA_3, PLAYER_IA_BOTTLE_BUG, 0x7A },
 };
 
 void Player_Action_SwingBottle(Player* this, PlayState* play) {
@@ -14119,6 +14126,8 @@ void Player_Action_SwingBottle(Player* this, PlayState* play) {
                     this->interactRangeActor->parent = &this->actor;
 
                     Player_UpdateBottleHeld(play, this, catchInfo->itemId, ABS(catchInfo->itemAction));
+                    Fishmod_OnBottleCatch(catchInfo->actorId,
+                                          gSaveContext.save.info.equips.cButtonSlots[this->heldItemButton - 1]);
                     Player_AnimPlayOnceAdjusted(play, this, swingEntry->catchAnimation);
                     Player_SetTurnAroundCamera(play, CAM_ITEM_TYPE_4);
                 }

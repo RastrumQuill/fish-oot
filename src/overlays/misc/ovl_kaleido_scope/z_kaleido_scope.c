@@ -1,4 +1,5 @@
 #include "z_kaleido_scope.h"
+#include "fishmod.h"
 
 #include "attributes.h"
 #include "libc64/sleep.h"
@@ -889,6 +890,47 @@ char gItemAgeReqs[] = {
     AGE_REQ_NONE,  // ITEM_SCALE_SILVER
     AGE_REQ_NONE,  // ITEM_SCALE_GOLDEN
     AGE_REQ_ADULT, // ITEM_GIANTS_KNIFE
+    // fishmod: up to its bait bottle items, so they can be equipped (the table used to end here)
+    AGE_REQ_NONE,  // ITEM_ADULTS_WALLET
+    AGE_REQ_NONE,  // ITEM_GIANTS_WALLET
+    AGE_REQ_NONE,  // ITEM_DEKU_SEEDS
+    AGE_REQ_NONE,  // ITEM_FISHING_POLE
+    AGE_REQ_NONE,  // ITEM_SONG_MINUET
+    AGE_REQ_NONE,  // ITEM_SONG_BOLERO
+    AGE_REQ_NONE,  // ITEM_SONG_SERENADE
+    AGE_REQ_NONE,  // ITEM_SONG_REQUIEM
+    AGE_REQ_NONE,  // ITEM_SONG_NOCTURNE
+    AGE_REQ_NONE,  // ITEM_SONG_PRELUDE
+    AGE_REQ_NONE,  // ITEM_SONG_LULLABY
+    AGE_REQ_NONE,  // ITEM_SONG_EPONA
+    AGE_REQ_NONE,  // ITEM_SONG_SARIA
+    AGE_REQ_NONE,  // ITEM_SONG_SUN
+    AGE_REQ_NONE,  // ITEM_SONG_TIME
+    AGE_REQ_NONE,  // ITEM_SONG_STORMS
+    AGE_REQ_NONE,  // ITEM_MEDALLION_FOREST
+    AGE_REQ_NONE,  // ITEM_MEDALLION_FIRE
+    AGE_REQ_NONE,  // ITEM_MEDALLION_WATER
+    AGE_REQ_NONE,  // ITEM_MEDALLION_SPIRIT
+    AGE_REQ_NONE,  // ITEM_MEDALLION_SHADOW
+    AGE_REQ_NONE,  // ITEM_MEDALLION_LIGHT
+    AGE_REQ_NONE,  // ITEM_KOKIRI_EMERALD
+    AGE_REQ_NONE,  // ITEM_GORON_RUBY
+    AGE_REQ_NONE,  // ITEM_ZORA_SAPPHIRE
+    AGE_REQ_NONE,  // ITEM_STONE_OF_AGONY
+    AGE_REQ_NONE,  // ITEM_GERUDOS_CARD
+    AGE_REQ_NONE,  // ITEM_SKULL_TOKEN
+    AGE_REQ_NONE,  // ITEM_HEART_CONTAINER
+    AGE_REQ_NONE,  // ITEM_HEART_PIECE
+    AGE_REQ_NONE,  // ITEM_DUNGEON_BOSS_KEY
+    AGE_REQ_NONE,  // ITEM_DUNGEON_COMPASS
+    AGE_REQ_NONE,  // ITEM_DUNGEON_MAP
+    AGE_REQ_NONE,  // ITEM_SMALL_KEY
+    AGE_REQ_NONE,  // ITEM_MAGIC_JAR_SMALL
+    AGE_REQ_NONE,  // ITEM_MAGIC_JAR_BIG
+    AGE_REQ_NONE,  // ITEM_HEART_PIECE_2
+    AGE_REQ_NONE,  // ITEM_INVALID_1 (fishmod: ITEM_BOTTLE_LARVA_*)
+    AGE_REQ_NONE,  // ITEM_INVALID_2 (fishmod: ITEM_BOTTLE_LARVA_*)
+    AGE_REQ_NONE,  // ITEM_INVALID_3 (fishmod: ITEM_BOTTLE_LARVA_*)
 };
 
 u8 gAreaGsFlags[] = {
@@ -2160,6 +2202,9 @@ void KaleidoScope_UpdateNamePanel(PlayState* play) {
 
         pauseCtx->namedItem = pauseCtx->cursorItem[pauseCtx->pageIndex];
         texIndex = pauseCtx->namedItem;
+        if (pauseCtx->pageIndex == PAUSE_ITEM) {
+            texIndex = Fishmod_ItemNameIndex(texIndex); // fishmod's items have no name graphics of their own
+        }
 
         osCreateMesgQueue(&pauseCtx->loadQueue, &pauseCtx->loadMsg, 1);
 

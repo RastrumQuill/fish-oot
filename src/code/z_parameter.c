@@ -1,4 +1,6 @@
 #include "array_count.h"
+#include "fishmod.h"
+#include "ultra64/libc.h"
 #include "attributes.h"
 #include "controller.h"
 #include "flag_set.h"
@@ -1342,6 +1344,13 @@ void func_800849EC(PlayState* play) {
 void Interface_LoadItemIcon1(PlayState* play, u16 button) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
 
+    // fishmod: its items' icons are in RAM, not in icon_item_static
+    if (Fishmod_ItemIcon(gSaveContext.save.info.equips.buttonItems[button]) != NULL) {
+        bcopy(Fishmod_ItemIcon(gSaveContext.save.info.equips.buttonItems[button]),
+              interfaceCtx->iconItemSegment + (button * ITEM_ICON_SIZE), ITEM_ICON_SIZE);
+        return;
+    }
+
     osCreateMesgQueue(&interfaceCtx->loadQueue, &interfaceCtx->loadMsg, 1);
     DMA_REQUEST_ASYNC(&interfaceCtx->dmaRequest_160, interfaceCtx->iconItemSegment + (button * ITEM_ICON_SIZE),
                       GET_ITEM_ICON_VROM(gSaveContext.save.info.equips.buttonItems[button]), ITEM_ICON_SIZE, 0,
@@ -1351,6 +1360,11 @@ void Interface_LoadItemIcon1(PlayState* play, u16 button) {
 
 void Interface_LoadItemIcon2(PlayState* play, u16 button) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
+
+    if (Fishmod_ItemIcon(gSaveContext.save.info.equips.buttonItems[button]) != NULL) {
+        Interface_LoadItemIcon1(play, button);
+        return;
+    }
 
     osCreateMesgQueue(&interfaceCtx->loadQueue, &interfaceCtx->loadMsg, 1);
     DMA_REQUEST_ASYNC(&interfaceCtx->dmaRequest_180, interfaceCtx->iconItemSegment + (button * ITEM_ICON_SIZE),

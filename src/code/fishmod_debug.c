@@ -22,6 +22,7 @@
 #include "item.h"
 #include "play_state.h"
 #include "pause.h"
+#include "regs.h"
 #include "player.h"
 #include "save.h"
 #include "sequence.h"
@@ -362,10 +363,20 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #ifdef FISHMOD_SCRIPT
         sScriptActive = true;
 #endif
+#ifdef FISHMOD_SCRIPT_TEST_HIVE
+        // a beehive just in front of Link, low enough for the sword
+        Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_COMB,
+                    player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 28.0f,
+                    player->actor.world.pos.y + 18.0f,
+                    player->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * 28.0f, 0, 0, 0, 0xFF02);
+#endif
     }
 
 #ifdef FISHMOD_VIEW
-    if (sPlacedPlayer && (sPlayFrames > 40)) {
+#ifndef FISHMOD_VIEW_START
+#define FISHMOD_VIEW_START 40 // frames before the fixed camera takes over (Link can't act while it's on)
+#endif
+    if (sPlacedPlayer && (sPlayFrames > FISHMOD_VIEW_START)) {
         Fishmod_ViewUpdate(play);
     }
 #endif
@@ -375,9 +386,9 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     }
 #endif
 
-    Fishmod_DebugPrintf(0, "F%d S%d/%d c%d l%d hv%d,%d,%d", sPlayFrames, sScriptStepIndex,
+    Fishmod_DebugPrintf(0, "F%d S%d/%d c%d l%d ps%d bg%d", sPlayFrames, sScriptStepIndex,
                         (s32)ARRAY_COUNT(sScriptSteps), gFishmodRodInfo.caught, gFishmodRodInfo.lost,
-                        (s32)gFishmodHivePos.x, (s32)gFishmodHivePos.y, (s32)gFishmodHivePos.z);
+                        play->pauseCtx.state, R_PAUSE_BG_PRERENDER_STATE);
     if (player != NULL) {
         Fishmod_DebugPrintf(1, "P %d %d %d y%04X ovl%08X", (s32)player->actor.world.pos.x,
                             (s32)player->actor.world.pos.y, (s32)player->actor.world.pos.z,

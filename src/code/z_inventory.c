@@ -5,6 +5,7 @@
 #include "play_state.h"
 #include "player.h"
 #include "save.h"
+#include "fishmod.h"
 
 #include "assets/textures/icon_item_static/icon_item_static.h"
 #include "assets/textures/icon_item_24_static/icon_item_24_static.h"
@@ -212,10 +213,11 @@ void* gItemIcons[] = {
     gQuestIconMagicJarBigTex,     // ITEM_MAGIC_JAR_BIG
     // icon_item_static 48x48 ia8
     gHeartPieceIcon1Tex, // ITEM_HEART_PIECE_2
-    gHeartPieceIcon2Tex, // ITEM_INVALID_1
-    gHeartPieceIcon3Tex, // ITEM_INVALID_2
+    // fishmod: bait bottles (32x32 rgba32, in RAM)
+    gFishmodBottleLarva3Tex, // ITEM_INVALID_1 = ITEM_BOTTLE_LARVA_3
+    gFishmodBottleLarva2Tex, // ITEM_INVALID_2 = ITEM_BOTTLE_LARVA_2
     // parameter_static 16x16 ia8
-    gOcarinaBtnIconCUpTex,    // ITEM_INVALID_3
+    gFishmodBottleLarva1Tex,  // ITEM_INVALID_3 = ITEM_BOTTLE_LARVA_1
     gOcarinaBtnIconCDownTex,  // ITEM_INVALID_4
     gOcarinaBtnIconCLeftTex,  // ITEM_INVALID_5
     gOcarinaBtnIconCRightTex, // ITEM_INVALID_6
