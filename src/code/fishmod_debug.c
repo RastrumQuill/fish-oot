@@ -38,6 +38,7 @@
 #include "ultra64/convert.h"
 #include "bgcheck.h"
 #include "segmented_address.h"
+#include "libc64/qrand.h"
 
 void Sram_InitDebugSave(void);
 
@@ -421,6 +422,8 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         sPlacedPlayer = true;
 #ifdef FISHMOD_SCRIPT
         sScriptActive = true;
+        // the same random numbers every run, so benchmark runs of different builds start alike
+        Rand_Seed(0x46495348);
 #endif
 #ifdef FISHMOD_SCRIPT_EXTRA_FISH
         {
