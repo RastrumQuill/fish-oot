@@ -27,43 +27,42 @@ Options 1 and 2 are the target. 3 and 4 only if they pass the performance rule.
 
 ## Engine and performance
 
-Not being worked on yet. Status says what already exists (several of these went into the build A/B
-optimization sets, see `fishmod/test-builds/README.md`).
+Target hardware is a real N64 with a flashcart (EverDrive, SummerCart64), so a bigger save than vanilla's is
+fine, and the Expansion Pak (8 MB) may be used. Lake Hylia and the long-term goals below need a lot of headroom.
 
-### Level of detail
+### Optimization to-do for kokiri-test4
 
-- **Billboards for distant fish:** past some distance, draw a fish as a camera-facing quad or an 8-vertex
-  "stretched hexagon" in solid vertex colours, with no texture. No texture loads (TMEM), and opaque (not
-  alpha-blended) so overlapping fish cost no extra fill. Status: to do. Note: it needs to be opaque or alpha-test
-  only; blended edges would bring the fill cost back.
-- **Lines as one vertex strip:** status: done for the fishing line (optimization 1, in build A and later).
-- **Skipping matrix work on limbs that don't change:** status: partly done (limb shortcuts, optimization 2, in
-  build A and later). Remaining: cache whole poses for idle fish (optimization 3 in build B does this for
-  distant fish).
+Planned for kokiri-test4 if test 3 has no major issues. Each one is measured (debug timing line, test-mode FPS
+counter, Kokiri vs Lake Hylia) and dropped if it doesn't help.
 
-### AI and culling
+1. **Billboards for distant fish:** past some distance, draw a fish as a camera-facing quad or an 8-vertex
+   "stretched hexagon" in solid vertex colours, with no texture: no texture loads (TMEM). It must be opaque or
+   alpha-test only; blended edges would bring the fill cost back.
+2. **More AI throttling by distance:** far fish already think every other frame (build B). Add further steps:
+   every 4th frame, then every 8th, for fish further out.
+3. **Sub-biome unloading:** unload fish (keeping each zone's count) when their zone is far from Link, and stop
+   processing them (the "fish near Link only" part of fishmod/LAKE_HYLIA.md).
+4. **More matrix skipping:** extend the limb shortcuts and pose caching (builds A/B) to every fish that isn't
+   changing shape, not just distant ones.
+5. **Folded-polynomial sin/cos:** Kaze's polynomial over 1/8 of the wave (symmetry for the rest, sqrtf for the
+   other half) in place of the sine table, behind a flag. Measure first: it only helps if trig cache misses
+   show up in CPU time.
+6. **Techniques from Majora's Mask:** borrow MM engine optimizations where they apply (MM runs a busier world on
+   the same hardware; its decomp, zeldaret/mm, is the reference).
+7. **Expansion Pak:** OoT doesn't use the extra 4 MB on its own. Change the memory setup to use it when present
+   (bigger arenas and caches, e.g. the water floor cache), keeping the game working without it if possible.
+8. **F3DEX3 on hardware:** the build flag exists (`fishmod/build.sh --f3dex3`) but has only been tested in ares.
+   Test it on the flashcart.
 
-- **AI throttling by distance:** status: partly done (build B: far fish think every other frame). To do: further
-  steps (every 4th or 8th frame) for fish further out.
-- **Sub-biome unloading:** unload fish (keeping each zone's count) when their zone is far from Link, and stop
-  processing them. Status: planned as part of Lake Hylia (fishmod/LAKE_HYLIA.md, "fish near Link only").
+### Done
 
-### Memory
-
-- **Word-sized table clears:** status: done (optimization 7: the collision line-test table is cleared in large
-  chunks; in build A and later).
-
-### Long-term
-
-- **5×5 item grid:** change the pause menu's item grid from 4×6 to 5×5, freeing a slot so the fishing rod
-  becomes a normal item to equip on a C button (today the rod has no inventory slot; L puts it on B). The grid
-  is full in vanilla, so the rod needs a slot from somewhere. Note: the item cursor movement, the item icon
-  layout and the "Equip to C" code all assume 4×6, so this touches a lot of the pause menu.
-- **F3DEX3 (Fast3D v3) microcode:** status: done as a build flag (`fishmod/build.sh --f3dex3`). It is tested in
-  ares only, not yet on hardware.
-- **Folded-polynomial sin/cos:** replace the sine lookup table with Kaze's polynomial over 1/8 of the wave
-  (symmetry for the rest, sqrtf for the other half), so trig doesn't miss the cache. Experimental, behind a flag,
-  and measure first: it only helps if trig misses are actually showing up in the CPU time.
+- **Lines as one vertex strip:** the fishing line (optimization 1, build A and later).
+- **Limb shortcuts:** limbs skip part-scale math they don't need (optimization 2, build A and later); distant
+  idle fish reuse their last pose (optimization 3, build B).
+- **Far fish think every other frame** (optimization 4, build B).
+- **Word-sized table clears:** the collision line-test table is cleared in large chunks (optimization 7, build A
+  and later).
+- **F3DEX3 build flag** (ares only so far).
 
 ## Notes for later
 
@@ -104,3 +103,30 @@ A much larger version of the Fishing Pond (a new scene, likely built with Fast64
 
 Much later: turn the Lake Hylia laboratory into an aquarium where you can keep your favourite catches, like a
 living version of the fishing journal.
+
+### 5. New items: bug net, fishing rod, pictograph box, journal
+
+Four new items, which grows the item page from 6 × 4 (24) to 7 × 4 (28): the same four rows, one more column, so
+the cursor math only changes its column count and icons keep their height (about 86% width). The layout stays
+in the spirit of vanilla (ammo top left, arrows and tools right, bottles along the bottom).
+
+- **Fishing rod:** a real item to equip on a C button. Given before the game starts by default; later the
+  Kokiri tutorial gives it (shoot down the hive for the rod, learn that larvae make bait). The Fishing Pond uses
+  your rod.
+- **Bug net:** catch bugs (and fireflies) for the compendium and for bait.
+- **Pictograph box:** in the style of MM's: first-person photos, logging every NPC, enemy type and the passive
+  wildlife that's in the shot (actors on screen and close enough when the shutter fires), plus a selfie
+  camera with a caught fish. Only a few photos are stored (each is about 9 KB at MM's 160 × 112, 4-bit); entries
+  are "logged" flags shown with the live model or a pre-made image.
+  - MM's code is fine to learn from (zeldaret/mm). MM's assets (the box model, its icon, the viewfinder
+    graphics, the shutter sound) aren't in the OoT ROM, so they'd be made new for the mod.
+  - Pre-rendered rooms (shops, the Market and such) have a fixed camera, so first-person photos don't work there:
+    the pictograph is disabled in them until they're rebuilt in 3D (new Fast64 rooms; any fan-made remakes would
+    need a licence that allows sharing).
+- **Journal / compendium:** the log of bugs caught, fish caught and characters, monsters and animals pictographed
+  (the fishing journal on Link's records plaque grows into this). Could be its own pause page (like MM's mask
+  page) instead of an item, if the item page gets tight.
+- **Save format:** the compendium needs a bigger save than the spare scene-flag space fishmod uses now. A new
+  save layout on a flashcart's bigger save type; the inventory keeps its slots, with a table for where each
+  slot shows in the grid.
+- Not limited to OoT's models in the long run: new models where needed.
