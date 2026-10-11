@@ -12,6 +12,7 @@
 #include "play_state.h"
 #include "segmented_address.h"
 #include "zelda_arena.h"
+#include "ultra64.h"
 #include "ultra64/libc.h"
 
 #define GRID_MAX_BOXES 4
@@ -52,6 +53,13 @@ void EnFishmod_WaterGridInit(PlayState* play) {
     s32 numBoxes = play->colCtx.colHeader->numWaterBoxes;
     s32 cornersLeft = GRID_MAX_CORNERS;
     s32 i;
+
+#if FISHMOD_OPT >= 3
+    // with the Expansion Pak there's room for a finer cache over bigger water (Lake Hylia)
+    if (osMemSize >= 0x800000) {
+        cornersLeft *= 4;
+    }
+#endif
 
     EnFishmod_WaterGridDestroy(play);
     bzero(sExactCache, sizeof(sExactCache));

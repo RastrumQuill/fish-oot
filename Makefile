@@ -227,6 +227,13 @@ endif
 # 2 = all of 1 plus distant-fish pose caching, half-rate far fish AI, fewer rod matrices, palette textures
 FISHMOD_OPT ?= 0
 CPP_DEFINES += -DFISHMOD_OPT=$(FISHMOD_OPT)
+# 3 = all of 2 plus billboards for distant fish, deeper AI throttling, dormant far fish, Expansion Pak memory
+# FISHMOD_FASTTRIG=1: polynomial sin/cos in place of the sine table (Math_SinS/Math_CosS, whole game)
+FISHMOD_FASTTRIG ?= 0
+CPP_DEFINES += -DFISHMOD_FASTTRIG=$(FISHMOD_FASTTRIG)
+ifneq ($(FISHMOD_FASTTRIG),0)
+  COMPARE := 0
+endif
 ifneq ($(FISHMOD_OPT),0)
   COMPARE := 0
 endif

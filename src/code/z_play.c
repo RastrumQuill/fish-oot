@@ -343,7 +343,13 @@ void Play_Init(GameState* thisx) {
     SystemArena_Display();
 #endif
 
+#if FISHMOD_OPT >= 3
+    // fishmod: with the Expansion Pak (and the frame buffers moved up, see SysCfb_Init), 2 MB more for Play, which
+    // all goes to the actor heap
+    GameState_Realloc(&this->state, 0x1D4790 + ((osMemSize >= 0x800000) && !DEBUG_FEATURES ? 0x200000 : 0));
+#else
     GameState_Realloc(&this->state, 0x1D4790);
+#endif
 
 #if PLATFORM_N64
     if ((B_80121220 != NULL) && (B_80121220->unk_10 != NULL)) {

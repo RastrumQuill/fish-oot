@@ -22,6 +22,7 @@
 #include "item.h"
 #include "play_state.h"
 #include "pause.h"
+#include "ss_sram.h"
 #include "regs.h"
 #include "player.h"
 #include "save.h"
@@ -291,6 +292,13 @@ void Fishmod_DebugBoot(void) {
     FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].count = 12;
     FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].bestTenths = 41;
 #endif
+#ifdef FISHMOD_SCRIPT_ADULT
+    // adult Link with the Iron Boots on (the debug save owns them), for walking the bottom of deep water
+    gSaveContext.save.linkAge = LINK_AGE_ADULT;
+    gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_MASTER;
+    Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_MASTER);
+    Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_IRON);
+#endif
     gSaveContext.respawnFlag = 0;
     gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = ENTR_LOAD_OPENING;
     gSaveContext.seqId = (u8)NA_BGM_DISABLED;
@@ -324,6 +332,12 @@ OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
  * Averages over 60 frames, in tenths of a millisecond: RSP graphics and RDP time, the CPU time of Play_Update,
  * Play_Draw and the fishmod actors, and the whole frame.
  */
+#ifndef FISHMOD_STATS_SKIP
+#define FISHMOD_STATS_SKIP 600 // frames before the whole-run stats start (scene load, settling)
+#endif
+static u32 sLastCpu[FISHMOD_CPU_MAX];
+static s32 sStatsFrames;
+
 static void Fishmod_DebugTiming(void) {
     static u32 sSum[2 + FISHMOD_CPU_MAX + 1];
     static u32 sShown[2 + FISHMOD_CPU_MAX + 1];
@@ -333,7 +347,8 @@ static void Fishmod_DebugTiming(void) {
     sSum[0] += (u32)OS_CYCLES_TO_USEC(gRSPGfxTimeTotal);
     sSum[1] += (u32)OS_CYCLES_TO_USEC(gRDPTimeTotal);
     for (i = 0; i < FISHMOD_CPU_MAX; i++) {
-        sSum[2 + i] += (u32)OS_CYCLES_TO_USEC(gFishmodCpuTime[i]);
+        sLastCpu[i] = (u32)OS_CYCLES_TO_USEC(gFishmodCpuTime[i]);
+        sSum[2 + i] += sLastCpu[i];
         gFishmodCpuTime[i] = 0;
     }
     sSum[2 + FISHMOD_CPU_MAX] += (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
@@ -346,6 +361,39 @@ static void Fishmod_DebugTiming(void) {
     }
     Fishmod_DebugPrintf(9, "r%d up%d dr%d f%d/%d r%d/%d F%d", sShown[1], sShown[2], sShown[3], sShown[4],
                         sShown[5], sShown[6], sShown[7], sShown[8]);
+
+    // Whole-run averages, written to the end of SRAM every second so the emulator's save file can be read
+    // afterwards (fishmod/tools/read_stats.py): exact numbers to compare builds with.
+    {
+        static struct {
+            u32 magic; // 'FMST'
+            u32 frames;
+            u32 sum[2 + FISHMOD_CPU_MAX + 2]; // microseconds, summed over `frames`
+            u32 max[2 + FISHMOD_CPU_MAX + 2]; // worst single frame
+        } sStats;
+        u32 now[2 + FISHMOD_CPU_MAX + 2];
+
+        now[0] = (u32)OS_CYCLES_TO_USEC(gRSPGfxTimeTotal);
+        now[1] = (u32)OS_CYCLES_TO_USEC(gRDPTimeTotal);
+        for (i = 0; i < FISHMOD_CPU_MAX; i++) {
+            now[2 + i] = sLastCpu[i];
+        }
+        now[2 + FISHMOD_CPU_MAX] = (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
+        now[3 + FISHMOD_CPU_MAX] = (u32)OS_CYCLES_TO_USEC(gRSPAudioTimeTotal);
+        if (sStatsFrames++ >= FISHMOD_STATS_SKIP) {
+            sStats.magic = 0x464D5354;
+            sStats.frames++;
+            for (i = 0; i < ARRAY_COUNT(now); i++) {
+                sStats.sum[i] += now[i];
+                if (now[i] > sStats.max[i]) {
+                    sStats.max[i] = now[i];
+                }
+            }
+            if ((sStats.frames % 60) == 0) {
+                SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7F00, &sStats, sizeof(sStats), OS_WRITE);
+            }
+        }
+    }
 }
 
 void Fishmod_DebugPlayUpdate(PlayState* play) {
@@ -362,6 +410,24 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         sPlacedPlayer = true;
 #ifdef FISHMOD_SCRIPT
         sScriptActive = true;
+#endif
+#ifdef FISHMOD_SCRIPT_EXTRA_FISH
+        {
+            // a crowd of fish around Link for stress tests: the Kokiri species in turn, in a ring
+            static u8 sKinds[] = { FISHMOD_SPECIES_GREENGILL, FISHMOD_SPECIES_HYRULE_BASS, FISHMOD_SPECIES_SANKE_CARP,
+                                   FISHMOD_SPECIES_ORDON_CATFISH, FISHMOD_SPECIES_HYRULE_MINNOW,
+                                   FISHMOD_SPECIES_HYLIAN_LOACH };
+            s32 n;
+
+            for (n = 0; n < FISHMOD_SCRIPT_EXTRA_FISH; n++) {
+                s16 yaw = n * (0x10000 / FISHMOD_SCRIPT_EXTRA_FISH);
+                f32 r = 40.0f + (n % 4) * 30.0f;
+
+                Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sScriptStartPos.x + Math_SinS(yaw) * r,
+                            sScriptStartPos.y + 30.0f + (n % 3) * 15.0f, sScriptStartPos.z + Math_CosS(yaw) * r, 0,
+                            yaw, 0, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sKinds[n % ARRAY_COUNT(sKinds)]));
+            }
+        }
 #endif
 #ifdef FISHMOD_SCRIPT_TEST_HIVE
         // a beehive just in front of Link, low enough for the sword
