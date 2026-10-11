@@ -265,6 +265,7 @@ typedef struct FishmodAutoplayStep {
 void Fishmod_DebugBoot(void);
 // True if the autoplay script wants a normal boot (logo, title, file select) instead of going straight to Kokiri
 s32 Fishmod_DebugNormalBoot(void);
+s32 Fishmod_DebugWantsFish(void);
 void Fishmod_AutoplayInput(struct GameState* gameState, Input* inputs);
 void Fishmod_DebugPlayUpdate(struct PlayState* play);
 void Fishmod_DebugDrawText(struct GameState* gameState, Gfx** gfxP);

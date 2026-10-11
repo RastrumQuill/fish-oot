@@ -98,6 +98,7 @@ typedef struct EnFishmod {
     /* 0x3F6 */ s8 startle;                        // frames left of a startled flick (sign: which way)
     /* 0x3F7 */ u8 fleeFromLink;                   // the current flee is away from Link (runYaw already set)
     /* 0x3F8 */ u8 thinkMask;                      // the AI runs on frames where (timer & thinkMask) == 0
+    /* 0x3F9 */ u8 depthPref;                      // where in its species' depth band this fish likes to be
 #if FISHMOD_OPT >= 2
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
@@ -181,6 +182,8 @@ void EnFishmod_RodMessage(s32 color, const char* line1, const char* line2);
 void EnFishmod_FishSetState(struct EnFishmod* this, s32 state);
 // Water floor cache (fishmod_water.c)
 void EnFishmod_WaterGridInit(struct PlayState* play);
+void EnFishmod_WaterGridAcquire(struct PlayState* play);
+void EnFishmod_WaterGridRelease(struct PlayState* play);
 void EnFishmod_WaterGridDestroy(struct PlayState* play);
 s32 EnFishmod_WaterFloor(struct PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative);
 

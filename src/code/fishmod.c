@@ -96,7 +96,11 @@ void Fishmod_OnSceneLoad(PlayState* play) {
         Fishmod_RestoreB(NULL);
     }
 
-    if (Fishmod_GetSceneSpawns(play->sceneId) == NULL) {
+    if ((Fishmod_GetSceneSpawns(play->sceneId) == NULL)
+#if FISHMOD_DEBUG
+        && !Fishmod_DebugWantsFish()
+#endif
+    ) {
         return;
     }
 

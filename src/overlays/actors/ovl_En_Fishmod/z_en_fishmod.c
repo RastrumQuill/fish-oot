@@ -448,6 +448,8 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
     this->swimPhaseStep = 0.25f;
     this->swimMag = 1500.0f;
     this->swimPhase = Rand_ZeroFloat(6.28f);
+    this->depthPref = (u8)Rand_ZeroFloat(255.9f);
+    EnFishmod_WaterGridAcquire(play);
     this->actor.world.rot.y = this->actor.shape.rot.y;
     this->actionFunc = EnFishmod_FishHover;
 }
@@ -466,6 +468,7 @@ void EnFishmod_Destroy(Actor* thisx, PlayState* play) {
     } else {
         EnFishmod_RodRelease(this);
         SkelAnime_Free(&this->skelAnime, play);
+        EnFishmod_WaterGridRelease(play);
     }
 }
 
@@ -562,14 +565,17 @@ static f32 EnFishmod_ClampY(EnFishmod* this, f32 y) {
 
 static f32 EnFishmod_DepthY(EnFishmod* this, f32 surface, f32 floor) {
     f32 depth = surface - floor;
+    // each fish has its own spot in its species' band, so deep water fills in layers instead of one plane each
+    f32 pref = this->depthPref * (1.0f / 255.0f);
+    f32 band = CLAMP_MAX(depth * 0.25f, 50.0f);
 
     switch (this->species->depth) {
         case FISHMOD_DEPTH_SURFACE:
-            return surface - CLAMP_MAX(6.0f, depth * 0.5f);
+            return surface - CLAMP_MAX(6.0f + pref * band, depth * 0.5f);
         case FISHMOD_DEPTH_BOTTOM:
-            return floor + CLAMP_MAX(5.0f, depth * 0.4f);
+            return floor + CLAMP_MAX(5.0f + pref * band, depth * 0.4f);
         default:
-            return floor + depth * 0.5f;
+            return floor + depth * (0.3f + pref * 0.4f);
     }
 }
 
@@ -621,8 +627,8 @@ static void EnFishmod_PickWanderTarget(EnFishmod* this, PlayState* play) {
                                  CLAMP_MIN(12.0f, this->halfHeight * 2.0f + this->halfLength * 0.5f), &point,
                                  &surface, &floor)) {
         point.y = EnFishmod_DepthY(this, surface, floor);
-        if (Rand_ZeroOne() < 0.25f) {
-            // down to pick at the bottom
+        if ((Rand_ZeroOne() < 0.25f) && (point.y - floor < 80.0f)) {
+            // down to pick at the bottom, if it's near
             point.y = floor + this->halfHeight + 1.0f;
         }
         this->target = point;

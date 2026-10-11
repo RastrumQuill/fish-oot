@@ -370,7 +370,7 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     ROD->state = ROD_STATE_NONE;
     ROD->bait = FISHMOD_BAIT_NONE;
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
-    EnFishmod_WaterGridInit(play);
+    EnFishmod_WaterGridAcquire(play);
 
     if (!gFishmodPhoto.active) {
         Rod_SpawnFish(this, play, FISH_COUNT);
@@ -379,7 +379,7 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
 
 void EnFishmod_RodDestroy(EnFishmod* this, PlayState* play) {
     Rod_CameraStop(play);
-    EnFishmod_WaterGridDestroy(play);
+    EnFishmod_WaterGridRelease(play);
 }
 
 /** The area's music comes back after the fish-on music (it only restores if the fish-on music is playing). */
