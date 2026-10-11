@@ -419,6 +419,13 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         EnFishmod_SetLength(this, lo + (hi - lo) * f);
         this->fishState = FISH_STATE_WANDER;
         this->stateTimer = 0;
+        if (gFishmodSpawnLength > 0.0f) {
+            // poured back from a bottle: its own size, and off it goes
+            EnFishmod_SetLength(this, gFishmodSpawnLength);
+            this->fishState = FISH_STATE_FLEE;
+            this->stateTimer = 50;
+            this->cooldown = 600;
+        }
         // don't draw fish that are off screen or far away (they still swim)
         this->actor.flags &= ~ACTOR_FLAG_DRAW_CULLING_DISABLED;
         this->actor.cullingVolumeDistance = 900.0f;
@@ -790,6 +797,78 @@ static void EnFishmod_BobberStation(EnFishmod* this, f32 reach, f32 y, Vec3f* ou
     out->y = y;
 }
 
+/**
+ * A watchdog for fish that stop getting anywhere (wedged against a bank or in a corner the steering keeps turning
+ * back into): every 40 frames, if a swimming fish has moved less than 4 units, it picks somewhere deep it can see
+ * nearby and heads there for a while. If that doesn't free it either, it is nudged straight there.
+ * Returns true while it is busy getting unstuck (the normal AI waits).
+ */
+static s32 EnFishmod_Unstick(EnFishmod* this, PlayState* play) {
+    s32 swimming = (this->fishState == FISH_STATE_WANDER) || (this->fishState == FISH_STATE_APPROACH) ||
+                   (this->fishState == FISH_STATE_FLEE);
+
+    if (!swimming) {
+        this->stuckTimer = 0;
+        this->stuckLevel = 0;
+        this->escapeTimer = 0;
+        this->stuckPos = this->actor.world.pos;
+        return false;
+    }
+
+    if (++this->stuckTimer >= 40) {
+        if (Math_Vec3f_DistXZ(&this->actor.world.pos, &this->stuckPos) < 4.0f) {
+            f32 surface;
+            f32 floor;
+            s32 i;
+
+            this->stuckLevel = CLAMP_MAX(this->stuckLevel + 1, 3);
+            for (i = 0; i < 4; i++) {
+                if (EnFishmod_FindWaterPoint(play, &this->actor.world.pos, 40.0f + i * 20.0f,
+                                             this->halfHeight * 2.0f + 4.0f, &this->escape, &surface, &floor) &&
+                    ((this->stuckLevel >= 2) || EnFishmod_OpenWaterTo(this, play, &this->escape))) {
+                    this->escapeTimer = 60;
+                    break;
+                }
+            }
+        } else {
+            this->stuckLevel = 0;
+        }
+        this->stuckPos = this->actor.world.pos;
+        this->stuckTimer = 0;
+    }
+
+    if (this->escapeTimer <= 0) {
+        return false;
+    }
+    this->escapeTimer--;
+    if (this->stuckLevel >= 2) {
+        // the steering keeps failing: go straight there, slowly
+        f32 dist = Math_Vec3f_DistXZ(&this->actor.world.pos, &this->escape);
+        s16 yaw = Math_Vec3f_Yaw(&this->actor.world.pos, &this->escape);
+
+        if (dist > 1.0f) {
+            this->actor.world.pos.x += Math_SinS(yaw) * 0.8f;
+            this->actor.world.pos.z += Math_CosS(yaw) * 0.8f;
+        }
+        Math_ApproachF(&this->actor.world.pos.y, this->escape.y, 0.1f, 0.5f);
+        Math_SmoothStepToS(&this->actor.shape.rot.y, yaw, 3, 0x800, 0x100);
+        this->speed = 0.8f;
+    } else {
+        EnFishmod_SwimToward(this, play, &this->escape, 0.8f, 0x800);
+    }
+    this->swimPhaseStep = 0.4f;
+    this->swimMag = 1500.0f;
+    if (this->escapeTimer == 0) {
+        // free again: start over from here (an approach starts over too, later)
+        this->target = this->escape;
+        if (this->fishState == FISH_STATE_APPROACH) {
+            this->cooldown = 200;
+            EnFishmod_FishSetState(this, FISH_STATE_WANDER);
+        }
+    }
+    return true;
+}
+
 void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
     FishmodRod* rod = &gFishmodRodState;
     const FishmodBehavior* b = &this->species->behavior;
@@ -805,6 +884,10 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
 
     below = rod->bobberPos;
     below.y = rod->waterY - 10.0f;
+
+    if (EnFishmod_Unstick(this, play)) {
+        return;
+    }
 
     switch (this->fishState) {
         case FISH_STATE_WANDER:

@@ -375,8 +375,9 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     }
 #endif
 
-    Fishmod_DebugPrintf(0, "F%d S%d/%d caught %d lost %d", sPlayFrames, sScriptStepIndex,
-                        (s32)ARRAY_COUNT(sScriptSteps), gFishmodRodInfo.caught, gFishmodRodInfo.lost);
+    Fishmod_DebugPrintf(0, "F%d S%d/%d c%d l%d hv%d,%d,%d", sPlayFrames, sScriptStepIndex,
+                        (s32)ARRAY_COUNT(sScriptSteps), gFishmodRodInfo.caught, gFishmodRodInfo.lost,
+                        (s32)gFishmodHivePos.x, (s32)gFishmodHivePos.y, (s32)gFishmodHivePos.z);
     if (player != NULL) {
         Fishmod_DebugPrintf(1, "P %d %d %d y%04X ovl%08X", (s32)player->actor.world.pos.x,
                             (s32)player->actor.world.pos.y, (s32)player->actor.world.pos.z,

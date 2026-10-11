@@ -5,6 +5,8 @@
  */
 
 #include "z_obj_comb.h"
+#include "fishmod.h"
+#include "rand.h"
 #include "src/overlays/effects/ovl_Effect_Ss_Kakera/z_eff_ss_kakera.h"
 
 #include "libc64/qrand.h"
@@ -189,11 +191,13 @@ void ObjComb_Wait(ObjComb* this, PlayState* play) {
     if (this->collider.base.acFlags & AC_HIT) {
         this->collider.base.acFlags &= ~AC_HIT;
         dmgFlags = this->collider.elements[0].base.acHitElem->atDmgInfo.dmgFlags;
-        if (dmgFlags & (DMG_HAMMER | DMG_ARROW | DMG_SLINGSHOT | DMG_DEKU_STICK)) {
+        // fishmod: a slingshot seed or an arrow knocks the hive down too (it's how you get bee larva for bait)
+        if (dmgFlags & (DMG_HAMMER | DMG_DEKU_STICK)) {
             this->unk_1B0 = 1500;
         } else {
             ObjComb_Break(this, play);
             ObjComb_ChooseItemDrop(this, play);
+            Fishmod_AddBait(FISHMOD_BAIT_BEE_LARVA, 2 + (s32)Rand_ZeroFloat(3.0f));
             Actor_Kill(&this->actor);
         }
     } else {

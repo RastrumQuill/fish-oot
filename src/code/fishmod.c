@@ -23,6 +23,9 @@
 #include "sfx.h"
 #include "z_lib.h"
 #include "string.h"
+#include "libc64/sprintf.h"
+#include "rand.h"
+#include "bgcheck.h"
 #include "ultra64/convert.h"
 #include "speed_meter.h"
 #include "libu64/gfxprint.h"
@@ -30,6 +33,7 @@
 s32 Object_LoadPersistent(ObjectContext* objectCtx, s16 objectId);
 
 Actor* gFishmodRod = NULL;
+Vec3f gFishmodHivePos; // where the scene's added beehive went (debug display)
 
 // The rod rides on B while fishing (like in the Fishing Pond); L puts it there and back.
 static u8 sRodOnB = false;
@@ -100,6 +104,50 @@ void Fishmod_OnSceneLoad(PlayState* play) {
 }
 
 /**
+ * Things fishmod adds to a scene besides the fish. Kokiri Forest gets a beehive (for bee larva bait) on a wall in
+ * sight of the moat, found by looking for the nearest wall around a spot by the water.
+ */
+static void Fishmod_SpawnSceneExtras(PlayState* play) {
+    if (play->sceneId == SCENE_KOKIRI_FOREST) {
+        static Vec3f sHiveLookFrom = { 960.0f, 75.0f, -60.0f };
+        Vec3f best;
+        f32 bestDist = 400.0f;
+        s16 bestYaw = 0;
+        s32 i;
+
+        for (i = 0; i < 16; i++) {
+            s16 yaw = i * 0x1000;
+            Vec3f to;
+            Vec3f hit;
+            CollisionPoly* poly;
+            s32 bgId;
+
+            to.x = sHiveLookFrom.x + Math_SinS(yaw) * 400.0f;
+            to.y = sHiveLookFrom.y;
+            to.z = sHiveLookFrom.z + Math_CosS(yaw) * 400.0f;
+            if (BgCheck_EntityLineTest1(&play->colCtx, &sHiveLookFrom, &to, &hit, &poly, true, false, false, true,
+                                        &bgId)) {
+                f32 dist = Math_Vec3f_DistXZ(&sHiveLookFrom, &hit);
+
+                if ((dist > 60.0f) && (dist < bestDist)) {
+                    bestDist = dist;
+                    bestYaw = yaw;
+                    best = hit;
+                }
+            }
+        }
+        if (bestDist < 400.0f) {
+            // just off the wall, hanging toward the water
+            best.x -= Math_SinS(bestYaw) * 10.0f;
+            best.z -= Math_CosS(bestYaw) * 10.0f;
+            Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_COMB, best.x, best.y, best.z, 0, bestYaw + 0x8000, 0,
+                        0xFF02);
+            gFishmodHivePos = best;
+        }
+    }
+}
+
+/**
  * Called every Play_Update. Spawns the fishing actor once the scene is running.
  */
 void Fishmod_PlayUpdate(PlayState* play) {
@@ -140,7 +188,85 @@ void Fishmod_PlayUpdate(PlayState* play) {
     if (rod != NULL) {
         rod->room = -1; // persists through room changes
         gFishmodRod = rod;
+        Fishmod_SpawnSceneExtras(play);
     }
+}
+
+f32 gFishmodSpawnLength;
+
+static const char* sBaitNames[FISHMOD_BAIT_MAX] = {
+    "None", "Bee larva", "Bug", "Worm", "Coral earring", "Fish",
+};
+
+const char* Fishmod_BaitName(s32 bait) {
+    return ((bait >= 0) && (bait < FISHMOD_BAIT_MAX)) ? sBaitNames[bait] : "?";
+}
+
+void Fishmod_AddBait(s32 bait, s32 count) {
+    static char sNotice[40];
+    u8* have = &FISHMOD_SAVE->baitCount[bait];
+
+    *have = CLAMP_MAX(*have + count, FISHMOD_BAIT_POUCH_MAX);
+    sprintf(sNotice, "%s x%d (bait: %d)", Fishmod_BaitName(bait), count, *have);
+    gFishmodRodInfo.notice = sNotice;
+    Sfx_PlaySfxCentered(NA_SE_SY_GET_ITEM);
+}
+
+/** Notes what just went into a bottle: the first empty one, which is where Item_Give puts a fish. */
+void Fishmod_BottleFish(s32 species, f32 lengthInches) {
+    s32 i;
+
+    for (i = 0; i < 4; i++) {
+        if (gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1 + i] == ITEM_BOTTLE_EMPTY) {
+            FISHMOD_SAVE->bottleFish[i].species = species + 1;
+            FISHMOD_SAVE->bottleFish[i].lengthTenths = (u16)(lengthInches * 10.0f);
+            return;
+        }
+    }
+}
+
+/**
+ * Link pours a bottled fish out (`slot` is its inventory slot). In a fishing scene, over water, it goes back in as
+ * the fish it was (a vanilla bottled fish becomes one of the fish that live there). Returns false to let the game
+ * drop a vanilla fish instead (on land, or where fishmod has no fish).
+ */
+s32 Fishmod_ReleaseBottleFish(PlayState* play, s32 slot, Vec3f* pos, s16 yaw) {
+    const FishmodSceneSpawns* spawns = Fishmod_GetSceneSpawns(play->sceneId);
+    FishmodBottleFish* bottle;
+    WaterBox* waterBox;
+    f32 surface;
+    s32 species;
+    s32 i;
+
+    if ((spawns == NULL) || (gFishmodRod == NULL) || (slot < SLOT_BOTTLE_1) || (slot > SLOT_BOTTLE_4)) {
+        return false;
+    }
+    // over water a little ahead of Link (he pours it out in front of him)
+    for (i = 0; i < 3; i++) {
+        f32 x = pos->x + Math_SinS(yaw) * (i * 20.0f);
+        f32 z = pos->z + Math_CosS(yaw) * (i * 20.0f);
+
+        if (BgCheck_GetWaterSurface(play, &play->colCtx, x, z, &surface, &waterBox) && (surface < pos->y + 20.0f)) {
+            break;
+        }
+    }
+    if (i == 3) {
+        return false;
+    }
+    bottle = &FISHMOD_SAVE->bottleFish[slot - SLOT_BOTTLE_1];
+    if (bottle->species != 0) {
+        species = bottle->species - 1;
+        gFishmodSpawnLength = bottle->lengthTenths * 0.1f;
+    } else {
+        species = spawns->entries[(s32)Rand_ZeroFloat(spawns->count - 0.01f)].species;
+        gFishmodSpawnLength = 0.0f;
+    }
+    bottle->species = 0;
+    bottle->lengthTenths = 0;
+    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, pos->x + Math_SinS(yaw) * (i * 20.0f), surface - 6.0f,
+                pos->z + Math_CosS(yaw) * (i * 20.0f), 0, yaw, 0, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, species));
+    gFishmodSpawnLength = 0.0f;
+    return true;
 }
 
 s32 Fishmod_RecordCatch(s32 species, f32 lengthInches) {

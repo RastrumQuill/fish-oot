@@ -81,6 +81,11 @@ typedef struct EnFishmod {
     /* 0x3CE */ s16 detourYaw;                     // heading around a bank that was in the way
     /* 0x3D0 */ s16 detourTimer;                   // frames left to follow detourYaw
     /* 0x3D2 */ u8 runKind;                        // EnFishmodRunKind of the current or last run when hooked
+    /* 0x3D3 */ u8 stuckLevel;                     // how many checks in a row found it not moving
+    /* 0x3D4 */ s16 stuckTimer;                    // frames since the last stuck check
+    /* 0x3D6 */ s16 escapeTimer;                   // frames left heading for `escape` to get unstuck
+    /* 0x3D8 */ Vec3f stuckPos;                    // where it was at the last stuck check
+    /* 0x3E4 */ Vec3f escape;                      // open water to head for when stuck
 #if FISHMOD_OPT >= 2
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
