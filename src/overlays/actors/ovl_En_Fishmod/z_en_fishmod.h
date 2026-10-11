@@ -34,6 +34,12 @@ struct EnFishmod;
 
 typedef void (*EnFishmodActionFunc)(struct EnFishmod*, struct PlayState*);
 
+#if FISHMOD_OPT >= 3
+#define FISHMOD_THINK_MASK(this) ((this)->thinkMask)
+#else
+#define FISHMOD_THINK_MASK(this) 1
+#endif
+
 typedef struct EnFishmod {
     /* 0x000 */ Actor actor;
     /* 0x14C */ SkelAnime skelAnime;
@@ -91,6 +97,7 @@ typedef struct EnFishmod {
     /* 0x3F4 */ s16 restTimer;                     // wandering: frames left resting in place before moving on
     /* 0x3F6 */ s8 startle;                        // frames left of a startled flick (sign: which way)
     /* 0x3F7 */ u8 fleeFromLink;                   // the current flee is away from Link (runYaw already set)
+    /* 0x3F8 */ u8 thinkMask;                      // the AI runs on frames where (timer & thinkMask) == 0
 #if FISHMOD_OPT >= 2
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];

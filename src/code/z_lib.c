@@ -34,17 +34,70 @@ void Lib_MemSet(u8* dest, size_t len, u8 val) {
  * @param angle binang
  * @return cos(angle)
  */
+#if FISHMOD_FASTTRIG
+/*
+ * fishmod: sin/cos from polynomials instead of the sine table (an idea from Kaze Emanuar's "folded polynomial"):
+ * fold the angle into +-45 degrees around the nearest quarter turn, take sin and cos of that from short
+ * polynomials, and swap/negate them for the quarter. No table lookups (no cache misses) and about 70x more accurate
+ * than the table (max error 0.000023 vs 0.0016), but it changes trig everywhere in the game slightly.
+ */
+static void Math_SinCosFolded(s16 angle, f32* sinOut, f32* cosOut) {
+    s32 quarter = ((angle + 0x2000) >> 14) & 3;
+    f32 t = (s16)(angle - (quarter << 14)) * (2.0f * M_PI / 65536.0f);
+    f32 t2 = t * t;
+    f32 s = t * (1.0f + t2 * (-0.1666f + t2 * 0.0080333333f));
+    f32 c = 1.0f + t2 * (-0.49984f + t2 * 0.04062f);
+
+    switch (quarter) {
+        case 0:
+            *sinOut = s;
+            *cosOut = c;
+            break;
+        case 1:
+            *sinOut = c;
+            *cosOut = -s;
+            break;
+        case 2:
+            *sinOut = -s;
+            *cosOut = -c;
+            break;
+        default:
+            *sinOut = -c;
+            *cosOut = s;
+            break;
+    }
+}
+
+f32 Math_CosS(s16 angle) {
+    f32 s;
+    f32 c;
+
+    Math_SinCosFolded(angle, &s, &c);
+    return c;
+}
+#else
 f32 Math_CosS(s16 angle) {
     return coss(angle) * SHT_MINV;
 }
+#endif
 
 /**
  * @param angle binang
  * @return sin(angle)
  */
+#if FISHMOD_FASTTRIG
+f32 Math_SinS(s16 angle) {
+    f32 s;
+    f32 c;
+
+    Math_SinCosFolded(angle, &s, &c);
+    return s;
+}
+#else
 f32 Math_SinS(s16 angle) {
     return sins(angle) * SHT_MINV;
 }
+#endif
 
 /**
  * Changes pValue by step (scaled by the update rate) towards target, setting it equal when the target is reached.

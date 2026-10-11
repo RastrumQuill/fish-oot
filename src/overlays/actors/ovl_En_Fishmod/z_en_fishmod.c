@@ -1408,9 +1408,24 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         return;
     }
 
+#if FISHMOD_OPT >= 3
+    // Far from Link a fish does less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200
+    // every 8th (gliding on in between), and past 1600 it goes dormant: it holds still and isn't drawn (its
+    // drawing is culled at 900) until Link comes closer.
+    if ((this->fishState == FISH_STATE_WANDER) && !gFishmodPhoto.active) {
+        f32 linkDist = Math_Vec3f_DistXZ(&this->actor.world.pos, &GET_PLAYER(play)->actor.world.pos);
+
+        if (linkDist > 1600.0f) {
+            return;
+        }
+        this->thinkMask = (linkDist > 1200.0f) ? 7 : (linkDist > 800.0f) ? 3 : (linkDist > 500.0f) ? 1 : 0;
+    } else {
+        this->thinkMask = 0;
+    }
+#endif
 #if FISHMOD_OPT >= 2
     // far from Link and the bobber, a wandering fish thinks every other frame and glides on in between
-    if ((this->fishState == FISH_STATE_WANDER) && (this->timer & 1) && !gFishmodPhoto.active &&
+    if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !gFishmodPhoto.active &&
         (Math_Vec3f_DistXZ(&this->actor.world.pos, &GET_PLAYER(play)->actor.world.pos) > 500.0f) &&
         (!EnFishmod_RodBobberInWater() ||
          (Math_Vec3f_DistXZ(&this->actor.world.pos, &gFishmodRodState.bobberPos) > 300.0f))) {
@@ -1809,6 +1824,74 @@ static void EnFishmod_DrawPose(EnFishmod* this, PlayState* play) {
 }
 #endif
 
+#if FISHMOD_OPT >= 3
+#define FISHMOD_LOD_DIST 380.0f
+/**
+ * A distant fish: a flat hexagon (nose, back, tail, belly) in the fish's own colour, turned about its long axis to
+ * face the camera. Vertex colours only, so no texture loads, and opaque, so it costs no blending.
+ */
+static void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    Vtx* vtx = GRAPH_ALLOC(gfxCtx, 6 * sizeof(Vtx));
+    f32 fx = Math_SinS(this->actor.shape.rot.y);
+    f32 fz = Math_CosS(this->actor.shape.rot.y);
+    f32 vx = this->actor.world.pos.x - play->view.eye.x;
+    f32 vy = this->actor.world.pos.y - play->view.eye.y;
+    f32 vz = this->actor.world.pos.z - play->view.eye.z;
+    // across the body, at right angles to both the fish and the line of sight: U = F x V, F = (fx, 0, fz)
+    f32 ux = -fz * vy;
+    f32 uy = fz * vx - fx * vz;
+    f32 uz = fx * vy;
+    f32 ul = sqrtf(SQ(ux) + SQ(uy) + SQ(uz));
+    f32 hl = this->halfLength;
+    f32 hh = this->halfHeight * 1.3f;
+    static const f32 sShape[6][2] = {
+        { 1.0f, 0.0f }, { 0.3f, 1.0f }, { -0.5f, 0.7f }, { -1.0f, 0.0f }, { -0.5f, -0.7f }, { 0.3f, -1.0f },
+    };
+    const u8* tint = this->species->tint;
+    s32 i;
+
+    if (ul < 0.001f) {
+        ux = 0.0f;
+        uy = 1.0f;
+        uz = 0.0f;
+    } else {
+        ux /= ul;
+        uy /= ul;
+        uz /= ul;
+    }
+    for (i = 0; i < 6; i++) {
+        f32 along = sShape[i][0] * hl;
+        f32 across = sShape[i][1] * hh;
+        // a bit darker toward the back and tail, like the real thing seen through water
+        u8 shade = (i == 3) ? 150 : (i == 0) ? 200 : 175;
+
+        vtx[i].v.ob[0] = (s16)(fx * along + ux * across);
+        vtx[i].v.ob[1] = (s16)(uy * across);
+        vtx[i].v.ob[2] = (s16)(fz * along + uz * across);
+        vtx[i].v.flag = 0;
+        vtx[i].v.tc[0] = vtx[i].v.tc[1] = 0;
+        vtx[i].v.cn[0] = tint[0] * shade / 255;
+        vtx[i].v.cn[1] = tint[1] * shade / 255;
+        vtx[i].v.cn[2] = tint[2] * shade / 255;
+        vtx[i].v.cn[3] = 255;
+    }
+
+    OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+    Gfx_SetupDL_25Opa(gfxCtx);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_SHADE, G_CC_SHADE);
+    gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH | G_TEXTURE_GEN);
+    Matrix_Translate(this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z, MTXMODE_NEW);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx, "../z_en_fishmod.c", __LINE__);
+    gSPVertex(POLY_OPA_DISP++, vtx, 6, 0);
+    gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
+    gSP2Triangles(POLY_OPA_DISP++, 0, 3, 4, 0, 0, 4, 5, 0);
+    CLOSE_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+}
+#endif
+
 void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
     const u8* shape;
@@ -1817,6 +1900,14 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
         EnFishmod_RodDraw(this, play);
         return;
     }
+#if FISHMOD_OPT >= 3
+    // far from the camera, a flat shape in the fish's colour instead of the textured skeleton
+    if ((this->type == FISHMOD_TYPE_FISH) && !gFishmodPhoto.active && (this->fishState != FISH_STATE_CAUGHT) &&
+        (Math_Vec3f_DistXYZ(&this->actor.world.pos, &play->view.eye) > FISHMOD_LOD_DIST)) {
+        EnFishmod_DrawBillboard(this, play);
+        return;
+    }
+#endif
     if (this->type == FISHMOD_TYPE_COMB) {
         // flickers for its last few seconds
         if ((this->stateTimer > 60) || (this->timer & 2)) {
