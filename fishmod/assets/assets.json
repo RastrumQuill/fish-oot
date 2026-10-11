@@ -1,0 +1,11 @@
+{
+  "textures": [
+    { "name": "gFishmodBottleLarva3Tex", "src": "fishmod/art/bottle_larva_3.png", "format": "rgba32",
+      "out": "src/code/fishmod_bait_icons.inc.c" },
+    { "name": "gFishmodBottleLarva2Tex", "src": "fishmod/art/bottle_larva_2.png", "format": "rgba32",
+      "out": "src/code/fishmod_bait_icons.inc.c" },
+    { "name": "gFishmodBottleLarva1Tex", "src": "fishmod/art/bottle_larva_1.png", "format": "rgba32",
+      "out": "src/code/fishmod_bait_icons.inc.c" }
+  ],
+  "models": []
+}
