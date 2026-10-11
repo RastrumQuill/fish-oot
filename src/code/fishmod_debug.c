@@ -296,11 +296,12 @@ void Fishmod_DebugBoot(void) {
     FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].bestTenths = 41;
 #endif
 #ifdef FISHMOD_SCRIPT_ADULT
-    // adult Link with the Iron Boots on (the debug save owns them), for walking the bottom of deep water
+    // adult Link with the Iron Boots and Zora Tunic on (the debug save owns them), for walking the bottom of deep water
     gSaveContext.save.linkAge = LINK_AGE_ADULT;
     gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_MASTER;
     Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_MASTER);
     Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_IRON);
+    Inventory_ChangeEquipment(EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_ZORA); // no drowning
 #endif
     gSaveContext.respawnFlag = 0;
     gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = ENTR_LOAD_OPENING;
