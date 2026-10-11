@@ -80,6 +80,24 @@ counter, Kokiri vs Lake Hylia) and dropped if it doesn't help.
   better) and in larger waters than Kokiri Forest. If it still needs a change, scale the tension by the fish's
   weight.
 
+## Feature complete (after normal bait fishing is sorted out)
+
+Not moonshots: these are needed for fishmod to count as feature complete, but they wait until plain bait
+fishing works well.
+
+- **More ways to fish:**
+  - **Sinking lure:** fished differently from bait (cast, let it sink, work it back); fish react to its motion
+    rather than its smell.
+  - **Iron Boots:** decide how they factor in (walking the bottom, reaching deep spots, fishing from underwater?).
+  - **Hookshot fishing:** some fish can be caught with the hookshot instead of the rod (a joke catch, but a real one).
+- **More bait:**
+  - **Cucco feathers.**
+  - **Fireflies:** the fairy graphic without wings, coloured yellow and flashing; caught in a bottle.
+  - **Bait shop:** the Fishing Pond doubles as a bait shop, selling bait that can't be found in the overworld.
+  - **Coral earring:** becomes a prize or a lost item to find, not a legendary heirloom bait.
+- **Underwater creatures:** repurpose Biri, Bari, Shell Blade, Leever and Stinger (scaled and retextured) for more
+  variety under the water; not all of them fishable.
+
 ## Moonshot goals
 
 ### 1. Underwater habitats
@@ -106,6 +124,8 @@ living version of the fishing journal.
 
 ### 5. New items: bug net, fishing rod, pictograph box, journal
 
+Last in line: after the sub-biomes, foliage for small bodies of water, the boat and the aquarium.
+
 Four new items, which grows the item page from 6 × 4 (24) to 7 × 4 (28): the same four rows, one more column, so
 the cursor math only changes its column count and icons keep their height (about 86% width). The layout stays
 in the spirit of vanilla (ammo top left, arrows and tools right, bottles along the bottom).
@@ -120,9 +140,9 @@ in the spirit of vanilla (ammo top left, arrows and tools right, bottles along t
   are "logged" flags shown with the live model or a pre-made image.
   - MM's code is fine to learn from (zeldaret/mm). MM's assets (the box model, its icon, the viewfinder
     graphics, the shutter sound) aren't in the OoT ROM, so they'd be made new for the mod.
-  - Pre-rendered rooms (shops, the Market and such) have a fixed camera, so first-person photos don't work there:
-    the pictograph is disabled in them until they're rebuilt in 3D (new Fast64 rooms; any fan-made remakes would
-    need a licence that allows sharing).
+  - Pre-rendered rooms (shops, the Market and such) have a fixed camera, so first-person photos don't work there,
+    and some NPCs only appear in them, so a complete log would need those rooms rebuilt in 3D. Not worth solving
+    now: this is out of scope for the main goal (fishing).
 - **Journal / compendium:** the log of bugs caught, fish caught and characters, monsters and animals pictographed
   (the fishing journal on Link's records plaque grows into this). Could be its own pause page (like MM's mask
   page) instead of an item, if the item page gets tight.
