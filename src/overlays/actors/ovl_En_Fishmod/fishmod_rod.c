@@ -43,6 +43,7 @@
 #include "audio.h"
 #include "message.h"
 #include "sequence.h"
+#include "regs.h"
 
 FishmodRod gFishmodRodState;
 
@@ -1507,5 +1508,8 @@ void EnFishmod_RodDraw(EnFishmod* this, PlayState* play) {
         Rod_DrawLine(play);
         Rod_DrawBobber(play);
     }
-    Rod_DrawHud(play);
+    // not in the picture the pause menu takes of the screen
+    if (R_PAUSE_BG_PRERENDER_STATE == PAUSE_BG_PRERENDER_OFF) {
+        Rod_DrawHud(play);
+    }
 }
