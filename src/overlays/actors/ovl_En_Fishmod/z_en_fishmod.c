@@ -7,6 +7,7 @@
  */
 
 #include "z_en_fishmod.h"
+#include "assets/objects/gameplay_field_keep/gameplay_field_keep.h"
 
 #include "assets/objects/object_fish/object_fish.h"
 #include "assets/objects/gameplay_keep/gameplay_keep_0x18610.h"
@@ -376,6 +377,16 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         EnFishmod_RodInit(this, play);
         return;
     }
+    if (this->type == FISHMOD_TYPE_COMB) {
+        // a chunk of broken beehive: pops out, falls, and lies there for a while to be scooped up
+        Actor_SetScale(&this->actor, 0.05f); // half a hive: big enough to spot beside Link
+        this->actor.gravity = -1.0f;
+        this->actor.velocity.y = 3.0f;
+        this->actor.speed = 1.5f;
+        this->actor.world.rot.y = this->actor.shape.rot.y;
+        this->stateTimer = 30 * 20;
+        return;
+    }
 
     species = FISHMOD_GET_SPECIES(thisx->params);
     if (species >= FISHMOD_SPECIES_MAX) {
@@ -444,6 +455,9 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
 void EnFishmod_Destroy(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
 
+    if (this->type == FISHMOD_TYPE_COMB) {
+        return;
+    }
     if (this->type == FISHMOD_TYPE_ROD) {
         EnFishmod_RodDestroy(this, play);
         if (gFishmodRod == thisx) {
@@ -901,6 +915,36 @@ static s32 EnFishmod_Unstick(EnFishmod* this, PlayState* play) {
     return true;
 }
 
+/**
+ * A chunk of broken beehive (with larvae in it): tumbles onto the ground and lies there for half a minute. Swinging
+ * an empty bottle at it scoops it up (Player's bottle catch list has it), like bugs.
+ */
+static void EnFishmod_CombUpdate(EnFishmod* this, PlayState* play) {
+    if (this->actor.parent != NULL) {
+        Actor_Kill(&this->actor); // in a bottle
+        return;
+    }
+    if (--this->stateTimer <= 0) {
+        Actor_Kill(&this->actor);
+        return;
+    }
+    Actor_MoveXZGravity(&this->actor);
+    Actor_UpdateBgCheckInfo(play, &this->actor, 8.0f, 8.0f, 8.0f,
+                            UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_2 | UPDBGCHECKINFO_FLAG_3 |
+                                UPDBGCHECKINFO_FLAG_4);
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
+        Math_ApproachZeroF(&this->actor.speed, 1.0f, 0.3f);
+        Math_SmoothStepToS(&this->actor.shape.rot.x, 0x3400, 3, 0x800, 0x80); // lies tipped on its side
+    } else {
+        this->actor.shape.rot.x += 0x1200; // tumbling down
+    }
+    // in water it sinks slowly
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_WATER) {
+        this->actor.velocity.y = CLAMP_MIN(this->actor.velocity.y, -0.5f);
+    }
+    Actor_OfferGetItem(&this->actor, play, GI_MAX, 60.0f, 30.0f);
+}
+
 void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
     FishmodRod* rod = &gFishmodRodState;
     const FishmodBehavior* b = &this->species->behavior;
@@ -1224,18 +1268,25 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
 
         case FISH_STATE_CAUGHT: {
             Player* player = GET_PLAYER(play);
-            // the hook is held up at about this height; the fish hangs from it by the mouth
-            f32 hookY = player->actor.world.pos.y + (LINK_IS_CHILD ? 46.0f : 66.0f);
-            f32 centerY = hookY - this->halfLength;
+            // Hanging by the mouth from Link's right hand: move the fish so its head (measured on the last
+            // draw, so it's right for every species and size) ends up at the hand.
+            Vec3f* hand = &player->bodyPartsPos[PLAYER_BODYPART_R_HAND];
+            Vec3f off;
 
-            // a big fish held by a small Link drags its tail on the ground rather than going into it
-            centerY = CLAMP_MIN(centerY, player->actor.world.pos.y + this->halfLength + 2.0f);
-            // out in front and off to Link's right, where he holds the line, so it doesn't hide his face
-            this->actor.world.pos.x = player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 14.0f -
-                                      Math_CosS(player->actor.shape.rot.y) * 16.0f;
-            this->actor.world.pos.y = centerY;
-            this->actor.world.pos.z = player->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * 14.0f +
-                                      Math_SinS(player->actor.shape.rot.y) * 16.0f;
+            off.x = hand->x - this->headPos.x;
+            off.y = hand->y - 2.0f - this->headPos.y;
+            off.z = hand->z - this->headPos.z;
+            // a big fish held by a small Link rests its tail on the ground rather than going into it
+            off.y = CLAMP_MIN(off.y, player->actor.world.pos.y + 1.0f - this->boundsMin.y);
+            if ((SQ(off.x) + SQ(off.y) + SQ(off.z)) > SQ(80.0f)) {
+                // just landed: start with the body hanging under the hand
+                this->actor.world.pos = *hand;
+                this->actor.world.pos.y -= this->halfLength;
+            } else {
+                this->actor.world.pos.x += off.x * 0.6f;
+                this->actor.world.pos.y += off.y * 0.6f;
+                this->actor.world.pos.z += off.z * 0.6f;
+            }
             // head up, swinging and twisting on the line
             this->actor.shape.rot.y = player->actor.shape.rot.y + 0x4000 + (s16)(Math_SinS(this->timer * 0x900) * 0x1800);
             this->actor.shape.rot.x = -0x4000 + (s16)(Math_SinS(this->timer * 0x700) * 0x500);
@@ -1350,6 +1401,10 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     if (this->type == FISHMOD_TYPE_ROD) {
         EnFishmod_RodUpdate(this, play);
         gFishmodRodState.splashed = false;
+        return;
+    }
+    if (this->type == FISHMOD_TYPE_COMB) {
+        EnFishmod_CombUpdate(this, play);
         return;
     }
 
@@ -1760,6 +1815,22 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
 
     if (this->type == FISHMOD_TYPE_ROD) {
         EnFishmod_RodDraw(this, play);
+        return;
+    }
+    if (this->type == FISHMOD_TYPE_COMB) {
+        // flickers for its last few seconds
+        if ((this->stateTimer > 60) || (this->timer & 2)) {
+            OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+            Gfx_SetupDL_25Opa(play->state.gfxCtx);
+            // turned about its middle (the hive model stands 236 units tall from its origin), like Obj_Comb does
+            Matrix_SetTranslateRotateYXZ(this->actor.world.pos.x, this->actor.world.pos.y + 118.0f * this->actor.scale.y,
+                                         this->actor.world.pos.z, &this->actor.shape.rot);
+            Matrix_Translate(0.0f, -118.0f * this->actor.scale.y, 0.0f, MTXMODE_APPLY);
+            Matrix_Scale(this->actor.scale.x, this->actor.scale.y, this->actor.scale.z, MTXMODE_APPLY);
+            MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+            gSPDisplayList(POLY_OPA_DISP++, gFieldBeehiveDL);
+            CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+        }
         return;
     }
 

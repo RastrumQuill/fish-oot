@@ -7,6 +7,7 @@
 #include "z_obj_comb.h"
 #include "fishmod.h"
 #include "rand.h"
+#include "actor.h"
 #include "src/overlays/effects/ovl_Effect_Ss_Kakera/z_eff_ss_kakera.h"
 
 #include "libc64/qrand.h"
@@ -197,7 +198,10 @@ void ObjComb_Wait(ObjComb* this, PlayState* play) {
         } else {
             ObjComb_Break(this, play);
             ObjComb_ChooseItemDrop(this, play);
-            Fishmod_AddBait(FISHMOD_BAIT_BEE_LARVA, 2 + (s32)Rand_ZeroFloat(3.0f));
+            // a chunk of comb with larvae in it falls out, to scoop up with an empty bottle
+            Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, this->actor.world.pos.x,
+                        this->actor.world.pos.y - 10.0f, this->actor.world.pos.z, 0, (s16)Rand_ZeroFloat(0x10000), 0,
+                        FISHMOD_PARAMS(FISHMOD_TYPE_COMB, 0));
             Actor_Kill(&this->actor);
         }
     } else {

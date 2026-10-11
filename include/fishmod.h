@@ -113,7 +113,8 @@ extern const s32 gFishmodSceneSpawnsCount;
 
 typedef enum FishmodActorType {
     /* 0 */ FISHMOD_TYPE_ROD, // one per scene: rod, line, bobber, camera, fish spawning
-    /* 1 */ FISHMOD_TYPE_FISH
+    /* 1 */ FISHMOD_TYPE_FISH,
+    /* 2 */ FISHMOD_TYPE_COMB // a chunk of a broken beehive with larvae in it, scooped up with a bottle
 } FishmodActorType;
 
 #define FISHMOD_PARAMS(type, species) (((type) << 8) | (species))
@@ -150,7 +151,9 @@ typedef struct FishmodRodInfo {
     /* 0x0A */ u16 lost;
     /* 0x0C */ f32 castPower;
     /* 0x10 */ u8 choice; // after a catch: 1 keep or release, 2 release only
-    /* 0x14 */ const char* notice; // a one-line notice for the rod's banner (e.g. bait found), shown once
+    /* 0x14 */ const char* notice; // a one-line notice for the rod's banner, shown once
+    /* 0x18 */ u8 bait;          // FishmodBait on the hook
+    /* 0x19 */ u8 baitRequest;   // set by a bait bottle: put this on the hook
 } FishmodRodInfo;
 
 extern FishmodRodInfo gFishmodRodInfo;
@@ -185,10 +188,24 @@ typedef struct FishmodSaveData {
 
 #define FISHMOD_SAVE ((FishmodSaveData*)&gSaveContext.save.info.sceneFlags[SCENE_ID_MAX])
 
-// Bait pouch
-#define FISHMOD_BAIT_POUCH_MAX 30
-void Fishmod_AddBait(s32 bait, s32 count);
+// Bait bottles: new bottle contents in item IDs the game never uses. Using one from a C button while holding the
+// rod baits the hook with one of what's in it.
+#define ITEM_BOTTLE_LARVA_3 ITEM_INVALID_1 // three bee larvae
+#define ITEM_BOTTLE_LARVA_2 ITEM_INVALID_2
+#define ITEM_BOTTLE_LARVA_1 ITEM_INVALID_3
+#define FISHMOD_IS_BAIT_ITEM(item) (((item) >= ITEM_BOTTLE_LARVA_3) && ((item) <= ITEM_BOTTLE_LARVA_1))
+extern u64 gFishmodBottleLarva3Tex[];
+extern u64 gFishmodBottleLarva2Tex[];
+extern u64 gFishmodBottleLarva1Tex[];
 const char* Fishmod_BaitName(s32 bait);
+// Player is about to use `item` from a button: returns true if fishmod used it (baiting the hook)
+s32 Fishmod_UseItem(struct PlayState* play, s32 item);
+// The icon texture (in RAM) for fishmod's items, or NULL for a vanilla item
+void* Fishmod_ItemIcon(s32 item);
+// The item whose name the pause menu shows for `item`
+s32 Fishmod_ItemNameIndex(s32 item);
+// A bottle just caught `actorId` into inventory slot `slot` (fish records, the larva message)
+void Fishmod_OnBottleCatch(s32 actorId, s32 slot);
 
 // Bottled fish: what went into a bottle, and letting it go again (returns true if fishmod handled the release)
 void Fishmod_BottleFish(s32 species, f32 lengthInches);
