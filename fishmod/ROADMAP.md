@@ -25,6 +25,46 @@ Make every fish look a little different from others of its species, cheapest opt
 
 Options 1 and 2 are the target. 3 and 4 only if they pass the performance rule.
 
+## Engine and performance
+
+Not being worked on yet. Status says what already exists (several of these went into the build A/B
+optimization sets, see `fishmod/test-builds/README.md`).
+
+### Level of detail
+
+- **Billboards for distant fish:** past some distance, draw a fish as a camera-facing quad or an 8-vertex
+  "stretched hexagon" in solid vertex colours, with no texture. No texture loads (TMEM), and opaque (not
+  alpha-blended) so overlapping fish cost no extra fill. Status: to do. Note: it needs to be opaque or alpha-test
+  only; blended edges would bring the fill cost back.
+- **Lines as one vertex strip:** status: done for the fishing line (optimization 1, in build A and later).
+- **Skipping matrix work on limbs that don't change:** status: partly done (limb shortcuts, optimization 2, in
+  build A and later). Remaining: cache whole poses for idle fish (optimization 3 in build B does this for
+  distant fish).
+
+### AI and culling
+
+- **AI throttling by distance:** status: partly done (build B: far fish think every other frame). To do: further
+  steps (every 4th or 8th frame) for fish further out.
+- **Sub-biome unloading:** unload fish (keeping each zone's count) when their zone is far from Link, and stop
+  processing them. Status: planned as part of Lake Hylia (fishmod/LAKE_HYLIA.md, "fish near Link only").
+
+### Memory
+
+- **Word-sized table clears:** status: done (optimization 7: the collision line-test table is cleared in large
+  chunks; in build A and later).
+
+### Long-term
+
+- **5×5 item grid:** change the pause menu's item grid from 4×6 to 5×5, freeing a slot so the fishing rod
+  becomes a normal item to equip on a C button (today the rod has no inventory slot; L puts it on B). The grid
+  is full in vanilla, so the rod needs a slot from somewhere. Note: the item cursor movement, the item icon
+  layout and the "Equip to C" code all assume 4×6, so this touches a lot of the pause menu.
+- **F3DEX3 (Fast3D v3) microcode:** status: done as a build flag (`fishmod/build.sh --f3dex3`). It is tested in
+  ares only, not yet on hardware.
+- **Folded-polynomial sin/cos:** replace the sine lookup table with Kaze's polynomial over 1/8 of the wave
+  (symmetry for the rest, sqrtf for the other half), so trig doesn't miss the cache. Experimental, behind a flag,
+  and measure first: it only helps if trig misses are actually showing up in the CPU time.
+
 ## Notes for later
 
 - **More fishing spots:** some grottos have large bodies of water (at least one known), and the Water Temple could
