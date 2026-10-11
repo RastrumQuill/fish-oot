@@ -1,0 +1,159 @@
+# Study: how the N64 works, and what the community does about it
+
+Part of the fishmod study (see [study.md](study.md)).
+
+**About the sources:** the hard numbers come from sources read directly:
+- the F3DEX3 docs;
+- the HackerSM64 and HackerOoT build configs;
+- the folded-polynomial reference code;
+- the ares emulator source, which encodes the VR4300's timings (ares's model, not a hardware measurement).
+
+Most N64 reference sites and Kaze's videos couldn't be opened from the research sandbox. Claims from them come from
+search summaries and are marked *(secondary)*.
+
+**The headline:** a fish costs us ~0.63 ms (update + draw), about **59,000 CPU cycles**. Float maths on a few limbs
+can't add up to that. Cache misses, per-actor engine overhead and instruction-cache thrash are the likely cause.
+Measure before rewriting.
+
+## The hardware, where it matters
+
+### CPU (VR4300, 93.75 MHz)
+
+**Caches:** 16 KB instruction cache with 32-byte lines, and 8 KB data cache with 16-byte lines. Both are
+direct-mapped, so two hot things 8 KB (data) or 16 KB (code) apart evict each other every time *(secondary)*.
+
+**A miss costs ~40 cycles** to fill a data line, +40 to write back a dirty one, and ~48 for a code line (ares).
+RDRAM latency is ~640 ns, about 60 CPU cycles *(secondary)*. It's worse while the RDP streams the framebuffer.
+
+**Instruction costs (ares, matching NEC's tables):**
+
+| Operation | Cycles |
+|---|---|
+| float add / sub | 3 |
+| float multiply | 5 |
+| float↔int conversion | 5 |
+| **float divide** | **29** |
+| **square root** | **29** |
+| integer multiply | 5 |
+| **integer divide** | **37** |
+| doubles | ~2× the float cost |
+
+- Integer division is *slower* than float division, and `1/sqrtf` costs ~58 cycles.
+- An accidental double (a `0.5` literal, `sqrt` instead of `sqrtf`) doubles the cost.
+
+**Not a concern:**
+- **Multiply bug:** some chips give wrong results after certain float multiplies. GCC needs `-mfix4300`; IDO code
+  has shipped for decades, so it only matters if we switch compilers.
+- **TLB, delay slots:** OoT overlays run in KSEG0 (no TLB), and IDO fills delay slots fine.
+
+### RDRAM
+
+- 500 MB/s peak, for sequential bursts only, shared by the CPU, RSP, RDP and video out *(secondary)*.
+- F3DEX3's docs say framebuffer and Z-buffer traffic stalls are often **half to two thirds of all RDP time**.
+
+### RSP (geometry and audio)
+
+- 4 KB data memory and 4 KB code memory. The vertex buffer holds 32 vertices in F3DEX2 and 56 in F3DEX3.
+- **F3DEX2 → F3DEX3 (NOC), from F3DEX3's own measurements:**
+
+  | Work | F3DEX2 | F3DEX3 (NOC) | RSP cycles |
+  |---|---|---|---|
+  | triangle | 172 | 149 | per triangle |
+  | small RDP command | 14 | 4 | per command |
+  | light transform, 2 lights | 180 | 93 | per light set (OoT binds lights per actor) |
+
+- **LVP**, the faster vertex path built for Kaze's Return to Yoshi's Island, has since been merged in. It's
+  automatic unless a material uses the advanced lighting. Our `BrW_NOC` build is the right one for OoT.
+- **Triangle snakes** save ~70 µs of RDP/RDRAM time but cost ~400 µs of RSP time in the docs' example. Not for us.
+- **Audio** runs as an RSP task each frame. In OoT the audio command lists are also built on the **CPU**, so CPU
+  cost grows with active voices.
+
+### RDP (62.5 MHz)
+
+- **Fill rate:** at most 1 pixel per clock in 1-cycle mode (hard to reach, since small triangles stall on memory),
+  1 per 2 in 2-cycle mode, 4 per clock in fill/copy *(secondary)*.
+- **Anti-aliasing** roughly doubles framebuffer traffic *(secondary)*. HackerSM64 and HackerOoT both have a
+  `DISABLE_AA` option, at the cost of visible seams.
+- **Z-buffer:** an extra read and write per pixel. Front-to-back drawing is fastest.
+- **TMEM:** 4 KB. A palette lives in the top 2 KB: 512 bytes for CI8, 32 bytes for CI4.
+
+### The CPU and the RCP run in parallel
+
+The CPU builds frame N while the RSP/RDP draw frame N−1. **If the CPU is the bottleneck (we use ~46 of 50 ms in
+the lab tank), RSP/RDP savings don't speed anything up** until the CPU gets below the RCP time. Find out which side
+limits before spending effort on F3DEX3, anti-aliasing or textures.
+
+## Community techniques
+
+| Technique | Reported saving | For fish-oot | Effort |
+|---|---|---|---|
+| **Cache misses first.** Kaze: the problem "isn't triangle count, but cache misses" *(secondary)* | big SM64 speedups ("up to 6×", headline) *(secondary)* | **most relevant**: 59k cycles per fish points here | measuring is cheap |
+| **Computing trig beats a table** (Kaze: SM64's 16 KB sine table misses cost more). Folded polynomial: a 2nd/4th-order polynomial plus octant symmetry, sometimes a `sqrtf` for the other component | no reliable number | we have `FISHMOD_FASTTRIG`; a folded version saves a few cycles per call at most | cheap, marginal |
+| **Don't unroll or inline** (instruction cache). HackerSM64 builds with `-Os`, inline limit 1, little unrolling, 32-byte-aligned hot functions | not quantified | keep the per-fish hot path small | review is cheap |
+| **GCC instead of IDO** (HackerSM64 and HackerOoT use GCC) | no IDO-vs-GCC number found | one overlay could be built with GCC (`-mfix4300`, `-G 0`) | medium, uncertain |
+| **Culling that touches more data can lose** (Kaze: Nintendo's culling often hurts) *(secondary)*; his occlusion culling gained 10–20% in some areas | | keep LOD decisions cheap: squared distances, once per frame | cheap |
+| **Fewer RDP syncs in texture loads** (F3DEX3) | "a few percent of RDP cycles per material" | our own fish display lists | cheap |
+| **Sort draws by material**; F3DEX3 skips a texture load that matches the last | not given | draw all fish of a species together (needs a manager) | medium |
+| **Lights once, not per actor** | saves the per-actor light transform (93–180 RSP cycles) and the CPU light-binding loop | **yes:** `Actor_Draw` binds lights for **every fish**. `ACTOR_FLAG_IGNORE_POINT_LIGHTS` skips the point-light loop; a manager could bind once for all fish | flag cheap, shared lights medium |
+| **Fewer matrix push/pops** | not quantified | each limb pays a push/pop (64-byte copies), a 3-axis rotation, and `Matrix_ToMtx` (16 float→int conversions, ~80+ cycles) | see below |
+| **Collision rewrites** (HackerSM64 options) | not found | our floor cache already covers this; keep raycasts off the hot path | beyond that, a rabbit hole |
+| **No AA / lower resolution** | AA ~2× framebuffer traffic | only if RDP-bound; fish could use a no-AA mode underwater where seams hide | AA on fish cheap; resolution a rabbit hole |
+| Inline assembly, fixed-point matrix pipeline | no numbers; fixed-point multiply costs the same as float | not with IDO; little gain | rabbit holes |
+
+## Ranked for fish-oot
+
+1. **Profile cache misses with ares's built-in profiler (do first, cheap).**
+   - ares has homebrew extensions (`XPROF`) that count cycles, instruction- and data-cache hits and misses, and RDRAM
+     traffic per profile slot.
+   - Wrap fish update and draw in slots. If misses × ~40 cycles explains most of the 59k, items 2–4 are where the
+     gains are.
+   - Also find out whether the frame is CPU- or RCP-bound.
+2. **Run all fish from one manager, phase by phase (medium, probably the biggest win).**
+   - Today each fish goes through the generic actor update and draw, interleaved with other actors. That evicts fish
+     code and data from the caches.
+   - A manager that runs all AI, then all motion, then all poses, then all draws (sorted by species) keeps code hot,
+     skips repeated texture loads and binds lights once.
+   - Keep each fish's hot fields in a small contiguous struct, away from the big actor struct.
+   - This is inferred from the cache principle; there's no published number for this exact pattern.
+3. **Cut per-fish draw overhead (cheap):** set `ACTOR_FLAG_IGNORE_POINT_LIGHTS` on fish (check that they still look
+   right near fires). Later, bind lights once from the manager.
+4. **Less limb matrix work (medium).**
+   - Fewer limbs for small and far fish (body + tail).
+   - One-axis bends from a single sin/cos pair instead of a full rotation.
+   - Compose limb matrices without push/pop.
+   - Extend pose caching to idle on-screen fish.
+5. **No divides, square roots or doubles in per-fish code (cheap):** squared-distance compares, one reciprocal then
+   multiplies, no double literals. The fish code has several `sqrtf(dx² + …)` that can become squared compares.
+6. **Stay in one number type (cheap):** each float↔int round trip is ~5 cycles plus moves.
+7. **RDP side, only if RDP-bound (cheap):**
+   - CI4 instead of CI8 where 16 colours do (a 32-byte palette load instead of 512).
+   - No-AA opaque modes for fish underwater.
+   - Fewer pipe syncs in our display lists.
+8. **F3DEX3 on hardware (cheap to test):** faster on both RSP and RDP per its docs; `BrW_NOC` is right. It won't fix
+   a CPU-bound frame.
+9. **Folded polynomial (cheap, marginal):** only if trig shows up in a profile.
+10. **Build the fish overlay with GCC `-Os` (medium, uncertain):** only after 1–5.
+
+**Rabbit holes, not now:** inline assembly, a fixed-point matrix pipeline, resolution or video tricks, engine-wide
+collision rewrites, occlusion planes, triangle snakes, replacing the audio microcode.
+
+**One cheap audio check:** make sure fish splashes don't stack many voices; OoT builds audio lists on the CPU.
+
+## Sources
+
+- F3DEX3 (README, `Performance.md`, `Configuration.md`, `Removed.md`, `Porting your Romhack.md`): https://github.com/HackerN64/F3DEX3
+- HackerSM64 (Makefile flags, `config_graphics.h`, `config_collision.h`): https://github.com/HackerN64/HackerSM64
+- HackerOoT (`-Os`, `config_graphics.h`): https://github.com/HackerN64/HackerOoT
+- Folded polynomial: https://github.com/AdamPrimer/folded-polynomial ; Kaze's video: https://www.youtube.com/watch?v=hffgNRfL1XY
+- ares (VR4300 timings, cache model, profiler): https://github.com/ares-emulator/ares (`ares/n64/cpu/`)
+- *(secondary, via search summaries)*:
+  - Kaze on sine: https://setsideb.com/kaze-emanuars-adventures-in-mario-64-optimization-calculating-sine/
+  - "Mario 64's Optimization Paradox": https://setsideb.com/mario-64s-optimization-paradox/
+  - Kaze's occlusion culling: https://80.lv/articles/occlusion-culling-system-for-optimized-rendering-on-nintendo-64
+  - "up to 6×": https://www.dsogaming.com/videotrailer-news/modder-has-increased-the-performance-of-super-mario-64-up-to-six-times/
+  - Kaze interview transcript: https://softwareengineeringdaily.com/wp-content/uploads/2024/03/SED1666-Kaze_Emanuar.txt
+  - Nintendo performance tuning guide: https://ultra64.ca/files/documentation/online-manuals/man-v5-1/kantan/step2/4/4_2.htm
+  - RDP cycle modes: https://ultra64.ca/files/documentation/online-manuals/man-v5-1/kantan/step2/2/2_7.htm
+  - Copetti's N64 architecture: https://www.copetti.org/writings/consoles/nintendo-64
+  - VR4300 / `-mfix4300`: https://n64brew.dev/wiki/CPU
+  - NEC VR4300 manual: https://ftp.mirrorservice.org/sites/www.bitsavers.org/components/nec/mips/1995_NEC_VR4300_MIPS_RISC_Microprocessor_Users_Manual.pdf
