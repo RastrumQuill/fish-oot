@@ -23,6 +23,7 @@
 #include "sfx.h"
 #include "z_lib.h"
 #include "string.h"
+#include "transition.h"
 #include "libc64/sprintf.h"
 #include "rand.h"
 #include "bgcheck.h"
@@ -160,6 +161,26 @@ void Fishmod_PlayUpdate(PlayState* play) {
             Interface_LoadItemIcon1(play, 0);
         }
     }
+
+#if FISHMOD_TESTMODE
+    // test mode: D-pad Up warps to Kokiri Forest (small water), D-pad Down to Lake Hylia (big water)
+    if ((play->pauseCtx.state == 0) && (Message_GetState(&play->msgCtx) == TEXT_STATE_NONE) &&
+        !Play_InCsMode(play) && (play->transitionTrigger == TRANS_TRIGGER_OFF)) {
+        u16 press = play->state.input[0].press.button;
+        s16 entrance = -1;
+
+        if (CHECK_BTN_ALL(press, BTN_DUP) && (play->sceneId != SCENE_KOKIRI_FOREST)) {
+            entrance = ENTR_KOKIRI_FOREST_0;
+        } else if (CHECK_BTN_ALL(press, BTN_DDOWN) && (play->sceneId != SCENE_LAKE_HYLIA)) {
+            entrance = ENTR_LAKE_HYLIA_0;
+        }
+        if (entrance >= 0) {
+            play->nextEntranceIndex = entrance;
+            play->transitionTrigger = TRANS_TRIGGER_START;
+            play->transitionType = TRANS_TYPE_FADE_BLACK;
+        }
+    }
+#endif
 
     // L: rod on B / back to the sword
     if ((Fishmod_GetSceneSpawns(play->sceneId) != NULL) && (gFishmodRod != NULL) &&
