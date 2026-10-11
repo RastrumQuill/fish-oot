@@ -18,7 +18,7 @@
 | Sell price | 150 rupees (more for bigger fish) |
 | Depth | bottom |
 | Most active | dawn |
-| Found in | Kokiri Forest |
+| Found in | Kokiri Forest, Lake Hylia (planned) |
 
 ## Behavior
 

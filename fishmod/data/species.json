@@ -48,7 +48,8 @@
         "worm": 1.5
       },
       "scenes": {
-        "KOKIRI_FOREST": 60
+        "KOKIRI_FOREST": 60,
+        "LAKE_HYLIA": 30
       },
       "flavor": "A small, bright fish found in almost every pond and creek in Hyrule. It nibbles at anything that drifts by, which makes it the first catch of many young anglers.",
       "tips": "Bites readily, even without bait. Taps the bobber a couple of times before it commits.",
@@ -314,7 +315,8 @@
         "worm": 1.4
       },
       "scenes": {
-        "KOKIRI_FOREST": 25
+        "KOKIRI_FOREST": 25,
+        "LAKE_HYLIA": 30
       },
       "flavor": "The classic Hylian game fish. It hunts from cover and strikes hard, and the big ones are known to leap clear of the water to throw the hook.",
       "tips": "Most active around dawn and dusk. A twitched bobber or a live bug draws it out. Expect a jump when it is hooked.",
@@ -445,7 +447,8 @@
         "worm": 1.8
       },
       "scenes": {
-        "KOKIRI_FOREST": 10
+        "KOKIRI_FOREST": 10,
+        "LAKE_HYLIA": 15
       },
       "flavor": "A whiskered bottom-feeder first described by the villagers of Ordon. It lurks in the deepest, muddiest part of a pond and pulls like a stubborn goat once hooked.",
       "tips": "Fish the deepest water after dark. It takes its time and nibbles several times before the real bite, then fights long but never jumps.",
@@ -661,7 +664,8 @@
         "worm": 1.0
       },
       "scenes": {
-        "KOKIRI_FOREST": 2
+        "KOKIRI_FOREST": 2,
+        "LAKE_HYLIA": 5
       },
       "flavor": "A long, spotted bottom-dweller that anglers whisper about. Young loaches turn up in quiet forest water now and then; the giants of legend are rarely seen anywhere.",
       "tips": "Extremely wary: cast well away from it and keep still. It nibbles a lot and the real bite is short.",
@@ -715,7 +719,8 @@
         "worm": 0.9
       },
       "scenes": {
-        "KOKIRI_FOREST": 3
+        "KOKIRI_FOREST": 3,
+        "LAKE_HYLIA": 15
       },
       "flavor": "An ornamental carp with red and white markings, kept in sacred waters since ancient times. The Kokiri say they swim in the forest for luck.",
       "tips": "Cruises near the surface on bright days. Curious, but picky: sweet bee larvae work best.",
@@ -1175,7 +1180,8 @@
     },
     "LAKE_HYLIA": {
       "name": "Lake Hylia",
-      "status": "planned"
+      "status": "testing",
+      "note": "Provisional: Kokiri species so test-mode builds can compare a big body of water with Kokiri. The real Lake Hylia plan is in fishmod/LAKE_HYLIA.md."
     },
     "ZORAS_RIVER": {
       "name": "Zora's River",
