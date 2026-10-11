@@ -23,6 +23,9 @@
 #include "sfx.h"
 #include "z_lib.h"
 #include "string.h"
+#include "ultra64/convert.h"
+#include "speed_meter.h"
+#include "libu64/gfxprint.h"
 
 s32 Object_LoadPersistent(ObjectContext* objectCtx, s16 objectId);
 
@@ -422,6 +425,30 @@ void Fishmod_InitTestSave(void) {
     Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_DEKU);
     gSaveContext.save.info.equips.buttonItems[1] = ITEM_SLINGSHOT;
     gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_SLINGSHOT;
+}
+#endif
+
+#if FISHMOD_TESTMODE
+void Fishmod_DrawFps(Gfx** gfxP) {
+    // average of the last 20 frame periods (the time between graph updates), updated every 20 frames
+    static u32 sSumUsec;
+    static s32 sCount;
+    static s32 sFpsTenths;
+    GfxPrint printer;
+
+    sSumUsec += (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
+    if (++sCount >= 20) {
+        sFpsTenths = (sSumUsec != 0) ? (s32)(20u * 10000000u / sSumUsec) : 0;
+        sSumUsec = 0;
+        sCount = 0;
+    }
+    GfxPrint_Init(&printer);
+    GfxPrint_Open(&printer, *gfxP);
+    GfxPrint_SetColor(&printer, 255, 255, 255, 200);
+    GfxPrint_SetPos(&printer, 17, 27); // bottom middle: clear of the hearts, buttons, map and rupees
+    GfxPrint_Printf(&printer, "%2d.%dfps", sFpsTenths / 10, sFpsTenths % 10);
+    *gfxP = GfxPrint_Close(&printer);
+    GfxPrint_Destroy(&printer);
 }
 #endif
 

@@ -816,14 +816,16 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             this->swimMag = 900.0f;
 
             EnFishmod_CheckSpook(this, play);
+            // Only one fish goes to look at a time (not while another is at the bobber), and not often: a bobber
+            // is something new in the water, not food falling from the sky.
             if ((this->fishState == FISH_STATE_WANDER) && (this->cooldown == 0) && EnFishmod_RodBobberInWater() &&
-                (((play->gameplayFrames + this->actor.params) % 10) == 0)) {
-                f32 notice = 45.0f + b->curiosity * 1.4f;
+                (rod->fish == NULL) && (((play->gameplayFrames + this->actor.params) % 10) == 0)) {
+                f32 notice = 30.0f + b->curiosity * 1.0f;
 
                 if (rod->twitchTimer > 0) {
-                    notice += 40.0f;
+                    notice += 30.0f;
                 }
-                if ((bobberDist < notice) && (Rand_ZeroOne() < b->curiosity * 0.004f * EnFishmod_BaitAppeal(this)) &&
+                if ((bobberDist < notice) && (Rand_ZeroOne() < b->curiosity * 0.0015f * EnFishmod_BaitAppeal(this)) &&
                     EnFishmod_OpenWaterTo(this, play, &rod->bobberPos)) {
                     this->fishState = FISH_STATE_APPROACH;
                     this->stateTimer = 200;
@@ -895,7 +897,7 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                     EnFishmod_RodBite(this);
                 } else {
                     // lost interest
-                    this->cooldown = 240;
+                    this->cooldown = 500 + (s16)Rand_ZeroFloat(300.0f);
                     EnFishmod_FishSetState(this, FISH_STATE_WANDER);
                 }
             }
@@ -1088,15 +1090,22 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
 
         case FISH_STATE_CAUGHT: {
             Player* player = GET_PLAYER(play);
-            f32 height = LINK_IS_CHILD ? 32.0f : 50.0f;
+            // the hook is held up at about this height; the fish hangs from it by the mouth
+            f32 hookY = player->actor.world.pos.y + (LINK_IS_CHILD ? 46.0f : 66.0f);
+            f32 centerY = hookY - this->halfLength;
 
-            // held up in front of Link, flapping
-            this->actor.world.pos.x = player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 16.0f;
-            this->actor.world.pos.y = player->actor.world.pos.y + height;
-            this->actor.world.pos.z = player->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * 16.0f;
-            this->actor.shape.rot.y = player->actor.shape.rot.y + 0x4000;
-            this->actor.shape.rot.x = 0;
-            this->actor.shape.rot.z = Math_SinS(this->timer * 0x1800) * 0x800;
+            // a big fish held by a small Link drags its tail on the ground rather than going into it
+            centerY = CLAMP_MIN(centerY, player->actor.world.pos.y + this->halfLength + 2.0f);
+            // out in front and off to Link's right, where he holds the line, so it doesn't hide his face
+            this->actor.world.pos.x = player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 14.0f -
+                                      Math_CosS(player->actor.shape.rot.y) * 16.0f;
+            this->actor.world.pos.y = centerY;
+            this->actor.world.pos.z = player->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * 14.0f +
+                                      Math_SinS(player->actor.shape.rot.y) * 16.0f;
+            // head up, swinging and twisting on the line
+            this->actor.shape.rot.y = player->actor.shape.rot.y + 0x4000 + (s16)(Math_SinS(this->timer * 0x900) * 0x1800);
+            this->actor.shape.rot.x = -0x4000 + (s16)(Math_SinS(this->timer * 0x700) * 0x500);
+            this->actor.shape.rot.z = 0;
             this->swimPhaseStep = 0.6f;
             this->swimMag = 2500.0f;
             break;

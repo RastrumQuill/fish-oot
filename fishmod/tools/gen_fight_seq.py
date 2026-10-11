@@ -74,10 +74,10 @@ def drum_layer():
 
 CHANNELS = [
     # name, layer, instrument, volume, pan, reverb
-    ("BASS", bass_layer, "SF3_INST_11", 115, 64, 8),
-    ("ROOT", root_layer, "SF3_INST_12", 90, 56, 16),
-    ("PAD", pad_layer, "SF3_INST_7", 72, 40, 64),
-    ("DRUMS", drum_layer, "FONTANY_INSTR_DRUM", 80, 84, 16),
+    ("BASS", bass_layer, "SF3_INST_11", 127, 64, 8),
+    ("ROOT", root_layer, "SF3_INST_12", 115, 56, 16),
+    ("PAD", pad_layer, "SF3_INST_7", 100, 40, 64),
+    ("DRUMS", drum_layer, "FONTANY_INSTR_DRUM", 105, 84, 16),
 ]
 
 
@@ -94,7 +94,7 @@ def main():
         "    mutebhv     0x20",
         "    mutescale   50",
         f"    initchan    0b{'1' * len(CHANNELS)}",
-        "    vol         72",
+        "    vol         115",  # the whole song: louder than most area music, which sits around 70-90
         "    tempo       160",
         "FIGHT_SEQ_LOOP:",
     ]
