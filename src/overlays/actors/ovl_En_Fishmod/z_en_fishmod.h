@@ -86,6 +86,11 @@ typedef struct EnFishmod {
     /* 0x3D6 */ s16 escapeTimer;                   // frames left heading for `escape` to get unstuck
     /* 0x3D8 */ Vec3f stuckPos;                    // where it was at the last stuck check
     /* 0x3E4 */ Vec3f escape;                      // open water to head for when stuck
+    /* 0x3F0 */ s16 lastYaw;                       // heading last frame, for bending the body into turns
+    /* 0x3F2 */ s16 turnBend;                      // how hard the body is bent into the current turn
+    /* 0x3F4 */ s16 restTimer;                     // wandering: frames left resting in place before moving on
+    /* 0x3F6 */ s8 startle;                        // frames left of a startled flick (sign: which way)
+    /* 0x3F7 */ u8 fleeFromLink;                   // the current flee is away from Link (runYaw already set)
 #if FISHMOD_OPT >= 2
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
