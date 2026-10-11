@@ -36,6 +36,8 @@
 #include "z_lib.h"
 #include "speed_meter.h"
 #include "ultra64/convert.h"
+#include "bgcheck.h"
+#include "segmented_address.h"
 
 void Sram_InitDebugSave(void);
 
@@ -313,6 +315,15 @@ void Fishmod_DebugBoot(void) {
     sPlacedPlayer = false;
 }
 
+/** True if the script spawns its own fish, so the fish object is needed even in scenes without fishing. */
+s32 Fishmod_DebugWantsFish(void) {
+#if defined(FISHMOD_SCRIPT_FISH_TANK) || defined(FISHMOD_SCRIPT_EXTRA_FISH)
+    return true;
+#else
+    return false;
+#endif
+}
+
 s32 Fishmod_DebugNormalBoot(void) {
 #ifdef FISHMOD_SCRIPT_NORMAL_BOOT
     // the script plays from power-on: through the title and file select, and Link is never moved
@@ -426,6 +437,27 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
                 Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sScriptStartPos.x + Math_SinS(yaw) * r,
                             sScriptStartPos.y + 30.0f + (n % 3) * 15.0f, sScriptStartPos.z + Math_CosS(yaw) * r, 0,
                             yaw, 0, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sKinds[n % ARRAY_COUNT(sKinds)]));
+            }
+        }
+#endif
+#ifdef FISHMOD_SCRIPT_FISH_TANK
+        {
+            // fill the scene's first water box with fish, spread on a grid across it at all depths (stress tests)
+            static u8 sKinds[] = { FISHMOD_SPECIES_GREENGILL, FISHMOD_SPECIES_HYRULE_BASS, FISHMOD_SPECIES_SANKE_CARP,
+                                   FISHMOD_SPECIES_ORDON_CATFISH, FISHMOD_SPECIES_HYRULE_MINNOW,
+                                   FISHMOD_SPECIES_HYLIAN_LOACH };
+            WaterBox* box = SEGMENTED_TO_VIRTUAL(play->colCtx.colHeader->waterBoxes);
+            s32 cols = 6;
+            s32 rows = (FISHMOD_SCRIPT_FISH_TANK + cols - 1) / cols;
+            s32 n;
+
+            for (n = 0; n < FISHMOD_SCRIPT_FISH_TANK; n++) {
+                f32 x = box->xMin + box->xLength * ((n % cols) + 0.5f) / cols;
+                f32 z = box->zMin + box->zLength * ((n / cols) + 0.5f) / rows;
+                f32 y = box->ySurface - 20.0f - (n * 37 % 300);
+
+                Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, x, y, z, 0, (s16)(n * 0x2800), 0,
+                            FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sKinds[n % ARRAY_COUNT(sKinds)]));
             }
         }
 #endif

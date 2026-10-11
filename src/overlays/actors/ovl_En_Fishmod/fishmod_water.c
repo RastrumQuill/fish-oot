@@ -47,6 +47,19 @@ static FishmodExactFloor sExactCache[EXACT_CACHE_SIZE];
 
 static FishmodWaterGrid sGrids[GRID_MAX_BOXES];
 static s32 sGridCount;
+static s32 sGridUsers; // the rod and the fish share one cache: built by the first, freed after the last
+
+void EnFishmod_WaterGridAcquire(PlayState* play) {
+    if (sGridUsers++ == 0) {
+        EnFishmod_WaterGridInit(play);
+    }
+}
+
+void EnFishmod_WaterGridRelease(PlayState* play) {
+    if ((sGridUsers > 0) && (--sGridUsers == 0)) {
+        EnFishmod_WaterGridDestroy(play);
+    }
+}
 
 void EnFishmod_WaterGridInit(PlayState* play) {
     WaterBox* boxes = SEGMENTED_TO_VIRTUAL(play->colCtx.colHeader->waterBoxes);
