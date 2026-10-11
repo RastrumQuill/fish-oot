@@ -150,6 +150,7 @@ typedef struct FishmodRodInfo {
     /* 0x0A */ u16 lost;
     /* 0x0C */ f32 castPower;
     /* 0x10 */ u8 choice; // after a catch: 1 keep or release, 2 release only
+    /* 0x14 */ const char* notice; // a one-line notice for the rod's banner (e.g. bait found), shown once
 } FishmodRodInfo;
 
 extern FishmodRodInfo gFishmodRodInfo;
@@ -166,12 +167,35 @@ typedef struct FishmodSpeciesRecord {
     /* 0x02 */ u16 bestTenths;   // longest, in tenths of an inch
 } FishmodSpeciesRecord; // size = 0x4
 
+// What's in a bottle with a fish in it (the item itself only says "fish")
+typedef struct FishmodBottleFish {
+    /* 0x00 */ u8 species;      // species + 1; 0 for a fish bottled some other way (a vanilla fish)
+    /* 0x01 */ u8 pad;
+    /* 0x02 */ u16 lengthTenths;
+} FishmodBottleFish; // size = 0x4
+
+#define FISHMOD_BAIT_SLOTS 8 // FISHMOD_BAIT_MAX, rounded up
+
 typedef struct FishmodSaveData {
     /* 0x00 */ u32 flags;
     /* 0x04 */ FishmodSpeciesRecord records[FISHMOD_SAVE_SPECIES_MAX];
-} FishmodSaveData; // size = 0x84
+    /* 0x84 */ u8 baitCount[FISHMOD_BAIT_SLOTS];  // the bait pouch
+    /* 0x8C */ FishmodBottleFish bottleFish[4];    // per bottle slot
+} FishmodSaveData; // size = 0x9C
 
 #define FISHMOD_SAVE ((FishmodSaveData*)&gSaveContext.save.info.sceneFlags[SCENE_ID_MAX])
+
+// Bait pouch
+#define FISHMOD_BAIT_POUCH_MAX 30
+void Fishmod_AddBait(s32 bait, s32 count);
+const char* Fishmod_BaitName(s32 bait);
+
+// Bottled fish: what went into a bottle, and letting it go again (returns true if fishmod handled the release)
+void Fishmod_BottleFish(s32 species, f32 lengthInches);
+s32 Fishmod_ReleaseBottleFish(struct PlayState* play, s32 slot, Vec3f* pos, s16 yaw);
+// A length for the next fish spawned (0 for a random one), used by Fishmod_ReleaseBottleFish
+extern f32 gFishmodSpawnLength;
+extern Vec3f gFishmodHivePos;
 
 /** Records a catch. Returns true if it is a new size record for its species. */
 s32 Fishmod_RecordCatch(s32 species, f32 lengthInches);

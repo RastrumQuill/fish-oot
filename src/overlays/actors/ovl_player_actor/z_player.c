@@ -14172,11 +14172,18 @@ void Player_Action_8084EFC0(Player* this, PlayState* play) {
         Camera_SetFinishedFlag(Play_GetCamera(play, CAM_ID_MAIN));
     } else if (LinkAnimation_OnFrame(&this->skelAnime, 76.0f)) {
         BottleDropInfo* dropInfo = &D_80854A28[this->itemAction - PLAYER_IA_BOTTLE_FISH];
+        Vec3f dropPos;
 
-        Actor_Spawn(&play->actorCtx, play, dropInfo->actorId,
-                    (Math_SinS(this->actor.shape.rot.y) * 5.0f) + this->leftHandPos.x, this->leftHandPos.y,
-                    (Math_CosS(this->actor.shape.rot.y) * 5.0f) + this->leftHandPos.z, 0x4000, this->actor.shape.rot.y,
-                    0, dropInfo->actorParams);
+        dropPos.x = (Math_SinS(this->actor.shape.rot.y) * 5.0f) + this->leftHandPos.x;
+        dropPos.y = this->leftHandPos.y;
+        dropPos.z = (Math_CosS(this->actor.shape.rot.y) * 5.0f) + this->leftHandPos.z;
+        // fishmod: a bottled fish poured into water goes back in as the fish it was
+        if ((dropInfo->actorId != ACTOR_EN_FISH) ||
+            !Fishmod_ReleaseBottleFish(play, gSaveContext.save.info.equips.cButtonSlots[this->heldItemButton - 1],
+                                       &dropPos, this->actor.shape.rot.y)) {
+            Actor_Spawn(&play->actorCtx, play, dropInfo->actorId, dropPos.x, dropPos.y, dropPos.z, 0x4000,
+                        this->actor.shape.rot.y, 0, dropInfo->actorParams);
+        }
 
         Player_UpdateBottleHeld(play, this, ITEM_BOTTLE_EMPTY, PLAYER_IA_BOTTLE);
     } else {

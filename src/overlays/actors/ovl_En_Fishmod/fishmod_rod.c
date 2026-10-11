@@ -387,6 +387,52 @@ static void Rod_StopFightMusic(void) {
     func_800F5B58();
 }
 
+/** True if Link has a bottle with bugs in it, and if `take` is set, empties it. */
+static s32 Rod_BugBottle(s32 take) {
+    s32 i;
+
+    for (i = SLOT_BOTTLE_1; i <= SLOT_BOTTLE_4; i++) {
+        if (gSaveContext.save.info.inventory.items[i] == ITEM_BOTTLE_BUG) {
+            if (take) {
+                Inventory_ReplaceItem(NULL, ITEM_BOTTLE_BUG, ITEM_BOTTLE_EMPTY);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Z while holding the rod: put the bait on the hook back in the pouch and hook the next kind there is some of
+ * (or none). Bugs come from a bottle of bugs: a bottle makes three baits.
+ */
+static void Rod_NextBait(void) {
+    u8* pouch = FISHMOD_SAVE->baitCount;
+    s32 bait = ROD->bait;
+    s32 i;
+
+    if (bait != FISHMOD_BAIT_NONE) {
+        pouch[bait] = CLAMP_MAX(pouch[bait] + 1, FISHMOD_BAIT_POUCH_MAX);
+    }
+    for (i = 0; i < FISHMOD_BAIT_MAX; i++) {
+        bait = (bait + 1) % FISHMOD_BAIT_MAX;
+        if (bait == FISHMOD_BAIT_NONE) {
+            break;
+        }
+        if ((bait == FISHMOD_BAIT_BUG) && (pouch[bait] == 0) && Rod_BugBottle(true)) {
+            pouch[bait] = 3;
+        }
+        if (pouch[bait] > 0) {
+            break;
+        }
+    }
+    if (bait != FISHMOD_BAIT_NONE) {
+        pouch[bait]--;
+    }
+    ROD->bait = bait;
+    Sfx_PlaySfxCentered((bait != FISHMOD_BAIT_NONE) ? NA_SE_SY_DECIDE : NA_SE_SY_CURSOR);
+}
+
 static void Rod_EndCast(PlayState* play, Player* player) {
     Rod_StopFightMusic();
     ROD->state = ROD_STATE_HELD;
@@ -689,6 +735,11 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
     Input* input = &play->state.input[0];
     s32 holding = (player->heldItemAction == PLAYER_IA_FISHING_POLE);
 
+    if (gFishmodRodInfo.notice != NULL) {
+        // something outside the rod has news (e.g. bait from a beehive)
+        EnFishmod_RodMessage(1, gFishmodRodInfo.notice, NULL);
+        gFishmodRodInfo.notice = NULL;
+    }
     if (ROD->messageTimer > 0) {
         ROD->messageTimer--;
     }
@@ -727,6 +778,9 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         case ROD_STATE_HELD:
             Math_ApproachZeroF(&player->unk_85C, 1.0f, 0.1f);
             Math_ApproachZeroF(&player->unk_858, 1.0f, 0.1f);
+            if (CHECK_BTN_ALL(input->press.button, BTN_Z)) {
+                Rod_NextBait();
+            }
             if (player->unk_860 == 1) {
                 // Link started the cast animation
                 ROD->state = ROD_STATE_WINDUP;
@@ -916,6 +970,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->choice = 0;
                 if (fish != NULL) {
                     if (decided == 1) {
+                        Fishmod_BottleFish(fish->species - gFishmodSpecies, fish->lengthInches);
                         Item_Give(play, ITEM_BOTTLE_FISH);
                         Sfx_PlaySfxCentered(NA_SE_SY_GET_ITEM);
                         EnFishmod_RodMessage(1, "Into the bottle!", NULL);
@@ -1446,7 +1501,7 @@ static void Rod_DrawHud(PlayState* play) {
 
             switch (ROD->state) {
                 case ROD_STATE_HELD:
-                    hint = "Hold the rod button to cast";
+                    hint = "Hold the rod button to cast  Z:Bait";
                     break;
                 case ROD_STATE_WINDUP:
                     hint = "Release to cast  Stick: aim";
@@ -1460,6 +1515,27 @@ static void Rod_DrawHud(PlayState* play) {
                 case ROD_STATE_FIGHT:
                     hint = "A:Reel  Stick: pull against it";
                     break;
+            }
+            if ((ROD->state == ROD_STATE_HELD) || (ROD->state == ROD_STATE_FLOAT)) {
+                // what's on the hook, under the hint
+                static char sBaitLine[40];
+                s32 have = 0;
+                s32 b;
+
+                for (b = 1; b < FISHMOD_BAIT_MAX; b++) {
+                    have += FISHMOD_SAVE->baitCount[b];
+                }
+                if (ROD->bait != FISHMOD_BAIT_NONE) {
+                    sprintf(sBaitLine, "Bait: %s (%d left)", Fishmod_BaitName(ROD->bait),
+                            FISHMOD_SAVE->baitCount[ROD->bait]);
+                } else if ((have > 0) || Rod_BugBottle(false)) {
+                    sprintf(sBaitLine, "No bait on the hook");
+                } else {
+                    sprintf(sBaitLine, "No bait (hives, bottled bugs)");
+                }
+                GfxPrint_SetColor(&printer, 255, 230, 160, 200);
+                GfxPrint_SetPos(&printer, 20 - strlen(sBaitLine) / 2, 8);
+                GfxPrint_Printf(&printer, "%s", sBaitLine);
             }
             if (hint != NULL) {
                 // just under the top of the HUD (the bottom has the map and rupees), until there's a tutorial
