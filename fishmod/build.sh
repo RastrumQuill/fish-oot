@@ -76,6 +76,13 @@ if [ -n "$SCRIPT" ]; then
     touch "fishmod/scripts/$SCRIPT.inc.c"
 fi
 
+# new art (fishmod/assets/assets.json) into C; the generated files are committed, so this is optional
+if python3 -c "import PIL" 2>/dev/null; then
+    python3 fishmod/tools/assets.py
+else
+    echo "note: Pillow isn't installed, so fishmod/assets isn't regenerated (the committed C is used)"
+fi
+
 make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
