@@ -581,15 +581,36 @@ static f32 EnFishmod_BaitAppeal(EnFishmod* this) {
     return appeal;
 }
 
+/** True during this species' active times of day. */
+static s32 EnFishmod_ActiveNow(EnFishmod* this) {
+    u16 time = gSaveContext.save.dayTime;
+    s32 tod;
+
+    if ((time >= CLOCK_TIME(4, 0)) && (time < CLOCK_TIME(8, 0))) {
+        tod = FISHMOD_TIME_DAWN;
+    } else if ((time >= CLOCK_TIME(8, 0)) && (time < CLOCK_TIME(17, 0))) {
+        tod = FISHMOD_TIME_DAY;
+    } else if ((time >= CLOCK_TIME(17, 0)) && (time < CLOCK_TIME(20, 0))) {
+        tod = FISHMOD_TIME_DUSK;
+    } else {
+        tod = FISHMOD_TIME_NIGHT;
+    }
+    return (this->species->activeTimes & (1 << tod)) != 0;
+}
+
 static void EnFishmod_PickWanderTarget(EnFishmod* this, PlayState* play) {
     Vec3f point;
     f32 surface;
     f32 floor;
 
-    if (EnFishmod_FindWaterPoint(play, &this->actor.home.pos, 130.0f,
+    if (EnFishmod_FindWaterPoint(play, &this->actor.home.pos, 75.0f,
                                  CLAMP_MIN(12.0f, this->halfHeight * 2.0f + this->halfLength * 0.5f), &point,
                                  &surface, &floor)) {
         point.y = EnFishmod_DepthY(this, surface, floor);
+        if (Rand_ZeroOne() < 0.25f) {
+            // down to pick at the bottom
+            point.y = floor + this->halfHeight + 1.0f;
+        }
         this->target = point;
     } else {
         this->target = this->actor.home.pos;
@@ -625,6 +646,8 @@ void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
             this->stateTimer = 50;
             this->cooldown = 300 + (s16)Rand_ZeroFloat(300.0f);
             this->jumping = false;
+            this->startle = (Rand_ZeroOne() < 0.5f) ? 8 : -8;
+            this->restTimer = 0;
             break;
     }
 }
@@ -756,10 +779,19 @@ static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
         EnFishmod_FishSetState(this, FISH_STATE_FLEE);
         return;
     }
-    // Link wading in close scares wary fish
-    if ((player->actor.depthInWater > 0.0f) &&
-        (Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos) < this->species->behavior.wariness * 0.8f)) {
-        EnFishmod_FishSetState(this, FISH_STATE_FLEE);
+    // Link: wading in nearby, running along the bank, or simply too close (nothing lets itself be stepped on)
+    {
+        f32 dist = Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
+        f32 calm = 20.0f + this->species->behavior.wariness * 0.6f + this->halfLength;
+        s32 scared = (dist < this->halfLength + 25.0f) ||
+                     ((player->actor.depthInWater > 0.0f) && (dist < calm * 1.3f)) ||
+                     ((player->actor.speed > 4.0f) && (dist < calm));
+
+        if (scared) {
+            EnFishmod_FishSetState(this, FISH_STATE_FLEE);
+            this->runYaw = Math_Vec3f_Yaw(&player->actor.world.pos, &this->actor.world.pos);
+            this->fleeFromLink = true;
+        }
     }
 }
 
@@ -891,12 +923,27 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
 
     switch (this->fishState) {
         case FISH_STATE_WANDER:
-            if ((this->stateTimer == 0) || (Math_Vec3f_DistXYZ(&this->actor.world.pos, &this->target) < 8.0f)) {
-                EnFishmod_PickWanderTarget(this, play);
+            // Fish don't roam about at random: they hold station near home for a while (resting, fins
+            // working), then make a short cruise somewhere nearby (sometimes down to pick at the bottom), and
+            // settle again. Fish out of their active time of day rest longer.
+            if (this->restTimer > 0) {
+                this->restTimer--;
+                // holding the spot it stopped at (the target was set there), gliding to a stop
+                EnFishmod_SwimToward(this, play, &this->target, 0.15f, 0x100);
+                this->swimPhaseStep = 0.06f;
+                this->swimMag = 450.0f;
+                if (this->restTimer == 0) {
+                    EnFishmod_PickWanderTarget(this, play);
+                }
+            } else {
+                if ((this->stateTimer == 0) || (Math_Vec3f_DistXYZ(&this->actor.world.pos, &this->target) < 8.0f)) {
+                    this->restTimer = 40 + (s16)Rand_ZeroFloat(EnFishmod_ActiveNow(this) ? 120.0f : 300.0f);
+                    this->target = this->actor.world.pos;
+                }
+                EnFishmod_SwimToward(this, play, &this->target, 0.4f + b->speed * 0.008f, 0x200);
+                this->swimPhaseStep = 0.15f + this->speed * 0.12f;
+                this->swimMag = 1300.0f;
             }
-            EnFishmod_SwimToward(this, play, &this->target, 0.4f + b->speed * 0.008f, 0x200);
-            this->swimPhaseStep = 0.15f + this->speed * 0.12f;
-            this->swimMag = 900.0f;
 
             EnFishmod_CheckSpook(this, play);
             // Only one fish goes to look at a time (not while another is at the bobber), and not often: a bobber
@@ -961,6 +1008,10 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             EnFishmod_SwimToward(this, play, &hover, 0.25f, 0x200);
             Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
             this->swimPhaseStep = 0.12f;
+            EnFishmod_CheckSpook(this, play);
+            if (this->fishState != FISH_STATE_INSPECT) {
+                break;
+            }
 
             this->interest += 0.01f * EnFishmod_BaitAppeal(this);
             // reeling the bobber away too fast is suspicious to wary fish
@@ -1200,8 +1251,10 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             // pick a way out once (away from the bobber, toward open water), and again only if the shore is
             // in the way
             if (this->stateTimer == 49) {
-                this->runYaw = EnFishmod_OpenWaterYaw(this, play,
-                                                      Math_Vec3f_Yaw(&rod->bobberPos, &this->actor.world.pos));
+                this->runYaw = EnFishmod_OpenWaterYaw(
+                    this, play,
+                    this->fleeFromLink ? this->runYaw : Math_Vec3f_Yaw(&rod->bobberPos, &this->actor.world.pos));
+                this->fleeFromLink = false;
             }
             away.x = this->actor.world.pos.x + Math_SinS(this->runYaw) * 60.0f;
             away.y = this->actor.world.pos.y - 5.0f;
@@ -1238,9 +1291,28 @@ static void EnFishmod_UpdateSwim(EnFishmod* this) {
         this->swimPhase -= 2.0f * M_PI;
     }
 
+    // Turning bends the whole body into the turn (each joint adds to the one before, so the tail sweeps wide),
+    // and a startle throws it into a sharp C for a moment before it shoots off.
+    {
+        s16 turn = this->actor.shape.rot.y - this->lastYaw;
+        s16 bendTarget = CLAMP(turn * 5, -0x1400, 0x1400);
+
+        this->lastYaw = this->actor.shape.rot.y;
+        Math_SmoothStepToS(&this->turnBend, bendTarget, 3, 0x600, 0x40);
+    }
     // traveling wave down the body, stronger toward the tail
     for (i = 0; i < 4; i++) {
-        this->bodyYaw[i] = cosf(this->swimPhase - (i * 1.1f)) * this->swimMag * (0.6f + (i * 0.45f));
+        this->bodyYaw[i] = cosf(this->swimPhase - (i * 1.1f)) * this->swimMag * (0.6f + (i * 0.55f)) -
+                           this->turnBend * (0.25f + i * 0.2f);
+    }
+    if (this->startle != 0) {
+        s32 dir = (this->startle > 0) ? 1 : -1;
+        s32 left = ABS(this->startle);
+
+        for (i = 0; i < 4; i++) {
+            this->bodyYaw[i] += dir * 0x900 * (left > 4 ? 1.0f : -0.6f) * (0.5f + i * 0.3f);
+        }
+        this->startle -= dir;
     }
     this->finYaw = (Math_SinS(this->timer * 0x900) * 1800.0f) + 1800.0f;
 }
