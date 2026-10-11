@@ -210,6 +210,9 @@ void GameState_Draw(GameState* gameState, GraphicsContext* gfxCtx) {
 #if FISHMOD_DEBUG
     Fishmod_DebugDrawText(gameState, &newDList);
 #endif
+#if FISHMOD_TESTMODE
+    Fishmod_DrawFps(&newDList);
+#endif
 
 #if DEBUG_FEATURES
     sLastButtonPressed = gameState->input[0].press.button | gameState->input[0].cur.button;

@@ -180,6 +180,8 @@ void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size);
 #if FISHMOD_TESTMODE
 // A new file in a test-mode build skips the intro and starts with bottles, a slingshot, the Goron's Bracelet etc.
 void Fishmod_InitTestSave(void);
+// A small frames-per-second readout in the top right corner
+void Fishmod_DrawFps(Gfx** gfxP);
 #endif
 // The catch textbox: the reused vanilla text id it shows under, and the call that opens it
 #define FISHMOD_CATCH_TEXT_ID 0x4083

@@ -770,7 +770,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->bobberVel.z = Math_CosS(yaw) * speed;
                 ROD->bobberVel.y = 4.0f + power * 5.0f;
                 ROD->dip = ROD->dipTarget = 0.0f;
-                ROD->zoom = (power > 0.6f) ? 1 : 0;
+                ROD->zoom = 2; // start zoomed all the way in on the bobber (Z cycles it)
                 Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
                 Rod_CameraStart(play);
             }
@@ -1461,8 +1461,9 @@ static void Rod_DrawHud(PlayState* play) {
                     break;
             }
             if (hint != NULL) {
+                // just under the top of the HUD (the bottom has the map and rupees), until there's a tutorial
                 GfxPrint_SetColor(&printer, 220, 220, 220, 200);
-                GfxPrint_SetPos(&printer, 20 - strlen(hint) / 2, 26);
+                GfxPrint_SetPos(&printer, 20 - strlen(hint) / 2, 7);
                 GfxPrint_Printf(&printer, "%s", hint);
             }
         }

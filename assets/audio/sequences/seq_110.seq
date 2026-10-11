@@ -8,7 +8,7 @@
     mutebhv     0x20
     mutescale   50
     initchan    0b1111
-    vol         72
+    vol         115
     tempo       160
 FIGHT_SEQ_LOOP:
     ldchan      0, FIGHT_CHAN_BASS
@@ -21,7 +21,7 @@ FIGHT_SEQ_LOOP:
 .channel FIGHT_CHAN_BASS
     noshort
     ldlayer     0, FIGHT_LAYER_BASS
-    vol         115
+    vol         127
     pan         64
     reverb      8
     instr       SF3_INST_11
@@ -31,7 +31,7 @@ FIGHT_SEQ_LOOP:
 .channel FIGHT_CHAN_ROOT
     noshort
     ldlayer     0, FIGHT_LAYER_ROOT
-    vol         90
+    vol         115
     pan         56
     reverb      16
     instr       SF3_INST_12
@@ -41,7 +41,7 @@ FIGHT_SEQ_LOOP:
 .channel FIGHT_CHAN_PAD
     noshort
     ldlayer     0, FIGHT_LAYER_PAD
-    vol         72
+    vol         100
     pan         40
     reverb      64
     instr       SF3_INST_7
@@ -51,7 +51,7 @@ FIGHT_SEQ_LOOP:
 .channel FIGHT_CHAN_DRUMS
     noshort
     ldlayer     0, FIGHT_LAYER_DRUMS
-    vol         80
+    vol         105
     pan         84
     reverb      16
     instr       FONTANY_INSTR_DRUM
