@@ -128,6 +128,7 @@ typedef struct EnFishmod {
     /* 0x3FE */ s16 startleBend;                   // the C-bend of a startle (sign: which way), 0 otherwise
     /* 0x400 */ u8 rigReady;                       // the manager can draw it (FISHMOD_OPT 4)
     /* 0x404 */ s32 waterCell;                     // the water grid cell waterY/floorY are for (FISHMOD_OPT 5)
+    /* 0x408 */ u8 biteStruck;                     // the strike reached the bait (after the wind-up; FISHMOD_OPT 5)
 #if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
