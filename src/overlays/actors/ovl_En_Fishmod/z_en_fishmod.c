@@ -1111,6 +1111,12 @@ static s32 EnFishmod_OpenWaterToImpl(EnFishmod* this, PlayState* play, Vec3f* to
 }
 
 #if FISHMOD_DEBUG
+#if FISHMOD_OPT >= 5
+#define FISHMOD_BAIT_MOUTH_Y(rod) FISHMOD_ROD_BAIT_Y(rod)
+#else
+#define FISHMOD_BAIT_MOUTH_Y(rod) ((rod)->bobberPos.y - 4.0f)
+#endif
+
 static s32 EnFishmod_OpenWaterTo(EnFishmod* this, PlayState* play, Vec3f* to) {
     s32 ret;
 
@@ -1268,7 +1274,12 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
     }
 
     below = rod->bobberPos;
+#if FISHMOD_OPT >= 5
+    // where the bait hangs: the float depth set on this cast
+    below.y = FISHMOD_ROD_BAIT_Y(rod) - 2.0f;
+#else
     below.y = rod->waterY - 10.0f;
+#endif
 
     if (EnFishmod_Unstick(this, play)) {
         return;
@@ -1313,6 +1324,13 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                 if (rod->twitchTimer > 0) {
                     notice += 30.0f;
                 }
+#if FISHMOD_OPT >= 5
+                // it has to be able to see the bait: not too far above or below it either (deep fish need the bait
+                // brought down to them, or to have come up to feed)
+                if (ABS(FISHMOD_ROD_BAIT_Y(rod) - this->actor.world.pos.y) > notice * 1.2f) {
+                    notice = 0.0f;
+                }
+#endif
                 if ((bobberDist < notice) && (Rand_ZeroOne() < b->curiosity * 0.0015f * EnFishmod_BaitAppeal(this)) &&
                     EnFishmod_OpenWaterTo(this, play, &rod->bobberPos)) {
                     this->fishState = FISH_STATE_APPROACH;
@@ -1437,7 +1455,11 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             }
             // dart forward to peck, then back off, without turning
             if (this->stateTimer > 6) {
+#if FISHMOD_OPT >= 5
+                EnFishmod_BobberStation(this, 0.45f, FISHMOD_ROD_BAIT_Y(rod), &peck);
+#else
                 EnFishmod_BobberStation(this, 0.45f, rod->waterY - 4.0f, &peck);
+#endif
             } else {
                 EnFishmod_BobberStation(this, 0.9f, below.y, &peck);
             }
@@ -1475,7 +1497,7 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                     break;
                 }
                 // the strike: fast, straight at it
-                EnFishmod_BobberStation(this, 0.5f, rod->bobberPos.y - 4.0f, &mouth);
+                EnFishmod_BobberStation(this, 0.5f, FISHMOD_BAIT_MOUTH_Y(rod), &mouth);
                 EnFishmod_SwimToward(this, play, &mouth, 2.4f, 0x600);
                 this->swimPhaseStep = 0.7f;
                 this->jawRot = 6000;
@@ -1488,7 +1510,7 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             }
 #endif
             // takes the bait and pulls the bobber down
-            EnFishmod_BobberStation(this, 0.5f, rod->bobberPos.y - 4.0f, &mouth);
+            EnFishmod_BobberStation(this, 0.5f, FISHMOD_BAIT_MOUTH_Y(rod), &mouth);
             EnFishmod_SwimToward(this, play, &mouth, 1.0f, 0x200);
             Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
             this->actor.shape.rot.x = 0x1000;

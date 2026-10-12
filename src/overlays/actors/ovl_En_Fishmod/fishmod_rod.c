@@ -52,6 +52,8 @@ FishmodRod gFishmodRodState;
 #define FISH_COUNT FISHMOD_FISH_COUNT
 #define WINDUP_FRAMES 18
 #define LINE_MIN 28.0f
+#define BAIT_DEPTH_START 6.0f   // the bait as it lands, just under the bobber
+#define BAIT_ABOVE_BOTTOM 6.0f  // where the sink stops by itself
 #define LINE_MAX_BASE 460.0f
 // Strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) let Link cast further and play out more line
 #define STRENGTH_CAST_SCALE() (1.0f + 0.2f * CUR_UPG_VALUE(UPG_STRENGTH))
@@ -273,10 +275,31 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
     if ((ROD->state == ROD_STATE_FLOAT) && ROD->biting) {
         zoom += 0.1f; // lean in on a bite
     }
-    zoom *= CLAMP(dist / 150.0f, 0.0f, 1.0f);
-    eyeTarget.x += (focus->x - eyeTarget.x) * zoom;
-    eyeTarget.y += (focus->y + 25.0f - eyeTarget.y) * zoom;
-    eyeTarget.z += (focus->z - eyeTarget.z) * zoom;
+    if (zoom > 0.0f) {
+        // each zoom level frames the bobber from a fixed distance (not a fraction of the cast), so a long cast
+        // doesn't leave it tiny and a short one still zooms
+        static f32 sZoomDist[] = { 0.0f, 330.0f, 200.0f, 120.0f };
+        Vec3f look;
+        f32 far;
+        f32 want = sZoomDist[ROD->zoom] * ((ROD->biting && (ROD->state == ROD_STATE_FLOAT)) ? 0.85f : 1.0f);
+
+        look.x = focus->x - eyeTarget.x;
+        look.y = focus->y + 25.0f - eyeTarget.y;
+        look.z = focus->z - eyeTarget.z;
+        far = sqrtf(SQ(look.x) + SQ(look.y) + SQ(look.z));
+        if (far > want) {
+            f32 t = (far - want) / far;
+
+            eyeTarget.x += look.x * t;
+            eyeTarget.y += look.y * t;
+            eyeTarget.z += look.z * t;
+        }
+    }
+
+    // never under the surface: look down into the water from above it (the bobber stays in view)
+    if ((ROD->state == ROD_STATE_FLOAT) && (eyeTarget.y < ROD->waterY + 20.0f)) {
+        eyeTarget.y = ROD->waterY + 20.0f;
+    }
 
     Math_ApproachF(&ROD->camBlend, 1.0f, 1.0f, 0.04f);
     Math_ApproachF(&ROD->camAt.x, focus->x, 0.25f, 40.0f * ROD->camBlend);
@@ -370,6 +393,7 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     ROD->camId = SUB_CAM_ID_DONE;
     ROD->state = ROD_STATE_NONE;
     ROD->bait = FISHMOD_BAIT_NONE;
+    ROD->baitDepth = BAIT_DEPTH_START;
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     EnFishmod_WaterGridAcquire(play);
 
@@ -587,14 +611,53 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     }
 }
 
+/**
+ * The float depth, set on every cast: the bait sinks under the bobber until A is pressed once (that press only
+ * stops it; A reels as usual once it's let go), or it stops by itself a little above the bottom, so shallow water
+ * isn't a race. The camera follows it down.
+ */
+static void Rod_UpdateSink(PlayState* play, Input* input) {
+    f32 surface;
+    f32 floor;
+    f32 deepest;
+
+    if (ROD->reelLock && !CHECK_BTN_ALL(input->cur.button, BTN_A)) {
+        ROD->reelLock = false;
+    }
+    if (!ROD->sinking) {
+        return;
+    }
+    if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
+        ROD->sinking = false;
+        ROD->reelLock = true;
+        Sfx_PlaySfxCentered(NA_SE_IT_FISHING_REEL_SLOW);
+        ROD->dip = 3.0f; // the bobber stands up as the line comes tight
+        return;
+    }
+    deepest = 1000.0f;
+    if (EnFishmod_WaterFloor(play, ROD->bobberPos.x, ROD->bobberPos.z, &surface, &floor, false)) {
+        deepest = (surface - floor) - BAIT_ABOVE_BOTTOM;
+    }
+    // sinking faster as the line pays out, like a weighted bait
+    ROD->baitDepth += CLAMP(0.8f + ROD->baitDepth * 0.012f, 0.8f, 3.0f);
+    if (ROD->baitDepth >= deepest) {
+        ROD->baitDepth = CLAMP_MIN(deepest, BAIT_DEPTH_START);
+        ROD->sinking = false;
+        ROD->dip = 3.0f;
+        Rumble_Override(0.0f, 60, 3, 10); // a small tug as the line comes tight near the bottom
+    }
+}
+
 static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, Input* input) {
     f32 waterY;
     f32 groundY;
     f32 dist;
     Vec3f toTip;
 
+    Rod_UpdateSink(play, input);
+
     // reel
-    if (CHECK_BTN_ALL(input->cur.button, BTN_A)) {
+    if (CHECK_BTN_ALL(input->cur.button, BTN_A) && !ROD->sinking && !ROD->reelLock) {
         f32 reel = CHECK_BTN_ALL(input->cur.button, BTN_R) ? 3.5f : 1.6f;
 
         ROD->lineOut -= reel;
@@ -837,6 +900,11 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->bobberPos.y = waterY;
                 ROD->dip = 6.0f;
                 ROD->splashed = true;
+                // the bait starts sinking under the bobber: A stops it at a depth (once per cast), or it stops by
+                // itself a little above the bottom
+                ROD->baitDepth = BAIT_DEPTH_START;
+                ROD->sinking = true;
+                ROD->reelLock = false;
                 ROD->lineOut = Math_Vec3f_DistXZ(&ROD->tipPos, &ROD->bobberPos);
                 Actor_PlaySfx(&this->actor, NA_SE_EV_BOMB_DROP_WATER);
                 Rod_Splash(play, &ROD->bobberPos, true);
@@ -883,6 +951,8 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                         ROD->waterY = waterY;
                         ROD->bobberPos.y = waterY;
                         ROD->dip = ROD->dipTarget = 0.0f;
+                        ROD->baitDepth = BAIT_DEPTH_START;
+                        ROD->sinking = false;
                         ROD->lineOut = Math_Vec3f_DistXZ(&ROD->tipPos, &ROD->bobberPos);
                         Rod_Splash(play, &ROD->bobberPos, false);
                     }
@@ -898,7 +968,11 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
             }
             Rod_UpdateFloat(this, play, player, input);
             if (ROD->state == ROD_STATE_FLOAT) {
-                Rod_CameraUpdate(play, player, &ROD->bobberPos);
+                // look at the bait, part way down the line (all the way down would lose the bobber)
+                Vec3f focus = ROD->bobberPos;
+
+                focus.y -= ROD->baitDepth * 0.6f;
+                Rod_CameraUpdate(play, player, &focus);
             }
             break;
 
@@ -1018,7 +1092,8 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
     {
         static const char* sStateNames[] = { "none", "held", "windup", "flying", "float", "ground", "fight", "land" };
 
-        Fishmod_DebugPrintf(2, "rod %s line %d", sStateNames[ROD->state], (s32)ROD->lineOut);
+        Fishmod_DebugPrintf(2, "rod %s line %d bait %d%s", sStateNames[ROD->state], (s32)ROD->lineOut,
+                            (s32)ROD->baitDepth, ROD->sinking ? " sink" : "");
         Fishmod_DebugPrintf(3, "ten %d stam %d bite %d hold st%d d%d", (s32)ROD->tension,
                             (ROD->fish != NULL) ? (s32)ROD->fish->stamina : -1, ROD->biting,
                             (ROD->fish != NULL) ? ROD->fish->fishState : -1,
@@ -1374,7 +1449,7 @@ static void Rod_DrawLine(PlayState* play) {
     if ((ROD->state == ROD_STATE_FLOAT) || (ROD->state == ROD_STATE_GROUND) || (ROD->state == ROD_STATE_FLYING)) {
         Vec3f hook = ROD->bobberPos;
 
-        hook.y -= (ROD->state == ROD_STATE_FLOAT) ? 14.0f : 4.0f;
+        hook.y -= (ROD->state == ROD_STATE_FLOAT) ? ROD->baitDepth : 4.0f;
         Rod_DrawLineSegment(play, &ROD->bobberPos, &hook, 0.001f);
     }
 
@@ -1400,7 +1475,7 @@ static void Rod_DrawBobber(PlayState* play) {
 
     // hook under the bobber
     if (ROD->state == ROD_STATE_FLOAT) {
-        Matrix_Translate(ROD->bobberPos.x, ROD->bobberPos.y - 14.0f, ROD->bobberPos.z, MTXMODE_NEW);
+        Matrix_Translate(ROD->bobberPos.x, ROD->bobberPos.y - ROD->baitDepth, ROD->bobberPos.z, MTXMODE_NEW);
         Matrix_Scale(0.004f, 0.004f, 0.004f, MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
         gSPDisplayList(POLY_OPA_DISP++, gFishingLureHookDL);
