@@ -610,7 +610,7 @@ PROP_KINDS = [
     ("lily_flower", "lily_flower", "ci4"),
     ("lily_centre", "lily_centre", "ci4"),
 ]
-VANILLA_KINDS = ["lily_pad", "rock"]
+VANILLA_KINDS = ["pond_reed", "lily_pad", "rock"]  # object_fish's own (the Fishing Pond's reed, pads, rocks)
 DATA = os.path.join(ROOT, "src", "fishmod_data")
 
 

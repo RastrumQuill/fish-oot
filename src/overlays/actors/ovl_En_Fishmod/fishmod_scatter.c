@@ -46,6 +46,7 @@ typedef struct FishmodPropKindInfo {
     f32 drawDist;
     u8 floating; // on the surface: not drawn while the water there is lower than it was placed for
     u8 plant;    // a living plant: not drawn where the water has gone (the drained lake)
+    u8 xlu;      // drawn see-through (the Fishing Pond's reed, as vanilla draws it)
 } FishmodPropKindInfo;
 
 #define DIST_SMALL 350.0f
@@ -64,6 +65,8 @@ static void Scatter_InitKinds(void) {
     // the generated kinds (the vanilla ones are set below)
     FISHMOD_PROP_KINDS_GENERATED(X)
 #undef X
+    sKinds[FISHMOD_PROP_POND_REED].material = gFishingReedMaterialDL;
+    sKinds[FISHMOD_PROP_POND_REED].model = gFishingReedModelDL;
     sKinds[FISHMOD_PROP_LILY_PAD].material = gFishingLilyPadMaterialDL;
     sKinds[FISHMOD_PROP_LILY_PAD].model = gFishingLilyPadModelDL;
     sKinds[FISHMOD_PROP_ROCK].material = gFishingRockMaterialDL;
@@ -76,6 +79,8 @@ static void Scatter_InitKinds(void) {
             sKinds[i].plant = true;
         }
     }
+    sKinds[FISHMOD_PROP_POND_REED].drawDist = DIST_MID;
+    sKinds[FISHMOD_PROP_POND_REED].xlu = true;
     sKinds[FISHMOD_PROP_GRASS_TUFT].drawDist = DIST_SMALL;
     sKinds[FISHMOD_PROP_LEAF_LITTER].drawDist = DIST_SMALL;
     sKinds[FISHMOD_PROP_PEBBLE_PATCH].drawDist = DIST_MID;
@@ -336,7 +341,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
         FishmodPropKindInfo* info = &sKinds[kind];
         f32 maxSq = SQ(info->drawDist);
-        s32 vanilla = (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK);
+        s32 vanilla = (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK) || (kind == FISHMOD_PROP_POND_REED);
+        Gfx** disp = info->xlu ? &POLY_XLU_DISP : &POLY_OPA_DISP;
         s32 material = false;
         f32 reachSq;
         s32 v;
@@ -376,7 +382,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 budget--;
                 if (!material) {
                     material = true;
-                    if (vanilla) {
+                    if (info->xlu) {
+                        Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+                        gSPDisplayList(POLY_XLU_DISP++, info->material);
+                    } else if (vanilla) {
                         // vanilla's own materials (lit by the scene's lights, like the Fishing Pond's props)
                         Gfx_SetupDL_25Opa(play->state.gfxCtx);
                         gSPDisplayList(POLY_OPA_DISP++, info->material);
@@ -394,10 +403,12 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                     }
                 }
                 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
-                gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, t, t, t, 255);
-                gSPMatrix(POLY_OPA_DISP++, Scatter_Matrix(prop, kind == FISHMOD_PROP_LILY_PAD),
+                if (!info->xlu) {
+                    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, t, t, t, 255);
+                }
+                gSPMatrix((*disp)++, Scatter_Matrix(prop, kind == FISHMOD_PROP_LILY_PAD),
                           G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-                gSPDisplayList(POLY_OPA_DISP++, info->model);
+                gSPDisplayList((*disp)++, info->model);
             }
         }
         if (material && !vanilla) {

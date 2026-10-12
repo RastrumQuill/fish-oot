@@ -77,6 +77,8 @@ def in_zone(zone, x, z):
 # cluster size range, scale range, needs steep slope)
 RULES = {
     "reed_clump": ((-6, 28), 0.02, {13: 0.5, 4: 0.35, 6: 0.15, 11: 0.1}, (2, 6), (0.8, 1.3), False),
+    # the Fishing Pond's own reed (one tall see-through card, swaying), in stands along the reed banks
+    "pond_reed": ((-6, 30), 0.02, {13: 0.55, 4: 0.45, 11: 0.12, 6: 0.12, 2: 0.1}, (4, 9), (0.75, 1.0), False),
     "cattails": ((-4, 22), 0.02, {13: 0.25, 4: 0.25, 11: 0.1}, (2, 5), (0.8, 1.2), False),
     "lily_pad": ((18, 95), 0.012, {4: 0.6, 13: 0.5, 11: 0.12, 6: 0.1}, (3, 8), (0.45, 0.85), False),
     "float_leaves": ((12, 70), 0.01, {4: 0.15, 13: 0.15, 12: 0.06}, (1, 2), (0.9, 1.3), False),
@@ -87,8 +89,10 @@ RULES = {
     "tall_weed": ((110, 340), 0.0, {}, (3, 7), (0.8, 1.3), True),
     "rock": ((-10, 600), 0.006, {5: 0.35, 14: 0.4, 1: 0.25, 9: 0.1}, (1, 4), (0.15, 0.6), False),
     "pebble_patch": ((-4, 60), 0.0, {1: 0.4, 3: 0.05, 15: 0.05}, (1, 3), (0.6, 1.2), False),
-    "sunken_log": ((25, 260), 0.002, {6: 0.05, 10: 0.06, 2: 0.04, 11: 0.04}, (1, 1), (0.7, 1.1), False),
-    "branch": ((20, 260), 0.004, {6: 0.06, 10: 0.08, 11: 0.06, 13: 0.04}, (1, 2), (0.7, 1.2), False),
+    # Wood: no trees grow round the lake, so it is driftwood brought down the Gerudo river, stranded near the
+    # inflow, along the lab shore and on the west flat downstream of it (no drowned or fallen trees)
+    "sunken_log": ((25, 260), 0.0, {1: 0.06, 2: 0.04, 6: 0.04}, (1, 1), (0.7, 1.1), False),
+    "branch": ((20, 260), 0.0, {1: 0.1, 2: 0.06, 6: 0.06, 5: 0.03}, (1, 2), (0.7, 1.2), False),
     "rush_tuft": ((-4, 20), 0.05, {13: 0.1, 4: 0.1, 6: 0.1, 11: 0.1}, (2, 5), (0.8, 1.3), False),
     "iris": ((-4, 18), 0.015, {4: 0.2, 13: 0.2, 6: 0.08, 11: 0.06}, (2, 4), (0.8, 1.2), False),
     "marigold": ((-6, 8), 0.01, {4: 0.12, 13: 0.12, 11: 0.08}, (1, 3), (0.8, 1.2), False),
@@ -100,8 +104,6 @@ RULES = {
     "bank_roots": ((0, 60), 0.0, {10: 0.05, 11: 0.05, 6: 0.05, 13: 0.04}, (1, 2), (0.8, 1.3), True),
     "fan_weed": ((300, 1100), 0.0, {9: 0.3, 8: 0.01}, (1, 3), (0.8, 1.4), False),
     "boulder": ((-20, 700), 0.0, {5: 0.06, 14: 0.08, 7: 0.03, 1: 0.03, 9: 0.05}, (1, 2), (0.9, 2.2), False),
-    "fallen_tree": ((140, 420), 0.0, {6: 0.012, 10: 0.015, 11: 0.012, 12: 0.006}, (1, 1), (0.8, 1.2), False),
-    "drowned_tree": ((60, 300), 0.0, {10: 0.03, 11: 0.03, 14: 0.02}, (1, 1), (0.8, 1.3), False),
     "old_posts": ((5, 200), 0.0, {14: 0.12, 15: 0.15, 2: 0.08}, (1, 2), (0.8, 1.2), False),
     "leaf_litter": ((10, 120), 0.005, {11: 0.05, 13: 0.04, 4: 0.04}, (1, 1), (0.8, 1.3), False),
 }
@@ -156,7 +158,7 @@ def place(scene, seed=1):
                 if not (drange[0] <= depth <= drange[1]):
                     continue
                 chance = base + sum(b * zin.get(zid, 0.0) for zid, b in boosts.items())
-                if kind in ("reed_clump", "cattails", "rush_tuft", "iris", "marigold"):
+                if kind in ("reed_clump", "pond_reed", "cattails", "rush_tuft", "iris", "marigold"):
                     chance *= 1.0 - min(1.0, open_shore * 3.0)
                 if steep:
                     chance += 0.35 * max(0.0, min(1.0, (slope - 0.6) / 0.8))
@@ -177,7 +179,7 @@ def place(scene, seed=1):
                     pd = ps - pf
                     if not (drange[0] - 4 <= pd <= drange[1] + 10):
                         continue
-                    y = ps if kind in FLOATING else pf
+                    y = (ps + 1) if kind in FLOATING else pf  # floating: a unit above the water, not z-fighting it
                     sc = rnd.uniform(*scale)
                     if kind in HEIGHT:
                         # stay a little under the surface (rocks and logs may show in the shallows)
@@ -197,7 +199,7 @@ def preview(scene, instances, outdir):
     zm = load_tool("zone_map")
     os.makedirs(outdir, exist_ok=True)
     folder, (x0, x1, z0, z1), _ = zm.SCENES[scene]
-    colours = {"reed_clump": (220, 220, 80), "cattails": (200, 160, 60), "lily_pad": (60, 220, 60),
+    colours = {"pond_reed": (240, 240, 120), "reed_clump": (220, 220, 80), "cattails": (200, 160, 60), "lily_pad": (60, 220, 60),
                "float_leaves": (120, 255, 120), "grass_tuft": (90, 140, 60), "ribbon_weed": (40, 120, 40),
                "broadleaf": (150, 200, 60), "bush_weed": (30, 90, 30), "tall_weed": (10, 60, 20),
                "rock": (200, 200, 200), "pebble_patch": (230, 210, 160), "sunken_log": (120, 70, 30),
@@ -215,7 +217,8 @@ def preview(scene, instances, outdir):
     # oblique views of a few areas, rendered with the props' real meshes
     pad = ss.load_vanilla("gFishingLilyPadModel", "gFishingLilyPadTex.rgba16.png", 32, 32)
     rock = ss.load_vanilla("gFishingRockModel", "gFishingRockTex.rgba16.png", 32, 32)
-    meshes = {k: ss.load_obj(k) for k in RULES if k not in ("lily_pad", "rock", "boulder")}
+    meshes = {k: ss.load_obj(k) for k in RULES if k not in ("lily_pad", "rock", "boulder", "pond_reed")}
+    meshes["pond_reed"] = ss.load_vanilla("gFishingReedModel", "gFishingLilyPadTex.rgba16.png", 32, 32)
     meshes["lily_pad"] = pad
     meshes["rock"] = rock
     meshes["boulder"] = rock

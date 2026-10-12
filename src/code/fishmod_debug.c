@@ -40,8 +40,21 @@
 #include "bgcheck.h"
 #include "segmented_address.h"
 #include "libc64/qrand.h"
+#include "gfx_setupdl.h"
+#include "sfx.h"
+#include "libc/math.h"
+#include "letterbox.h"
+#include "actor.h"
 
 void Sram_InitDebugSave(void);
+
+// A stop on a camera tour (FISHMOD_TOUR in a script): where the camera is, what it looks at, and a caption
+typedef struct FishmodTourStop {
+    Vec3f eye;
+    Vec3f at;
+    const char* title;
+    const char* lines[3];
+} FishmodTourStop;
 
 #ifdef FISHMOD_SCRIPT
 #include FISHMOD_SCRIPT
@@ -404,6 +417,178 @@ static void Fishmod_ViewUpdate(PlayState* play) {
 }
 #endif
 
+#ifdef FISHMOD_TOUR
+/*
+ * Camera tour: a free camera glides between the script's stops (sTourStops) and a Navi-style caption names each.
+ * A: next stop, B: the one before, stick: turn and raise the camera about what it looks at, L: debug text.
+ * The controller is kept from Link while the tour runs. FISHMOD_TOUR_AUTO: move on by itself (for screenshots).
+ */
+#define TOUR_GLIDE 110
+static s16 sTourCamId = SUB_CAM_ID_DONE;
+static s32 sTourStop;
+static s32 sTourFrame;
+static Vec3f sTourFromEye;
+static Vec3f sTourFromAt;
+static Vec3f sTourEye;
+static Vec3f sTourAt;
+static f32 sTourYaw;
+static f32 sTourRise;
+static u16 sTourPress;
+static s8 sTourStickX;
+static s8 sTourStickY;
+static s32 sTourDebugText;
+
+static void Fishmod_TourGo(s32 stop) {
+    s32 n = ARRAY_COUNT(sTourStops);
+
+    sTourStop = ((stop % n) + n) % n;
+    sTourFrame = 0;
+    sTourFromEye = sTourEye;
+    sTourFromAt = sTourAt;
+    sTourYaw = 0.0f;
+    sTourRise = 0.0f;
+    Sfx_PlaySfxCentered(NA_SE_VO_NAVY_HELLO);
+}
+
+static void Fishmod_TourUpdate(PlayState* play) {
+    FishmodTourStop* stop;
+    f32 t;
+    f32 s;
+    f32 arc;
+    f32 dx;
+    f32 dz;
+    f32 c;
+    f32 sn;
+    Vec3f eye;
+    Vec3f at;
+
+    if (sTourCamId == SUB_CAM_ID_DONE) {
+        sTourCamId = Play_CreateSubCamera(play);
+        Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STAT_WAIT);
+        Play_ChangeCameraStatus(play, sTourCamId, CAM_STAT_ACTIVE);
+        sTourEye = sTourStops[0].eye;
+        sTourAt = sTourStops[0].at;
+        Fishmod_TourGo(0);
+    }
+    // something else in the scene can hand the view back to the main camera (or clear ours): take it back
+    if (play->cameraPtrs[sTourCamId] == NULL) {
+        sTourCamId = Play_CreateSubCamera(play);
+    }
+    // the owl talks to Link by the bench (and takes the camera): not on the tour
+    {
+        Actor* actor = play->actorCtx.actorLists[ACTORCAT_NPC].head;
+
+        for (; actor != NULL; actor = actor->next) {
+            if (actor->id == ACTOR_EN_OWL) {
+                Actor_Kill(actor);
+            }
+        }
+    }
+    Letterbox_SetSizeTarget(0);
+    if (play->activeCamId != sTourCamId) {
+        Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STAT_WAIT);
+        Play_ChangeCameraStatus(play, sTourCamId, CAM_STAT_ACTIVE);
+    }
+    Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_NOTHING);
+
+    if (sTourPress & BTN_A) {
+        Fishmod_TourGo(sTourStop + 1);
+    } else if (sTourPress & BTN_B) {
+        Fishmod_TourGo(sTourStop - 1);
+    }
+    if (sTourPress & BTN_L) {
+        sTourDebugText ^= 1;
+    }
+    sTourPress = 0;
+#ifdef FISHMOD_TOUR_AUTO
+    if (sTourFrame >= FISHMOD_TOUR_AUTO) {
+        Fishmod_TourGo(sTourStop + 1);
+    }
+#endif
+    sTourYaw += sTourStickX * 0.0006f;
+    sTourRise = CLAMP(sTourRise + sTourStickY * 0.08f, -150.0f, 400.0f);
+
+    // glide (eased), arcing up over long hops so the camera doesn't cut through the land
+    stop = &sTourStops[sTourStop];
+    t = CLAMP_MAX(sTourFrame / (f32)TOUR_GLIDE, 1.0f);
+    s = t * t * (3.0f - 2.0f * t);
+    sTourFrame++;
+    arc = sqrtf(SQ(stop->eye.x - sTourFromEye.x) + SQ(stop->eye.z - sTourFromEye.z)) * 0.25f;
+    arc = CLAMP_MAX(arc, 700.0f) * sinf(s * M_PI);
+    sTourEye.x = sTourFromEye.x + (stop->eye.x - sTourFromEye.x) * s;
+    sTourEye.y = sTourFromEye.y + (stop->eye.y - sTourFromEye.y) * s;
+    sTourEye.z = sTourFromEye.z + (stop->eye.z - sTourFromEye.z) * s;
+    sTourAt.x = sTourFromAt.x + (stop->at.x - sTourFromAt.x) * s;
+    sTourAt.y = sTourFromAt.y + (stop->at.y - sTourFromAt.y) * s;
+    sTourAt.z = sTourFromAt.z + (stop->at.z - sTourFromAt.z) * s;
+
+    // looking around: turned about the point looked at, and raised
+    at = sTourAt;
+    dx = sTourEye.x - at.x;
+    dz = sTourEye.z - at.z;
+    c = cosf(sTourYaw);
+    sn = sinf(sTourYaw);
+    eye.x = at.x + dx * c + dz * sn;
+    eye.z = at.z - dx * sn + dz * c;
+    eye.y = sTourEye.y + arc + sTourRise;
+    Play_SetCameraAtEye(play, sTourCamId, &at, &eye);
+
+    // under the surface: the water's own lights (its colour and fog), as when the main camera dives
+    {
+        static s32 sUnder;
+        WaterBox* box;
+        f32 surface;
+        s32 under = BgCheck_GetWaterSurface(play, &play->colCtx, eye.x, eye.z, &surface, &box) && (eye.y < surface);
+
+        if (under && !sUnder) {
+            Environment_EnableUnderwaterLights(play, WaterBox_GetLightIndex(&play->colCtx, box));
+        } else if (!under && sUnder) {
+            Environment_DisableUnderwaterLights(play);
+        }
+        sUnder = under;
+    }
+}
+
+static void Fishmod_TourDraw(Gfx** gfxP) {
+    FishmodTourStop* stop = &sTourStops[sTourStop];
+    GfxPrint printer;
+    Gfx* gfx = *gfxP;
+    s32 i;
+
+    // a dark box at the bottom, like a textbox
+    gfx = Gfx_SetupDL_57(gfx);
+    gDPSetPrimColor(gfx++, 0, 0, 0, 10, 40, 170);
+    gDPSetAlphaDither(gfx++, G_AD_DISABLE);
+    gDPSetColorDither(gfx++, G_CD_DISABLE);
+    gDPFillRectangle(gfx++, 18, 166, SCREEN_WIDTH - 18, 226);
+    gDPPipeSync(gfx++);
+#ifdef FISHMOD_TOUR_AUTO
+    // for fishmod/tools/tour_capture.py: which stop has settled on screen (red = 10 * stop number), black while gliding
+    gDPSetPrimColor(gfx++, 0, 0, (sTourFrame > TOUR_GLIDE + 10) ? (sTourStop + 1) * 8 : 0, 0, 0, 255);
+    gDPFillRectangle(gfx++, 0, 0, 16, 16);
+    gDPPipeSync(gfx++);
+#endif
+
+    GfxPrint_Init(&printer);
+    GfxPrint_Open(&printer, gfx);
+    GfxPrint_SetColor(&printer, 140, 200, 255, 255);
+    GfxPrint_SetPos(&printer, 3, 21);
+    GfxPrint_Printf(&printer, "%d/%d %s", sTourStop + 1, (s32)ARRAY_COUNT(sTourStops), stop->title);
+    GfxPrint_SetColor(&printer, 255, 255, 255, 255);
+    for (i = 0; i < 3; i++) {
+        if (stop->lines[i] != NULL) {
+            GfxPrint_SetPos(&printer, 3, 23 + i);
+            GfxPrint_Printf(&printer, "%s", stop->lines[i]);
+        }
+    }
+    GfxPrint_SetColor(&printer, 255, 255, 120, 255);
+    GfxPrint_SetPos(&printer, 21, 27);
+    GfxPrint_Printf(&printer, "A>  B<  stick:look");
+    *gfxP = GfxPrint_Close(&printer);
+    GfxPrint_Destroy(&printer);
+}
+#endif
+
 static s32 sScriptStepIndex;
 static s32 sScriptStepFrame;
 static s32 sScriptActive;
@@ -687,6 +872,11 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         Fishmod_ViewUpdate(play);
     }
 #endif
+#ifdef FISHMOD_TOUR
+    if (sPlacedPlayer && (sPlayFrames > 40)) {
+        Fishmod_TourUpdate(play);
+    }
+#endif
 #ifdef FISHMOD_PHOTO
     if (sPlacedPlayer && (sPlayFrames > 60)) {
         Fishmod_PhotoUpdate(play);
@@ -717,6 +907,20 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     Input* input = &inputs[0];
     FishmodAutoplayStep* step;
     u16 buttonDiff;
+
+#ifdef FISHMOD_TOUR
+    // the tour has the controller: Link stands still
+    if (sTourCamId != SUB_CAM_ID_DONE) {
+        sTourPress |= input->press.button;
+        sTourStickX = input->cur.stick_x;
+        sTourStickY = input->cur.stick_y;
+        input->cur.button = input->press.button = input->rel.button = 0;
+        input->cur.stick_x = input->cur.stick_y = 0;
+        input->rel.stick_x = input->rel.stick_y = 0;
+        input->press.stick_x = input->press.stick_y = 0;
+        return;
+    }
+#endif
 
 #ifdef FISHMOD_AUTO_ANGLER
     // after the script: play the fishing game from the rod's state (for testing the whole loop)
@@ -869,6 +1073,14 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
     if (gFishmodPhoto.active) {
         return;
     }
+#ifdef FISHMOD_TOUR
+    if (sTourCamId != SUB_CAM_ID_DONE) {
+        Fishmod_TourDraw(gfxP);
+        if (!sTourDebugText) {
+            return;
+        }
+    }
+#endif
 
     GfxPrint_Init(&printer);
     GfxPrint_Open(&printer, *gfxP);
