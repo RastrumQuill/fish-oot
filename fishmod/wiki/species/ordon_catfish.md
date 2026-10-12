@@ -17,7 +17,7 @@
 | Rarity | Rare (3/5) |
 | Sell price | 40 rupees (more for bigger fish) |
 | Depth | bottom |
-| Most active | night, dusk |
+| Most active | dusk, night |
 | Found in | Kokiri Forest, Lake Hylia (planned) |
 
 ## Behavior

@@ -15,7 +15,7 @@
 | Rarity | Rare (3/5) |
 | Sell price | 50 rupees (more for bigger fish) |
 | Depth | mid |
-| Most active | day, dusk |
+| Most active | dawn, day, dusk |
 | Found in | Lake Hylia (planned), Zora's River (planned) |
 
 ## Behavior

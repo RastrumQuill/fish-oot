@@ -17,7 +17,7 @@
 | Rarity | Legendary (5/5) |
 | Sell price | 150 rupees (more for bigger fish) |
 | Depth | bottom |
-| Most active | dawn |
+| Most active | dawn, night |
 | Found in | Kokiri Forest, Lake Hylia (planned) |
 
 ## Behavior

@@ -26,10 +26,18 @@
       "rarity": 1,
       "price": 5,
       "depth": "mid",
-      "activeTimes": [
-        "day",
-        "dusk"
+      "activity": {
+        "dawn": 2,
+        "day": 3,
+        "dusk": 3,
+        "night": 0
+      },
+      "depthBand": [
+        0.15,
+        0.55
       ],
+      "rise": 0.1,
+      "lightShy": 0.3,
       "behavior": {
         "curiosity": 80,
         "aggression": 70,
@@ -226,11 +234,18 @@
       "rarity": 1,
       "price": 2,
       "depth": "surface",
-      "activeTimes": [
-        "dawn",
-        "day",
-        "dusk"
+      "activity": {
+        "dawn": 2,
+        "day": 3,
+        "dusk": 3,
+        "night": 1
+      },
+      "depthBand": [
+        0.0,
+        0.35
       ],
+      "rise": 0.0,
+      "lightShy": 0.4,
       "behavior": {
         "curiosity": 95,
         "aggression": 80,
@@ -303,10 +318,18 @@
       "rarity": 2,
       "price": 20,
       "depth": "mid",
-      "activeTimes": [
-        "dawn",
-        "dusk"
+      "activity": {
+        "dawn": 3,
+        "day": 2,
+        "dusk": 3,
+        "night": 1
+      },
+      "depthBand": [
+        0.35,
+        0.85
       ],
+      "rise": 0.5,
+      "lightShy": 0.5,
       "behavior": {
         "curiosity": 55,
         "aggression": 65,
@@ -440,10 +463,18 @@
       "rarity": 3,
       "price": 40,
       "depth": "bottom",
-      "activeTimes": [
-        "night",
-        "dusk"
+      "activity": {
+        "dawn": 1,
+        "day": 0,
+        "dusk": 2,
+        "night": 3
+      },
+      "depthBand": [
+        0.75,
+        1.0
       ],
+      "rise": 0.45,
+      "lightShy": 0.8,
       "behavior": {
         "curiosity": 40,
         "aggression": 50,
@@ -663,9 +694,18 @@
       "rarity": 5,
       "price": 150,
       "depth": "bottom",
-      "activeTimes": [
-        "dawn"
+      "activity": {
+        "dawn": 3,
+        "day": 0,
+        "dusk": 1,
+        "night": 2
+      },
+      "depthBand": [
+        0.8,
+        1.0
       ],
+      "rise": 0.3,
+      "lightShy": 0.7,
       "behavior": {
         "curiosity": 20,
         "aggression": 30,
@@ -723,9 +763,19 @@
       "rarity": 4,
       "price": 80,
       "depth": "surface",
-      "activeTimes": [
-        "day"
+      "activity": {
+        "dawn": 2,
+        "day": 3,
+        "dusk": 2,
+        "night": 1
+      },
+      "depthBand": [
+        0.0,
+        0.5
       ],
+      "rise": 0.2,
+      "lightShy": 0.1,
+      "chronotypeHours": 3,
       "behavior": {
         "curiosity": 70,
         "aggression": 25,
@@ -968,10 +1018,18 @@
       "rarity": 3,
       "price": 50,
       "depth": "mid",
-      "activeTimes": [
-        "day",
-        "dusk"
+      "activity": {
+        "dawn": 3,
+        "day": 2,
+        "dusk": 3,
+        "night": 0
+      },
+      "depthBand": [
+        0.2,
+        0.6
       ],
+      "rise": 0.3,
+      "lightShy": 0.3,
       "behavior": {
         "curiosity": 60,
         "aggression": 85,
@@ -1029,12 +1087,18 @@
       "rarity": 5,
       "price": 200,
       "depth": "mid",
-      "activeTimes": [
-        "day",
-        "dusk",
-        "night",
-        "dawn"
+      "activity": {
+        "dawn": 2,
+        "day": 2,
+        "dusk": 2,
+        "night": 2
+      },
+      "depthBand": [
+        0.3,
+        0.7
       ],
+      "rise": 0.2,
+      "lightShy": 0.4,
       "behavior": {
         "curiosity": 50,
         "aggression": 55,
@@ -1092,10 +1156,18 @@
       "rarity": 4,
       "price": 90,
       "depth": "mid",
-      "activeTimes": [
-        "dawn",
-        "dusk"
+      "activity": {
+        "dawn": 3,
+        "day": 1,
+        "dusk": 3,
+        "night": 2
+      },
+      "depthBand": [
+        0.5,
+        0.95
       ],
+      "rise": 0.6,
+      "lightShy": 0.6,
       "behavior": {
         "curiosity": 45,
         "aggression": 60,
@@ -1152,12 +1224,18 @@
       "rarity": 5,
       "price": 250,
       "depth": "surface",
-      "activeTimes": [
-        "day",
-        "dusk",
-        "night",
-        "dawn"
+      "activity": {
+        "dawn": 2,
+        "day": 2,
+        "dusk": 2,
+        "night": 2
+      },
+      "depthBand": [
+        0.0,
+        0.3
       ],
+      "rise": 0.0,
+      "lightShy": 0.2,
       "behavior": {
         "curiosity": 90,
         "aggression": 40,
@@ -1277,5 +1355,6 @@
     }
   },
   "_doc_look": "'look' sets per-part color (RGB, multiplied into the model texture) and scale ([length, height, width]) on top of the whole-fish 'shape'. Parts: head, bodyFront, bodyRear, tail, finDorsal, finPectoral, finBelly. Parts not listed use 'tint' and scale 1. 'whiskers' adds catfish barbels.",
-  "_doc_textures": "'look.textures' patterns the model textures per role (back, belly, head, side, fin); see fishmod/tools/gen_textures.py for the operations. Patterned parts usually use a light tint."
+  "_doc_textures": "'look.textures' patterns the model textures per role (back, belly, head, side, fin); see fishmod/tools/gen_textures.py for the operations. Patterned parts usually use a light tint.",
+  "_doc_rhythm": "activity: 0-3 per time of day (dawn 4-8, day 8-17, dusk 17-20, night), from the research table in fishmod/docs/research/biomes-time-behaviour.md; 2 and up count as 'most active'. depthBand: where in the water column the fish keeps (0 = surface, 1 = floor). rise: how far up the band moves when it's active and the light is low (feeding). lightShy: how much bright light pushes it deeper. chronotypeHours: each fish's own clock is shifted by up to this many hours (carp differ by individual)."
 }

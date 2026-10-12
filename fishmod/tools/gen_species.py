@@ -56,7 +56,8 @@ def gen_header(data):
     out.append("const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {")
     for sp in species:
         b = sp["behavior"]
-        times = sum(1 << TIMES.index(t) for t in sp["activeTimes"])
+        times = sum(1 << i for i, t in enumerate(TIMES) if sp["activity"][t] >= 2)
+        activity = sum(sp["activity"][t] << (2 * i) for i, t in enumerate(TIMES))
         bait = ", ".join(f"{int(round(sp['bait'].get(k, 0.0) * 100))}" for k in BAITS)
         out.append(f"    /* FISHMOD_SPECIES_{sp['id']} */ {{")
         out.append(f'        "{sp["name"]}",')
@@ -86,6 +87,10 @@ def gen_header(data):
         if look.get("whiskers"):
             flags.append("FISHMOD_LOOK_WHISKERS")
         out.append(f"        {' | '.join(flags) if flags else '0'},")
+        band = sp["depthBand"]
+        out.append(f"        0x{activity:02X}, {int(round(band[0] * 255))}, {int(round(band[1] * 255))}, "
+                   f"{int(round(sp['rise'] * 255))}, {int(round(sp['lightShy'] * 255))}, {sp.get('chronotypeHours', 0)},"
+                   " /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */")
         out.append("    },")
     out.append("};")
     out.append("")
@@ -164,7 +169,7 @@ def gen_species_page(sp, data):
     lines.append(f"| Rarity | {RARITY_NAMES[sp['rarity']]} ({sp['rarity']}/5) |")
     lines.append(f"| Sell price | {sp['price']} rupees (more for bigger fish) |")
     lines.append(f"| Depth | {sp['depth']} |")
-    lines.append(f"| Most active | {', '.join(sp['activeTimes'])} |")
+    lines.append(f"| Most active | {', '.join(t for t in TIMES if sp['activity'][t] >= 2)} |")
     where = ", ".join(
         f"{data['scenes'][s]['name']}" + ("" if data["scenes"][s]["status"] == "in-game" else " (planned)")
         for s in sp["scenes"]

@@ -33,3 +33,4 @@ graphs/
 
 # fishmod: baked from the extracted scenes by fishmod/tools/gen_watermap.py
 src/fishmod_data/
+fishmod/art/habitat_rom/
