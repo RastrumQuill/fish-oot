@@ -589,6 +589,16 @@ static void Fishmod_TourDraw(Gfx** gfxP) {
 }
 #endif
 
+s32 Fishmod_DebugRosterFocus(Vec3f* focus) {
+#ifdef FISHMOD_TOUR
+    if (sTourCamId != SUB_CAM_ID_DONE) {
+        *focus = sTourAt;
+        return true;
+    }
+#endif
+    return false;
+}
+
 static s32 sScriptStepIndex;
 static s32 sScriptStepFrame;
 static s32 sScriptActive;

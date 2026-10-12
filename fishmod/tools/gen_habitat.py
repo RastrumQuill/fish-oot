@@ -354,6 +354,35 @@ def crossed_cards(name, texture, width, height, planes, base_col, tip_col, seed,
     return m
 
 
+# Patches: a few clumps baked into one mesh, so the commonest small plants are a third to a quarter as many props
+# to place and draw (each prop costs a matrix and a draw call however small it is). gen_scatter.py thins these kinds
+# by the same number.
+PATCH = {"grass_tuft": 4, "ribbon_weed": 3}
+
+
+def patch(name, count, radius, seed, make):
+    """`count` copies of make(i) (a Mesh), each moved, turned and sized a little differently, as one mesh."""
+    rnd = random.Random(seed)
+    m = None
+    for i in range(count):
+        part = make(i)
+        if m is None:
+            m = Mesh(name, part.texture)
+        ang = rnd.uniform(0, 2 * math.pi)
+        r = radius * (0.0 if i == 0 else rnd.uniform(0.45, 1.0))
+        ox, oz = math.cos(ang) * r, math.sin(ang) * r
+        turn = rnd.uniform(0, 2 * math.pi)
+        c, sn = math.cos(turn), math.sin(turn)
+        sc = rnd.uniform(0.75, 1.15)
+        base = len(m.v)
+        for (x, y, z, cr, cg, cb), uv in zip(part.v, part.vt):
+            m.v.append((ox + (x * c - z * sn) * sc, y * sc, oz + (x * sn + z * c) * sc, cr, cg, cb))
+            m.vt.append(uv)
+        for face in part.f:
+            m.f.append(tuple(base + j for j in face))
+    return m
+
+
 def cylinder(m, p0, p1, r0, r1, sides, col0, col1, v_repeat=2.0, cap=None, cap_col=None):
     """A few-sided tube from p0 to p1 (radius r0 to r1)."""
     ax = [p1[i] - p0[i] for i in range(3)]
@@ -400,32 +429,6 @@ def cap(m, center, radius, sides, col, y_up=True):
     for s in range(sides):
         a, b = ring[s], ring[(s + 1) % sides]
         m.tri(c, b, a) if y_up else m.tri(c, a, b)
-    return m
-
-
-def mesh_stump():
-    m = Mesh("stump", "bark")
-    dark, light = hexc("#352621"), hexc("#8a7a5a")
-    cylinder(m, (0, -10, 0), (0, 24, 0), 15, 11, 6, dark, light, v_repeat=1.2)
-    # roots
-    for k in range(3):
-        a = 2 * math.pi * k / 3 + 0.4
-        cylinder(m, (math.cos(a) * 8, 4, math.sin(a) * 8), (math.cos(a) * 26, -6, math.sin(a) * 26), 5, 2, 4,
-                 dark, dark, v_repeat=0.8)
-    return m
-
-
-def mesh_stump_top():
-    """The stump's cut top, drawn with the ring texture."""
-    return cap(Mesh("stump_top", "log_rings"), (0, 24, 0), 11, 6, hexc("#c8b8a0"))
-
-
-def mesh_drowned_tree():
-    m = Mesh("drowned_tree", "bark")
-    dark, light = hexc("#2b2311"), hexc("#707346")
-    cylinder(m, (0, -10, 0), (6, 160, 4), 14, 8, 5, dark, light, v_repeat=5.0)
-    for (a, b, r) in (((5, 90, 3), (55, 150, 30), 5), ((6, 120, 4), (-45, 190, -20), 4), ((6, 155, 4), (20, 210, -35), 3)):
-        cylinder(m, a, b, r, 1.5, 4, dark, light, v_repeat=2.0)
     return m
 
 
@@ -497,21 +500,6 @@ def mesh_flat_scatter(name, texture, count, spread, size, y, col, seed):
     return m
 
 
-def mesh_fallen_tree():
-    """A big fallen tree on the bottom: a thick trunk, a root plate at one end and a crown of bare branches."""
-    m = Mesh("fallen_tree", "bark")
-    dark, light = hexc("#241c10"), hexc("#7a7a58")
-    cylinder(m, (-260, 22, 0), (240, 30, 30), 26, 16, 6, dark, light, v_repeat=8.0)
-    # the root plate: a flared, short cylinder at the base, turned up
-    cylinder(m, (-270, 10, -4), (-285, 60, -10), 44, 30, 6, dark, dark, v_repeat=1.0)
-    # crown branches fanning from the top end
-    for (a, b, r) in (((150, 34, 20), (330, 90, 80), 7), ((180, 36, 26), (320, 40, -70), 6),
-                      ((210, 40, 34), (360, 120, 10), 5), ((120, 30, 14), (230, 110, -40), 5),
-                      ((60, 26, 8), (110, 80, 60), 4), ((260, 32, 30), (400, 30, 70), 4)):
-        cylinder(m, a, b, r, 1.5, 4, dark, light, v_repeat=2.0)
-    return m
-
-
 def mesh_branch():
     m = Mesh("branch", "bark")
     dark, light = hexc("#2b2311"), hexc("#707346")
@@ -555,7 +543,8 @@ MESHES = [
     lambda: crossed_cards("marigold", "marigold", 28, 22, 2, (200, 200, 200), (255, 255, 255), 117),
     lambda: crossed_cards("fan_weed", "fan_card", 44, 44, 2, hexc("#2a3a1a"), hexc("#8a9a58"), 118),
 
-    lambda: crossed_cards("grass_tuft", "grass_card", 34, 16, 2, hexc("#1c3a12"), hexc("#6c7a3b"), 104),
+    lambda: patch("grass_tuft", PATCH["grass_tuft"], 26, 204, lambda i: crossed_cards(
+        "grass_tuft", "grass_card", 34, 16, 2, hexc("#1c3a12"), hexc("#6c7a3b"), 104 + i)),
     lambda: crossed_cards_v("tall_weed", "ribbon_card", 26, 190, 3, hexc("#0d260b"), hexc("#5a6a30"), 105, lean=18,
                             v_repeat=2.0),
     lambda: crossed_cards("broadleaf", "broadleaf_card", 38, 40, 3, hexc("#1a3a12"), hexc("#7a8a40"), 106),
@@ -564,15 +553,12 @@ MESHES = [
     lambda: mesh_flat_scatter("float_leaves", "float_leaf", 5, 22, 7, 0.5, (255, 255, 255), 109),
     lambda: mesh_flat_scatter("leaf_litter", "leaf_litter", 9, 40, 5, 0.6, (200, 200, 200), 110),
     mesh_branch,
-    mesh_fallen_tree,
 
     lambda: crossed_cards("reed_clump", "reed_card", 40, 95, 3, hexc("#184217"), hexc("#8f9342"), 101, lean=4),
-    lambda: crossed_cards("ribbon_weed", "ribbon_card", 18, 80, 3, hexc("#133611"), hexc("#6c7a3b"), 102, lean=10),
+    lambda: patch("ribbon_weed", PATCH["ribbon_weed"], 22, 202, lambda i: crossed_cards(
+        "ribbon_weed", "ribbon_card", 18, 80, 2, hexc("#133611"), hexc("#6c7a3b"), 102 + i, lean=10)),
     lambda: crossed_cards("bush_weed", "bush_card", 46, 42, 3, hexc("#082b07"), hexc("#525d28"), 103),
     mesh_log,
-    mesh_stump,
-    mesh_stump_top,
-    mesh_drowned_tree,
     lambda: mesh_decal("pebble_patch", "pebbles", 120, (255, 255, 255)),
     mesh_lily_flower,
     mesh_lily_centre,
@@ -595,8 +581,6 @@ PROP_KINDS = [
     ("pebble_patch", "pebbles", "ci4"),
     ("sunken_log", "bark", "ci4"),
     ("branch", "bark", "ci4"),
-    ("drowned_tree", "bark", "ci4"),
-    ("fallen_tree", "bark", "ci4"),
     ("rush_tuft", "rush_card", "ia8"),
     ("iris", "iris_card", "ia8"),
     ("big_pondweed", "bigleaf_card", "ia8"),
