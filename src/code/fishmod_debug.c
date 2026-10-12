@@ -420,6 +420,8 @@ void Fishmod_DebugBoot(void) {
 #ifdef FISHMOD_SCRIPT_TIME
     gSaveContext.save.dayTime = FISHMOD_SCRIPT_TIME;
 #endif
+    // day 1: a clear day at Kokiri Forest and Lake Hylia (the weather is rolled per spot per day)
+    gSaveContext.save.totalDays = 1;
 #ifdef FISHMOD_SCRIPT_DAY
     gSaveContext.save.totalDays = FISHMOD_SCRIPT_DAY;
 #endif
