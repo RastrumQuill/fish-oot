@@ -34,7 +34,7 @@ swim 0.9 ms; the frame is CPU-bound). Everything in this version is AI and asset
 
 - **Item 3 goes first and pays for the rest.** Target: halve the AI cost in the lab tank before adding behaviour.
 - **Staggered, never all at once.** Every periodic heavy job (decisions, notice checks, school updates, wake and
-  sleep, prop detail, learning decay) runs in a slot from the fish's own offset, under a per-frame budget. One-off
+  sleep, prop detail) runs in a slot from the fish's own offset, under a per-frame budget. One-off
   heavy work (rolling the day's fish, loading the map, stamping koi patterns) is spread over frames or done at scene
   load. Features are judged by the **worst frame** as well as the average.
 - **Every feature is measured** on the lab bench (36 and 90 fish) and a new Lake Hylia bench, against the build
@@ -208,8 +208,7 @@ One piece at a time, each measured.
      sharply and leaves.
 
    Each step shows, so the player reads what the fish thinks.
-6. **Learning:** a fish that was hooked and got away, or was released, gets shy of that bait for the rest of the
-   day. A spot's fishing pressure decays over days. The roster is per day, so learning is per fish within a day and per spot across days.
+6. ~~Learning~~: dropped. Fish learning to avoid bait isn't a mechanic for this mod.
 7. **Schools:** minnows and greengills become schools: a leader and up to ~12 followers at fixed offsets, drawn as
    the pond's 4-vertex group fish or the small rig up close. No neighbour queries. They swim faster in bright water
    (so they drift to shade, Berdahl 2013). A scare spreads through the school as a wave (each member reacts after
