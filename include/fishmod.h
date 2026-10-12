@@ -148,6 +148,25 @@ typedef struct FishmodPhoto {
 
 extern FishmodPhoto gFishmodPhoto;
 
+// Animation studio (debug, fishmod/scripts/anim.inc.c): fish posed in a row on the photo backdrop, moved by a
+// script so their swimming can be recorded (fishmod/tools/anim_capture.sh). Used with gFishmodPhoto.active.
+#define FISHMOD_STUDIO_MAX 4
+typedef struct FishmodStudio {
+    /* 0x00 */ u8 active;
+    /* 0x01 */ s8 startle;      // one-shot: a startled flick this frame (sign: which way)
+    /* 0x02 */ s16 yaw;
+    /* 0x04 */ s16 pitch;
+    /* 0x06 */ s16 roll;
+    /* 0x08 */ s16 jawRot;
+    /* 0x0C */ f32 swimMag;
+    /* 0x10 */ f32 swimPhaseStep;
+    /* 0x14 */ f32 spawnLength;  // size for the next fish spawned (inches), 0 = typical
+    /* 0x18 */ struct Actor* fish[FISHMOD_STUDIO_MAX];
+    /* 0x28 */ u8 rig[FISHMOD_STUDIO_MAX]; // per fish: 0 = as the game picks, 1 = full rig, 2 = reduced rig
+} FishmodStudio;
+
+extern FishmodStudio gFishmodStudio;
+
 // Rod status published every frame by the fishing controller (for the debug auto-angler and the HUD)
 typedef struct FishmodRodInfo {
     /* 0x00 */ u8 state;  // FishmodRodState

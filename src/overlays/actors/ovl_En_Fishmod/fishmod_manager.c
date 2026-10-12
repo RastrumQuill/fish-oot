@@ -272,7 +272,7 @@ s32 EnFishmod_ThinkAllowed(EnFishmod* this, PlayState* play) {
     return false;
 }
 
-#define DRAW_MAX 64
+#define DRAW_MAX 128
 
 typedef struct ManagerDrawItem {
     EnFishmod* fish;
@@ -281,8 +281,9 @@ typedef struct ManagerDrawItem {
 } ManagerDrawItem;
 
 void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
-    ManagerDrawItem full[DRAW_MAX];
-    EnFishmod* far[DRAW_MAX];
+    // static: too big for the graphics thread's stack
+    static ManagerDrawItem full[DRAW_MAX];
+    static EnFishmod* far[DRAW_MAX];
     s32 fullCount = 0;
     s32 farCount = 0;
     Actor* actor;
@@ -323,7 +324,18 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
             item->variant = (close || ((dist < LOD_FULL_DIST) && (fish->lengthInches >= FISHMOD_SMALL_RIG_LENGTH)))
                                 ? FISH_RIG_FULL
                                 : FISH_RIG_REDUCED;
-            item->whiskers = (fish->species->lookFlags & FISHMOD_LOOK_WHISKERS) && (close || (dist < LOD_FULL_DIST));
+            if (gFishmodStudio.active) {
+                // the animation studio picks the rig per fish
+                s32 k;
+
+                for (k = 0; k < FISHMOD_STUDIO_MAX; k++) {
+                    if ((gFishmodStudio.fish[k] == actor) && (gFishmodStudio.rig[k] != 0)) {
+                        item->variant = gFishmodStudio.rig[k] - 1;
+                    }
+                }
+            }
+            item->whiskers = (fish->species->lookFlags & FISHMOD_LOOK_WHISKERS) &&
+                             (item->variant == FISH_RIG_FULL) && (close || (dist < LOD_FULL_DIST));
         }
     }
 
@@ -373,7 +385,8 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         if (full[i].whiskers) {
             FISHMOD_PROF(FISHMOD_PROF_D_WHISKERS, EnFishmod_DrawWhiskersRigid(full[i].fish, play));
         }
-        if (gFishmodPhoto.active) {
+        // the camera frames the fish (in the animation studio, the middle one of the row)
+        if (gFishmodPhoto.active && (!gFishmodStudio.active || (&full[i].fish->actor == gFishmodStudio.fish[1]))) {
             EnFishmod_PhotoBounds(full[i].fish);
         }
     }
