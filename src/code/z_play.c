@@ -1627,6 +1627,7 @@ void Play_InitScene(PlayState* this, s32 spawn) {
     Scene_ExecuteCommands(this, this->sceneSegment);
     Fishmod_OnSceneLoad(this);
     Play_InitEnvironment(this, this->skyboxId);
+    Fishmod_OnEnvironmentInit(this);
 }
 
 void Play_SpawnScene(PlayState* this, s32 sceneId, s32 spawn) {

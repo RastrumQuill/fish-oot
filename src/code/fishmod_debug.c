@@ -417,6 +417,12 @@ void Fishmod_DebugBoot(void) {
     Sram_InitDebugSave();
 
     gSaveContext.save.dayTime = CLOCK_TIME(10, 0);
+#ifdef FISHMOD_SCRIPT_TIME
+    gSaveContext.save.dayTime = FISHMOD_SCRIPT_TIME;
+#endif
+#ifdef FISHMOD_SCRIPT_DAY
+    gSaveContext.save.totalDays = FISHMOD_SCRIPT_DAY;
+#endif
     gSaveContext.save.cutsceneIndex = 0;
 
     // Rod on C-Left, two empty bottles on C-Down / C-Right slots.
