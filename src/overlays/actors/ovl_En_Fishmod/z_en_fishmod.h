@@ -9,7 +9,12 @@
 #define EN_FISHMOD_POSE_GFX_MAX 72
 
 #define FISHMOD_FISH_COUNT 10       // fish per fishing scene
+#if FISHMOD_OPT >= 5
+#define FISHMOD_ROSTER_MAX 600      // the most a scene's roster can hold
+#else
 #define FISHMOD_ROSTER_MAX 30       // (FISHMOD_OPT 4) the most a scene's roster can hold
+#endif
+#define FISHMOD_NO_ROSTER 0xFFFF
 #define FISHMOD_LOD_DIST 380.0f     // (FISHMOD_OPT 3) farther from the camera than this: the flat far shape
 #define FISHMOD_SMALL_RIG_LENGTH 9.0f // (FISHMOD_OPT 4) fish shorter than this (inches) always use the reduced rig
 
@@ -118,10 +123,10 @@ typedef struct EnFishmod {
     /* 0x3F7 */ u8 fleeFromLink;                   // the current flee is away from Link (runYaw already set)
     /* 0x3F8 */ u8 thinkMask;                      // the AI runs on frames where (timer & thinkMask) == 0
     /* 0x3F9 */ u8 depthPref;                      // where in its species' depth band this fish likes to be
-    /* 0x3FA */ u8 rosterIndex;                    // its record in the scene's roster, 0xFF if none (FISHMOD_OPT 4)
-    /* 0x3FB */ u8 rigReady;                       // the manager can draw it (FISHMOD_OPT 4)
+    /* 0x3FA */ u16 rosterIndex;                   // its record in the scene's roster, FISHMOD_NO_ROSTER if none
     /* 0x3FC */ s16 lastThink;                     // timer value when it last ran its AI (FISHMOD_OPT 4)
     /* 0x3FE */ s16 startleBend;                   // the C-bend of a startle (sign: which way), 0 otherwise
+    /* 0x400 */ u8 rigReady;                       // the manager can draw it (FISHMOD_OPT 4)
 #if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
@@ -210,6 +215,7 @@ void EnFishmod_WaterGridRelease(struct PlayState* play);
 void EnFishmod_WaterGridDestroy(struct PlayState* play);
 void EnFishmod_WaterNewFrame(void);
 s32 EnFishmod_WaterFloor(struct PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative);
+s32 EnFishmod_OpenWaterDir(struct PlayState* play, f32 x, f32 z, s16* yaw);
 
 s32 EnFishmod_FindWaterPoint(struct PlayState* play, Vec3f* center, f32 radius, f32 minDepth, Vec3f* out,
                              f32* outSurface, f32* outFloor);

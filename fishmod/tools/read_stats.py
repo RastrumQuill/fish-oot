@@ -59,6 +59,10 @@ PROF = [
     ("    limb callbacks", "part scales, tints, head position"),
     ("  whiskers", "catfish whiskers"),
     ("  billboard", "far fish drawn flat"),
+    ("  AI: steering", "steering toward a target (in AI)"),
+    ("  AI: spook", "splash and Link checks (in AI)"),
+    ("  AI: see", "open water to a point (in AI)"),
+    ("  AI: unstick", "the stuck watchdog (in AI)"),
 ]
 
 

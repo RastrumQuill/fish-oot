@@ -30,6 +30,8 @@
 
 #define ROSTER_WAKE_DIST 1400.0f  // a fish appears at its home when Link comes this close
 #define ROSTER_SLEEP_DIST 1800.0f // and is removed when he's this far away (while it's just cruising)
+#define ROSTER_CHECKS_PER_FRAME 48 // (FISHMOD_OPT 5) roster records looked at per frame
+#define ROSTER_SPAWNS_PER_FRAME 2  // (FISHMOD_OPT 5) fish woken per frame
 #define THINK_BUDGET 16           // full AI updates per frame for fish cruising far from Link and the bobber
 #define THINK_FAR_DIST 300.0f
 #define LOD_FULL_DIST 200.0f      // closer than this: the full rig (and whiskers)
@@ -73,7 +75,7 @@ EnFishmodShared* EnFishmod_Shared(PlayState* play) {
 
 /** The record of a fish the manager spawned, or NULL. */
 static FishmodRosterFish* Manager_Record(EnFishmod* fish) {
-    if ((fish->rosterIndex == 0xFF) || (fish->rosterIndex >= sRosterCount)) {
+    if ((fish->rosterIndex == FISHMOD_NO_ROSTER) || (fish->rosterIndex >= sRosterCount)) {
         return NULL;
     }
     return &sRoster[fish->rosterIndex];
@@ -112,7 +114,6 @@ static void Manager_BuildRoster(PlayState* play) {
     WaterBox* boxes;
     s32 numBoxes = play->colCtx.colHeader->numWaterBoxes;
     s32 totalWeight = 0;
-    u32 caughtBits;
     s32 count;
     s32 i;
     s32 n;
@@ -125,7 +126,6 @@ static void Manager_BuildRoster(PlayState* play) {
     for (i = 0; i < spawns->count; i++) {
         totalWeight += spawns->entries[i].weight;
     }
-    caughtBits = Fishmod_RosterCaughtBits(play->sceneId, gSaveContext.save.totalDays);
 
     // the shared random numbers, seeded for the roster and reseeded from the clock afterwards
     Rand_Seed((u32)play->sceneId * 7919 + (u32)gSaveContext.save.totalDays * 104729 + 17);
@@ -174,7 +174,7 @@ static void Manager_BuildRoster(PlayState* play) {
             rec->species = s;
             rec->length = lo + (hi - lo) * f;
             rec->yaw = (s16)Rand_ZeroFloat(0xFFFF);
-            rec->caught = (caughtBits >> sRosterCount) & 1;
+            rec->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, sRosterCount);
             rec->fish = NULL;
             sRosterCount++;
         }
@@ -186,7 +186,27 @@ static void Manager_BuildRoster(PlayState* play) {
 static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
     EnFishmodShared* shared = EnFishmod_Shared(play);
     s32 i;
+#if FISHMOD_OPT >= 5
+    // Staggered: a slice of the roster each frame, and only a few new fish at a time, so a big roster never costs
+    // one frame a lot (arriving at the lake would otherwise spawn dozens of fish at once).
+    static s32 sNext;
+    s32 checks = MIN(sRosterCount, ROSTER_CHECKS_PER_FRAME);
+    s32 spawns = ROSTER_SPAWNS_PER_FRAME;
+    s32 n;
 
+    for (n = 0; n < checks; n++) {
+        FishmodRosterFish* rec;
+        f32 dist;
+
+        i = sNext;
+        sNext = (sNext + 1 < sRosterCount) ? sNext + 1 : 0;
+        rec = &sRoster[i];
+        dist = Math_Vec3f_DistXZ(&shared->linkPos, &rec->home);
+        if (rec->caught) {
+            continue;
+        }
+        if ((rec->fish == NULL) && (dist < ROSTER_WAKE_DIST) && (spawns-- > 0)) {
+#else
     for (i = 0; i < sRosterCount; i++) {
         FishmodRosterFish* rec = &sRoster[i];
         f32 dist = Math_Vec3f_DistXZ(&shared->linkPos, &rec->home);
@@ -195,8 +215,15 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
             continue;
         }
         if ((rec->fish == NULL) && (dist < ROSTER_WAKE_DIST)) {
+#endif
+#if FISHMOD_OPT >= 5
+            // the record's index rides in the spawn roll (the params only have room for 31)
+            Actor* fish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, rec->home.x, rec->home.y, rec->home.z,
+                                      0, rec->yaw, i + 1, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, rec->species));
+#else
             Actor* fish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, rec->home.x, rec->home.y, rec->home.z,
                                       0, rec->yaw, 0, FISHMOD_PARAMS_ROSTER(rec->species, i));
+#endif
 
             if (fish != NULL) {
                 fish->room = -1;

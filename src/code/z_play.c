@@ -278,6 +278,8 @@ void Play_Destroy(GameState* thisx) {
     SREG(91) = 0;
     R_PAUSE_BG_PRERENDER_STATE = PAUSE_BG_PRERENDER_OFF;
 
+    Fishmod_TimeOnSceneExit();
+
     PreRender_Destroy(&this->pauseBgPreRender);
     Effect_DeleteAll(this);
     EffectSs_ClearAll(this);

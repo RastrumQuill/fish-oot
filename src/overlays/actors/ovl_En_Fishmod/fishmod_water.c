@@ -13,6 +13,7 @@
 #include "play_state.h"
 #include "segmented_address.h"
 #include "zelda_arena.h"
+#include "sys_math.h"
 #include "ultra64.h"
 #include "ultra64/libc.h"
 
@@ -35,6 +36,10 @@ typedef struct FishmodWaterGrid {
     s16 width; // corners
     s16 depth;
     s16* floor;
+#if FISHMOD_OPT >= 5
+    u8* open;          // per corner: how many cells to the nearest bank (see EnFishmod_OpenWaterDir)
+    f32 openSurface;   // the water level it was worked out for
+#endif
 } FishmodWaterGrid;
 
 // Exact floors near banks, cached by 4-unit spot
@@ -54,6 +59,10 @@ static FishmodExactFloor sExactCache[EXACT_CACHE_SIZE];
 static f32 EnFishmod_RaycastFloor(PlayState* play, f32 x, f32 y, f32 z);
 
 static FishmodWaterGrid sGrids[GRID_MAX_BOXES];
+#if FISHMOD_OPT >= 5
+struct FishmodWaterGrid;
+static void EnFishmod_OpenBuild(struct FishmodWaterGrid* grid);
+#endif
 static s32 sGridCount;
 
 #if FISHMOD_OPT >= 5
@@ -145,6 +154,7 @@ void EnFishmod_WaterGridInit(PlayState* play) {
                     grid->width = m->width;
                     grid->depth = m->depth;
                     grid->floor = floors + m->offset;
+                    grid->open = NULL;
                     break;
                 }
             }
@@ -181,6 +191,15 @@ void EnFishmod_WaterGridInit(PlayState* play) {
             Fishmod_DebugPrintf(10, "map %d/%d off, worst %d", bad, checked, worst);
         }
 #endif
+        // the open water map, now while the scene loads rather than in the middle of play
+        for (i = 0; i < sGridCount; i++) {
+            FishmodWaterGrid* grid = &sGrids[i];
+
+            grid->open = ZeldaArena_Malloc(grid->width * grid->depth);
+            if (grid->open != NULL) {
+                EnFishmod_OpenBuild(grid);
+            }
+        }
         return;
     }
 #endif
@@ -219,6 +238,9 @@ void EnFishmod_WaterGridInit(PlayState* play) {
         grid->invCell = 1.0f / cell;
         grid->width = width;
         grid->depth = depth;
+#if FISHMOD_OPT >= 5
+        grid->open = NULL;
+#endif
         cornersLeft -= width * depth;
         sGridCount++;
     }
@@ -231,6 +253,12 @@ void EnFishmod_WaterGridDestroy(PlayState* play) {
     sMemoGrid = NULL;
 #endif
 #if FISHMOD_OPT >= 5
+    for (i = 0; i < sGridCount; i++) {
+        if (sGrids[i].open != NULL) {
+            ZeldaArena_Free(sGrids[i].open);
+            sGrids[i].open = NULL;
+        }
+    }
     if (sWaterMap != NULL) {
         ZeldaArena_Free(sWaterMap);
         sWaterMap = NULL;
@@ -427,3 +455,122 @@ s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* f
     *floor = EnFishmod_RaycastFloor(play, x, *surface + GRID_CAST_HEIGHT, z);
     return true;
 }
+
+#if FISHMOD_OPT >= 5
+/*
+ * Open water: for each grid corner, how many cells it is to the nearest bank (water too shallow for a fish, or no
+ * floor), worked out once for the scene's water level with two passes over the grid (a chamfer distance). Its slope
+ * points away from the banks: a fish heading into a bank turns that way with one lookup instead of trying headings
+ * one after another.
+ */
+#define OPEN_MIN_DEPTH 12.0f
+#define OPEN_MAX 250
+
+static void EnFishmod_OpenBuild(FishmodWaterGrid* grid) {
+    s32 w = grid->width;
+    s32 d = grid->depth;
+    f32 surface = grid->box->ySurface;
+    u8* open = grid->open;
+    s32 x;
+    s32 z;
+
+    // 0 on banks, "far" in water; then forward and backward passes (2 straight, 3 diagonal, halved at the end)
+    for (z = 0; z < d; z++) {
+        for (x = 0; x < w; x++) {
+            s32 f = grid->floor[z * w + x];
+
+            open[z * w + x] =
+                ((f == FISHMOD_WATERMAP_NO_FLOOR) || (f == GRID_UNKNOWN) || (f > surface - OPEN_MIN_DEPTH)) ? 0
+                                                                                                          : OPEN_MAX;
+        }
+    }
+    for (z = 0; z < d; z++) {
+        for (x = 0; x < w; x++) {
+            s32 v = open[z * w + x];
+
+            if (v == 0) {
+                continue;
+            }
+            if (x > 0) {
+                v = MIN(v, open[z * w + x - 1] + 2);
+            }
+            if (z > 0) {
+                v = MIN(v, open[(z - 1) * w + x] + 2);
+                if (x > 0) {
+                    v = MIN(v, open[(z - 1) * w + x - 1] + 3);
+                }
+                if (x < w - 1) {
+                    v = MIN(v, open[(z - 1) * w + x + 1] + 3);
+                }
+            }
+            open[z * w + x] = MIN(v, OPEN_MAX);
+        }
+    }
+    for (z = d - 1; z >= 0; z--) {
+        for (x = w - 1; x >= 0; x--) {
+            s32 v = open[z * w + x];
+
+            if (v == 0) {
+                continue;
+            }
+            if (x < w - 1) {
+                v = MIN(v, open[z * w + x + 1] + 2);
+            }
+            if (z < d - 1) {
+                v = MIN(v, open[(z + 1) * w + x] + 2);
+                if (x < w - 1) {
+                    v = MIN(v, open[(z + 1) * w + x + 1] + 3);
+                }
+                if (x > 0) {
+                    v = MIN(v, open[(z + 1) * w + x - 1] + 3);
+                }
+            }
+            open[z * w + x] = MIN(v, OPEN_MAX);
+        }
+    }
+    grid->openSurface = surface;
+}
+
+/**
+ * The way to open water from (x, z): away from the nearest banks, as a yaw. Returns false where it can't tell (no
+ * grid there, or open water all around).
+ */
+s32 EnFishmod_OpenWaterDir(PlayState* play, f32 x, f32 z, s16* yaw) {
+    s32 i;
+
+    for (i = 0; i < sGridCount; i++) {
+        FishmodWaterGrid* grid = &sGrids[i];
+        WaterBox* box = grid->box;
+
+        if ((x >= box->xMin) && (x <= box->xMin + box->xLength) && (z >= box->zMin) &&
+            (z <= box->zMin + box->zLength)) {
+            s32 ix;
+            s32 iz;
+            s32 w = grid->width;
+            s32 gx;
+            s32 gz;
+
+            if (grid->open == NULL) {
+                grid->open = ZeldaArena_Malloc(grid->width * grid->depth);
+                if (grid->open == NULL) {
+                    return false;
+                }
+                grid->openSurface = -32000.0f;
+            }
+            if (grid->openSurface != box->ySurface) {
+                EnFishmod_OpenBuild(grid);
+            }
+            ix = CLAMP((s32)((x - grid->x0) * grid->invCell + 0.5f), 1, grid->width - 2);
+            iz = CLAMP((s32)((z - grid->z0) * grid->invCell + 0.5f), 1, grid->depth - 2);
+            gx = (s32)grid->open[iz * w + ix + 1] - grid->open[iz * w + ix - 1];
+            gz = (s32)grid->open[(iz + 1) * w + ix] - grid->open[(iz - 1) * w + ix];
+            if ((gx == 0) && (gz == 0)) {
+                return false;
+            }
+            *yaw = Math_Atan2S(gz, gx);
+            return true;
+        }
+    }
+    return false;
+}
+#endif

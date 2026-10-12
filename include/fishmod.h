@@ -133,7 +133,7 @@ typedef enum FishmodActorType {
 
 const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId);
 // Which of a scene's roster fish were kept today (FISHMOD_OPT 4): they stay gone until the day changes.
-u32 Fishmod_RosterCaughtBits(s16 sceneId, s32 day);
+s32 Fishmod_RosterIsCaught(s16 sceneId, s32 day, s32 index);
 void Fishmod_RosterSetCaught(s16 sceneId, s32 day, s32 index);
 void Fishmod_OnSceneLoad(struct PlayState* play);
 void Fishmod_PlayUpdate(struct PlayState* play);
@@ -292,6 +292,10 @@ typedef enum FishmodProfSlot {
     FISHMOD_PROF_D_LIMB_CB,  //     the limb callbacks (part scales, tints, head position)
     FISHMOD_PROF_D_WHISKERS, //   catfish whiskers
     FISHMOD_PROF_D_BILLBOARD,//   far fish drawn flat
+    FISHMOD_PROF_U_STEER,    //   (in AI) steering toward a target, staying in the water
+    FISHMOD_PROF_U_SPOOK,    //   (in AI) checking for splashes and Link
+    FISHMOD_PROF_U_SEE,      //   (in AI) open water between it and a point (noticing the bobber, escapes)
+    FISHMOD_PROF_U_UNSTICK,  //   (in AI) the stuck watchdog
     FISHMOD_PROF_MAX
 } FishmodProfSlot;
 extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
@@ -332,6 +336,11 @@ typedef struct FishmodAutoplayStep {
 // The scene's baked water floor map, loaded into the zelda arena (free it with ZeldaArena_Free), or NULL if it has
 // none
 FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId);
+
+// Time: the 20 minute day and the hidden clock for places where time stands still (fishmod.c)
+void Fishmod_AdvanceTime(struct PlayState* play);
+void Fishmod_TimeUpdate(struct PlayState* play);
+void Fishmod_TimeOnSceneExit(void);
 
 #if FISHMOD_DEBUG
 void Fishmod_DebugBoot(void);
