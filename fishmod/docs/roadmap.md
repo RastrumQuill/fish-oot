@@ -115,6 +115,19 @@ Lab tank capacity at opt4 (all fish close): about 60–65 fish at 20 fps in debu
 
 The extra bones cost about 65 µs of CPU per close fish, but frame times didn't change: the AI dominates the frame.
 
+**Test5 phase 1 so far** (opt 5: baked water floor maps, cheaper water queries, open water map, a 600-fish roster
+checked and woken a slice at a time). Debug builds, ares:
+
+| Bench | Water query | AI | Fish update avg (worst) | Frame avg / worst |
+|---|---|---|---|---|
+| Lab tank 36, opt4 | 19.2 µs | 5.7 ms | 13.2 ms | 50.1 / 54.3 ms |
+| Lab tank 36, opt5 | 9.8 µs | 4.4 ms | 10.9 ms | 50.1 / 54.3 ms |
+| Lake Hylia north beach, 30-fish roster (opt4) | 14 µs | 0.1 ms | 0.45 ms (4.0) | 50.1 / 50.3 ms |
+| Lake Hylia north beach, 300-fish roster | 12 µs | 0.9 ms | 3.3 ms (10.8) | 50.1 / 50.3 ms |
+| Lake Hylia north beach, 600-fish roster | 19 µs | 1.8 ms | 5.9 ms (19.6) | 50.1 / 50.3 ms |
+
+With 600 fish in Lake Hylia about 48 are awake around Link at the north beach; the frame stays at 20 fps.
+
 ### Next
 
 **Fish animation** (found with the animation studio, `--script anim`):
