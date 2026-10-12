@@ -233,6 +233,8 @@ come up at dawn.
 - Risk to check first: OoT's water fogs out quickly; if a deep bait can't be seen, read the depth from the bobber
   and the line's angle instead (still no icon).
 
+**"FISH ON!"** text when the hook sets, as in Twilight Princess.
+
 **Bite rhythm (item 7).** Take, hold up to a second, spit and take again about one time in ten (the carp study), so
 the bobber goes nibble, nibble, then under. Each nibble gets a small rumble (there is none today) and a sound; the
 bite a bigger one.
