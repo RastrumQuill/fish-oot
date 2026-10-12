@@ -8,13 +8,24 @@ and are not being worked on yet.
 Visual extras only go in if they don't cost performance. Each one gets measured in ares with the debug timing line
 (RSP/RDP, CPU update/draw, frame time) against the build without it, and it is dropped if the frame gets slower.
 
-## To do for test5
+## Test5: biomes, time and behaviour
 
-- **Deep water fishing (Lake Hylia).** Fishing only works in shallow water: fish keep deep in the lake and never come
-  near a bait dangling about 4 inches under the bobber. Equipment, AI or both: a way to fish deep (adjustable line
-  depth, sinking baits and lures), and/or fish that rise to the surface to feed (by time of day, weather, species).
-- **Longer days.** OoT's day runs about 5x faster than MM's (MM: 18 min 26 s). Aim for a 20 or 24 minute day, so
-  hanging out at a spot to meet its different fish by time and weather is possible (and it makes Dampé easier).
+The plan is in [v5-plan.md](v5-plan.md). Items:
+
+1. **Deep water fishing (Lake Hylia).** Fishing only works in shallow water: fish keep deep in the lake and never come
+   near a bait dangling about 4 inches under the bobber. Gear (float depth, sinking baits and lures) and fish that
+   rise to feed (by time of day, weather, species).
+2. **Longer days.** OoT's day runs about 5x faster than MM's (MM: 18 min 26 s). Aim for a 20 or 24 minute day, so
+   hanging out at a spot to meet its different fish by time and weather is possible (and it makes Dampé easier).
+3. **Cheaper AI hot path**, to pay for the rest.
+5. **Lure behaviour:** fish react to how a lure moves, retrieve styles, surface lures.
+6. **Visible reactions:** notice, follow, inspect, strike.
+7. **Bite rhythm:** nibble, nibble, bite on the bobber, with sound and rumble.
+8. **Line tension re-check** in bigger water, scaled by the fish's weight if needed.
+10. **Individual fish looks:** per-fish texture offsets and palettes.
+11. **Animation polish:** catfish curl on sharp turns, small-fish swim speed.
+12. **AI v2:** heading with pitch, schools for small species, habitats as shapes, senses and mood.
+13. **Lake Hylia** sub-biomes with their own fish.
 
 ## Planned
 
@@ -148,6 +159,9 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
 
 - **More fishing spots:** some grottos have large bodies of water (at least one known), and the Water Temple could
   be interesting.
+  The Great Deku Tree's water too (with grottos, the oasis, etc.).
+- **Bottle fishing:** minnows and other tiny fish can be scooped up with a bottle, larger fish (probably) can't. A way to
+  fish of its own, like the hookshot.
 - **Fireflies:** a new bait. Small glowing bugs (fairy-style glow without the wings) that can be caught in a bottle.
 - **Strength and casting:** the strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) raise the
   longest possible cast.
