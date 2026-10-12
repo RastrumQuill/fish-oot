@@ -113,6 +113,7 @@ static void Manager_BuildRoster(PlayState* play) {
     s32 numBoxes = play->colCtx.colHeader->numWaterBoxes;
     s32 totalWeight = 0;
     u32 caughtBits;
+    s32 count;
     s32 i;
     s32 n;
 
@@ -128,7 +129,13 @@ static void Manager_BuildRoster(PlayState* play) {
 
     // the shared random numbers, seeded for the roster and reseeded from the clock afterwards
     Rand_Seed((u32)play->sceneId * 7919 + (u32)gSaveContext.save.totalDays * 104729 + 17);
-    for (n = 0; n < FISHMOD_FISH_COUNT; n++) {
+    count = FISHMOD_FISH_COUNT;
+#if FISHMOD_DEBUG
+    if (Fishmod_DebugRosterCount() > 0) {
+        count = MIN(Fishmod_DebugRosterCount(), FISHMOD_ROSTER_MAX);
+    }
+#endif
+    for (n = 0; n < count; n++) {
         WaterBox* box = &boxes[(s32)Rand_ZeroFloat(numBoxes - 0.01f)];
         FishmodRosterFish* rec = &sRoster[sRosterCount];
         const FishmodSpecies* species;
