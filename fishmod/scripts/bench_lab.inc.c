@@ -2,7 +2,9 @@
 // tank packed with fish at every depth.
 #define FISHMOD_SCRIPT_ENTRANCE ENTR_LAKESIDE_LABORATORY_0
 #define FISHMOD_SCRIPT_ADULT 1
+#ifndef FISHMOD_SCRIPT_FISH_TANK
 #define FISHMOD_SCRIPT_FISH_TANK 36
+#endif
 static Vec3f sScriptStartPos = { 0.0f, -360.0f, -60.0f };
 static s16 sScriptStartYaw = -0x8000;
 static FishmodAutoplayStep sScriptSteps[] = {

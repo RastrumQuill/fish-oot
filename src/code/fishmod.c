@@ -71,6 +71,7 @@ static void Fishmod_RestoreB(PlayState* play) {
     sRodOnB = false;
 }
 FishmodPhoto gFishmodPhoto;
+FishmodStudio gFishmodStudio;
 FishmodRodInfo gFishmodRodInfo;
 
 const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId) {

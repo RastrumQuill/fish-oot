@@ -435,7 +435,9 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
     EnFishmod_InitLimbData(this, SEGMENTED_TO_VIRTUAL(skel));
 
     if (gFishmodPhoto.active) {
-        EnFishmod_SetLength(this, this->species->lengthTypical);
+        EnFishmod_SetLength(this, (gFishmodStudio.active && (gFishmodStudio.spawnLength > 0.0f))
+                                      ? gFishmodStudio.spawnLength
+                                      : this->species->lengthTypical);
         this->fishState = FISH_STATE_PHOTO;
     } else {
         // length: triangular distribution between min and max, peaking at the typical size
@@ -1373,6 +1375,19 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
 
         case FISH_STATE_PHOTO:
             this->actor.world.pos = this->actor.home.pos;
+            if (gFishmodStudio.active) {
+                // the animation studio moves it
+                this->actor.shape.rot.y = gFishmodStudio.yaw;
+                this->actor.shape.rot.x = gFishmodStudio.pitch;
+                this->actor.shape.rot.z = gFishmodStudio.roll;
+                this->swimMag = gFishmodStudio.swimMag;
+                this->swimPhaseStep = gFishmodStudio.swimPhaseStep;
+                this->jawRot = gFishmodStudio.jawRot;
+                if (gFishmodStudio.startle != 0) {
+                    this->startle = gFishmodStudio.startle;
+                }
+                break;
+            }
             this->actor.shape.rot.y = gFishmodPhoto.yaw;
             this->actor.shape.rot.x = gFishmodPhoto.pitch;
             // a gentle, nearly straight pose for portraits
