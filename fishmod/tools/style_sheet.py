@@ -240,13 +240,14 @@ def main():
         load_vanilla("gFishingWoodPostModel", "gFishingWoodPostTex.rgba16.png", 32, 32),
     ]
     new_names = ["reed_clump", "ribbon_weed", "bush_weed", "sunken_log", "drowned_tree", "pebble_patch",
-                 "silt_patch", "lily_flower"]
+                 "silt_patch"]
     new = [load_obj(n) for n in new_names]
     stump = [load_obj("stump"), load_obj("stump_top")]
-    pad_with_flower = [vanilla[1], load_obj("lily_flower").moved((4, 1, 4), 1.2)]
+    flower = [load_obj("lily_flower"), load_obj("lily_centre")]
+    pad_with_flower = [vanilla[1]] + [f.moved((4, 1, 4), 1.2) for f in flower]
 
     t1 = ([tile([m], "vanilla " + m.name) for m in vanilla] + [tile([m], "new " + m.name) for m in new] +
-          [tile(stump, "new stump"), tile(pad_with_flower, "vanilla pad + new flower")])
+          [tile(stump, "new stump"), tile(flower, "new lily flower"), tile(pad_with_flower, "vanilla pad + flower")])
     panel1 = grid(t1, 5)
 
     v = os.path.join(SCENES, "misc", "turibori")
