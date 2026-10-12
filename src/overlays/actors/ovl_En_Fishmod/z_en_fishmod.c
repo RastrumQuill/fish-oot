@@ -7,6 +7,7 @@
  */
 
 #include "z_en_fishmod.h"
+#include "sys_math.h"
 #include "assets/objects/gameplay_field_keep/gameplay_field_keep.h"
 
 #include "assets/objects/object_fish/object_fish.h"
@@ -494,6 +495,9 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
     this->swimMag = 1500.0f;
     this->swimPhase = Rand_ZeroFloat(6.28f);
     this->depthPref = (u8)Rand_ZeroFloat(255.9f);
+#if FISHMOD_OPT >= 5
+    this->waterCell = -2;
+#endif
     EnFishmod_WaterGridAcquire(play);
     this->actor.world.rot.y = this->actor.shape.rot.y;
     this->actionFunc = EnFishmod_FishHover;
@@ -587,6 +591,9 @@ static s32 EnFishmod_ProbeWater(EnFishmod* this, PlayState* play, Vec3f* pos, s1
     }
     this->waterY = CLAMP_MAX(surface, noseSurface);
     this->floorY = CLAMP_MIN(floor, noseFloor);
+#if FISHMOD_OPT >= 5
+    this->waterCell = -2; // not the steering's cell answer any more
+#endif
     return (this->waterY - this->floorY) > (this->halfHeight * 2.0f + 2.0f);
 }
 
@@ -617,7 +624,61 @@ static f32 EnFishmod_ClampY(EnFishmod* this, f32 y) {
     return CLAMP(y, lo, hi);
 }
 
-static f32 EnFishmod_DepthY(EnFishmod* this, f32 surface, f32 floor) {
+#if FISHMOD_OPT >= 5
+/** The time of day on this fish's own clock (carp differ by individual: FishmodSpecies.chronotype). */
+static s32 EnFishmod_TimeOfDay(EnFishmod* this) {
+    s32 shift = 0;
+    s32 time;
+
+    if (this->species->chronotype != 0) {
+        s32 spread = this->species->chronotype * 2 + 1;
+
+        shift = (this->depthPref % spread) - this->species->chronotype;
+    }
+    time = (u16)(gSaveContext.save.dayTime + shift * CLOCK_TIME(1, 0));
+    if ((time >= CLOCK_TIME(4, 0)) && (time < CLOCK_TIME(8, 0))) {
+        return FISHMOD_TIME_DAWN;
+    } else if ((time >= CLOCK_TIME(8, 0)) && (time < CLOCK_TIME(17, 0))) {
+        return FISHMOD_TIME_DAY;
+    } else if ((time >= CLOCK_TIME(17, 0)) && (time < CLOCK_TIME(20, 0))) {
+        return FISHMOD_TIME_DUSK;
+    }
+    return FISHMOD_TIME_NIGHT;
+}
+
+/** How active it is now, 0-3 (its species' rhythm on its own clock). */
+static s32 EnFishmod_Activity(EnFishmod* this) {
+    return FISHMOD_ACTIVITY(this->species, EnFishmod_TimeOfDay(this));
+}
+
+/**
+ * Where in the water column it keeps (AI v2): its spot in the species' band, higher when it's feeding (active, in
+ * low light: deep fish come up at dawn and dusk, night feeders at night) and deeper in bright light for fish that
+ * shy from it (research: fishmod/docs/research/biomes-time-behaviour.md).
+ */
+static f32 EnFishmod_DepthY(EnFishmod* this, PlayState* play, f32 surface, f32 floor) {
+    const FishmodSpecies* sp = this->species;
+    f32 clearance = EnFishmod_BodyClearance(this);
+    f32 light = EnFishmod_Shared(play)->light;
+    f32 activity = EnFishmod_Activity(this) * (1.0f / 3.0f);
+    f32 pref = this->depthPref * (1.0f / 255.0f);
+    f32 f = (sp->depthTop + (sp->depthBottom - sp->depthTop) * pref) * (1.0f / 255.0f);
+    f32 room = (surface - clearance) - (floor + clearance);
+
+    if (activity >= 0.6f) {
+        f -= sp->rise * (1.0f / 255.0f) * activity * (1.0f - light);
+    }
+    if (light > 0.5f) {
+        f += sp->lightShy * (1.0f / 255.0f) * (light - 0.5f) * 0.6f;
+    }
+    f = CLAMP(f, 0.0f, 1.0f);
+    if (room <= 0.0f) {
+        return (surface + floor) * 0.5f;
+    }
+    return surface - clearance - f * room;
+}
+#else
+static f32 EnFishmod_DepthY(EnFishmod* this, PlayState* play, f32 surface, f32 floor) {
     f32 depth = surface - floor;
     // each fish has its own spot in its species' band, so deep water fills in layers instead of one plane each
     f32 pref = this->depthPref * (1.0f / 255.0f);
@@ -632,6 +693,7 @@ static f32 EnFishmod_DepthY(EnFishmod* this, f32 surface, f32 floor) {
             return floor + depth * (0.3f + pref * 0.4f);
     }
 }
+#endif
 
 /** How appealing the bobber is right now: bait, time of day and twitches. */
 static f32 EnFishmod_BaitAppeal(EnFishmod* this) {
@@ -648,7 +710,16 @@ static f32 EnFishmod_BaitAppeal(EnFishmod* this) {
     } else {
         tod = FISHMOD_TIME_NIGHT;
     }
+#if FISHMOD_OPT >= 5
+    {
+        static f32 sActivityAppeal[] = { 0.4f, 0.7f, 1.1f, 1.4f };
+
+        appeal *= sActivityAppeal[EnFishmod_Activity(this)];
+    }
+    (void)tod;
+#else
     appeal *= (this->species->activeTimes & (1 << tod)) ? 1.3f : 0.6f;
+#endif
     if (gFishmodRodState.twitchTimer > 0) {
         appeal *= 1.5f;
     }
@@ -680,7 +751,7 @@ static void EnFishmod_PickWanderTarget(EnFishmod* this, PlayState* play) {
     if (EnFishmod_FindWaterPoint(play, &this->actor.home.pos, 75.0f,
                                  CLAMP_MIN(12.0f, this->halfHeight * 2.0f + this->halfLength * 0.5f), &point,
                                  &surface, &floor)) {
-        point.y = EnFishmod_DepthY(this, surface, floor);
+        point.y = EnFishmod_DepthY(this, play, surface, floor);
         if ((Rand_ZeroOne() < 0.25f) && (point.y - floor < 80.0f)) {
             // down to pick at the bottom, if it's near
             point.y = floor + this->halfHeight + 1.0f;
@@ -770,6 +841,118 @@ static s16 EnFishmod_OpenWaterYaw(EnFishmod* this, PlayState* play, s16 preferre
 }
 
 /** Steers toward target at the given speed, staying inside the water. Returns false if the shore blocked it. */
+#if FISHMOD_OPT >= 5
+/**
+ * Steers toward target at the given speed, staying inside the water (AI v2): a heading with pitch, so a fish swims
+ * up or down to its target instead of easing its height. The water under it is looked up only when it moves into
+ * another grid cell, and the way ahead is checked every few frames at one point a little in front of its nose; a
+ * bank there turns it toward open water (the open water map) and it slides along. Returns false if the shore
+ * blocked it.
+ */
+static s32 EnFishmod_SwimTowardImpl(EnFishmod* this, PlayState* play, Vec3f* target, f32 speed, s16 turnStep) {
+    Vec3f* pos = &this->actor.world.pos;
+    f32 dx = target->x - pos->x;
+    f32 dz = target->z - pos->z;
+    f32 dy = target->y - pos->y;
+    f32 distXZSq = SQ(dx) + SQ(dz);
+    f32 clearance = EnFishmod_BodyClearance(this);
+    s32 cell;
+    s16 yaw;
+    s16 pitch;
+    f32 horiz;
+
+    // the water here: only when it enters another cell (the floor is the cell's highest corner)
+    cell = EnFishmod_WaterCell(play, pos->x, pos->z);
+    if ((cell != this->waterCell) || (cell < 0)) {
+        f32 surface;
+        f32 floor;
+
+        if (EnFishmod_WaterFloor(play, pos->x, pos->z, &surface, &floor, true)) {
+            this->waterY = surface;
+            this->floorY = floor;
+        }
+        this->waterCell = cell;
+    }
+
+    // somehow inside a bank: push straight out toward open water
+    if ((this->waterY - this->floorY) <= 1.0f) {
+        s16 out;
+
+        if (!EnFishmod_OpenWaterDir(play, pos->x, pos->z, &out)) {
+            out = Math_Vec3f_Yaw(pos, &this->actor.home.pos);
+        }
+        pos->x += Math_SinS(out) * 1.5f;
+        pos->z += Math_CosS(out) * 1.5f;
+        Math_SmoothStepToS(&this->actor.shape.rot.y, out, 2, 0x800, 0x100);
+        this->waterCell = -2;
+        this->blocked = true;
+        return false;
+    }
+
+    if (distXZSq < SQ(2.0f + this->halfLength * 0.3f)) {
+        // basically there: hold the heading and drift onto the spot (turning toward a point this close would swing
+        // the fish around with every tiny move)
+        f32 dist = sqrtf(distXZSq);
+        f32 step = CLAMP_MAX(dist * 0.2f, speed);
+
+        Math_ApproachF(&this->speed, 0.0f, 1.0f, 0.08f);
+        if (dist > 0.01f) {
+            pos->x += dx / dist * step;
+            pos->z += dz / dist * step;
+        }
+        pos->y += CLAMP(dy * 0.08f, -0.8f, 0.8f);
+        Math_SmoothStepToS(&this->actor.shape.rot.x, 0, 4, 0x200, 0x20);
+    } else {
+        yaw = Math_Atan2S(dz, dx);
+        if (this->detourTimer > 0) {
+            // working around a bank: follow the way out for a while before aiming at the target again
+            this->detourTimer--;
+            yaw = this->detourYaw;
+            turnStep = CLAMP_MIN(turnStep, 0x400);
+        }
+        Math_SmoothStepToS(&this->actor.shape.rot.y, yaw, 4, turnStep, 0x40);
+        // pitch toward the target's height, at most 45 degrees (rot.x is nose down positive)
+        pitch = CLAMP(Math_Atan2S(sqrtf(distXZSq), dy), -0x2000, 0x2000);
+        Math_SmoothStepToS(&this->actor.shape.rot.x, -pitch, 4, 0x300, 0x40);
+        Math_ApproachF(&this->speed, speed, 1.0f, 0.08f);
+
+        // the way ahead, every 4th frame (staggered by fish): one point in front of the nose
+        if (((this->timer + this->depthPref) & 3) == 0) {
+            f32 reach = this->halfLength + 4.0f + this->speed * 6.0f;
+            f32 surface;
+            f32 floor;
+            f32 ax = pos->x + Math_SinS(this->actor.shape.rot.y) * reach;
+            f32 az = pos->z + Math_CosS(this->actor.shape.rot.y) * reach;
+
+            if (!EnFishmod_WaterFloor(play, ax, az, &surface, &floor, true) ||
+                ((surface - floor) < clearance * 2.0f + 2.0f)) {
+                // a bank ahead: turn toward open water, on the side it was already turning to, and slow down
+                s16 away;
+
+                if (EnFishmod_OpenWaterDir(play, pos->x, pos->z, &away)) {
+                    s16 diff = this->actor.shape.rot.y - away;
+
+                    away += CLAMP(diff, -0x3000, 0x3000);
+                } else {
+                    away = Math_Vec3f_Yaw(pos, &this->actor.home.pos);
+                }
+                this->detourYaw = away;
+                this->detourTimer = 20;
+                this->speed = CLAMP_MIN(this->speed * 0.5f, 0.4f);
+                this->blocked = true;
+            } else {
+                this->blocked = false;
+            }
+        }
+        horiz = this->speed * Math_CosS(this->actor.shape.rot.x);
+        pos->x += Math_SinS(this->actor.shape.rot.y) * horiz;
+        pos->z += Math_CosS(this->actor.shape.rot.y) * horiz;
+        pos->y -= this->speed * Math_SinS(this->actor.shape.rot.x);
+    }
+    pos->y = EnFishmod_ClampY(this, pos->y);
+    return !this->blocked;
+}
+#else
 static s32 EnFishmod_SwimTowardImpl(EnFishmod* this, PlayState* play, Vec3f* target, f32 speed, s16 turnStep) {
     Vec3f next;
     f32 surface;
@@ -835,6 +1018,9 @@ static s32 EnFishmod_SwimTowardImpl(EnFishmod* this, PlayState* play, Vec3f* tar
         // stranded somewhere too shallow (released or dragged there): anywhere deeper is better
         this->waterY = surface;
         this->floorY = floor;
+#if FISHMOD_OPT >= 5
+        this->waterCell = -2;
+#endif
         next.y = EnFishmod_ClampY(this, next.y);
         this->actor.world.pos = next;
     } else {
@@ -857,6 +1043,7 @@ static s32 EnFishmod_SwimTowardImpl(EnFishmod* this, PlayState* play, Vec3f* tar
     this->blocked = !moved;
     return moved;
 }
+#endif
 
 #if FISHMOD_DEBUG
 static s32 EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target, f32 speed, s16 turnStep) {
@@ -1118,6 +1305,10 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                     EnFishmod_OpenWaterTo(this, play, &rod->bobberPos)) {
                     this->fishState = FISH_STATE_APPROACH;
                     this->stateTimer = 200;
+#if FISHMOD_OPT >= 5
+                    // a fish deep below has further to come: time for the climb too
+                    this->stateTimer += (s16)CLAMP(ABS(rod->waterY - this->actor.world.pos.y) * 2.5f, 0, 1000);
+#endif
                 }
             }
             break;
@@ -1341,6 +1532,9 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                     // thrashing in the shallows, belly on the bottom
                     this->waterY = surface;
                     this->floorY = floor;
+#if FISHMOD_OPT >= 5
+                    this->waterCell = -2;
+#endif
                     next.y = CLAMP_MIN(floor + this->halfHeight, (floor + surface) * 0.5f);
                     this->actor.world.pos = next;
                     this->actor.shape.rot.x = 0;

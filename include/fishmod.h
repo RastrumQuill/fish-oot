@@ -98,7 +98,15 @@ typedef struct FishmodSpecies {
     /* 0x2A */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
     /* 0x3F */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
     /* 0x54 */ u8 lookFlags;                       // FISHMOD_LOOK_*
+    /* 0x55 */ u8 activity;    // 0-3 per FishmodTimeOfDay, 2 bits each (dawn in the low bits)
+    /* 0x56 */ u8 depthTop;    // the band of the water column it keeps to: 0 = surface, 255 = floor
+    /* 0x57 */ u8 depthBottom;
+    /* 0x58 */ u8 rise;        // how far up the band moves when it's active and the light is low (feeding)
+    /* 0x59 */ u8 lightShy;    // how much bright light pushes it deeper
+    /* 0x5A */ u8 chronotype;  // each fish's clock is shifted by up to this many hours
 } FishmodSpecies;
+
+#define FISHMOD_ACTIVITY(species, tod) (((species)->activity >> (2 * (tod))) & 3)
 
 typedef struct FishmodSpawnEntry {
     /* 0x00 */ u8 species;

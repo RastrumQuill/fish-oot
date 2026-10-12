@@ -65,6 +65,9 @@ EnFishmodShared* EnFishmod_Shared(PlayState* play) {
         sShared.bobberIn = EnFishmod_RodBobberInWater();
         sShared.bobberPos = gFishmodRodState.bobberPos;
         sShared.thinksLeft = THINK_BUDGET;
+#if FISHMOD_OPT >= 5
+        sShared.light = Fishmod_Light(play);
+#endif
     }
     return &sShared;
 }
