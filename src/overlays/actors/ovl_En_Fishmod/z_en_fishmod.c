@@ -464,12 +464,22 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         this->actor.cullingVolumeDownward = this->halfLength * 2.0f + 20.0f;
     }
 #if FISHMOD_OPT >= 4
-    this->rosterIndex = 0xFF;
-    if (!gFishmodPhoto.active && (FISHMOD_GET_ROSTER(thisx->params) >= 0) &&
-        (EnFishmod_RosterLength(FISHMOD_GET_ROSTER(thisx->params)) > 0.0f)) {
-        // one of the scene's roster fish: its own size, every time it appears
-        this->rosterIndex = FISHMOD_GET_ROSTER(thisx->params);
-        EnFishmod_SetLength(this, EnFishmod_RosterLength(this->rosterIndex));
+    this->rosterIndex = FISHMOD_NO_ROSTER;
+    {
+#if FISHMOD_OPT >= 5
+        // the manager passes the record's index in the spawn roll
+        s32 index = thisx->world.rot.z - 1;
+
+        thisx->world.rot.z = thisx->shape.rot.z = 0;
+#else
+        s32 index = FISHMOD_GET_ROSTER(thisx->params);
+#endif
+
+        if (!gFishmodPhoto.active && (index >= 0) && (EnFishmod_RosterLength(index) > 0.0f)) {
+            // one of the scene's roster fish: its own size, every time it appears
+            this->rosterIndex = index;
+            EnFishmod_SetLength(this, EnFishmod_RosterLength(this->rosterIndex));
+        }
     }
     // the fish manager draws every fish (if this species' rig couldn't be made, it draws itself the old way)
     this->rigReady = EnFishmod_RigPrepare(this);
@@ -727,6 +737,20 @@ static s16 EnFishmod_OpenWaterYaw(EnFishmod* this, PlayState* play, s16 preferre
     f32 savedFloor = this->floorY;
     s32 i;
 
+#if FISHMOD_OPT >= 5
+    {
+        // the open water map knows which way is away from the banks: the side of that the fish already favours
+        s16 away;
+
+        if (EnFishmod_OpenWaterDir(play, this->actor.world.pos.x, this->actor.world.pos.z, &away)) {
+            s16 diff = preferred - away;
+
+            // within 45 degrees of straight away from the bank, on the side it was already turning to
+            return away + CLAMP(diff, -0x2000, 0x2000);
+        }
+    }
+#endif
+
     for (i = 0; i < ARRAY_COUNT(sTurns); i++) {
         s16 yaw = preferred + sTurns[i];
         Vec3f probe;
@@ -746,7 +770,7 @@ static s16 EnFishmod_OpenWaterYaw(EnFishmod* this, PlayState* play, s16 preferre
 }
 
 /** Steers toward target at the given speed, staying inside the water. Returns false if the shore blocked it. */
-static s32 EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target, f32 speed, s16 turnStep) {
+static s32 EnFishmod_SwimTowardImpl(EnFishmod* this, PlayState* play, Vec3f* target, f32 speed, s16 turnStep) {
     Vec3f next;
     f32 surface;
     f32 floor;
@@ -834,7 +858,18 @@ static s32 EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target,
     return moved;
 }
 
-static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
+#if FISHMOD_DEBUG
+static s32 EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target, f32 speed, s16 turnStep) {
+    s32 ret;
+
+    FISHMOD_PROF(FISHMOD_PROF_U_STEER, ret = EnFishmod_SwimTowardImpl(this, play, target, speed, turnStep));
+    return ret;
+}
+#else
+#define EnFishmod_SwimToward EnFishmod_SwimTowardImpl
+#endif
+
+static void EnFishmod_CheckSpookImpl(EnFishmod* this, PlayState* play) {
     FishmodRod* rod = &gFishmodRodState;
     Player* player = GET_PLAYER(play);
     f32 warySq = 30.0f + this->species->behavior.wariness * 0.7f;
@@ -859,8 +894,16 @@ static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
     }
 }
 
+#if FISHMOD_DEBUG
+static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
+    FISHMOD_PROF(FISHMOD_PROF_U_SPOOK, EnFishmod_CheckSpookImpl(this, play));
+}
+#else
+#define EnFishmod_CheckSpook EnFishmod_CheckSpookImpl
+#endif
+
 /** True if there's water deep enough for this fish all the way from it to `to` (it can see and reach it). */
-static s32 EnFishmod_OpenWaterTo(EnFishmod* this, PlayState* play, Vec3f* to) {
+static s32 EnFishmod_OpenWaterToImpl(EnFishmod* this, PlayState* play, Vec3f* to) {
     s32 i;
 
     // up to just short of the target (the fish stops a body length back), with the interpolated floor: the
@@ -879,6 +922,17 @@ static s32 EnFishmod_OpenWaterTo(EnFishmod* this, PlayState* play, Vec3f* to) {
     }
     return true;
 }
+
+#if FISHMOD_DEBUG
+static s32 EnFishmod_OpenWaterTo(EnFishmod* this, PlayState* play, Vec3f* to) {
+    s32 ret;
+
+    FISHMOD_PROF(FISHMOD_PROF_U_SEE, ret = EnFishmod_OpenWaterToImpl(this, play, to));
+    return ret;
+}
+#else
+#define EnFishmod_OpenWaterTo EnFishmod_OpenWaterToImpl
+#endif
 
 /**
  * Where the fish's center goes so its mouth is `reach` body-halves short of the bobber, along the heading it
@@ -899,7 +953,7 @@ static void EnFishmod_BobberStation(EnFishmod* this, f32 reach, f32 y, Vec3f* ou
  * nearby and heads there for a while. If that doesn't free it either, it is nudged straight there.
  * Returns true while it is busy getting unstuck (the normal AI waits).
  */
-static s32 EnFishmod_Unstick(EnFishmod* this, PlayState* play) {
+static s32 EnFishmod_UnstickImpl(EnFishmod* this, PlayState* play) {
     s32 swimming = (this->fishState == FISH_STATE_WANDER) || (this->fishState == FISH_STATE_APPROACH) ||
                    (this->fishState == FISH_STATE_FLEE);
 
@@ -964,6 +1018,17 @@ static s32 EnFishmod_Unstick(EnFishmod* this, PlayState* play) {
     }
     return true;
 }
+
+#if FISHMOD_DEBUG
+static s32 EnFishmod_Unstick(EnFishmod* this, PlayState* play) {
+    s32 ret;
+
+    FISHMOD_PROF(FISHMOD_PROF_U_UNSTICK, ret = EnFishmod_UnstickImpl(this, play));
+    return ret;
+}
+#else
+#define EnFishmod_Unstick EnFishmod_UnstickImpl
+#endif
 
 /**
  * A chunk of broken beehive (with larvae in it): tumbles onto the ground and lies there for half a minute. Swinging

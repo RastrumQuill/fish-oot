@@ -26,6 +26,7 @@
 #include "regs.h"
 #include "player.h"
 #include "save.h"
+#include "environment.h"
 #include "sequence.h"
 #include "seqcmd.h"
 #include "game.h"
@@ -689,9 +690,10 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     }
 #endif
 
-    Fishmod_DebugPrintf(0, "F%d S%d/%d c%d l%d ps%d bg%d", sPlayFrames, sScriptStepIndex,
+    Fishmod_DebugPrintf(0, "F%d S%d/%d c%d l%d t%02d:%02d s%d", sPlayFrames, sScriptStepIndex,
                         (s32)ARRAY_COUNT(sScriptSteps), gFishmodRodInfo.caught, gFishmodRodInfo.lost,
-                        play->pauseCtx.state, R_PAUSE_BG_PRERENDER_STATE);
+                        (s32)gSaveContext.save.dayTime * 24 / 0x10000,
+                        (s32)gSaveContext.save.dayTime * 24 * 60 / 0x10000 % 60, gTimeSpeed);
     if (player != NULL) {
         Fishmod_DebugPrintf(1, "P %d %d %d y%04X ovl%08X", (s32)player->actor.world.pos.x,
                             (s32)player->actor.world.pos.y, (s32)player->actor.world.pos.z,

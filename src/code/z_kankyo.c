@@ -1,6 +1,7 @@
 #pragma increment_block_number "gc-eu:224 gc-eu-mq:224 gc-jp:224 gc-jp-ce:224 gc-jp-mq:224 gc-us:224 gc-us-mq:224" \
                                "ique-cn:224 ntsc-1.0:0 ntsc-1.1:0 ntsc-1.2:0 pal-1.0:240 pal-1.1:240"
 
+#include "fishmod.h"
 #include "libc64/qrand.h"
 #include "libu64/gfxprint.h"
 #include "array_count.h"
@@ -980,11 +981,8 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
                 if ((envCtx->changeSkyboxTimer == 0) && !FrameAdvance_IsEnabled(play) &&
                     (play->transitionMode == TRANS_MODE_OFF || ((void)0, gSaveContext.gameMode) != GAMEMODE_NORMAL)) {
 
-                    if (IS_DAY || gTimeSpeed >= 400) {
-                        gSaveContext.save.dayTime += gTimeSpeed;
-                    } else {
-                        gSaveContext.save.dayTime += gTimeSpeed * 2; // time moves twice as fast at night
-                    }
+                    // fishmod: a 20 minute day, and a hidden clock where time stands still
+                    Fishmod_AdvanceTime(play);
                 }
             }
         }

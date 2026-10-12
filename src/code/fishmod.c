@@ -20,6 +20,7 @@
 #include "message.h"
 #include "message_data_fmt.h"
 #include "save.h"
+#include "environment.h"
 #include "sfx.h"
 #include "z_lib.h"
 #include "string.h"
@@ -95,40 +96,36 @@ const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId) {
  */
 typedef struct FishmodRosterCaught {
     s16 sceneId;
+    s16 index; // in the scene's roster, plus 1 (0: an empty entry)
     s32 day;
-    u32 bits;
 } FishmodRosterCaught;
 
-static FishmodRosterCaught sRosterCaught[8];
+// Kept fish are few (they need bottles), so a short list; the oldest is forgotten first.
+static FishmodRosterCaught sRosterCaught[24];
 static s32 sRosterCaughtNext;
 
-static FishmodRosterCaught* Fishmod_FindRosterCaught(s16 sceneId, s32 day, s32 create) {
+s32 Fishmod_RosterIsCaught(s16 sceneId, s32 day, s32 index) {
     s32 i;
 
     for (i = 0; i < ARRAY_COUNT(sRosterCaught); i++) {
-        if ((sRosterCaught[i].bits != 0) && (sRosterCaught[i].sceneId == sceneId) && (sRosterCaught[i].day == day)) {
-            return &sRosterCaught[i];
+        if ((sRosterCaught[i].index == index + 1) && (sRosterCaught[i].sceneId == sceneId) &&
+            (sRosterCaught[i].day == day)) {
+            return true;
         }
     }
-    if (!create) {
-        return NULL;
-    }
-    i = sRosterCaughtNext;
-    sRosterCaughtNext = (sRosterCaughtNext + 1) % ARRAY_COUNT(sRosterCaught);
-    sRosterCaught[i].sceneId = sceneId;
-    sRosterCaught[i].day = day;
-    sRosterCaught[i].bits = 0;
-    return &sRosterCaught[i];
-}
-
-u32 Fishmod_RosterCaughtBits(s16 sceneId, s32 day) {
-    FishmodRosterCaught* entry = Fishmod_FindRosterCaught(sceneId, day, false);
-
-    return (entry != NULL) ? entry->bits : 0;
+    return false;
 }
 
 void Fishmod_RosterSetCaught(s16 sceneId, s32 day, s32 index) {
-    Fishmod_FindRosterCaught(sceneId, day, true)->bits |= 1 << index;
+    FishmodRosterCaught* entry = &sRosterCaught[sRosterCaughtNext];
+
+    if (Fishmod_RosterIsCaught(sceneId, day, index)) {
+        return;
+    }
+    sRosterCaughtNext = (sRosterCaughtNext + 1) % ARRAY_COUNT(sRosterCaught);
+    entry->sceneId = sceneId;
+    entry->index = index + 1;
+    entry->day = day;
 }
 
 void Fishmod_OnSceneLoad(PlayState* play) {
@@ -201,6 +198,8 @@ static void Fishmod_SpawnSceneExtras(PlayState* play) {
  */
 void Fishmod_PlayUpdate(PlayState* play) {
     Actor* rod;
+
+    Fishmod_TimeUpdate(play);
 
     // Repair files saved with the old rod bug that left a Deku Stick on B (vanilla never puts it there)
     if (gSaveContext.save.info.equips.buttonItems[0] == ITEM_DEKU_STICK) {
@@ -788,4 +787,99 @@ FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId) {
         }
     }
     return NULL;
+}
+
+/*
+ * Time (fishmod/docs/v5-plan.md, phase 2)
+ *
+ * - A 20 minute day: about 12 minutes from 6:30 to 18:00 and 8 minutes of night, at the field speed (10). Each frame's
+ *   step is scaled with a fraction carried over between frames (the engine's speed is a whole number). Sun's Song
+ *   (speed 400 and up) isn't scaled. The Fishing Pond (speed 1) runs on the same clock as the field.
+ * - Places where vanilla stops the clock (speed 0: Kokiri Forest, towns, indoors) keep a hidden clock running: the
+ *   time owed. At each scene change the visible time catches up by at most an hour, but never past the next barrier
+ *   (day to dusk at 16:00, night to dawn at 4:00), so frozen places get later in the day or the night but never turn
+ *   to dusk or dawn. Sunsets and sunrises only play where time flows; once one does, nothing is owed any more.
+ */
+
+#define TIME_DAY_SCALE 56    // per 256: 31403 units of day in 12 minutes at speed 10
+#define TIME_NIGHT_SCALE 91  // per 256: 34133 units of night in 8 minutes at speed 10 (vanilla: twice the day's)
+#define TIME_FIELD_SPEED 10
+#define TIME_STEP_MAX CLOCK_TIME(1, 0)
+#define TIME_BARRIER_MARGIN CLOCK_TIME(0, 2)
+
+static u32 sTimeFrac;     // 1/256 units carried to the next frame
+static u32 sHiddenFrac;
+static u32 sTimeOwed;     // time that passed while the clock was stopped
+static u16 sTimeLast;     // the visible time last frame (to see a barrier pass)
+
+/** The time to add this frame, in 1/256 units. */
+static u32 Fishmod_TimeStep(u32 speed, s32 day) {
+    return speed * (day ? TIME_DAY_SCALE : TIME_NIGHT_SCALE);
+}
+
+/** True if going from `from` forward to `to` passes 16:00 or 4:00. */
+static s32 Fishmod_TimeCrossesBarrier(u16 from, u16 to) {
+    u16 span = to - from;
+
+    return ((u16)(CLOCK_TIME(16, 0) - from) < span) || ((u16)(CLOCK_TIME(4, 0) - from) < span) ||
+           (to == CLOCK_TIME(16, 0)) || (to == CLOCK_TIME(4, 0));
+}
+
+void Fishmod_AdvanceTime(PlayState* play) {
+    u16 speed = gTimeSpeed;
+    s32 day = IS_DAY;
+
+    if (play->sceneId == SCENE_FISHING_POND) {
+        speed = TIME_FIELD_SPEED;
+    }
+    if (speed >= 400) {
+        // Sun's Song: as vanilla
+        gSaveContext.save.dayTime += speed;
+    } else if (speed != 0) {
+        sTimeFrac += Fishmod_TimeStep(speed, day);
+        gSaveContext.save.dayTime += sTimeFrac >> 8;
+        sTimeFrac &= 0xFF;
+    } else {
+        // the clock is stopped here: the hidden clock runs at the field's speed
+        sHiddenFrac += Fishmod_TimeStep(TIME_FIELD_SPEED, day);
+        sTimeOwed += sHiddenFrac >> 8;
+        sHiddenFrac &= 0xFF;
+        if (sTimeOwed > 0x10000) {
+            sTimeOwed = 0x10000;
+        }
+    }
+}
+
+/** Once a frame: a sunset or sunrise that played out (or Sun's Song) means nothing is owed any more. */
+void Fishmod_TimeUpdate(PlayState* play) {
+    u16 now = gSaveContext.save.dayTime;
+
+    if ((now != sTimeLast) && Fishmod_TimeCrossesBarrier(sTimeLast, now)) {
+        sTimeOwed = 0;
+    }
+    sTimeLast = now;
+}
+
+/** At every scene change: the visible time catches up a little with the time owed, up to the next barrier. */
+void Fishmod_TimeOnSceneExit(void) {
+    u16 now = gSaveContext.save.dayTime;
+    u16 toBarrier;
+    u32 step;
+
+    if (sTimeOwed == 0) {
+        return;
+    }
+    // the next barrier ahead of now
+    toBarrier = (u16)(CLOCK_TIME(16, 0) - now);
+    if ((u16)(CLOCK_TIME(4, 0) - now) < toBarrier) {
+        toBarrier = (u16)(CLOCK_TIME(4, 0) - now);
+    }
+    if (toBarrier <= TIME_BARRIER_MARGIN) {
+        return; // waiting at a barrier: only flowing time takes it past
+    }
+    step = MIN(sTimeOwed, TIME_STEP_MAX);
+    step = MIN(step, (u32)(toBarrier - TIME_BARRIER_MARGIN));
+    gSaveContext.save.dayTime = now + step;
+    sTimeOwed -= step;
+    sTimeLast = gSaveContext.save.dayTime;
 }
