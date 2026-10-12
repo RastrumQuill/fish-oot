@@ -18,7 +18,6 @@ The plan is in [v5-plan.md](v5-plan.md). Items:
 2. **Longer days.** OoT's day runs about 5x faster than MM's (MM: 18 min 26 s). Aim for a 20 or 24 minute day, so
    hanging out at a spot to meet its different fish by time and weather is possible (and it makes Dampé easier).
 3. **Cheaper AI hot path**, to pay for the rest.
-5. **Lure behaviour:** fish react to how a lure moves, retrieve styles, surface lures.
 6. **Visible reactions:** notice, follow, inspect, strike.
 7. **Bite rhythm:** nibble, nibble, bite on the bobber, with sound and rumble.
 8. **Line tension re-check** in bigger water, scaled by the fish's weight if needed.
@@ -26,6 +25,8 @@ The plan is in [v5-plan.md](v5-plan.md). Items:
 11. **Animation polish:** catfish curl on sharp turns, small-fish swim speed.
 12. **AI v2:** heading with pitch, schools for small species, habitats as shapes, senses and mood.
 13. **Lake Hylia** sub-biomes with their own fish.
+
+Notes only, not built in test5: lures, sinkers and the sinking lure (item 5), hookshot fishing.
 
 ## Planned
 
