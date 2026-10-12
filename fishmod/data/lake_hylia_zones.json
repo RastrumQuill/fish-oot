@@ -1,19 +1,204 @@
 {
   "scene": "SCENE_LAKE_HYLIA",
-  "note": "DRAFT for approval: Lake Hylia's sub-biomes. Shapes are circles (x, z, r) or capsules (x1, z1, x2, z2, r) in world units. 'auto' zones come from the depth map.",
+  "note": "DRAFT 2 for approval: Lake Hylia's sub-biomes. Shapes mark places for authoring only: in the game, props thin out at the edges and zones overlap, and the shore-to-deep banding (reeds, lily pads, submerged weed, bare bottom) follows every shore from the depth map. Circles (x, z, r) or capsules (x1, z1, x2, z2, r) in world units; 'auto' zones come from the depth map.",
   "zones": [
-    { "id": 1, "name": "Gerudo river inflow", "shape": ["circle", -3700, 3700, 520], "bed": "pebbles and gravel fan", "props": "smooth river stones, foam at the mouth, ribbon weed bent downstream", "fish": "current lovers, active at dawn" },
-    { "id": 2, "name": "Lab shore and dock", "shape": ["circle", -2450, 4050, 420], "bed": "silt", "props": "dock pilings with cross-bracing, a sunken crib, shade", "fish": "bass and catfish in the shade" },
-    { "id": 3, "name": "North beach shallows", "shape": ["capsule", -1900, 3150, 1100, 3150, 520], "bed": "sand", "props": "sedge tussocks at the edge, a few reeds, open sand lanes", "fish": "minnow schools by day, carp, bass at dawn and dusk" },
-    { "id": 4, "name": "Pond-house cove", "shape": ["circle", 1650, 4350, 650], "bed": "silt", "props": "lily field with a few flowers, reed walls, a stump under the pads", "fish": "bass under the pads, greengill" },
-    { "id": 5, "name": "West bridge and grave islet point", "shape": ["capsule", -3050, 4700, -3050, 6150, 380], "bed": "cobble", "props": "bridge pilings, iwagumi-style boulders running out from the islet", "fish": "bass at the point, pike in ambush" },
-    { "id": 6, "name": "West weed flat", "shape": ["circle", -3900, 5600, 650], "bed": "silt and sand", "props": "eelgrass meadows with sand lanes, a laydown log", "fish": "pike, bass, greengill" },
-    { "id": 7, "name": "Drop-off (weed edge)", "shape": "auto: where the depth falls fast around the basin", "bed": "steep bank", "props": "tall ribbon weed at the lip, scattered boulders down the slope", "fish": "big bass and pike holding at the edge" },
-    { "id": 8, "name": "Deep basin", "shape": ["circle", -1000, 5800, 1000], "bed": "bare silt", "props": "none (open water)", "fish": "catfish and carp by day, big fish rising at dusk" },
-    { "id": 9, "name": "Water Temple gate (deepest)", "shape": ["circle", -1057, 6230, 240], "bed": "the gate", "props": "none", "fish": "the rare deep fish" },
-    { "id": 10, "name": "South bridge pilings", "shape": ["capsule", -2700, 6450, -1500, 6900, 260], "bed": "silt", "props": "bridge pilings, drowned branches", "fish": "bass, catfish at night" },
-    { "id": 11, "name": "Island shallows", "shape": ["circle", -900, 7150, 760], "bed": "sand and silt", "props": "weed flat, a drowned tree, pebbles near the island", "fish": "loach at night, carp" },
-    { "id": 12, "name": "East weed flats", "shape": ["circle", 1500, 6500, 950], "bed": "silt", "props": "pondweed and eelgrass clumps, sand lanes", "fish": "bass, greengill, minnow schools" },
-    { "id": 13, "name": "South reed bank and lily cove", "shape": ["capsule", -1700, 8650, 700, 8650, 520], "bed": "silt", "props": "reed walls, lily pads, duckweed caught in the reeds", "fish": "bass at dawn and dusk, catfish at night" }
+    {
+      "id": 1,
+      "name": "Gerudo river inflow",
+      "shape": [
+        "circle",
+        -3700,
+        3700,
+        520
+      ],
+      "bed": "pebbles and gravel fan",
+      "props": "smooth river stones, foam at the mouth, ribbon weed bent downstream",
+      "fish": "current lovers, active at dawn"
+    },
+    {
+      "id": 2,
+      "name": "Lab shore and dock",
+      "shape": [
+        "circle",
+        -2450,
+        4050,
+        420
+      ],
+      "bed": "silt",
+      "props": "dock pilings with cross-bracing, a sunken crib, shade",
+      "fish": "bass in the shade, catfish under the dock by day"
+    },
+    {
+      "id": 3,
+      "name": "North beach shallows",
+      "shape": [
+        "capsule",
+        -1900,
+        3150,
+        1100,
+        3150,
+        520
+      ],
+      "bed": "sand",
+      "props": "sedge tussocks at the edge, a few reeds, open sand lanes",
+      "fish": "minnow schools by day, carp, bass at dawn and dusk"
+    },
+    {
+      "id": 4,
+      "name": "Pond-house cove",
+      "shape": [
+        "circle",
+        1650,
+        4350,
+        650
+      ],
+      "bed": "silt",
+      "props": "lily field with a few flowers, reed walls, a stump under the pads",
+      "fish": "bass under the pads, greengill"
+    },
+    {
+      "id": 5,
+      "name": "West bridge and grave islet point",
+      "shape": [
+        "capsule",
+        -3050,
+        4700,
+        -3050,
+        6150,
+        380
+      ],
+      "bed": "cobble",
+      "props": "bridge pilings, iwagumi-style boulders running out from the islet",
+      "fish": "bass at the point, pike in ambush, catfish in the rocks by day"
+    },
+    {
+      "id": 6,
+      "name": "West weed flat",
+      "shape": [
+        "circle",
+        -3900,
+        5600,
+        650
+      ],
+      "bed": "silt and sand",
+      "props": "eelgrass meadows with sand lanes, a laydown log",
+      "fish": "pike, bass, greengill"
+    },
+    {
+      "id": 7,
+      "name": "Drop-off (weed edge)",
+      "shape": "auto: where the depth falls fast around the basin",
+      "bed": "steep bank",
+      "props": "tall ribbon weed at the lip, scattered boulders down the slope",
+      "fish": "big bass and pike holding at the edge"
+    },
+    {
+      "id": 8,
+      "name": "Deep basin",
+      "shape": [
+        "circle",
+        -1000,
+        5800,
+        1000
+      ],
+      "bed": "bare silt",
+      "props": "none (open water)",
+      "fish": "pike and big bass cruising, carp by day; big fish rising at dusk (catfish stay on the banks)"
+    },
+    {
+      "id": 9,
+      "name": "Water Temple gate (deepest)",
+      "shape": [
+        "circle",
+        -1057,
+        6230,
+        240
+      ],
+      "bed": "the gate",
+      "props": "none",
+      "fish": "the rare deep fish"
+    },
+    {
+      "id": 10,
+      "name": "South bridge pilings",
+      "shape": [
+        "capsule",
+        -2700,
+        6450,
+        -1500,
+        6900,
+        260
+      ],
+      "bed": "silt",
+      "props": "bridge pilings, drowned branches",
+      "fish": "bass, catfish under the pilings by day, roaming at night"
+    },
+    {
+      "id": 11,
+      "name": "Island shallows",
+      "shape": [
+        "circle",
+        -900,
+        7150,
+        760
+      ],
+      "bed": "sand and silt",
+      "props": "weed flat, a drowned tree, pebbles near the island",
+      "fish": "loach at night, carp, catfish cruising the shallows at night"
+    },
+    {
+      "id": 12,
+      "name": "East weed flats",
+      "shape": [
+        "circle",
+        1500,
+        6500,
+        950
+      ],
+      "bed": "silt",
+      "props": "pondweed and eelgrass clumps, sand lanes",
+      "fish": "bass, greengill, minnow schools"
+    },
+    {
+      "id": 13,
+      "name": "South reed bank and lily cove",
+      "shape": [
+        "capsule",
+        -1700,
+        8650,
+        700,
+        8650,
+        520
+      ],
+      "bed": "silt",
+      "props": "reed walls, lily pads, duckweed caught in the reeds",
+      "fish": "bass at dawn and dusk, catfish along the reeds at night"
+    },
+    {
+      "id": 14,
+      "name": "Pillar ruins (by the Zora's Domain way)",
+      "shape": [
+        "circle",
+        -950,
+        3850,
+        380
+      ],
+      "bed": "stone blocks and rubble",
+      "props": "fallen stone blocks, moss on the stone, weed between the blocks",
+      "fish": "catfish and big bass holding in the shade of the blocks by day; loach at night"
+    },
+    {
+      "id": 15,
+      "name": "Dry dock (north beach)",
+      "shape": [
+        "circle",
+        -430,
+        3330,
+        260
+      ],
+      "bed": "sand and planks",
+      "props": "a short dock on pilings, a boat's mooring later, sedge along the beach",
+      "fish": "minnows and greengill around the pilings, bass at dawn"
+    }
   ]
 }
