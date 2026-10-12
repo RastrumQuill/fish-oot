@@ -238,7 +238,48 @@ def rom_leaf_litter():
     return vanilla("objects/gameplay_keep/gWitheredLeafTex.rgba16.png")
 
 
+def rom_spatterdock():
+    """A round floating leaf from a quarter of the magic bean's platform leaf, mirrored four ways, darkened toward a
+    pond green."""
+    src = vanilla("objects/object_mamenoki/gMagicBeanPlatformTex.rgba16.png")
+    w, h = src.size
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    q = src.resize((w // 2, h // 2), Image.BOX)
+    for (fx, fy, ox, oy) in ((False, False, 0, 0), (True, False, w // 2, 0), (False, True, 0, h // 2),
+                             (True, True, w // 2, h // 2)):
+        t = q.transpose(Image.FLIP_LEFT_RIGHT) if fx else q
+        t = t.transpose(Image.FLIP_TOP_BOTTOM) if fy else t
+        out.paste(t, (ox, oy))
+    res = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = out.getpixel((x, y))
+            if a < 128 or math.hypot(x - w / 2 + 0.5, y - h / 2 + 0.5) > w / 2 - 0.5:
+                continue
+            v = luma((r, g, b)) / 255.0
+            res.putpixel((x, y), lerp(hexc("#1e3c10"), hexc("#86a046"), v) + (255,))
+    return res
+
+
+def rom_colour(path, size=None):
+    """A vanilla texture kept in colour (cut-out kept)."""
+    src = vanilla(path)
+    if size:
+        src = src.resize(size, Image.BOX)
+    return src
+
+
 ROM_TEXTURES = {
+    "rush_card": (lambda: ia_card("scenes/misc/kakusiana/kakusiana_room_0_000032A0_Tex.rgba16.png"), "ia8"),
+    "iris_card": (lambda: ia_card("objects/object_spot18_obj/gGoronCitySpearLeafTex.rgba16.png"), "ia8"),
+    "bigleaf_card": (lambda: ia_card("scenes/misc/kakusiana/kakusiana_room_9_00004B40_Tex.rgba16.png"), "ia8"),
+    "spatterdock": (rom_spatterdock, "ci4"),
+    "frond_card": (lambda: ia_card("scenes/overworld/spot11/spot11_scene_000164E0_Tex.ia4.png"), "ia8"),
+    "vine_card": (lambda: ia_card("scenes/dungeons/Bmori1/Bmori1_room_10_00002A60_Tex.rgba16.png"), "ia8"),
+    "curtain_card": (lambda: ia_card("scenes/overworld/spot04/spot04_room_0_00010D08_Tex.rgba16.png"), "ia8"),
+    "bankroot_card": (lambda: ia_card("scenes/dungeons/ddan/ddan_room_1_00006F00_Tex.rgba16.png"), "ia8"),
+    "marigold": (lambda: rom_colour("scenes/overworld/spot15/spot15_scene_0000BA00_Tex.rgba16.png"), "ci8"),
+    "fan_card": (lambda: ia_card("objects/object_jj/gJabuJabuFrillTex.rgba16.png"), "ia8"),
     "reed_card": (rom_reed_card, "ia8"),
     "grass_card": (rom_grass_card, "ia8"),
     "ribbon_card": (rom_ribbon_card, "ia8"),
@@ -480,7 +521,40 @@ def mesh_branch():
     return m
 
 
+def mesh_spatterdock():
+    """Floating leaves: three round pads on the surface."""
+    rnd = random.Random(121)
+    m = Mesh("spatterdock", "spatterdock")
+    white = (255, 255, 255)
+    for k in range(3):
+        cx, cz = rnd.uniform(-14, 14), rnd.uniform(-14, 14)
+        sz = rnd.uniform(9, 13)
+        ids = [m.vert((cx + dx * sz, 0.5 + k * 0.2, cz + dz * sz), uv, white)
+               for (dx, dz), uv in zip(((-1, -1), (1, -1), (1, 1), (-1, 1)), ((0, 0), (1, 0), (1, 1), (0, 1)))]
+        m.quad(ids[0], ids[3], ids[2], ids[1])
+    return m
+
+
+def mesh_curtain():
+    """Vines hanging down from the surface (under the ruins' blocks and the docks): cards whose top is at y 0."""
+    m = crossed_cards("vine_curtain", "curtain_card", 50, 90, 2, hexc("#8a9a50"), hexc("#1c2c10"), 122)
+    m.v = [(x, y - 90.0, z, r, g, b) for (x, y, z, r, g, b) in m.v]
+    return m
+
+
 MESHES = [
+    lambda: crossed_cards("rush_tuft", "rush_card", 40, 26, 2, hexc("#24401a"), hexc("#9aa050"), 111),
+    lambda: crossed_cards("iris", "iris_card", 30, 85, 3, hexc("#2a4a1c"), hexc("#a0b060"), 112, lean=4),
+    lambda: crossed_cards("big_pondweed", "bigleaf_card", 40, 52, 4, hexc("#1a3412"), hexc("#7a8a40"), 113),
+    mesh_spatterdock,
+    lambda: crossed_cards("kelp_frond", "frond_card", 26, 260, 3, hexc("#0c200a"), hexc("#6a7a38"), 114, lean=30),
+    lambda: crossed_cards_v("vine_strand", "vine_card", 28, 150, 2, hexc("#122a0e"), hexc("#7a8a48"), 115,
+                            lean=10, v_repeat=2.0),
+    mesh_curtain,
+    lambda: crossed_cards("bank_roots", "bankroot_card", 60, 70, 2, hexc("#2a2014"), hexc("#8a7a58"), 116),
+    lambda: crossed_cards("marigold", "marigold", 28, 22, 2, (200, 200, 200), (255, 255, 255), 117),
+    lambda: crossed_cards("fan_weed", "fan_card", 44, 44, 2, hexc("#2a3a1a"), hexc("#8a9a58"), 118),
+
     lambda: crossed_cards("grass_tuft", "grass_card", 34, 16, 2, hexc("#1c3a12"), hexc("#6c7a3b"), 104),
     lambda: crossed_cards_v("tall_weed", "ribbon_card", 26, 190, 3, hexc("#0d260b"), hexc("#5a6a30"), 105, lean=18,
                             v_repeat=2.0),
@@ -523,6 +597,16 @@ PROP_KINDS = [
     ("branch", "bark", "ci4"),
     ("drowned_tree", "bark", "ci4"),
     ("fallen_tree", "bark", "ci4"),
+    ("rush_tuft", "rush_card", "ia8"),
+    ("iris", "iris_card", "ia8"),
+    ("big_pondweed", "bigleaf_card", "ia8"),
+    ("spatterdock", "spatterdock", "ci4"),
+    ("kelp_frond", "frond_card", "ia8"),
+    ("vine_strand", "vine_card", "ia8"),
+    ("vine_curtain", "curtain_card", "ia8"),
+    ("bank_roots", "bankroot_card", "ia8"),
+    ("marigold", "marigold", "ci8"),
+    ("fan_weed", "fan_card", "ia8"),
     ("lily_flower", "lily_flower", "ci4"),
     ("lily_centre", "lily_centre", "ci4"),
 ]

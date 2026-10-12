@@ -89,13 +89,28 @@ RULES = {
     "pebble_patch": ((-4, 60), 0.0, {1: 0.4, 3: 0.05, 15: 0.05}, (1, 3), (0.6, 1.2), False),
     "sunken_log": ((25, 260), 0.002, {6: 0.05, 10: 0.06, 2: 0.04, 11: 0.04}, (1, 1), (0.7, 1.1), False),
     "branch": ((20, 260), 0.004, {6: 0.06, 10: 0.08, 11: 0.06, 13: 0.04}, (1, 2), (0.7, 1.2), False),
+    "rush_tuft": ((-4, 20), 0.05, {13: 0.1, 4: 0.1, 6: 0.1, 11: 0.1}, (2, 5), (0.8, 1.3), False),
+    "iris": ((-4, 18), 0.015, {4: 0.2, 13: 0.2, 6: 0.08, 11: 0.06}, (2, 4), (0.8, 1.2), False),
+    "marigold": ((-6, 8), 0.01, {4: 0.12, 13: 0.12, 11: 0.08}, (1, 3), (0.8, 1.2), False),
+    "big_pondweed": ((30, 180), 0.01, {12: 0.12, 6: 0.12, 4: 0.1}, (2, 4), (0.8, 1.3), False),
+    "spatterdock": ((15, 80), 0.0, {4: 0.2, 13: 0.2, 6: 0.08}, (2, 5), (0.8, 1.3), False),
+    "kelp_frond": ((150, 420), 0.0, {7: 0.2, 9: 0.1}, (3, 6), (0.8, 1.3), True),
+    "vine_strand": ((60, 260), 0.01, {12: 0.06, 6: 0.06, 10: 0.06}, (2, 4), (0.8, 1.3), False),
+    "vine_curtain": ((20, 200), 0.0, {14: 0.08, 15: 0.06, 2: 0.06}, (1, 3), (0.8, 1.2), False),
+    "bank_roots": ((0, 60), 0.0, {10: 0.05, 11: 0.05, 6: 0.05, 13: 0.04}, (1, 2), (0.8, 1.3), True),
+    "fan_weed": ((300, 1100), 0.0, {9: 0.3, 8: 0.01}, (1, 3), (0.8, 1.4), False),
     "boulder": ((-20, 700), 0.0, {5: 0.06, 14: 0.08, 7: 0.03, 1: 0.03, 9: 0.05}, (1, 2), (0.9, 2.2), False),
-    "fallen_tree": ((60, 320), 0.0, {6: 0.012, 10: 0.015, 11: 0.012, 12: 0.006}, (1, 1), (0.8, 1.2), False),
+    "fallen_tree": ((140, 420), 0.0, {6: 0.012, 10: 0.015, 11: 0.012, 12: 0.006}, (1, 1), (0.8, 1.2), False),
     "drowned_tree": ((60, 300), 0.0, {10: 0.03, 11: 0.03, 14: 0.02}, (1, 1), (0.8, 1.3), False),
     "old_posts": ((5, 200), 0.0, {14: 0.12, 15: 0.15, 2: 0.08}, (1, 2), (0.8, 1.2), False),
     "leaf_litter": ((10, 120), 0.005, {11: 0.05, 13: 0.04, 4: 0.04}, (1, 1), (0.8, 1.3), False),
 }
-FLOATING = {"lily_pad", "float_leaves"}  # sit on the surface, not the bed
+# How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
+# meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
+HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 190, "broadleaf": 40, "bush_weed": 42, "kelp_frond": 260,
+          "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44, "drowned_tree": 210,
+          "old_posts": 60, "fallen_tree": 90, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
+FLOATING = {"lily_pad", "float_leaves", "spatterdock", "vine_curtain"}  # sit on the surface, not the bed
 
 
 def place(scene, seed=1):
@@ -141,7 +156,7 @@ def place(scene, seed=1):
                 if not (drange[0] <= depth <= drange[1]):
                     continue
                 chance = base + sum(b * zin.get(zid, 0.0) for zid, b in boosts.items())
-                if kind in ("reed_clump", "cattails"):
+                if kind in ("reed_clump", "cattails", "rush_tuft", "iris", "marigold"):
                     chance *= 1.0 - min(1.0, open_shore * 3.0)
                 if steep:
                     chance += 0.35 * max(0.0, min(1.0, (slope - 0.6) / 0.8))
@@ -163,8 +178,15 @@ def place(scene, seed=1):
                     if not (drange[0] - 4 <= pd <= drange[1] + 10):
                         continue
                     y = ps if kind in FLOATING else pf
+                    sc = rnd.uniform(*scale)
+                    if kind in HEIGHT:
+                        # stay a little under the surface (rocks and logs may show in the shallows)
+                        room = pd - (2 if kind in ("rock", "boulder", "sunken_log", "branch") else 8)
+                        sc = min(sc, room / HEIGHT[kind])
+                        if sc < 0.35:
+                            continue
                     out.append({"kind": kind, "x": px, "y": y, "z": pz, "yaw": rnd.uniform(0, 2 * math.pi),
-                                "scale": rnd.uniform(*scale), "tint": rnd.uniform(0.82, 1.08)})
+                                "scale": sc, "tint": rnd.uniform(0.82, 1.08)})
                 break  # one rule per candidate: keeps kinds from stacking on one spot
     return out
 
