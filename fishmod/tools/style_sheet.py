@@ -242,12 +242,11 @@ def main():
     skip = {"stump", "stump_top", "lily_flower", "lily_centre"}
     new_names = sorted(f[:-4] for f in os.listdir(MESH) if f.endswith(".obj") and f[:-4] not in skip)
     new = [load_obj(n) for n in new_names]
-    stump = [load_obj("stump"), load_obj("stump_top")]
     flower = [load_obj("lily_flower"), load_obj("lily_centre")]
     pad_with_flower = [vanilla[1]] + [f.moved((4, 1, 4), 1.2) for f in flower]
 
     t1 = ([tile([m], "vanilla " + m.name) for m in vanilla] + [tile([m], "new " + m.name) for m in new] +
-          [tile(stump, "new stump"), tile(flower, "new lily flower"), tile(pad_with_flower, "vanilla pad + flower")])
+          [tile(flower, "new lily flower"), tile(pad_with_flower, "vanilla pad + flower")])
     panel1 = grid(t1, 5)
 
     v = os.path.join(SCENES, "misc", "turibori")
@@ -283,7 +282,6 @@ def main():
         load_obj("bush_weed").moved((70, 0, -50), 1.0, 0.3), load_obj("bush_weed").moved((95, 0, -20), 0.8, 1.3),
         load_obj("pebble_patch").moved((-20, 1, 80), 0.8),
         rock.moved((-90, 2, 40), 0.35, 0.7), rock.moved((60, 2, 70), 0.25, 2.0),
-        load_obj("stump").moved((120, 0, 60), 1.2), load_obj("stump_top").moved((120, 0, 60), 1.2),
     ]
     lo, hi = bounds(cluster)
     c = (lo + hi) / 2
@@ -292,7 +290,7 @@ def main():
     width = max(panel1.width, panel2.width, big.width + 8)
     parts = [heading("1. Vanilla props (object_fish) and the new props, same camera", width), panel1,
              heading("2. New textures next to the vanilla textures they were sampled from (4x)", width), panel2,
-             heading("3. A weed bed cluster: hero log, ribbon weed and bushes, pebbles, vanilla rocks, a stump", width),
+             heading("3. A weed bed cluster: hero log, ribbon weed and bushes, pebbles, vanilla rocks", width),
              big]
     sheet = Image.new("RGB", (width, sum(p.height for p in parts)), (25, 25, 25))
     y = 0

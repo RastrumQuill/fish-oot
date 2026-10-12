@@ -62,6 +62,10 @@ EnFishmodShared* EnFishmod_Shared(PlayState* play) {
 
         sShared.frame = play->gameplayFrames;
         sShared.linkPos = player->actor.world.pos;
+        sShared.rosterFocus = sShared.linkPos;
+#if FISHMOD_DEBUG
+        Fishmod_DebugRosterFocus(&sShared.rosterFocus);
+#endif
         sShared.bobberIn = EnFishmod_RodBobberInWater();
         sShared.bobberPos = gFishmodRodState.bobberPos;
         sShared.thinksLeft = THINK_BUDGET;
@@ -133,6 +137,11 @@ static void Manager_BuildRoster(PlayState* play) {
     // the shared random numbers, seeded for the roster and reseeded from the clock afterwards
     Rand_Seed((u32)play->sceneId * 7919 + (u32)gSaveContext.save.totalDays * 104729 + 17);
     count = FISHMOD_FISH_COUNT;
+#if FISHMOD_OPT >= 5
+    if (spawns->fish > 0) {
+        count = MIN(spawns->fish, FISHMOD_ROSTER_MAX);
+    }
+#endif
 #if FISHMOD_DEBUG
     if (Fishmod_DebugRosterCount() > 0) {
         count = MIN(Fishmod_DebugRosterCount(), FISHMOD_ROSTER_MAX);
@@ -143,6 +152,7 @@ static void Manager_BuildRoster(PlayState* play) {
         FishmodRosterFish* rec = &sRoster[sRosterCount];
         const FishmodSpecies* species;
         Vec3f center;
+        f32 radius;
         f32 surface;
         f32 floor;
         s32 roll = (s32)Rand_ZeroFloat(totalWeight - 0.01f);
@@ -172,8 +182,14 @@ static void Manager_BuildRoster(PlayState* play) {
         center.x = box->xMin + box->xLength * 0.5f;
         center.y = box->ySurface;
         center.z = box->zMin + box->zLength * 0.5f;
-        if (EnFishmod_FindWaterPoint(play, &center, CLAMP_MIN(box->xLength, box->zLength) * 0.6f, 25.0f, &rec->home,
-                                     &surface, &floor)) {
+        radius = CLAMP_MIN(box->xLength, box->zLength) * 0.6f;
+#if FISHMOD_OPT >= 5
+        // most fish live by cover (weed beds, rocks, reeds, pads), the rest out in the open water
+        if ((Rand_ZeroOne() < 0.75f) && EnFishmod_ScatterRandomCover(&center)) {
+            radius = 120.0f;
+        }
+#endif
+        if (EnFishmod_FindWaterPoint(play, &center, radius, 25.0f, &rec->home, &surface, &floor)) {
             rec->species = s;
             rec->length = lo + (hi - lo) * f;
             rec->yaw = (s16)Rand_ZeroFloat(0xFFFF);
@@ -204,7 +220,7 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
         i = sNext;
         sNext = (sNext + 1 < sRosterCount) ? sNext + 1 : 0;
         rec = &sRoster[i];
-        dist = Math_Vec3f_DistXZ(&shared->linkPos, &rec->home);
+        dist = Math_Vec3f_DistXZ(&shared->rosterFocus, &rec->home);
         if (rec->caught) {
             continue;
         }
@@ -212,7 +228,7 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
 #else
     for (i = 0; i < sRosterCount; i++) {
         FishmodRosterFish* rec = &sRoster[i];
-        f32 dist = Math_Vec3f_DistXZ(&shared->linkPos, &rec->home);
+        f32 dist = Math_Vec3f_DistXZ(&shared->rosterFocus, &rec->home);
 
         if (rec->caught) {
             continue;

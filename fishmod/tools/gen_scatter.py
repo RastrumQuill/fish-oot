@@ -89,10 +89,10 @@ RULES = {
     "tall_weed": ((110, 340), 0.0, {}, (3, 7), (0.8, 1.3), True),
     "rock": ((-10, 600), 0.006, {5: 0.35, 14: 0.4, 1: 0.25, 9: 0.1}, (1, 4), (0.15, 0.6), False),
     "pebble_patch": ((-4, 60), 0.0, {1: 0.4, 3: 0.05, 15: 0.05}, (1, 3), (0.6, 1.2), False),
-    # Wood: no trees grow round the lake, so it is driftwood brought down the Gerudo river, stranded near the
-    # inflow, along the lab shore and on the west flat downstream of it (no drowned or fallen trees)
-    "sunken_log": ((25, 260), 0.0, {1: 0.06, 2: 0.04, 6: 0.04}, (1, 1), (0.7, 1.1), False),
-    "branch": ((20, 260), 0.0, {1: 0.1, 2: 0.06, 6: 0.06, 5: 0.03}, (1, 2), (0.7, 1.2), False),
+    # Wood: the lake's one tree is the dead tree on the main island, so wood is only what has fallen from it, in the
+    # water round the island (zone 16); no drowned or fallen trees
+    "sunken_log": ((25, 260), 0.0, {16: 0.05}, (1, 1), (0.7, 1.1), False),
+    "branch": ((15, 260), 0.0, {16: 0.12}, (1, 2), (0.7, 1.2), False),
     "rush_tuft": ((-4, 20), 0.05, {13: 0.1, 4: 0.1, 6: 0.1, 11: 0.1}, (2, 5), (0.8, 1.3), False),
     "iris": ((-4, 18), 0.015, {4: 0.2, 13: 0.2, 6: 0.08, 11: 0.06}, (2, 4), (0.8, 1.2), False),
     "marigold": ((-6, 8), 0.01, {4: 0.12, 13: 0.12, 11: 0.08}, (1, 3), (0.8, 1.2), False),
@@ -104,14 +104,14 @@ RULES = {
     "bank_roots": ((0, 60), 0.0, {10: 0.05, 11: 0.05, 6: 0.05, 13: 0.04}, (1, 2), (0.8, 1.3), True),
     "fan_weed": ((300, 1100), 0.0, {9: 0.3, 8: 0.01}, (1, 3), (0.8, 1.4), False),
     "boulder": ((-20, 700), 0.0, {5: 0.06, 14: 0.08, 7: 0.03, 1: 0.03, 9: 0.05}, (1, 2), (0.9, 2.2), False),
-    "old_posts": ((5, 200), 0.0, {14: 0.12, 15: 0.15, 2: 0.08}, (1, 2), (0.8, 1.2), False),
+    "old_posts": ((5, 200), 0.0, {15: 0.15, 2: 0.08}, (1, 2), (0.8, 1.2), False),  # old pilings at the docks
     "leaf_litter": ((10, 120), 0.005, {11: 0.05, 13: 0.04, 4: 0.04}, (1, 1), (0.8, 1.3), False),
 }
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
 # meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
 HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 190, "broadleaf": 40, "bush_weed": 42, "kelp_frond": 260,
-          "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44, "drowned_tree": 210,
-          "old_posts": 60, "fallen_tree": 90, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
+          "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44,
+          "old_posts": 60, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
 FLOATING = {"lily_pad", "float_leaves", "spatterdock", "vine_curtain"}  # sit on the surface, not the bed
 
 
@@ -125,6 +125,17 @@ def place(scene, seed=1):
     zones = zones["zones"]
     rnd = random.Random(seed)
     patch = {k: Noise(seed * 31 + i, 420.0) for i, k in enumerate(RULES)}
+
+    # places kept clear of props (a zone's "exclude" shapes: rect x0 z0 x1 z1, or circle x z r)
+    excludes = [sh for zn in zones for sh in zn.get("exclude", [])]
+
+    def excluded(x, z):
+        for sh in excludes:
+            if sh[0] == "rect" and sh[1] <= x <= sh[3] and sh[2] <= z <= sh[4]:
+                return True
+            if sh[0] == "circle" and (x - sh[1]) ** 2 + (z - sh[2]) ** 2 <= sh[3] ** 2:
+                return True
+        return False
 
     def surface_at(x, z):
         return next((b["y"] for b in boxes if b["xMin"] <= x <= b["xMin"] + b["xLen"] and
@@ -171,7 +182,7 @@ def place(scene, seed=1):
                     px = x + (rnd.gauss(0, 14) if k else 0)
                     pz = z + (rnd.gauss(0, 14) if k else 0)
                     ps = surface_at(px, pz)
-                    if ps is None:
+                    if ps is None or excluded(px, pz):
                         continue
                     pf = floor_at(px, pz, ps)
                     if pf is None:
@@ -203,9 +214,8 @@ def preview(scene, instances, outdir):
                "float_leaves": (120, 255, 120), "grass_tuft": (90, 140, 60), "ribbon_weed": (40, 120, 40),
                "broadleaf": (150, 200, 60), "bush_weed": (30, 90, 30), "tall_weed": (10, 60, 20),
                "rock": (200, 200, 200), "pebble_patch": (230, 210, 160), "sunken_log": (120, 70, 30),
-               "branch": (150, 100, 60), "stump": (100, 60, 30), "drowned_tree": (80, 50, 20),
-               "old_posts": (180, 140, 100), "leaf_litter": (170, 90, 40), "boulder": (240, 240, 240),
-               "fallen_tree": (60, 40, 20)}
+               "branch": (150, 100, 60), "stump": (100, 60, 30),
+               "old_posts": (180, 140, 100), "leaf_litter": (170, 90, 40), "boulder": (240, 240, 240)}
     s = 0.12
     img = Image.new("RGB", (int((x1 - x0) * s), int((z1 - z0) * s)), (30, 50, 70))
     d = ImageDraw.Draw(img)
@@ -254,6 +264,9 @@ def write_c(scene, instances):
     props = []
     for it in instances:
         kind = {"boulder": "rock"}.get(it["kind"], it["kind"])
+        # patch kinds are several clumps per mesh: keep one in that many
+        if kind in gh.PATCH and rnd.random() >= 1.0 / gh.PATCH[kind]:
+            continue
         props.append((it["x"], it["y"], it["z"], kind, it["yaw"], it["scale"], it["tint"]))
         if kind == "lily_pad" and rnd.random() < 0.15:
             # a flower on some of the pads

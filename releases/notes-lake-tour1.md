@@ -22,5 +22,14 @@ What's new to look at:
 - no drowned or fallen trees any more: wood is driftwood from the Gerudo river, near the inflow, the lab shore and
   the west flat.
 
+Updated (same name, rebuilt):
+- props draw much further (up to 1500 units), nearest first whatever their kind, only what's in view, and grow in at
+  the edge of their range instead of popping in;
+- 300 fish in the lake (it had 10), most living by cover (weed beds, rocks, reeds, pads); on the tour they wake
+  around the camera, a couple per second, so they gather at each stop;
+- nothing grows on the ruins' walkway, plaza or pillars (by and near them is fine);
+- the only wood is branches and a log under the island's dead tree; no drowned or fallen trees;
+- a bobber's bait sinks at most about 5 m (180 units): the deep basin and the Water Temple gate are out of its reach.
+
 Known: the underwater haze isn't in yet (the water looks like vanilla's under the surface); the pond reeds don't
 sway yet.

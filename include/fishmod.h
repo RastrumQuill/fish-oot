@@ -117,7 +117,8 @@ typedef struct FishmodSceneSpawns {
     /* 0x00 */ s16 sceneId;
     /* 0x02 */ s16 count;
     /* 0x04 */ const FishmodSpawnEntry* entries;
-} FishmodSceneSpawns; // size = 0x08
+    /* 0x08 */ s16 fish; // how many fish live there (0: FISHMOD_FISH_COUNT); the most is FISHMOD_ROSTER_MAX
+} FishmodSceneSpawns; // size = 0x0C
 
 extern const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX];
 extern const FishmodSceneSpawns gFishmodSceneSpawns[];
@@ -370,6 +371,8 @@ void Fishmod_DebugBoot(void);
 // True if the autoplay script wants a normal boot (logo, title, file select) instead of going straight to Kokiri
 s32 Fishmod_DebugNormalBoot(void);
 s32 Fishmod_DebugWantsFish(void);
+// The debug tour's camera target, where fish should be woken instead of around Link; false when no tour runs
+s32 Fishmod_DebugRosterFocus(Vec3f* focus);
 // Fish per scene roster wanted by the autoplay script (benchmarks), 0 = the game's own count
 s32 Fishmod_DebugRosterCount(void);
 void Fishmod_AutoplayInput(struct GameState* gameState, Input* inputs);

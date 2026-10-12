@@ -184,8 +184,30 @@
         380
       ],
       "bed": "stone blocks and rubble",
-      "props": "fallen stone blocks, moss on the stone, weed between the blocks",
-      "fish": "catfish and big bass holding in the shade of the blocks by day; loach at night"
+      "props": "weed and fallen stone beside the ruins, never on the walkway, the plaza or the pillars",
+      "fish": "catfish and big bass holding in the shade of the blocks by day; loach at night",
+      "exclude": [
+        [
+          "rect",
+          -1110,
+          3240,
+          -740,
+          3930
+        ],
+        [
+          "circle",
+          -800,
+          3950,
+          140
+        ],
+        [
+          "circle",
+          -1050,
+          4250,
+          160
+        ]
+      ],
+      "_exclude_doc": "No props on the entrance itself: the stone walkway from the shore, the sunken plaza and right round the pillars (a path that's used). Plants and stones next to it are fine."
     },
     {
       "id": 15,
@@ -199,6 +221,18 @@
       "bed": "sand and planks",
       "props": "a short dock on pilings, a boat's mooring later, sedge along the beach",
       "fish": "minnows and greengill around the pilings, bass at dawn"
+    },
+    {
+      "id": 16,
+      "name": "Under the island's dead tree",
+      "shape": [
+        "circle",
+        -900,
+        7120,
+        700
+      ],
+      "props": "branches and a log fallen from the island's dead tree (the lake's only tree): the only wood in the lake",
+      "fish": "as the island shallows"
     }
   ]
 }

@@ -256,6 +256,22 @@ koi.
 **Animation (item 11).** Limit the catfish's turn curl (a per-model limit on the curve), speed up small fish's tail
 beat (phase ×1.25 under 9 inches), check the reduced rig against the full one in the studio.
 
+## Stretch: underwater atmosphere
+
+Not required for test5; worth doing if the budget allows, since together they would sell the water:
+- **Thicker haze under the surface** (fog closer than vanilla's underwater fog), which also lets dense props be drawn
+  only near the camera while it's underwater.
+- **Plant sway:** a slow per-kind bend applied in the props' matrices (a shear by a sine of time and position), so no
+  per-vertex work; the Fishing Pond's reeds sway in vanilla too.
+- **Particles:** a few small bubbles rising from weed beds, and specks drifting in the water near the camera
+  (billboards from a small pool, like vanilla's effects).
+
+Mesh simplification won't help much: the plants are already 4-6 triangles; what costs is the count of props (each a
+matrix and a draw call). So the commonest small plants are now **patches** (several clumps baked into one mesh:
+grass 4, ribbon weed 3). Baking whole chunks into one mesh would cut the CPU further but every chunk's vertices would
+have to be in memory (about 1.5 MB for the lake), so patches are the trade taken. The props have no collision at all
+(they're only drawn), so there's nothing to save there.
+
 ## Release
 
 **lake-test5:** Kokiri Forest and Lake Hylia (child and adult), with the test mode and animation studio patches as

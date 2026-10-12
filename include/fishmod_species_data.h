@@ -186,8 +186,8 @@ static const FishmodSpawnEntry sFishmodSpawns_LAKE_HYLIA[] = {
 };
 
 const FishmodSceneSpawns gFishmodSceneSpawns[] = {
-    { SCENE_KOKIRI_FOREST, ARRAY_COUNT(sFishmodSpawns_KOKIRI_FOREST), sFishmodSpawns_KOKIRI_FOREST },
-    { SCENE_LAKE_HYLIA, ARRAY_COUNT(sFishmodSpawns_LAKE_HYLIA), sFishmodSpawns_LAKE_HYLIA },
+    { SCENE_KOKIRI_FOREST, ARRAY_COUNT(sFishmodSpawns_KOKIRI_FOREST), sFishmodSpawns_KOKIRI_FOREST, 0 },
+    { SCENE_LAKE_HYLIA, ARRAY_COUNT(sFishmodSpawns_LAKE_HYLIA), sFishmodSpawns_LAKE_HYLIA, 300 },
 };
 
 const s32 gFishmodSceneSpawnsCount = ARRAY_COUNT(gFishmodSceneSpawns);

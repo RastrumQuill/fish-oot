@@ -229,6 +229,7 @@ s32 EnFishmod_WaterCell(struct PlayState* play, f32 x, f32 z);
 /* Habitat props (fishmod_scatter.c, FISHMOD_OPT 5) */
 void EnFishmod_ScatterLoad(struct PlayState* play);
 void EnFishmod_ScatterUnload(void);
+s32 EnFishmod_ScatterRandomCover(Vec3f* out);
 void EnFishmod_ScatterDraw(struct PlayState* play);
 
 s32 EnFishmod_FindWaterPoint(struct PlayState* play, Vec3f* center, f32 radius, f32 minDepth, Vec3f* out,
@@ -255,6 +256,7 @@ void EnFishmod_RigDraw(struct EnFishmod* this, struct PlayState* play, s32 varia
 typedef struct EnFishmodShared {
     u32 frame;
     Vec3f linkPos;
+    Vec3f rosterFocus; // where fish are woken around: Link (the debug tour: its camera)
     Vec3f bobberPos;
     s32 bobberIn;
     s32 thinksLeft;

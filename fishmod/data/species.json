@@ -1338,6 +1338,7 @@
     },
     "LAKE_HYLIA": {
       "name": "Lake Hylia",
+      "fish": 300,
       "status": "testing",
       "note": "Provisional: Kokiri species so test-mode builds can compare a big body of water with Kokiri. The real Lake Hylia plan is in fishmod/docs/lake-hylia.md."
     },

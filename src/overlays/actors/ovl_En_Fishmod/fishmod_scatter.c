@@ -25,6 +25,7 @@
 #include "libc/math.h"
 #include "ultra64.h"
 #include "zelda_arena.h"
+#include "rand.h"
 #include "assets/objects/object_fish/object_fish.h"
 
 #if FISHMOD_OPT >= 5
@@ -49,12 +50,24 @@ typedef struct FishmodPropKindInfo {
     u8 xlu;      // drawn see-through (the Fishing Pond's reed, as vanilla draws it)
 } FishmodPropKindInfo;
 
-#define DIST_SMALL 350.0f
-#define DIST_MID 600.0f
-#define DIST_FAR 950.0f
-// Props drawn per frame at most: each is a matrix and three commands in the frame's display buffer, which is far
-// from bottomless. Close-range kinds (and nearer chunks) come first, so the budget runs out on the far ones.
-#define PROP_BUDGET 260
+#define DIST_SMALL 650.0f
+#define DIST_MID 1050.0f
+#define DIST_FAR 1500.0f
+// The last part of a kind's range where its props grow in from nothing (instead of popping in)
+#define GROW_IN 0.25f
+// Props drawn per frame at most. They are drawn nearest band first (whatever their kind), so the budget runs out on
+// the far ones. Each is a matrix and three commands, in buffers of the props' own (allocated with the scene's props).
+#define PROP_BUDGET 700
+#define BAND_NEAR 500.0f
+#define BAND_MID 1000.0f
+#define BANDS 3
+// Props in view per band at most (before the budget)
+#define BAND_MAX 1200
+// The view's half-angle (diagonal, with room for the props' size): props outside it aren't drawn
+#define VIEW_COS 0.6f
+#define PROP_RADIUS 90.0f
+// See-through props (the pond reeds) drawn per frame at most
+#define XLU_MAX 200
 
 static FishmodPropKindInfo sKinds[FISHMOD_PROP_KIND_MAX];
 
@@ -104,8 +117,6 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_PEBBLE_PATCH].plant = false;
     sKinds[FISHMOD_PROP_SUNKEN_LOG].plant = false;
     sKinds[FISHMOD_PROP_BRANCH].plant = false;
-    sKinds[FISHMOD_PROP_FALLEN_TREE].plant = false;
-    sKinds[FISHMOD_PROP_DROWNED_TREE].plant = false;
     sKinds[FISHMOD_PROP_OLD_POSTS].plant = false;
 }
 
@@ -120,6 +131,30 @@ static FishmodProp* sProps;
 static u8* sChunkDry;
 static s8 sDryFor = -1; // the flag the table was made for; -1: not made yet
 
+// Two frames' worth of matrices and commands (the RSP reads last frame's while this one is built), in buffers of
+// their own rather than the frame's display buffer, which the scene and the fish need.
+typedef struct ScatterFrame {
+    Mtx mtx[PROP_BUDGET];
+    Gfx opa[PROP_BUDGET * 3 + FISHMOD_PROP_KIND_MAX * BANDS * 16 + 4];
+    Gfx xlu[XLU_MAX * 2 + BANDS * 16 + 4];
+} ScatterFrame;
+static ScatterFrame* sFrames; // [2]
+static s32 sFrame;
+static s32 sMtxUsed;
+
+static void Scatter_AllocBuffers(void) {
+    if (sFrames == NULL) {
+        sFrames = ZeldaArena_Malloc(sizeof(ScatterFrame) * 2);
+    }
+}
+
+static void Scatter_FreeBuffers(void) {
+    if (sFrames != NULL) {
+        ZeldaArena_Free(sFrames);
+        sFrames = NULL;
+    }
+}
+
 void EnFishmod_ScatterLoad(PlayState* play) {
     EnFishmod_ScatterUnload();
     sScatter = Fishmod_LoadScatter(play->sceneId);
@@ -131,7 +166,43 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sProps = (FishmodProp*)((u8*)sScatter + sScatter->propsOffset);
     sChunkDry = ZeldaArena_Malloc(sScatter->width * sScatter->depth);
     sDryFor = -1;
+    Scatter_AllocBuffers();
+#if FISHMOD_DEBUG
+    {
+        u32 maxFree;
+        u32 free;
+        u32 alloc;
+
+        ZeldaArena_GetSizes(&maxFree, &free, &alloc);
+        Fishmod_DebugPrintf(10, "props %d bufs %s arena free %dK (max %dK)", sScatter->count,
+                            (sFrames != NULL) ? "ok" : "NONE", (s32)(free >> 10), (s32)(maxFree >> 10));
+    }
+#endif
     Scatter_InitKinds();
+}
+
+/**
+ * A random piece of cover (a weed bed, rock, reeds, a lily pad...) for a fish's home: fish live by cover, not spread
+ * evenly over open water. False if the scene has no props.
+ */
+s32 EnFishmod_ScatterRandomCover(Vec3f* out) {
+    s32 tries;
+
+    if ((sScatter == NULL) || (sScatter->count == 0)) {
+        return false;
+    }
+    for (tries = 0; tries < 8; tries++) {
+        FishmodProp* prop = &sProps[(s32)Rand_ZeroFloat(sScatter->count - 0.01f)];
+
+        if ((prop->kind == FISHMOD_PROP_LILY_FLOWER) || (prop->kind == FISHMOD_PROP_LILY_CENTRE)) {
+            continue;
+        }
+        out->x = prop->x;
+        out->y = prop->y;
+        out->z = prop->z;
+        return true;
+    }
+    return false;
 }
 
 void EnFishmod_ScatterUnload(void) {
@@ -143,13 +214,8 @@ void EnFishmod_ScatterUnload(void) {
         ZeldaArena_Free(sChunkDry);
         sChunkDry = NULL;
     }
+    Scatter_FreeBuffers();
 }
-
-// The props' matrices, in a pool of their own (two frames' worth: the RSP reads last frame's while this one is
-// built), not in the frame's display buffer, which the scene and the fish need.
-static Mtx sMtxPool[2][PROP_BUDGET];
-static s32 sMtxFrame;
-static s32 sMtxUsed;
 
 /** One s15.16 entry of a fixed-point Mtx (row r, column c). */
 #define MTX_SET(mtx, r, c, fixed)                         \
@@ -163,11 +229,12 @@ static s32 sMtxUsed;
 /**
  * A prop's matrix: turned about Y, scaled, placed. Written straight into the fixed-point Mtx (guMtxF2L converts all
  * sixteen entries from floats; here only the three that aren't 0, 1 or a whole-number position need it).
+ * `grow` (0-1) shrinks it toward its base as it reaches the end of its draw distance.
  */
-static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
-    Mtx* mtx = &sMtxPool[sMtxFrame][sMtxUsed++];
+static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale, f32 grow) {
+    Mtx* mtx = &sFrames[sFrame].mtx[sMtxUsed++];
     s16 yaw = prop->yaw << 8;
-    f32 s = prop->scale * (65536.0f / 64.0f);
+    f32 s = prop->scale * grow * (65536.0f / 64.0f);
     s32 c = (s32)(Math_CosS(yaw) * s);
     s32 sn = (s32)(Math_SinS(yaw) * s);
 
@@ -177,7 +244,7 @@ static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
     MTX_SET(mtx, 0, 2, -sn);
     MTX_SET(mtx, 0, 3, 0);
     MTX_SET(mtx, 1, 0, 0);
-    MTX_SET(mtx, 1, 1, flatScale ? 0x10000 : prop->scale << 10);
+    MTX_SET(mtx, 1, 1, flatScale ? (s32)(grow * 0x10000) : (s32)s);
     MTX_SET(mtx, 1, 2, 0);
     MTX_SET(mtx, 1, 3, 0);
     MTX_SET(mtx, 2, 0, sn);
@@ -220,14 +287,41 @@ static void Scatter_UpdateDry(PlayState* play) {
     }
 }
 
+/** A kind's material, at the start of its props in a band. */
+static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind) {
+    gfx = Gfx_SetupDL(gfx, SETUPDL_25);
+    if (info->xlu || (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK)) {
+        // vanilla's own materials (lit by the scene's lights, like the Fishing Pond's props)
+        gSPDisplayList(gfx++, info->material);
+        return gfx;
+    }
+    gDPPipeSync(gfx++);
+    gDPSetTextureLUT(gfx++, G_TT_NONE);
+    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0, COMBINED);
+    gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_TEX_EDGE2);
+    gSPClearGeometryMode(gfx++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
+    gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
+    gSPDisplayList(gfx++, info->material);
+    return gfx;
+}
+
 void EnFishmod_ScatterDraw(PlayState* play) {
-    static u16 sVisible[64];                                       // chunks near the camera
-    static f32 sDistSq[ARRAY_COUNT(sVisible)];                     // their centres' distance from the eye, squared
-    static u8 sLowered[ARRAY_COUNT(sVisible)];                     // the water there has gone down (the drained lake)
+    static u16 sVisible[128];                  // chunks near the camera
+    static f32 sChunkDistSq[ARRAY_COUNT(sVisible)]; // their centres' distance from the eye, squared
+    static u16 sBand[BANDS][BAND_MAX];         // props in view, by distance band (kind by kind within a band)
+    static f32 sBandGrow[BANDS][BAND_MAX];     // and how far each has grown in
     static u16 sKindStart[ARRAY_COUNT(sVisible)][FISHMOD_PROP_KIND_MAX + 1]; // each kind's first prop in the chunk
+    s32 xluLeft = XLU_MAX;
+#if FISHMOD_DEBUG
+    static s32 sScanned;
+    static OSTime sT0, sT1, sT2;
+    OSTime tStart = osGetTime();
+#endif
+    s32 bandCount[BANDS];
     Vec3f eye = play->view.eye;
     Vec3f at = play->view.at;
     f32 lookX;
+    f32 lookY;
     f32 lookZ;
     f32 lookLen;
     s32 visibleCount = 0;
@@ -238,29 +332,38 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     s32 cx;
     s32 cz;
     s32 kind;
-    s32 chunk = sScatter ? sScatter->chunk : 1;
+    s32 chunk;
     s32 budget = PROP_BUDGET;
-    s32 pass;
+    s32 band;
+    s32 v;
+    Gfx* opa;
+    Gfx* xlu;
+    ScatterFrame* frame;
 
-    if ((sScatter == NULL) || (sChunkDry == NULL)) {
+    if ((sScatter == NULL) || (sChunkDry == NULL) || (sFrames == NULL)) {
         return;
     }
+    chunk = sScatter->chunk;
     Scatter_UpdateDry(play);
     // a camera being set up can give a nonsense eye for a frame (and turning a NaN into an integer is a crash on
     // the N64): skip the props that frame
-    if (!(eye.x == eye.x) || !(eye.z == eye.z) || (fabsf(eye.x) > 30000.0f) || (fabsf(eye.z) > 30000.0f) ||
-        !(at.x == at.x) || !(at.z == at.z)) {
+    if (!(eye.x == eye.x) || !(eye.y == eye.y) || !(eye.z == eye.z) || (fabsf(eye.x) > 30000.0f) ||
+        (fabsf(eye.z) > 30000.0f) || !(at.x == at.x) || !(at.y == at.y) || !(at.z == at.z)) {
         return;
     }
 
-    // the chunks within reach of the camera, and not behind it
     lookX = at.x - eye.x;
+    lookY = at.y - eye.y;
     lookZ = at.z - eye.z;
-    lookLen = sqrtf(SQ(lookX) + SQ(lookZ));
-    if (lookLen > 0.01f) {
-        lookX /= lookLen;
-        lookZ /= lookLen;
+    lookLen = sqrtf(SQ(lookX) + SQ(lookY) + SQ(lookZ));
+    if (lookLen < 0.01f) {
+        return;
     }
+    lookX /= lookLen;
+    lookY /= lookLen;
+    lookZ /= lookLen;
+
+    // the chunks within reach of the camera
     cx0 = CLAMP((s32)((eye.x - DIST_FAR - sScatter->x0) / chunk), 0, sScatter->width - 1);
     cx1 = CLAMP((s32)((eye.x + DIST_FAR - sScatter->x0) / chunk), 0, sScatter->width - 1);
     cz0 = CLAMP((s32)((eye.z - DIST_FAR - sScatter->z0) / chunk), 0, sScatter->depth - 1);
@@ -270,152 +373,182 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             s32 c = cz * sScatter->width + cx;
             f32 mx = sScatter->x0 + (cx + 0.5f) * chunk - eye.x;
             f32 mz = sScatter->z0 + (cz + 0.5f) * chunk - eye.z;
+            f32 d = SQ(mx) + SQ(mz);
 
-            if (sChunkStart[c] == sChunkStart[c + 1]) {
+            f32 my;
+            f32 front;
+
+            if ((sChunkStart[c] == sChunkStart[c + 1]) || (d > SQ(DIST_FAR + chunk))) {
                 continue;
             }
-            // behind the camera (with a chunk's width of slack)
-            if ((mx * lookX + mz * lookZ) < -chunk) {
-                continue;
-            }
-            if ((SQ(mx) + SQ(mz)) > SQ(DIST_FAR + chunk)) {
+            // the whole chunk outside the view cone (the same test as each prop's, with the chunk's size and the
+            // water's depth as room)
+            my = ((sChunkSurface[c] != -0x8000) ? sChunkSurface[c] - 150.0f : eye.y) - eye.y;
+            front = mx * lookX + my * lookY + mz * lookZ + chunk * 0.71f + PROP_RADIUS + 150.0f;
+            if (((front < 0.0f) || (SQ(front) < SQ(VIEW_COS) * (d + SQ(my)))) && (d > SQ(chunk * 1.5f))) {
                 continue;
             }
             if (visibleCount < ARRAY_COUNT(sVisible)) {
+                sChunkDistSq[visibleCount] = d;
                 sVisible[visibleCount++] = c;
             }
         }
     }
-    if (visibleCount == 0) {
-        return;
-    }
-    // nearest first
-    {
-        s32 i;
-        s32 j;
 
-        for (i = 0; i < visibleCount; i++) {
-            s32 c = sVisible[i];
-            f32 mx = sScatter->x0 + ((c % sScatter->width) + 0.5f) * chunk - eye.x;
-            f32 mz = sScatter->z0 + ((c / sScatter->width) + 0.5f) * chunk - eye.z;
-            f32 d = SQ(mx) + SQ(mz);
+    // where each kind's props start in each chunk (sorted by kind within a chunk: one pass finds them all)
+    for (v = 0; v < visibleCount; v++) {
+        s32 c = sVisible[v];
+        s32 i = sChunkStart[c];
+        s32 end = sChunkStart[c + 1];
+        s32 k = 0;
 
-            for (j = i - 1; (j >= 0) && (sDistSq[j] > d); j--) {
-                sDistSq[j + 1] = sDistSq[j];
-                sVisible[j + 1] = sVisible[j];
+        for (; i < end; i++) {
+            while (k <= sProps[i].kind) {
+                sKindStart[v][k++] = i;
             }
-            sDistSq[j + 1] = d;
-            sVisible[j + 1] = c;
+        }
+        while (k <= FISHMOD_PROP_KIND_MAX) {
+            sKindStart[v][k++] = end;
         }
     }
-    // Once per chunk, not per kind: whether it's dry, and where each kind's props start (they are sorted by kind
-    // within the chunk, so one pass finds them all)
-    {
-        s32 v;
+
+    // One pass over the props near the camera: in view (a cone around the look direction, any pitch), within their
+    // kind's distance, sorted into near / mid / far bands. Kinds come in order within a chunk, and the chunks are
+    // walked kind by kind, so each band is grouped by kind (one material per kind per band).
+    bandCount[0] = bandCount[1] = bandCount[2] = 0;
+#if FISHMOD_DEBUG
+    sScanned = 0;
+#endif
+    for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
+        FishmodPropKindInfo* info = &sKinds[kind];
+        f32 maxDist = info->drawDist;
+        f32 maxSq = SQ(maxDist);
+        f32 reachSq = SQ(maxDist + chunk * 0.71f);
+        f32 growFrom = maxDist * (1.0f - GROW_IN);
+        f32 growFromSq = SQ(growFrom);
 
         for (v = 0; v < visibleCount; v++) {
             s32 c = sVisible[v];
-            s32 i = sChunkStart[c];
-            s32 end = sChunkStart[c + 1];
-            s32 k = 0;
-
-            sLowered[v] = sChunkDry[c];
-            for (; i < end; i++) {
-                while (k <= sProps[i].kind) {
-                    sKindStart[v][k++] = i;
-                }
-            }
-            while (k <= FISHMOD_PROP_KIND_MAX) {
-                sKindStart[v][k++] = end;
-            }
-        }
-    }
-
-    sMtxFrame ^= 1;
-    sMtxUsed = 0;
-
-    OPEN_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
-
-    // close-range kinds first, then the mid and far ones (the budget runs out on the far ones)
-    for (pass = 0; pass < 3; pass++)
-    for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
-        FishmodPropKindInfo* info = &sKinds[kind];
-        f32 maxSq = SQ(info->drawDist);
-        s32 vanilla = (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK) || (kind == FISHMOD_PROP_POND_REED);
-        Gfx** disp = info->xlu ? &POLY_XLU_DISP : &POLY_OPA_DISP;
-        s32 material = false;
-        f32 reachSq;
-        s32 v;
-
-        if (info->drawDist != ((pass == 0) ? DIST_SMALL : (pass == 1) ? DIST_MID : DIST_FAR)) {
-            continue;
-        }
-
-        // a chunk whose nearest corner is out of this kind's reach is skipped whole (the half-diagonal is ~0.71)
-        reachSq = SQ(info->drawDist + chunk * 0.71f);
-
-        for (v = 0; v < visibleCount; v++) {
             s32 i;
-            s32 end = sKindStart[v][kind + 1];
+            s32 end;
 
-            if (sDistSq[v] > reachSq) {
-                break; // nearest first: the rest are further still
+            if (sChunkDistSq[v] > reachSq) {
+                continue;
             }
-            if (sLowered[v] && (info->floating || info->plant)) {
+            if (sChunkDry[c] && (info->floating || info->plant)) {
                 continue; // floating props wait for the water, plants don't grow on dry land
             }
-
+            end = sKindStart[v][kind + 1];
+#if FISHMOD_DEBUG
+            sScanned += end - sKindStart[v][kind];
+#endif
             for (i = sKindStart[v][kind]; i < end; i++) {
                 FishmodProp* prop = &sProps[i];
-                f32 dx;
-                f32 dz;
-                u8 t;
+                f32 dx = prop->x - eye.x;
+                f32 dy = prop->y - eye.y;
+                f32 dz = prop->z - eye.z;
+                f32 dSq = SQ(dx) + SQ(dz);
+                f32 front;
+                f32 d;
 
-                dx = prop->x - eye.x;
-                dz = prop->z - eye.z;
-                if ((SQ(dx) + SQ(dz)) > maxSq) {
+                if (dSq > maxSq) {
                     continue;
                 }
-                if (budget <= 0) {
-                    break;
+                // outside the view cone (with room for the prop's size), unless it's right by the camera; squared,
+                // no square roots: front + R < cos * dist  <=>  (front + R)^2 < cos^2 * dist^2 (when front + R >= 0)
+                front = dx * lookX + dy * lookY + dz * lookZ + PROP_RADIUS;
+                if (((front < 0.0f) || (SQ(front) < SQ(VIEW_COS) * (dSq + SQ(dy)))) &&
+                    (dSq > SQ(PROP_RADIUS * 2.0f))) {
+                    continue;
                 }
-                budget--;
-                if (!material) {
-                    material = true;
-                    if (info->xlu) {
-                        Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-                        gSPDisplayList(POLY_XLU_DISP++, info->material);
-                    } else if (vanilla) {
-                        // vanilla's own materials (lit by the scene's lights, like the Fishing Pond's props)
-                        Gfx_SetupDL_25Opa(play->state.gfxCtx);
-                        gSPDisplayList(POLY_OPA_DISP++, info->material);
+                band = (dSq < SQ(BAND_NEAR)) ? 0 : (dSq < SQ(BAND_MID)) ? 1 : 2;
+                if (bandCount[band] < BAND_MAX) {
+                    sBand[band][bandCount[band]] = i;
+                    if (dSq > growFromSq) {
+                        d = sqrtf(dSq);
+                        sBandGrow[band][bandCount[band]] = CLAMP_MIN((maxDist - d) / (maxDist - growFrom), 0.05f);
                     } else {
-                        Gfx_SetupDL_25Opa(play->state.gfxCtx);
-                        gDPPipeSync(POLY_OPA_DISP++);
-                        gDPSetTextureLUT(POLY_OPA_DISP++, G_TT_NONE);
-                        gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0,
-                                          PRIMITIVE, 0, 0, 0, 0, COMBINED);
-                        gDPSetRenderMode(POLY_OPA_DISP++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_TEX_EDGE2);
-                        gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN |
-                                                                  G_TEXTURE_GEN_LINEAR);
-                        gSPSetGeometryMode(POLY_OPA_DISP++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
-                        gSPDisplayList(POLY_OPA_DISP++, info->material);
+                        sBandGrow[band][bandCount[band]] = 1.0f;
                     }
+                    bandCount[band]++;
                 }
-                t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
-                if (!info->xlu) {
-                    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, t, t, t, 255);
-                }
-                gSPMatrix((*disp)++, Scatter_Matrix(prop, kind == FISHMOD_PROP_LILY_PAD),
-                          G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-                gSPDisplayList((*disp)++, info->model);
             }
-        }
-        if (material && !vanilla) {
-            gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
         }
     }
 
+#if FISHMOD_DEBUG
+    {
+        OSTime t = osGetTime();
+
+        sT0 += t - tStart;
+        tStart = t;
+    }
+#endif
+    sFrame ^= 1;
+    sMtxUsed = 0;
+    frame = &sFrames[sFrame];
+    opa = frame->opa;
+    xlu = frame->xlu;
+
+    // nearest band first, so the budget runs out on the far ones
+    for (band = 0; (band < BANDS) && (budget > 0); band++) {
+        s32 lastKind = -1;
+        s32 n;
+
+        for (n = 0; (n < bandCount[band]) && (budget > 0); n++) {
+            FishmodProp* prop = &sProps[sBand[band][n]];
+            FishmodPropKindInfo* info;
+            Mtx* mtx;
+            u8 t;
+
+            kind = prop->kind;
+            info = &sKinds[kind];
+            if (info->xlu && (xluLeft-- <= 0)) {
+                continue;
+            }
+            if (kind != lastKind) {
+                if ((lastKind >= 0) && !sKinds[lastKind].xlu) {
+                    gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+                }
+                lastKind = kind;
+                if (info->xlu) {
+                    xlu = Scatter_Material(xlu, info, kind);
+                } else {
+                    opa = Scatter_Material(opa, info, kind);
+                }
+            }
+            budget--;
+            mtx = Scatter_Matrix(prop, kind == FISHMOD_PROP_LILY_PAD, sBandGrow[band][n]);
+            if (info->xlu) {
+                gSPMatrix(xlu++, mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+                gSPDisplayList(xlu++, info->model);
+            } else {
+                t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
+                gDPSetPrimColor(opa++, 0, 0, t, t, t, 255);
+                gSPMatrix(opa++, mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+                gSPDisplayList(opa++, info->model);
+            }
+        }
+        if ((lastKind >= 0) && !sKinds[lastKind].xlu) {
+            gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+        }
+    }
+    gSPEndDisplayList(opa++);
+    gSPEndDisplayList(xlu++);
+#if FISHMOD_DEBUG
+    sT1 += osGetTime() - tStart;
+    sT2++;
+    if ((play->gameplayFrames & 15) == 0) // (printing is slow: not every frame)
+    {
+        Fishmod_DebugPrintf(10, "p%d s%d us %d+%d", PROP_BUDGET - budget, sScanned,
+                            (s32)OS_CYCLES_TO_USEC(sT0 / sT2), (s32)OS_CYCLES_TO_USEC(sT1 / sT2));
+        sT0 = sT1 = sT2 = 0;
+    }
+#endif
+
+    OPEN_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
+    gSPDisplayList(POLY_OPA_DISP++, frame->opa);
+    gSPDisplayList(POLY_XLU_DISP++, frame->xlu);
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
 }
 

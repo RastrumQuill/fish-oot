@@ -109,7 +109,8 @@ def gen_header(data):
     out.append("")
     out.append("const FishmodSceneSpawns gFishmodSceneSpawns[] = {")
     for sc, entries in scenes.items():
-        out.append(f"    {{ {SCENE_IDS[sc]}, ARRAY_COUNT(sFishmodSpawns_{sc}), sFishmodSpawns_{sc} }},")
+        fish = data["scenes"][sc].get("fish", 0)  # 0: FISHMOD_FISH_COUNT
+        out.append(f"    {{ {SCENE_IDS[sc]}, ARRAY_COUNT(sFishmodSpawns_{sc}), sFishmodSpawns_{sc}, {fish} }},")
     out.append("};")
     out.append("")
     out.append("const s32 gFishmodSceneSpawnsCount = ARRAY_COUNT(gFishmodSceneSpawns);")

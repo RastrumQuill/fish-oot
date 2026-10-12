@@ -1110,12 +1110,14 @@ static s32 EnFishmod_OpenWaterToImpl(EnFishmod* this, PlayState* play, Vec3f* to
     return true;
 }
 
-#if FISHMOD_DEBUG
+// where a fish takes the bait: the bait on its line under the bobber (FISHMOD_OPT 5), or just under the bobber
 #if FISHMOD_OPT >= 5
 #define FISHMOD_BAIT_MOUTH_Y(rod) FISHMOD_ROD_BAIT_Y(rod)
 #else
 #define FISHMOD_BAIT_MOUTH_Y(rod) ((rod)->bobberPos.y - 4.0f)
 #endif
+
+#if FISHMOD_DEBUG
 
 static s32 EnFishmod_OpenWaterTo(EnFishmod* this, PlayState* play, Vec3f* to) {
     s32 ret;

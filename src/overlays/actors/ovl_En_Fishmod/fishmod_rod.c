@@ -54,6 +54,9 @@ FishmodRod gFishmodRodState;
 #define LINE_MIN 28.0f
 #define BAIT_DEPTH_START 6.0f   // the bait as it lands, just under the bobber
 #define BAIT_ABOVE_BOTTOM 6.0f  // where the sink stops by itself
+// The most line under a bobber (about the rod's length, some 5 m): a float rig fishes the top of the water, not the
+// deep basin or the Water Temple's gate (that's for sinkers and lures)
+#define BAIT_DEPTH_MAX 180.0f
 #define LINE_MAX_BASE 460.0f
 // Strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) let Link cast further and play out more line
 #define STRENGTH_CAST_SCALE() (1.0f + 0.2f * CUR_UPG_VALUE(UPG_STRENGTH))
@@ -634,9 +637,9 @@ static void Rod_UpdateSink(PlayState* play, Input* input) {
         ROD->dip = 3.0f; // the bobber stands up as the line comes tight
         return;
     }
-    deepest = 1000.0f;
+    deepest = BAIT_DEPTH_MAX;
     if (EnFishmod_WaterFloor(play, ROD->bobberPos.x, ROD->bobberPos.z, &surface, &floor, false)) {
-        deepest = (surface - floor) - BAIT_ABOVE_BOTTOM;
+        deepest = CLAMP_MAX((surface - floor) - BAIT_ABOVE_BOTTOM, BAIT_DEPTH_MAX);
     }
     // sinking faster as the line pays out, like a weighted bait
     ROD->baitDepth += CLAMP(0.8f + ROD->baitDepth * 0.012f, 0.8f, 3.0f);
