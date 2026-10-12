@@ -597,6 +597,14 @@ static void Fishmod_DebugTiming(void) {
     Fishmod_DebugProfile(sStatsFrames > FISHMOD_STATS_SKIP);
 }
 
+s32 Fishmod_DebugRosterCount(void) {
+#ifdef FISHMOD_SCRIPT_ROSTER
+    return FISHMOD_SCRIPT_ROSTER;
+#else
+    return 0;
+#endif
+}
+
 void Fishmod_DebugPlayUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
@@ -858,7 +866,7 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
 
     for (i = 0; i < FISHMOD_DEBUG_LINES; i++) {
         if (sDebugLines[i][0] != '\0') {
-            GfxPrint_SetPos(&printer, 2, 20 + i);
+            GfxPrint_SetPos(&printer, 2, 19 + i);
             GfxPrint_Printf(&printer, "%s", sDebugLines[i]);
         }
     }

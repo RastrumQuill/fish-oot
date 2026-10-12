@@ -1488,3 +1488,25 @@ beginseg
     romalign 0x1000
     include "$(BUILD_DIR)/baserom/softsprite_matrix_static.o"
 endseg
+
+// fishmod: water floor maps baked from the scenes' collision (fishmod/tools/gen_watermap.py)
+beginseg
+    name "fishmod_wm_spot04"
+    compress
+    romalign 0x1000
+    include "$(BUILD_DIR)/src/fishmod_data/fishmod_wm_spot04.o"
+endseg
+
+beginseg
+    name "fishmod_wm_spot06"
+    compress
+    romalign 0x1000
+    include "$(BUILD_DIR)/src/fishmod_data/fishmod_wm_spot06.o"
+endseg
+
+beginseg
+    name "fishmod_wm_hylia_labo"
+    compress
+    romalign 0x1000
+    include "$(BUILD_DIR)/src/fishmod_data/fishmod_wm_hylia_labo.o"
+endseg

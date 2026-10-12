@@ -314,7 +314,7 @@ extern s16 gFishmodDebugFocusYaw;
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */
 
-#define FISHMOD_DEBUG_LINES 10
+#define FISHMOD_DEBUG_LINES 11
 #define FISHMOD_DEBUG_LINE_LEN 40
 
 typedef struct FishmodAutoplayStep {
@@ -328,11 +328,18 @@ typedef struct FishmodAutoplayStep {
     /* 0x07 */ u8 untilPause;
 } FishmodAutoplayStep; // size = 0x8
 
+#include "fishmod_watermap.h"
+// The scene's baked water floor map, loaded into the zelda arena (free it with ZeldaArena_Free), or NULL if it has
+// none
+FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId);
+
 #if FISHMOD_DEBUG
 void Fishmod_DebugBoot(void);
 // True if the autoplay script wants a normal boot (logo, title, file select) instead of going straight to Kokiri
 s32 Fishmod_DebugNormalBoot(void);
 s32 Fishmod_DebugWantsFish(void);
+// Fish per scene roster wanted by the autoplay script (benchmarks), 0 = the game's own count
+s32 Fishmod_DebugRosterCount(void);
 void Fishmod_AutoplayInput(struct GameState* gameState, Input* inputs);
 void Fishmod_DebugPlayUpdate(struct PlayState* play);
 void Fishmod_DebugDrawText(struct GameState* gameState, Gfx** gfxP);

@@ -51,8 +51,27 @@ typedef struct {
 } FishmodExactFloor;
 static FishmodExactFloor sExactCache[EXACT_CACHE_SIZE];
 
+static f32 EnFishmod_RaycastFloor(PlayState* play, f32 x, f32 y, f32 z);
+
 static FishmodWaterGrid sGrids[GRID_MAX_BOXES];
 static s32 sGridCount;
+
+#if FISHMOD_OPT >= 5
+#define CELL_MEMO_SIZE 128
+typedef struct CellMemo {
+    FishmodWaterGrid* grid;
+    s16 ix;
+    s16 iz;
+    f32 surface;
+    f32 floor;
+} CellMemo;
+static CellMemo sCellMemo[CELL_MEMO_SIZE];
+static CellMemo* sMemoSlot;
+#endif
+#if FISHMOD_OPT >= 5
+// the scene's baked map (fishmod/tools/gen_watermap.py): the grids point into it instead of having their own
+static FishmodWaterMapHeader* sWaterMap;
+#endif
 
 #if FISHMOD_OPT >= 4
 // the last conservative cell answer (see EnFishmod_WaterFloor); good for one frame
@@ -97,6 +116,74 @@ void EnFishmod_WaterGridInit(PlayState* play) {
 
     EnFishmod_WaterGridDestroy(play);
     bzero(sExactCache, sizeof(sExactCache));
+#if FISHMOD_OPT >= 5
+    bzero(sCellMemo, sizeof(sCellMemo));
+#endif
+
+#if FISHMOD_OPT >= 5
+    // Baked at build time from the scene's collision: no raycasts for the corners at all.
+    sWaterMap = Fishmod_LoadWaterMap(play->sceneId);
+    if (sWaterMap != NULL) {
+        s16* floors = (s16*)(sWaterMap + 1);
+
+        for (i = 0; (i < sWaterMap->numBoxes) && (sGridCount < GRID_MAX_BOXES); i++) {
+            FishmodWaterMapBox* m = &sWaterMap->boxes[i];
+            s32 j;
+
+            for (j = 0; j < numBoxes; j++) {
+                WaterBox* box = &boxes[j];
+
+                if ((box->xMin == m->xMin) && (box->zMin == m->zMin) && (box->xLength == m->xLength) &&
+                    (box->zLength == m->zLength)) {
+                    FishmodWaterGrid* grid = &sGrids[sGridCount++];
+
+                    grid->box = box;
+                    grid->x0 = box->xMin;
+                    grid->z0 = box->zMin;
+                    grid->cell = m->cell;
+                    grid->invCell = 1.0f / m->cell;
+                    grid->width = m->width;
+                    grid->depth = m->depth;
+                    grid->floor = floors + m->offset;
+                    break;
+                }
+            }
+        }
+#if FISHMOD_DEBUG
+        // check the bake against the game's own raycasts at a spread of corners (debug text line 10)
+        {
+            s32 checked = 0;
+            s32 bad = 0;
+            s32 worst = 0;
+            s32 g;
+
+            for (g = 0; g < sGridCount; g++) {
+                FishmodWaterGrid* grid = &sGrids[g];
+                s32 n = grid->width * grid->depth;
+                s32 k;
+
+                for (k = 7; k < n; k += n / 40 + 1) {
+                    s32 ix = k % grid->width;
+                    s32 iz = k / grid->width;
+                    f32 floor = EnFishmod_RaycastFloor(play, grid->x0 + ix * grid->cell,
+                                                       grid->box->ySurface + GRID_CAST_HEIGHT,
+                                                       grid->z0 + iz * grid->cell);
+                    s32 live = (floor <= BGCHECK_Y_MIN + 1.0f) ? GRID_NO_FLOOR : (s16)CLAMP(floor, -0x7FF0, 0x7FF0);
+                    s32 diff = ABS(live - grid->floor[k]);
+
+                    checked++;
+                    if (diff > 2) {
+                        bad++;
+                        worst = MAX(worst, diff);
+                    }
+                }
+            }
+            Fishmod_DebugPrintf(10, "map %d/%d off, worst %d", bad, checked, worst);
+        }
+#endif
+        return;
+    }
+#endif
 
     for (i = 0; (i < numBoxes) && (sGridCount < GRID_MAX_BOXES); i++) {
         FishmodWaterGrid* grid = &sGrids[sGridCount];
@@ -142,6 +229,14 @@ void EnFishmod_WaterGridDestroy(PlayState* play) {
 
 #if FISHMOD_OPT >= 4
     sMemoGrid = NULL;
+#endif
+#if FISHMOD_OPT >= 5
+    if (sWaterMap != NULL) {
+        ZeldaArena_Free(sWaterMap);
+        sWaterMap = NULL;
+        sGridCount = 0;
+        return;
+    }
 #endif
     for (i = 0; i < sGridCount; i++) {
         if (sGrids[i].floor != NULL) {
@@ -222,6 +317,25 @@ s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* f
     FishmodWaterGrid* grid = NULL;
     s32 i;
 
+#if FISHMOD_OPT >= 5
+    // The grids are the scene's water boxes in the scene's order, so the first one the point is in is the box the
+    // engine's search would find, without its walk over every box.
+    for (i = 0; i < sGridCount; i++) {
+        WaterBox* box = sGrids[i].box;
+
+        if ((x >= box->xMin) && (x <= box->xMin + box->xLength) && (z >= box->zMin) &&
+            (z <= box->zMin + box->zLength)) {
+            grid = &sGrids[i];
+            *surface = box->ySurface;
+            break;
+        }
+    }
+    if (grid == NULL) {
+        if (!BgCheck_GetWaterSurface(play, &play->colCtx, x, z, surface, &waterBox)) {
+            return false;
+        }
+    }
+#else
     if (!BgCheck_GetWaterSurface(play, &play->colCtx, x, z, surface, &waterBox)) {
         return false;
     }
@@ -231,6 +345,7 @@ s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* f
             break;
         }
     }
+#endif
 
     if (grid != NULL) {
 #if FISHMOD_OPT >= 4
@@ -247,7 +362,19 @@ s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* f
         s32 c01;
         s32 c11;
 
-#if FISHMOD_OPT >= 4
+#if FISHMOD_OPT >= 5
+        // The conservative floor depends only on the cell (and the surface, for cells on a bank), and the corners
+        // never change once known: keep recent answers by cell.
+        if (conservative) {
+            CellMemo* memo = &sCellMemo[((iz * grid->width + ix) * 7 + (grid - sGrids)) & (CELL_MEMO_SIZE - 1)];
+
+            if ((memo->grid == grid) && (memo->ix == ix) && (memo->iz == iz) && (memo->surface == *surface)) {
+                *floor = memo->floor;
+                return true;
+            }
+            sMemoSlot = memo;
+        }
+#elif FISHMOD_OPT >= 4
         // The nose and the middle of a fish, and fish near each other, often ask about the same cell: its
         // conservative floor depends only on the cell (unless it straddles a bank), so the last answer is kept.
         if (conservative && (grid == sMemoGrid) && (ix == sMemoIx) && (iz == sMemoIz) && (sMemoFrame == sFrame)) {
@@ -272,6 +399,13 @@ s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* f
             }
             if (conservative) {
                 *floor = MAX(MAX(c00, c10), MAX(c01, c11));
+#if FISHMOD_OPT >= 5
+                sMemoSlot->grid = grid;
+                sMemoSlot->ix = ix;
+                sMemoSlot->iz = iz;
+                sMemoSlot->surface = *surface;
+                sMemoSlot->floor = *floor;
+#endif
 #if FISHMOD_OPT >= 4
                 sMemoGrid = grid;
                 sMemoIx = ix;

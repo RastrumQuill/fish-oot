@@ -125,6 +125,14 @@ only 85 slots for the whole game).
 
 ## Phase 3: biomes (item 13)
 
+**Map the sub-biomes first.** Before any modeling or regions: a map of Lake Hylia's sub-biomes drawn over the
+depth map (zones, their edges, which fish, which props), for approval.
+
+**References.** Newer Zelda games (Twilight Princess's Lake Hylia and fishing hole, Skyward Sword, Breath of the Wild
+and Tears of the Kingdom, the Link's Awakening remake, Majora's Mask), the fishing games (TP's fishing hole, Sega
+Bass Fishing's lakes without the modern gear), real ponds, lakes and underwater plants, and aquariums (nature
+aquarium and iwagumi composition). Collected in a reference doc with colours, shapes and placement rules.
+
 **Zones.** Some come from the map automatically, others are drawn by hand as circles and capsules in a per-scene
 JSON file (baked into the habitat ids):
 

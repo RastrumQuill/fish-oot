@@ -744,3 +744,48 @@ void Fishmod_DrawFps(Gfx** gfxP) {
 s32 Fishmod_CanUseRod(PlayState* play) {
     return (gFishmodRod != NULL) && (Fishmod_GetSceneSpawns(play->sceneId) != NULL);
 }
+
+/* Baked water floor maps (fishmod/tools/gen_watermap.py) */
+
+#include "dma.h"
+#include "segment_symbols.h"
+#include "zelda_arena.h"
+
+#define FISHMOD_WATERMAP(sceneId, segment) DECLARE_ROM_SEGMENT(segment)
+#include "fishmod_watermap_scenes.h"
+#undef FISHMOD_WATERMAP
+
+typedef struct FishmodWaterMapRom {
+    s16 sceneId;
+    uintptr_t romStart;
+    uintptr_t romEnd;
+} FishmodWaterMapRom;
+
+static const FishmodWaterMapRom sWaterMaps[] = {
+#define FISHMOD_WATERMAP(sceneId, segment) \
+    { sceneId, (uintptr_t)_##segment##SegmentRomStart, (uintptr_t)_##segment##SegmentRomEnd },
+#include "fishmod_watermap_scenes.h"
+#undef FISHMOD_WATERMAP
+};
+
+FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId) {
+    s32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sWaterMaps); i++) {
+        if (sWaterMaps[i].sceneId == sceneId) {
+            size_t size = sWaterMaps[i].romEnd - sWaterMaps[i].romStart;
+            FishmodWaterMapHeader* map = ZeldaArena_Malloc(size);
+
+            if (map == NULL) {
+                return NULL;
+            }
+            DmaMgr_RequestSync(map, sWaterMaps[i].romStart, size);
+            if (map->magic != FISHMOD_WATERMAP_MAGIC) {
+                ZeldaArena_Free(map);
+                return NULL;
+            }
+            return map;
+        }
+    }
+    return NULL;
+}
