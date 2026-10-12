@@ -340,6 +340,8 @@ s32 Fishmod_DebugNormalBoot(void) {
 }
 
 OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
+OSTime gFishmodProf[FISHMOD_PROF_MAX];
+u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 
 /**
  * Averages over 60 frames, in tenths of a millisecond: RSP graphics and RDP time, the CPU time of Play_Update,
@@ -350,6 +352,42 @@ OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
 #endif
 static u32 sLastCpu[FISHMOD_CPU_MAX];
 static s32 sStatsFrames;
+
+/**
+ * The fish profile timers (FISHMOD_PROF): whole-run totals per slot, written to SRAM at 0x7E00 next to the timing
+ * stats, for fishmod/tools/read_stats.py --prof.
+ */
+static void Fishmod_DebugProfile(s32 record) {
+    static struct {
+        u32 magic; // 'FMPR'
+        u32 frames;
+        u32 usec[FISHMOD_PROF_MAX];  // microseconds over the run
+        u32 calls[FISHMOD_PROF_MAX]; // timed blocks over the run
+    } sProf;
+    static OSTime sTotal[FISHMOD_PROF_MAX];
+    s32 i;
+
+    // what a timer costs on its own, to subtract from slots that are timed many times a frame
+    for (i = 0; i < 8; i++) {
+        FISHMOD_PROF(FISHMOD_PROF_CALIBRATE, (void)0);
+    }
+    if (record) {
+        sProf.magic = 0x464D5052;
+        sProf.frames++;
+        for (i = 0; i < FISHMOD_PROF_MAX; i++) {
+            sTotal[i] += gFishmodProf[i];
+            sProf.usec[i] = (u32)OS_CYCLES_TO_USEC(sTotal[i]);
+            sProf.calls[i] += gFishmodProfCount[i];
+        }
+        if ((sProf.frames % 60) == 0) {
+            SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7E00, &sProf, sizeof(sProf), OS_WRITE);
+        }
+    }
+    for (i = 0; i < FISHMOD_PROF_MAX; i++) {
+        gFishmodProf[i] = 0;
+        gFishmodProfCount[i] = 0;
+    }
+}
 
 static void Fishmod_DebugTiming(void) {
     static u32 sSum[2 + FISHMOD_CPU_MAX + 1];
@@ -407,6 +445,7 @@ static void Fishmod_DebugTiming(void) {
             }
         }
     }
+    Fishmod_DebugProfile(sStatsFrames > FISHMOD_STATS_SKIP);
 }
 
 void Fishmod_DebugPlayUpdate(PlayState* play) {

@@ -1443,14 +1443,16 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         if (this->cooldown > 0) {
             this->cooldown--;
         }
-        EnFishmod_UpdateSwim(this);
+        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_UpdateSwim(this));
         return;
     }
 #endif
-    EnFishmod_FishAI(this, play);
-    EnFishmod_UpdateSwim(this);
+    FISHMOD_PROF(FISHMOD_PROF_U_AI, EnFishmod_FishAI(this, play));
+    FISHMOD_PROF(FISHMOD_PROF_U_SWIM, EnFishmod_UpdateSwim(this));
 
 #if FISHMOD_DEBUG
+    {
+    OSTime debugStart = osGetTime();
     {
         // nearest fish to the camera focus, for testing
         static const char* sStateNames[] = { "wander", "approach", "inspect", "nibble", "bite",
@@ -1514,6 +1516,9 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
             Fishmod_DebugPrintf(5, "fish%d %s %s", sCount, this->species->name, sStateNames[this->fishState]);
             Fishmod_DebugPrintf(6, " %d %d %d w%d f%d hh%d hl%d b%d", (s32)this->actor.world.pos.x, (s32)this->actor.world.pos.y, (s32)this->actor.world.pos.z, (s32)this->waterY, (s32)this->floorY, (s32)this->halfHeight, (s32)this->halfLength, this->blocked);
         }
+    }
+    gFishmodProf[FISHMOD_PROF_U_DEBUG] += osGetTime() - debugStart;
+    gFishmodProfCount[FISHMOD_PROF_U_DEBUG]++;
     }
 #endif
 }
@@ -1695,6 +1700,26 @@ void EnFishmod_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* 
 
 }
 
+#if FISHMOD_DEBUG
+// the limb callbacks with profile timers around them (debug builds only)
+static s32 EnFishmod_OverrideLimbDrawProf(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
+                                          void* thisx) {
+    s32 ret;
+
+    FISHMOD_PROF(FISHMOD_PROF_D_LIMB_CB, ret = EnFishmod_OverrideLimbDraw(play, limbIndex, dList, pos, rot, thisx));
+    return ret;
+}
+
+static void EnFishmod_PostLimbDrawProf(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
+    FISHMOD_PROF(FISHMOD_PROF_D_LIMB_CB, EnFishmod_PostLimbDraw(play, limbIndex, dList, rot, thisx));
+}
+#define FISHMOD_LIMB_OVERRIDE EnFishmod_OverrideLimbDrawProf
+#define FISHMOD_LIMB_POST EnFishmod_PostLimbDrawProf
+#else
+#define FISHMOD_LIMB_OVERRIDE EnFishmod_OverrideLimbDraw
+#define FISHMOD_LIMB_POST EnFishmod_PostLimbDraw
+#endif
+
 static void EnFishmod_DrawWhiskers(EnFishmod* this, PlayState* play) {
     s32 i;
     s32 k;
@@ -1814,7 +1839,7 @@ static void EnFishmod_DrawPose(EnFishmod* this, PlayState* play) {
     } else {
         start = POLY_OPA_DISP;
         SkelAnime_DrawFlexOpa(play, this->skelAnime.skeleton, this->skelAnime.jointTable,
-                              this->skelAnime.dListCount, EnFishmod_OverrideLimbDraw, EnFishmod_PostLimbDraw, this);
+                              this->skelAnime.dListCount, FISHMOD_LIMB_OVERRIDE, FISHMOD_LIMB_POST, this);
         this->poseGfxCount = 0;
         if (((POLY_OPA_DISP - start) <= EN_FISHMOD_POSE_GFX_MAX) &&
             (this->skelAnime.dListCount <= EN_FISHMOD_MAX_LIMBS + 1) && ((start[0].words.w0 >> 24) == G_MOVEWORD)) {
@@ -1901,6 +1926,9 @@ static void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
 void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
     const u8* shape;
+#if FISHMOD_DEBUG
+    OSTime profStart;
+#endif
 
     if (this->type == FISHMOD_TYPE_ROD) {
         EnFishmod_RodDraw(this, play);
@@ -1910,7 +1938,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     // far from the camera, a flat shape in the fish's colour instead of the textured skeleton
     if ((this->type == FISHMOD_TYPE_FISH) && !gFishmodPhoto.active && (this->fishState != FISH_STATE_CAUGHT) &&
         (Math_Vec3f_DistXYZ(&this->actor.world.pos, &play->view.eye) > FISHMOD_LOD_DIST)) {
-        EnFishmod_DrawBillboard(this, play);
+        FISHMOD_PROF(FISHMOD_PROF_D_BILLBOARD, EnFishmod_DrawBillboard(this, play));
         return;
     }
 #endif
@@ -1936,6 +1964,9 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
         EnFishmod_DrawPhotoBackdrop(play);
     }
 
+#if FISHMOD_DEBUG
+    profStart = osGetTime();
+#endif
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
 
     {
@@ -1978,6 +2009,11 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     }
 
     shape = this->species->shape;
+#if FISHMOD_DEBUG
+    gFishmodProf[FISHMOD_PROF_D_SETUP] += osGetTime() - profStart;
+    gFishmodProfCount[FISHMOD_PROF_D_SETUP]++;
+    profStart = osGetTime();
+#endif
 
     Matrix_Translate(this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z, MTXMODE_NEW);
     Matrix_RotateY(BINANG_TO_RAD_ALT(this->actor.shape.rot.y), MTXMODE_APPLY);
@@ -2003,16 +2039,21 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     }
 
     this->lastTintPart = 0xFE;
+#if FISHMOD_DEBUG
+    gFishmodProf[FISHMOD_PROF_D_ROOT] += osGetTime() - profStart;
+    gFishmodProfCount[FISHMOD_PROF_D_ROOT]++;
+#endif
 #if FISHMOD_OPT >= 2
-    EnFishmod_DrawPose(this, play);
+    FISHMOD_PROF(FISHMOD_PROF_D_POSE, EnFishmod_DrawPose(this, play));
 #else
-    SkelAnime_DrawFlexOpa(play, this->skelAnime.skeleton, this->skelAnime.jointTable, this->skelAnime.dListCount,
-                          EnFishmod_OverrideLimbDraw, EnFishmod_PostLimbDraw, this);
+    FISHMOD_PROF(FISHMOD_PROF_D_POSE,
+                 SkelAnime_DrawFlexOpa(play, this->skelAnime.skeleton, this->skelAnime.jointTable,
+                                       this->skelAnime.dListCount, FISHMOD_LIMB_OVERRIDE, FISHMOD_LIMB_POST, this));
 #endif
 
     if (this->species->lookFlags & FISHMOD_LOOK_WHISKERS) {
-        EnFishmod_UpdateWhiskers(this);
-        EnFishmod_DrawWhiskers(this, play);
+        FISHMOD_PROF(FISHMOD_PROF_D_WHISKERS,
+                     (EnFishmod_UpdateWhiskers(this), EnFishmod_DrawWhiskers(this, play)));
     }
 
     if (gFishmodPhoto.active) {

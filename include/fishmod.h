@@ -241,8 +241,43 @@ typedef enum FishmodCpuTimer {
     FISHMOD_CPU_MAX
 } FishmodCpuTimer;
 extern OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
+
+// Finer timers for the parts of a fish's update and draw (fishmod/tools/read_stats.py --prof). Nested slots are
+// also counted in the slot around them.
+typedef enum FishmodProfSlot {
+    FISHMOD_PROF_CALIBRATE,  // an empty timed block: what one timer costs
+    FISHMOD_PROF_U_ENGINE,   // the whole actor->update call for fish (includes everything below)
+    FISHMOD_PROF_U_GLIDE,    // the cheap in-between frames of throttled fish
+    FISHMOD_PROF_U_AI,       // EnFishmod_FishAI: deciding and moving
+    FISHMOD_PROF_U_WATER,    //   water surface/floor queries (inside AI)
+    FISHMOD_PROF_U_RAYCAST,  //     collision raycasts for the floor (inside water queries)
+    FISHMOD_PROF_U_SWIM,     // the swim wave (body and fin angles)
+    FISHMOD_PROF_U_DEBUG,    // the debug readout block (not in release builds)
+    FISHMOD_PROF_D_ENGINE,   // the whole Actor_Draw for fish: lights, root matrix, then the draw function
+    FISHMOD_PROF_D_SETUP,    //   render setup and texture segments
+    FISHMOD_PROF_D_ROOT,     //   the fish's root matrix
+    FISHMOD_PROF_D_POSE,     //   the skeleton: limb matrices and display lists (includes the callbacks)
+    FISHMOD_PROF_D_LIMB_CB,  //     the limb callbacks (part scales, tints, head position)
+    FISHMOD_PROF_D_WHISKERS, //   catfish whiskers
+    FISHMOD_PROF_D_BILLBOARD,//   far fish drawn flat
+    FISHMOD_PROF_MAX
+} FishmodProfSlot;
+extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
+extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
+#define FISHMOD_PROF(slot, stmt)                        \
+    {                                                   \
+        OSTime profStart_ = osGetTime();                \
+        stmt;                                           \
+        gFishmodProf[slot] += osGetTime() - profStart_; \
+        gFishmodProfCount[slot]++;                      \
+    }
 extern Vec3f gFishmodDebugFocus; // the fish nearest to Link, for the follow camera
 extern s16 gFishmodDebugFocusYaw;
+#else
+#define FISHMOD_PROF(slot, stmt) \
+    {                            \
+        stmt;                    \
+    }
 #endif
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */
