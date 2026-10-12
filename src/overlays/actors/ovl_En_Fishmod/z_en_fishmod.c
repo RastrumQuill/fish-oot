@@ -124,7 +124,7 @@ static s32 EnFishmod_TexSet(const FishmodSpecies* species) {
     return TEXSET_BASS;
 }
 
-static u8* EnFishmod_PartMap(const FishmodSpecies* species) {
+u8* EnFishmod_PartMap(const FishmodSpecies* species) {
     if (species->base == FISHMOD_BASE_LOACH) {
         return sLoachLimbParts;
     }
@@ -275,6 +275,18 @@ static void EnFishmod_PrepareSmallDLs(void) {
     sSmallDLsReady = true;
 }
 
+/** The overlay's patched copy of one of the small fish's display lists (the original if it isn't one of them). */
+Gfx* EnFishmod_SmallDL(Gfx* src) {
+    s32 k;
+
+    for (k = 0; k < 3; k++) {
+        if (src == sSmallDLSources[k]) {
+            return sSmallDLs[k];
+        }
+    }
+    return SEGMENTED_TO_VIRTUAL(src);
+}
+
 typedef enum EnFishmodLimbMode {
     LIMB_MODE_PLAIN,       // no part scaling to apply here
     LIMB_MODE_OWN_SCALE,   // scaled, parent isn't: translate/rotate, then scale
@@ -372,6 +384,12 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
 
     this->type = FISHMOD_GET_TYPE(thisx->params);
 
+#if FISHMOD_OPT >= 4
+    if (this->type == FISHMOD_TYPE_MANAGER) {
+        EnFishmod_ManagerInit(this, play);
+        return;
+    }
+#endif
     if (this->type == FISHMOD_TYPE_ROD) {
         this->actionFunc = EnFishmod_RodIdle;
         EnFishmod_RodInit(this, play);
@@ -443,6 +461,21 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         this->actor.cullingVolumeScale = this->halfLength * 2.0f + 20.0f;
         this->actor.cullingVolumeDownward = this->halfLength * 2.0f + 20.0f;
     }
+#if FISHMOD_OPT >= 4
+    this->rosterIndex = 0xFF;
+    if (!gFishmodPhoto.active && (FISHMOD_GET_ROSTER(thisx->params) >= 0) &&
+        (EnFishmod_RosterLength(FISHMOD_GET_ROSTER(thisx->params)) > 0.0f)) {
+        // one of the scene's roster fish: its own size, every time it appears
+        this->rosterIndex = FISHMOD_GET_ROSTER(thisx->params);
+        EnFishmod_SetLength(this, EnFishmod_RosterLength(this->rosterIndex));
+    }
+    // the fish manager draws every fish (if this species' rig couldn't be made, it draws itself the old way)
+    this->rigReady = EnFishmod_RigPrepare(this);
+    if (this->rigReady) {
+        this->actor.draw = NULL;
+    }
+    EnFishmod_ManagerEnsure(play);
+#endif
     this->staminaMax = 60.0f + this->species->behavior.stamina * 3.0f + this->lengthInches * 4.0f;
     this->stamina = this->staminaMax;
     this->swimPhaseStep = 0.25f;
@@ -460,6 +493,15 @@ void EnFishmod_Destroy(Actor* thisx, PlayState* play) {
     if (this->type == FISHMOD_TYPE_COMB) {
         return;
     }
+#if FISHMOD_OPT >= 4
+    if (this->type == FISHMOD_TYPE_MANAGER) {
+        EnFishmod_ManagerDestroy(this, play);
+        return;
+    }
+    if (this->type == FISHMOD_TYPE_FISH) {
+        EnFishmod_RosterForget(this);
+    }
+#endif
     if (this->type == FISHMOD_TYPE_ROD) {
         EnFishmod_RodDestroy(this, play);
         if (gFishmodRod == thisx) {
@@ -1359,8 +1401,15 @@ static void EnFishmod_UpdateSwim(EnFishmod* this) {
     }
     // traveling wave down the body, stronger toward the tail
     for (i = 0; i < 4; i++) {
+#if FISHMOD_OPT >= 4
+        // the sine table instead of cosf: the same wave to well under a degree
+        this->bodyYaw[i] = Math_CosS((s16)((this->swimPhase - (i * 1.1f)) * (0x8000 / M_PI))) * this->swimMag *
+                               (0.6f + (i * 0.55f)) -
+                           this->turnBend * (0.25f + i * 0.2f);
+#else
         this->bodyYaw[i] = cosf(this->swimPhase - (i * 1.1f)) * this->swimMag * (0.6f + (i * 0.55f)) -
                            this->turnBend * (0.25f + i * 0.2f);
+#endif
     }
     if (this->startle != 0) {
         s32 dir = (this->startle > 0) ? 1 : -1;
@@ -1399,10 +1448,29 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
 #define EnFishmod_Draw EnFishmod_DrawImpl
 #endif
 
+/** A frame without the AI: keep going the way it was headed. */
+static void EnFishmod_Glide(EnFishmod* this) {
+    this->actor.world.pos.x += Math_SinS(this->actor.shape.rot.y) * this->speed;
+    this->actor.world.pos.z += Math_CosS(this->actor.shape.rot.y) * this->speed;
+    if (this->stateTimer > 0) {
+        this->stateTimer--;
+    }
+    if (this->cooldown > 0) {
+        this->cooldown--;
+    }
+    EnFishmod_UpdateSwim(this);
+}
+
 void EnFishmod_Update(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
 
     this->timer++;
+#if FISHMOD_OPT >= 4
+    if (this->type == FISHMOD_TYPE_MANAGER) {
+        EnFishmod_ManagerUpdate(this, play);
+        return;
+    }
+#endif
 
     if (this->type == FISHMOD_TYPE_ROD) {
         EnFishmod_RodUpdate(this, play);
@@ -1435,15 +1503,13 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         (Math_Vec3f_DistXZ(&this->actor.world.pos, &GET_PLAYER(play)->actor.world.pos) > 500.0f) &&
         (!EnFishmod_RodBobberInWater() ||
          (Math_Vec3f_DistXZ(&this->actor.world.pos, &gFishmodRodState.bobberPos) > 300.0f))) {
-        this->actor.world.pos.x += Math_SinS(this->actor.shape.rot.y) * this->speed;
-        this->actor.world.pos.z += Math_CosS(this->actor.shape.rot.y) * this->speed;
-        if (this->stateTimer > 0) {
-            this->stateTimer--;
-        }
-        if (this->cooldown > 0) {
-            this->cooldown--;
-        }
-        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_UpdateSwim(this));
+        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
+        return;
+    }
+#endif
+#if FISHMOD_OPT >= 4
+    if ((this->type == FISHMOD_TYPE_FISH) && !EnFishmod_ThinkAllowed(this, play)) {
+        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
         return;
     }
 #endif
@@ -1758,7 +1824,7 @@ static void EnFishmod_DrawWhiskers(EnFishmod* this, PlayState* play) {
  * Photo mode backdrop: a vertical gradient over the whole screen, drawn before the fish.
  * Rooms and the skybox are not drawn in photo mode, so nothing else is in the frame.
  */
-static void EnFishmod_DrawPhotoBackdrop(PlayState* play) {
+void EnFishmod_DrawPhotoBackdrop(PlayState* play) {
     s32 band;
 
     OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
@@ -1797,7 +1863,7 @@ static void EnFishmod_DrawPhotoBackdrop(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
 }
 
-#if FISHMOD_OPT >= 2
+#if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
 /**
  * Draws the skeleton. A distant fish that's just swimming around redraws the pose it had last frame every other
  * frame: the limb matrices and the commands that drew them are kept, copied into this frame and pointed at the
@@ -1856,12 +1922,11 @@ static void EnFishmod_DrawPose(EnFishmod* this, PlayState* play) {
 #endif
 
 #if FISHMOD_OPT >= 3
-#define FISHMOD_LOD_DIST 380.0f
 /**
  * A distant fish: a flat hexagon (nose, back, tail, belly) in the fish's own colour, turned about its long axis to
  * face the camera. Vertex colours only, so no texture loads, and opaque, so it costs no blending.
  */
-static void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
+void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     Vtx* vtx = GRAPH_ALLOC(gfxCtx, 6 * sizeof(Vtx));
     f32 fx = Math_SinS(this->actor.shape.rot.y);
@@ -1923,6 +1988,147 @@ static void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
 }
 #endif
 
+#if FISHMOD_OPT >= 4
+/** A species' textures and palette behind their segments (the manager does this once per species). */
+void EnFishmod_SetSpeciesTextures(EnFishmod* this, PlayState* play) {
+    s32 speciesIndex = this->species - gFishmodSpecies;
+    s32 role;
+    IF_F3DEX3_DONT_SKIP_TEX_INIT();
+
+    OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+    IF_F3DEX3_DONT_SKIP_TEX_HERE(POLY_OPA_DISP++, speciesIndex);
+    if (sSpeciesPalettes[speciesIndex] != NULL) {
+        gDPLoadTLUT_pal256(POLY_OPA_DISP++, sSpeciesPalettes[speciesIndex]);
+    }
+    for (role = 0; role < FISHMOD_TEX_ROLE_MAX; role++) {
+        void* tex = sSpeciesTexturesCI[speciesIndex][role];
+
+        if (tex != NULL) {
+            gSPSegment(POLY_OPA_DISP++, 0x08 + role, tex);
+        }
+    }
+    CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+}
+
+/**
+ * Whiskers fixed to the head (no sway): the same shapes and sizes as before, placed from the head's position and
+ * the fish's facing, pitch and head swing. One matrix and one vertex load per fish.
+ */
+void EnFishmod_DrawWhiskersRigid(EnFishmod* this, PlayState* play) {
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    const u8* tint = this->species->partTint[FISHMOD_PART_HEAD];
+    Vtx* vtx = GRAPH_ALLOC(gfxCtx, 32 * sizeof(Vtx));
+    f32 dx = this->boundsMax.x - this->boundsMin.x;
+    f32 dz = this->boundsMax.z - this->boundsMin.z;
+    f32 length = sqrtf(SQ(dx) + SQ(dz)) * 1.9f;
+    Vec3f pts[4][3];
+    f32 rot[3][3];
+    s16 yaw = this->actor.shape.rot.y + this->bodyYaw[0] / 2;
+    f32 sy = Math_SinS(yaw);
+    f32 cy = Math_CosS(yaw);
+    f32 sx = Math_SinS(this->actor.shape.rot.x);
+    f32 cx = Math_CosS(this->actor.shape.rot.x);
+    s32 i;
+    s32 k;
+    s32 side;
+    s32 v = 0;
+
+    // fish frame: Ry(yaw + head swing) * Rx(pitch); fish swim upright, so roll is left out
+    rot[0][0] = cy;
+    rot[0][1] = sy * sx;
+    rot[0][2] = sy * cx;
+    rot[1][0] = 0.0f;
+    rot[1][1] = cx;
+    rot[1][2] = -sx;
+    rot[2][0] = -sy;
+    rot[2][1] = cy * sx;
+    rot[2][2] = cy * cx;
+
+    for (i = 0; i < 2; i++) {
+        for (k = 0; k < 3; k++) {
+            Vec3f* p = &sWhiskerPoints[i][k];
+
+            for (side = 0; side < 2; side++) {
+                // fish space: x = side, y = up, z = forward
+                f32 lx = ((side == 0) ? p->z : -p->z) * length;
+                f32 ly = p->y * length;
+                f32 lz = (p->x + 0.03f) * length;
+                Vec3f* out = &pts[i * 2 + side][k];
+
+                // relative to the head, in eighths of a unit (the vertices are s16)
+                out->x = (rot[0][0] * lx + rot[0][1] * ly + rot[0][2] * lz) * 8.0f;
+                out->y = (rot[1][0] * lx + rot[1][1] * ly + rot[1][2] * lz) * 8.0f;
+                out->z = (rot[2][0] * lx + rot[2][1] * ly + rot[2][2] * lz) * 8.0f;
+            }
+        }
+    }
+
+    // each segment a flat, level ribbon like the fishing line model, as wide as before
+    for (i = 0; i < 4; i++) {
+        for (k = 0; k < 2; k++) {
+            Vec3f* a = &pts[i][k];
+            Vec3f* b = &pts[i][k + 1];
+            f32 segX = b->x - a->x;
+            f32 segZ = b->z - a->z;
+            f32 distXZ = sqrtf(SQ(segX) + SQ(segZ));
+            f32 half = 150.0f * this->actor.scale.z * (1.0f - k * 0.45f) * 8.0f;
+            f32 wx = (distXZ > 0.01f) ? (segZ / distXZ) * half : half;
+            f32 wz = (distXZ > 0.01f) ? (-segX / distXZ) * half : 0.0f;
+            Vec3f c[4];
+            s32 n;
+
+            c[0].x = a->x - wx;
+            c[0].y = a->y;
+            c[0].z = a->z - wz;
+            c[1].x = a->x + wx;
+            c[1].y = a->y;
+            c[1].z = a->z + wz;
+            c[2].x = b->x + wx;
+            c[2].y = b->y;
+            c[2].z = b->z + wz;
+            c[3].x = b->x - wx;
+            c[3].y = b->y;
+            c[3].z = b->z - wz;
+            for (n = 0; n < 4; n++, v++) {
+                vtx[v].v.ob[0] = c[n].x;
+                vtx[v].v.ob[1] = c[n].y;
+                vtx[v].v.ob[2] = c[n].z;
+                vtx[v].v.flag = 0;
+                vtx[v].v.tc[0] = vtx[v].v.tc[1] = 0;
+                vtx[v].v.cn[0] = vtx[v].v.cn[1] = vtx[v].v.cn[2] = 0;
+                vtx[v].v.cn[3] = 0xFF;
+            }
+        }
+    }
+
+    OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+    POLY_OPA_DISP = Gfx_SetupDL(POLY_OPA_DISP, SETUPDL_25);
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, tint[0] / 2, tint[1] / 2, tint[2] / 2, 255);
+    Matrix_Translate(this->headPos.x, this->headPos.y, this->headPos.z, MTXMODE_NEW);
+    Matrix_Scale(1.0f / 8.0f, 1.0f / 8.0f, 1.0f / 8.0f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx, "../z_en_fishmod.c", __LINE__);
+    gSPVertex(POLY_OPA_DISP++, vtx, 32, 0);
+    for (i = 0; i < 32; i += 8) {
+        gSP2Triangles(POLY_OPA_DISP++, i + 0, i + 1, i + 2, 0, i + 0, i + 2, i + 3, 0);
+        gSP2Triangles(POLY_OPA_DISP++, i + 4, i + 5, i + 6, 0, i + 4, i + 6, i + 7, 0);
+    }
+    CLOSE_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+}
+
+/** Photo mode: where the fish is and how big, for the camera. */
+void EnFishmod_PhotoBounds(EnFishmod* this) {
+    f32 dx = this->boundsMax.x - this->boundsMin.x;
+    f32 dy = this->boundsMax.y - this->boundsMin.y;
+    f32 dz = this->boundsMax.z - this->boundsMin.z;
+
+    gFishmodPhoto.center.x = (this->boundsMin.x + this->boundsMax.x) * 0.5f;
+    gFishmodPhoto.center.y = (this->boundsMin.y + this->boundsMax.y) * 0.5f;
+    gFishmodPhoto.center.z = (this->boundsMin.z + this->boundsMax.z) * 0.5f;
+    gFishmodPhoto.extent = sqrtf(SQ(dx) + SQ(dy) + SQ(dz));
+}
+#endif
+
 void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
     const u8* shape;
@@ -1934,6 +2140,12 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
         EnFishmod_RodDraw(this, play);
         return;
     }
+#if FISHMOD_OPT >= 4
+    if (this->type == FISHMOD_TYPE_MANAGER) {
+        EnFishmod_ManagerDraw(this, play);
+        return;
+    }
+#endif
 #if FISHMOD_OPT >= 3
     // far from the camera, a flat shape in the fish's colour instead of the textured skeleton
     if ((this->type == FISHMOD_TYPE_FISH) && !gFishmodPhoto.active && (this->fishState != FISH_STATE_CAUGHT) &&
@@ -2043,7 +2255,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     gFishmodProf[FISHMOD_PROF_D_ROOT] += osGetTime() - profStart;
     gFishmodProfCount[FISHMOD_PROF_D_ROOT]++;
 #endif
-#if FISHMOD_OPT >= 2
+#if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     FISHMOD_PROF(FISHMOD_PROF_D_POSE, EnFishmod_DrawPose(this, play));
 #else
     FISHMOD_PROF(FISHMOD_PROF_D_POSE,

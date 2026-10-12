@@ -8,6 +8,25 @@
 #define EN_FISHMOD_MAX_LIMBS 16
 #define EN_FISHMOD_POSE_GFX_MAX 72
 
+#define FISHMOD_FISH_COUNT 10       // fish per fishing scene
+#define FISHMOD_ROSTER_MAX 30       // (FISHMOD_OPT 4) the most a scene's roster can hold
+#define FISHMOD_LOD_DIST 380.0f     // (FISHMOD_OPT 3) farther from the camera than this: the flat far shape
+#define FISHMOD_SMALL_RIG_LENGTH 9.0f // (FISHMOD_OPT 4) fish shorter than this (inches) always use the reduced rig
+
+// Fish rigs (fishmod_rig.c, FISHMOD_OPT 4)
+#define FISH_RIG_MAX_SLOTS 8
+typedef enum FishRigVariant {
+    /* 0 */ FISH_RIG_FULL,    // every moving limb: head, body joints, jaw, pectoral fins
+    /* 1 */ FISH_RIG_REDUCED, // head, middle and tail
+    /* 2 */ FISH_RIG_VARIANTS
+} FishRigVariant;
+typedef enum FishRigModel {
+    /* 0 */ FISH_RIG_BASS,
+    /* 1 */ FISH_RIG_LOACH,
+    /* 2 */ FISH_RIG_SMALL,
+    /* 3 */ FISH_RIG_MODELS
+} FishRigModel;
+
 // Texture roles: each is drawn from its own segment (0x08 + role) so species can swap in patterned textures.
 typedef enum FishmodTexRole {
     /* 0 */ FISHMOD_TEX_ROLE_BACK,
@@ -99,7 +118,10 @@ typedef struct EnFishmod {
     /* 0x3F7 */ u8 fleeFromLink;                   // the current flee is away from Link (runYaw already set)
     /* 0x3F8 */ u8 thinkMask;                      // the AI runs on frames where (timer & thinkMask) == 0
     /* 0x3F9 */ u8 depthPref;                      // where in its species' depth band this fish likes to be
-#if FISHMOD_OPT >= 2
+    /* 0x3FA */ u8 rosterIndex;                    // its record in the scene's roster, 0xFF if none (FISHMOD_OPT 4)
+    /* 0x3FB */ u8 rigReady;                       // the manager can draw it (FISHMOD_OPT 4)
+    /* 0x3FC */ s16 lastThink;                     // timer value when it last ran its AI (FISHMOD_OPT 4)
+#if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
     Gfx poseGfx[EN_FISHMOD_POSE_GFX_MAX];
@@ -185,9 +207,46 @@ void EnFishmod_WaterGridInit(struct PlayState* play);
 void EnFishmod_WaterGridAcquire(struct PlayState* play);
 void EnFishmod_WaterGridRelease(struct PlayState* play);
 void EnFishmod_WaterGridDestroy(struct PlayState* play);
+void EnFishmod_WaterNewFrame(void);
 s32 EnFishmod_WaterFloor(struct PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative);
 
 s32 EnFishmod_FindWaterPoint(struct PlayState* play, Vec3f* center, f32 radius, f32 minDepth, Vec3f* out,
                              f32* outSurface, f32* outFloor);
+
+// Fish drawing pieces (z_en_fishmod.c), used by the manager
+u8* EnFishmod_PartMap(const FishmodSpecies* species);
+Gfx* EnFishmod_SmallDL(Gfx* src);
+void EnFishmod_SetSpeciesTextures(struct EnFishmod* this, struct PlayState* play);
+void EnFishmod_DrawBillboard(struct EnFishmod* this, struct PlayState* play);
+void EnFishmod_DrawPhotoBackdrop(struct PlayState* play);
+void EnFishmod_DrawWhiskersRigid(struct EnFishmod* this, struct PlayState* play);
+void EnFishmod_PhotoBounds(struct EnFishmod* this);
+
+// Fish rigs (fishmod_rig.c)
+s32 EnFishmod_RigModel(const FishmodSpecies* species);
+s32 EnFishmod_RigPrepare(struct EnFishmod* this);
+void EnFishmod_RigFreeAll(void);
+void EnFishmod_RigSetSpecies(struct EnFishmod* this, struct PlayState* play, s32 variant);
+void EnFishmod_RigRestoreSegments(struct PlayState* play);
+void EnFishmod_RigDraw(struct EnFishmod* this, struct PlayState* play, s32 variant, s32 wantBounds);
+
+// Fish manager (fishmod_manager.c)
+typedef struct EnFishmodShared {
+    u32 frame;
+    Vec3f linkPos;
+    Vec3f bobberPos;
+    s32 bobberIn;
+    s32 thinksLeft;
+} EnFishmodShared;
+EnFishmodShared* EnFishmod_Shared(struct PlayState* play);
+void EnFishmod_ManagerEnsure(struct PlayState* play);
+void EnFishmod_ManagerInit(struct EnFishmod* this, struct PlayState* play);
+void EnFishmod_ManagerDestroy(struct EnFishmod* this, struct PlayState* play);
+void EnFishmod_ManagerUpdate(struct EnFishmod* this, struct PlayState* play);
+void EnFishmod_ManagerDraw(struct EnFishmod* this, struct PlayState* play);
+s32 EnFishmod_ThinkAllowed(struct EnFishmod* this, struct PlayState* play);
+f32 EnFishmod_RosterLength(s32 index);
+void EnFishmod_RosterCaught(struct PlayState* play, struct EnFishmod* fish);
+void EnFishmod_RosterForget(struct EnFishmod* fish);
 
 #endif

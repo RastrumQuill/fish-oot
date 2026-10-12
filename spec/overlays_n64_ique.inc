@@ -3246,4 +3246,6 @@ beginseg
     include "$(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/z_en_fishmod.o"
     include "$(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/fishmod_rod.o"
     include "$(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/fishmod_water.o"
+    include "$(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/fishmod_rig.o"
+    include "$(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/fishmod_manager.o"
 endseg
