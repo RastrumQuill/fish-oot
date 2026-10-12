@@ -7,6 +7,8 @@ Three parts, researched in parallel:
 - [fish-ai.md](fish-ai.md): efficient fish AI. What vanilla OoT, Twilight Princess and Majora's Mask fish actually
   do (read from the decomps), steering and schooling on N64 budgets, 3D navigation without pathfinding, and a
   proposed AI v2.
+- [biomes-time-behaviour.md](biomes-time-behaviour.md): for test5: fish daily rhythms, depth and weather, lures
+  and learning, schools, other games' days and lures, per-fish patterns, and the vanilla assets we can reuse.
 - [fishing-feel.md](fishing-feel.md): what makes acclaimed fishing feel good (OoT, TP, Sega Bass Fishing,
   FFXV, RDR2, Sea of Thieves and others), what players criticise, and how it maps to the N64 pad.
 
