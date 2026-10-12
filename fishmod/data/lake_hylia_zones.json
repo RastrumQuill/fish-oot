@@ -130,7 +130,7 @@
         260
       ],
       "bed": "silt",
-      "props": "bridge pilings, drowned branches",
+      "props": "bridge pilings",
       "fish": "bass, catfish under the pilings by day, roaming at night"
     },
     {
@@ -143,7 +143,7 @@
         760
       ],
       "bed": "sand and silt",
-      "props": "weed flat, a drowned tree, pebbles near the island",
+      "props": "weed flat, pebbles near the island",
       "fish": "loach at night, carp, catfish cruising the shallows at night"
     },
     {

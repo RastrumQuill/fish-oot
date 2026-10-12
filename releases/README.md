@@ -8,6 +8,7 @@ controls.
 
 | Release | Patches | Notes |
 |---|---|---|
+| lake-tour1 (feedback build) | `fish-oot-lake-tour1.bps` | [notes](notes-lake-tour1.md): a camera tour of Lake Hylia's habitat props, above and below the water |
 | kokiri-test4 (newest) | `fish-oot-kokiri-test4.bps`, `-testmode`, `-animstudio` | [notes](notes-kokiri-test4.md): faster fish (fish manager, rigs), fish that stay for the day, animation studio |
 | kokiri-test3.1 | `fish-oot-kokiri-test3.1.bps`, `-testmode` | [notes](notes-kokiri-test3.1.md): bait bottles, fixes |
 | kokiri-test3 | `fish-oot-kokiri-test3.bps`, `-testmode` | [notes](notes-kokiri-test3.md) |
