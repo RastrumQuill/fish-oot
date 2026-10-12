@@ -45,7 +45,13 @@ typedef enum FishmodBait {
     /* 3 */ FISHMOD_BAIT_WORM,
     /* 4 */ FISHMOD_BAIT_CORAL_EARRING,
     /* 5 */ FISHMOD_BAIT_FISH,
-    /* 6 */ FISHMOD_BAIT_MAX
+    // lures (how they're fished comes later)
+    /* 6 */ FISHMOD_BAIT_LURE_SPINNER,
+    /* 7 */ FISHMOD_BAIT_LURE_CRANKBAIT,
+    /* 8 */ FISHMOD_BAIT_LURE_POPPER,
+    /* 9 */ FISHMOD_BAIT_LURE_FROG,
+    /* 10 */ FISHMOD_BAIT_LURE_SINKING,
+    /* 11 */ FISHMOD_BAIT_MAX
 } FishmodBait;
 
 typedef struct FishmodBehavior {
@@ -89,9 +95,9 @@ typedef struct FishmodSpecies {
     /* 0x14 */ u16 weightCoef; // weight (lbs) = weightCoef * length^3 / 1000000
     /* 0x16 */ FishmodBehavior behavior;
     /* 0x1F */ u8 bait[FISHMOD_BAIT_MAX]; // interest multiplier percent per bait
-    /* 0x25 */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
-    /* 0x3A */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
-    /* 0x4F */ u8 lookFlags;                       // FISHMOD_LOOK_*
+    /* 0x2A */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
+    /* 0x3F */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
+    /* 0x54 */ u8 lookFlags;                       // FISHMOD_LOOK_*
 } FishmodSpecies;
 
 typedef struct FishmodSpawnEntry {
@@ -203,7 +209,7 @@ typedef struct FishmodBottleFish {
     /* 0x02 */ u16 lengthTenths;
 } FishmodBottleFish; // size = 0x4
 
-#define FISHMOD_BAIT_SLOTS 8 // FISHMOD_BAIT_MAX, rounded up
+#define FISHMOD_BAIT_SLOTS 8 // the save's (unused) bait pouch; not tied to FISHMOD_BAIT_MAX
 
 typedef struct FishmodSaveData {
     /* 0x00 */ u32 flags;

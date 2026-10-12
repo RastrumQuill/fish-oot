@@ -40,6 +40,11 @@ bite window12 frames (0.60 s) to set the hook
 | Bee Larva | ×0.8 |
 | Bug | ×1.3 |
 | Worm | ×1.0 |
+| Spinner | ×1.7 |
+| Crankbait | ×1.6 |
+| Popper | ×1.1 |
+| Frog Lure | ×1.2 |
+| Sinking Lure | ×1.4 |
 
 ## Tips
 

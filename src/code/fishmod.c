@@ -266,7 +266,8 @@ f32 gFishmodSpawnLength;
 static FishmodBottleFish sFloppingFish;
 
 static const char* sBaitNames[FISHMOD_BAIT_MAX] = {
-    "None", "Bee larva", "Bug", "Worm", "Coral earring", "Fish",
+    "None", "Bee larva", "Bug", "Worm", "Coral earring", "Fish", "Spinner", "Crankbait", "Popper", "Frog lure",
+    "Sinking lure",
 };
 
 const char* Fishmod_BaitName(s32 bait) {
