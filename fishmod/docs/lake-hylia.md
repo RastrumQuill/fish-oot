@@ -26,7 +26,7 @@ Each zone has its own species mix, preferred depth and active times.
 | **Dry dock** | The dock by the lab and the Fishing Pond's pier, and the shade under them | Mid, shaded, posts | Bass, catfish | Structure fishing: fish hold in the shade by the posts. Cast tight to the structure |
 | **Drop-offs** | The edges where the shallows fall away to deep water, and around the island | Steep, mid to deep | Carp, bass, larger greengill | Fish patrol along the edge between feeding up shallow and resting deep |
 | **Deep water** | The middle of the lake, the Water Temple island area | Deep, cold, dark | Catfish, loach (bottom), big pike, hearty bass | Long casts, heavy fish, slow fights. The rare record fish live here |
-| **Inflow** | Where the water comes in from Zora's Fountain | Moving water, oxygen | River fish (from Zora's River) | Current-loving species, more active at dawn |
+| **Inflow** | Where the Gerudo Valley river comes in (water boxes 0 and 1) | Moving water, oxygen | River fish (from Zora's River) | Current-loving species, more active at dawn |
 
 Special case: as adult, before the Water Temple is cleared, **the lake is drained**. Options: no fish (the lake
 is mud), a few stranded pools with trapped fish, or the drained state only in a later version. Decide before
