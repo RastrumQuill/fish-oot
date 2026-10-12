@@ -21,6 +21,7 @@
 #include "message_data_fmt.h"
 #include "save.h"
 #include "environment.h"
+#include "skybox.h"
 #include "sfx.h"
 #include "z_lib.h"
 #include "string.h"
@@ -882,4 +883,92 @@ void Fishmod_TimeOnSceneExit(void) {
     gSaveContext.save.dayTime = now + step;
     sTimeOwed -= step;
     sTimeLast = gSaveContext.save.dayTime;
+}
+
+/*
+ * Weather: a roll per fishing spot per day (the same all day): mostly clear, sometimes overcast, rarely rain. Set
+ * up the way the engine's own rainy weather is (darker sky and light, rain falling). The Song of Storms still
+ * brings rain on top of it.
+ */
+#define WEATHER_RAIN_CHANCE 10     // percent of days
+#define WEATHER_OVERCAST_CHANCE 20
+
+static u8 sWeather; // FishmodWeather, for the scene being played
+
+s32 Fishmod_WeatherRoll(s16 sceneId, s32 day) {
+    // a small hash of the spot and the day (the game's random numbers stay untouched)
+    u32 h = (u32)sceneId * 0x9E3779B1u + (u32)day * 0x85EBCA77u;
+    u32 roll;
+
+    h ^= h >> 15;
+    h *= 0x2C1B3C6Du;
+    h ^= h >> 12;
+    roll = h % 100;
+    if (roll < WEATHER_RAIN_CHANCE) {
+        return FISHMOD_WEATHER_RAIN;
+    }
+    if (roll < WEATHER_RAIN_CHANCE + WEATHER_OVERCAST_CHANCE) {
+        return FISHMOD_WEATHER_OVERCAST;
+    }
+    return FISHMOD_WEATHER_CLEAR;
+}
+
+void Fishmod_OnEnvironmentInit(PlayState* play) {
+    EnvironmentContext* envCtx = &play->envCtx;
+
+    sWeather = FISHMOD_WEATHER_CLEAR;
+    if ((Fishmod_GetSceneSpawns(play->sceneId) == NULL) || (play->skyboxId != SKYBOX_NORMAL_SKY) ||
+        (gWeatherMode != WEATHER_MODE_CLEAR)) {
+        return;
+    }
+    sWeather = Fishmod_WeatherRoll(play->sceneId, gSaveContext.save.totalDays);
+    if (sWeather == FISHMOD_WEATHER_CLEAR) {
+        return;
+    }
+    // the cloudy sky and the darker light set (scenes have at least three light sets, so set 2 is safe)
+    envCtx->skyboxConfig = 1;
+    envCtx->changeSkyboxNextConfig = 1;
+    envCtx->lightConfig = 2;
+    envCtx->changeLightNextConfig = 2;
+    if (sWeather == FISHMOD_WEATHER_RAIN) {
+        envCtx->precipitation[PRECIP_RAIN_MAX] = 20;
+        envCtx->precipitation[PRECIP_RAIN_CUR] = 20;
+        envCtx->stormState = STORM_STATE_ON;
+    }
+}
+
+s32 Fishmod_Weather(PlayState* play) {
+    // the Song of Storms (or any rain) counts as rain while it lasts
+    if (play->envCtx.precipitation[PRECIP_RAIN_CUR] > 0) {
+        return FISHMOD_WEATHER_RAIN;
+    }
+    return sWeather;
+}
+
+/**
+ * How bright it is for the fish, 0 (dark night) to 1 (full day): dawn from 4:00 to 8:00, dusk from 16:00 to 19:00
+ * (the engine's light table), dimmer under clouds and rain.
+ */
+f32 Fishmod_Light(PlayState* play) {
+    s32 t = gSaveContext.save.dayTime;
+    f32 light;
+
+    if ((t >= CLOCK_TIME(8, 0)) && (t < CLOCK_TIME(16, 0))) {
+        light = 1.0f;
+    } else if ((t >= CLOCK_TIME(4, 0)) && (t < CLOCK_TIME(8, 0))) {
+        light = 0.15f + 0.85f * (t - CLOCK_TIME(4, 0)) / (f32)(CLOCK_TIME(8, 0) - CLOCK_TIME(4, 0));
+    } else if ((t >= CLOCK_TIME(16, 0)) && (t < CLOCK_TIME(19, 0))) {
+        light = 1.0f - 0.85f * (t - CLOCK_TIME(16, 0)) / (f32)(CLOCK_TIME(19, 0) - CLOCK_TIME(16, 0));
+    } else {
+        light = 0.15f;
+    }
+    switch (Fishmod_Weather(play)) {
+        case FISHMOD_WEATHER_OVERCAST:
+            light *= 0.75f;
+            break;
+        case FISHMOD_WEATHER_RAIN:
+            light *= 0.6f;
+            break;
+    }
+    return light;
 }

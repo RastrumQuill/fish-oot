@@ -342,6 +342,17 @@ void Fishmod_AdvanceTime(struct PlayState* play);
 void Fishmod_TimeUpdate(struct PlayState* play);
 void Fishmod_TimeOnSceneExit(void);
 
+// Weather and light (fishmod.c)
+typedef enum FishmodWeather {
+    /* 0 */ FISHMOD_WEATHER_CLEAR,
+    /* 1 */ FISHMOD_WEATHER_OVERCAST,
+    /* 2 */ FISHMOD_WEATHER_RAIN
+} FishmodWeather;
+s32 Fishmod_WeatherRoll(s16 sceneId, s32 day);
+void Fishmod_OnEnvironmentInit(struct PlayState* play);
+s32 Fishmod_Weather(struct PlayState* play);
+f32 Fishmod_Light(struct PlayState* play);
+
 #if FISHMOD_DEBUG
 void Fishmod_DebugBoot(void);
 // True if the autoplay script wants a normal boot (logo, title, file select) instead of going straight to Kokiri
