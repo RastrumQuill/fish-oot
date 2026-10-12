@@ -37,6 +37,7 @@
 s32 Object_LoadPersistent(ObjectContext* objectCtx, s16 objectId);
 
 Actor* gFishmodRod = NULL;
+static u8 sRainSoundPending; // start the rain's sound once the scene's music has started (see the weather)
 Vec3f gFishmodHivePos; // where the scene's added beehive went (debug display)
 
 // The rod rides on B while fishing (like in the Fishing Pond); L puts it there and back.
@@ -201,6 +202,13 @@ void Fishmod_PlayUpdate(PlayState* play) {
     Actor* rod;
 
     Fishmod_TimeUpdate(play);
+
+    // the rain's sound (the nature ambience's rain channel, as vanilla's rain weather plays it), once the scene's
+    // own music has started
+    if (sRainSoundPending && (play->transitionMode == TRANS_MODE_OFF) && (play->state.frames > 30)) {
+        sRainSoundPending = false;
+        Environment_PlayStormNatureAmbience(play);
+    }
 
     // Repair files saved with the old rod bug that left a Deku Stick on B (vanilla never puts it there)
     if (gSaveContext.save.info.equips.buttonItems[0] == ITEM_DEKU_STICK) {
@@ -917,6 +925,7 @@ void Fishmod_OnEnvironmentInit(PlayState* play) {
     EnvironmentContext* envCtx = &play->envCtx;
 
     sWeather = FISHMOD_WEATHER_CLEAR;
+    sRainSoundPending = false;
     if ((Fishmod_GetSceneSpawns(play->sceneId) == NULL) || (play->skyboxId != SKYBOX_NORMAL_SKY) ||
         (gWeatherMode != WEATHER_MODE_CLEAR)) {
         return;
@@ -934,6 +943,7 @@ void Fishmod_OnEnvironmentInit(PlayState* play) {
         envCtx->precipitation[PRECIP_RAIN_MAX] = 20;
         envCtx->precipitation[PRECIP_RAIN_CUR] = 20;
         envCtx->stormState = STORM_STATE_ON;
+        sRainSoundPending = true;
     }
 }
 
