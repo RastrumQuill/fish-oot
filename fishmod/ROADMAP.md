@@ -71,6 +71,30 @@ wait for the hardware readout. Every variant looked right (no broken graphics).
 Up close (the lab tank: 36 fish around Link, all within LOD range) opt1 and opt3 cost the same, ~44 of the 50 ms
 frame on the CPU. That case needs the cheaper AI and fish manager from [wiki/study.md](wiki/study.md).
 
+**Opt level 4** (`fishmod/build.sh --opt 4`): the fish manager, fish rigs, reduced rigs, fixed whiskers and cheaper
+water lookups. Profiled with `read_stats.py --prof`, ares, ms per frame, debug builds (the debug readout block,
+about 5 ms in the lab tank, isn't in release builds):
+
+| | Lab tank opt3 | Lab tank opt4 | Kokiri opt3 | Kokiri opt4 |
+|---|---|---|---|---|
+| Fish draw | 13.0 | **1.8** | 1.8 | 0.7 |
+| — per drawn fish (close) | 1,263 µs | **~158 µs** | 1,323 µs (one fish) | ~200 µs |
+| — catfish whiskers | 774 µs each | 187 µs each, close only | — | — |
+| Fish update | 15.5 | 13.6 | 4.0 | 4.6* |
+| — water lookup | 31.5 µs | 22.5 µs | | |
+| — bank raycasts | 2.1 per frame | 0.6 per frame | | |
+| CPU draw (whole frame) | 20.9 | **8.2** | 23.6 | 24.3 |
+| CPU update (whole frame) | 25.5 | 24.6 | 23.0 | 19.7 |
+| Worst frame | 60.0 | 53.8 | 65.8 | 52.3 |
+
+\* Kokiri opt4 runs the day's roster: the 5 fish whose homes are far from Link are dormant (not spawned), so it's a
+different set of fish from opt3's random ones; per frame the update is within noise of opt3.
+
+Renders: the full rig is identical to the old skeleton (photo booth, every species, side and three-quarter views);
+the reduced rig is identical at rest. Whiskers are now fixed to the head.
+
+Still to do for the update side: the AI itself (~170 µs per fish) is next; see [wiki/study.md](wiki/study.md).
+
 ### Done
 
 - **Lines as one vertex strip:** the fishing line (optimization 1, build A and later).

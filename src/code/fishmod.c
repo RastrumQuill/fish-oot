@@ -88,6 +88,48 @@ const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId) {
  * Called from Play_InitScene after the scene header commands ran, before any room objects are loaded,
  * so the fishing object can be loaded as a persistent object for the whole scene.
  */
+/*
+ * Fish kept from each scene's roster today (FISHMOD_OPT 4): they don't come back until the day changes. A few scenes
+ * are remembered; the oldest is forgotten first.
+ */
+typedef struct FishmodRosterCaught {
+    s16 sceneId;
+    s32 day;
+    u32 bits;
+} FishmodRosterCaught;
+
+static FishmodRosterCaught sRosterCaught[8];
+static s32 sRosterCaughtNext;
+
+static FishmodRosterCaught* Fishmod_FindRosterCaught(s16 sceneId, s32 day, s32 create) {
+    s32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sRosterCaught); i++) {
+        if ((sRosterCaught[i].bits != 0) && (sRosterCaught[i].sceneId == sceneId) && (sRosterCaught[i].day == day)) {
+            return &sRosterCaught[i];
+        }
+    }
+    if (!create) {
+        return NULL;
+    }
+    i = sRosterCaughtNext;
+    sRosterCaughtNext = (sRosterCaughtNext + 1) % ARRAY_COUNT(sRosterCaught);
+    sRosterCaught[i].sceneId = sceneId;
+    sRosterCaught[i].day = day;
+    sRosterCaught[i].bits = 0;
+    return &sRosterCaught[i];
+}
+
+u32 Fishmod_RosterCaughtBits(s16 sceneId, s32 day) {
+    FishmodRosterCaught* entry = Fishmod_FindRosterCaught(sceneId, day, false);
+
+    return (entry != NULL) ? entry->bits : 0;
+}
+
+void Fishmod_RosterSetCaught(s16 sceneId, s32 day, s32 index) {
+    Fishmod_FindRosterCaught(sceneId, day, true)->bits |= 1 << index;
+}
+
 void Fishmod_OnSceneLoad(PlayState* play) {
     gFishmodRod = NULL;
 

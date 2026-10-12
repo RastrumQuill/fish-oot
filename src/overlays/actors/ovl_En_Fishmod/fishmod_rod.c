@@ -49,7 +49,7 @@ FishmodRod gFishmodRodState;
 
 #define ROD (&gFishmodRodState)
 
-#define FISH_COUNT 10
+#define FISH_COUNT FISHMOD_FISH_COUNT
 #define WINDUP_FRAMES 18
 #define LINE_MIN 28.0f
 #define LINE_MAX_BASE 460.0f
@@ -347,7 +347,8 @@ static void Rod_MaintainPopulation(EnFishmod* this, PlayState* play) {
     Actor* actor;
     s32 count = 0;
 
-    if (gFishmodPhoto.active || ((play->gameplayFrames % 300) != 150)) {
+    if (gFishmodPhoto.active || ((play->gameplayFrames % 300) != 150) || (FISHMOD_OPT >= 4)) {
+        // (from FISHMOD_OPT 4 the fish manager's roster keeps the water stocked)
         return;
     }
     for (actor = play->actorCtx.actorLists[ACTORCAT_NPC].head; actor != NULL; actor = actor->next) {
@@ -372,9 +373,14 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     EnFishmod_WaterGridAcquire(play);
 
+#if FISHMOD_OPT >= 4
+    // the fish manager spawns the scene's fish (its roster)
+    EnFishmod_ManagerEnsure(play);
+#else
     if (!gFishmodPhoto.active) {
         Rod_SpawnFish(this, play, FISH_COUNT);
     }
+#endif
 }
 
 void EnFishmod_RodDestroy(EnFishmod* this, PlayState* play) {
@@ -943,6 +949,9 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                     if (decided == 1) {
                         Fishmod_BottleFish(fish->species - gFishmodSpecies, fish->lengthInches);
                         Item_Give(play, ITEM_BOTTLE_FISH);
+#if FISHMOD_OPT >= 4
+                        EnFishmod_RosterCaught(play, fish);
+#endif
                         Sfx_PlaySfxCentered(NA_SE_SY_GET_ITEM);
                         EnFishmod_RodMessage(1, "Into the bottle!", NULL);
                         // FLEE releases it from the rod (clearing ROD->fish), so use our own pointer

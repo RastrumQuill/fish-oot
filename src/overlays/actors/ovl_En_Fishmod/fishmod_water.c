@@ -31,13 +31,18 @@ typedef struct FishmodWaterGrid {
     f32 x0;
     f32 z0;
     f32 cell;
+    f32 invCell; // 1 / cell
     s16 width; // corners
     s16 depth;
     s16* floor;
 } FishmodWaterGrid;
 
 // Exact floors near banks, cached by 4-unit spot
+#if FISHMOD_OPT >= 4
+#define EXACT_CACHE_SIZE 512 // 4 KB: bank raycasts cost about 0.6 ms each, so misses are expensive
+#else
 #define EXACT_CACHE_SIZE 64
+#endif
 typedef struct {
     s16 x;
     s16 z;
@@ -48,6 +53,21 @@ static FishmodExactFloor sExactCache[EXACT_CACHE_SIZE];
 
 static FishmodWaterGrid sGrids[GRID_MAX_BOXES];
 static s32 sGridCount;
+
+#if FISHMOD_OPT >= 4
+// the last conservative cell answer (see EnFishmod_WaterFloor); good for one frame
+static FishmodWaterGrid* sMemoGrid;
+static s32 sMemoIx;
+static s32 sMemoIz;
+static f32 sMemoFloor;
+static u32 sMemoFrame;
+static u32 sFrame;
+
+/** Called once a frame (by the fish manager): the cell memo only lasts a frame (corners can still fill in). */
+void EnFishmod_WaterNewFrame(void) {
+    sFrame++;
+}
+#endif
 static s32 sGridUsers; // the rod and the fish share one cache: built by the first, freed after the last
 
 void EnFishmod_WaterGridAcquire(PlayState* play) {
@@ -109,6 +129,7 @@ void EnFishmod_WaterGridInit(PlayState* play) {
         grid->x0 = box->xMin;
         grid->z0 = box->zMin;
         grid->cell = cell;
+        grid->invCell = 1.0f / cell;
         grid->width = width;
         grid->depth = depth;
         cornersLeft -= width * depth;
@@ -119,6 +140,9 @@ void EnFishmod_WaterGridInit(PlayState* play) {
 void EnFishmod_WaterGridDestroy(PlayState* play) {
     s32 i;
 
+#if FISHMOD_OPT >= 4
+    sMemoGrid = NULL;
+#endif
     for (i = 0; i < sGridCount; i++) {
         if (sGrids[i].floor != NULL) {
             ZeldaArena_Free(sGrids[i].floor);
@@ -209,14 +233,32 @@ s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* f
     }
 
     if (grid != NULL) {
+#if FISHMOD_OPT >= 4
+        f32 gx = (x - grid->x0) * grid->invCell;
+        f32 gz = (z - grid->z0) * grid->invCell;
+#else
         f32 gx = (x - grid->x0) / grid->cell;
         f32 gz = (z - grid->z0) / grid->cell;
+#endif
         s32 ix = CLAMP((s32)gx, 0, grid->width - 2);
         s32 iz = CLAMP((s32)gz, 0, grid->depth - 2);
-        s32 c00 = EnFishmod_GridCorner(play, grid, ix, iz);
-        s32 c10 = EnFishmod_GridCorner(play, grid, ix + 1, iz);
-        s32 c01 = EnFishmod_GridCorner(play, grid, ix, iz + 1);
-        s32 c11 = EnFishmod_GridCorner(play, grid, ix + 1, iz + 1);
+        s32 c00;
+        s32 c10;
+        s32 c01;
+        s32 c11;
+
+#if FISHMOD_OPT >= 4
+        // The nose and the middle of a fish, and fish near each other, often ask about the same cell: its
+        // conservative floor depends only on the cell (unless it straddles a bank), so the last answer is kept.
+        if (conservative && (grid == sMemoGrid) && (ix == sMemoIx) && (iz == sMemoIz) && (sMemoFrame == sFrame)) {
+            *floor = sMemoFloor;
+            return true;
+        }
+#endif
+        c00 = EnFishmod_GridCorner(play, grid, ix, iz);
+        c10 = EnFishmod_GridCorner(play, grid, ix + 1, iz);
+        c01 = EnFishmod_GridCorner(play, grid, ix, iz + 1);
+        c11 = EnFishmod_GridCorner(play, grid, ix + 1, iz + 1);
 
         if ((c00 != GRID_NO_FLOOR) && (c10 != GRID_NO_FLOOR) && (c01 != GRID_NO_FLOOR) && (c11 != GRID_NO_FLOOR)) {
             s32 hi = MAX(MAX(c00, c10), MAX(c01, c11));
@@ -230,6 +272,13 @@ s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* f
             }
             if (conservative) {
                 *floor = MAX(MAX(c00, c10), MAX(c01, c11));
+#if FISHMOD_OPT >= 4
+                sMemoGrid = grid;
+                sMemoIx = ix;
+                sMemoIz = iz;
+                sMemoFloor = *floor;
+                sMemoFrame = sFrame;
+#endif
             } else {
                 f32 fx = CLAMP(gx - ix, 0.0f, 1.0f);
                 f32 fz = CLAMP(gz - iz, 0.0f, 1.0f);

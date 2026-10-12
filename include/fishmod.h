@@ -114,14 +114,21 @@ extern const s32 gFishmodSceneSpawnsCount;
 typedef enum FishmodActorType {
     /* 0 */ FISHMOD_TYPE_ROD, // one per scene: rod, line, bobber, camera, fish spawning
     /* 1 */ FISHMOD_TYPE_FISH,
-    /* 2 */ FISHMOD_TYPE_COMB // a chunk of a broken beehive with larvae in it, scooped up with a bottle
+    /* 2 */ FISHMOD_TYPE_COMB, // a chunk of a broken beehive with larvae in it, scooped up with a bottle
+    /* 3 */ FISHMOD_TYPE_MANAGER // one per scene (FISHMOD_OPT 4): the fish roster, drawing all the fish
 } FishmodActorType;
 
 #define FISHMOD_PARAMS(type, species) (((type) << 8) | (species))
-#define FISHMOD_GET_TYPE(params) (((params) >> 8) & 0xFF)
+#define FISHMOD_GET_TYPE(params) (((params) >> 8) & 3)
+// a fish from the scene's roster (FISHMOD_OPT 4): its record index, in bits 10-14
+#define FISHMOD_PARAMS_ROSTER(species, index) (FISHMOD_PARAMS(FISHMOD_TYPE_FISH, species) | (((index) + 1) << 10))
+#define FISHMOD_GET_ROSTER(params) ((((params) >> 10) & 0x1F) - 1)
 #define FISHMOD_GET_SPECIES(params) ((params) & 0xFF)
 
 const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId);
+// Which of a scene's roster fish were kept today (FISHMOD_OPT 4): they stay gone until the day changes.
+u32 Fishmod_RosterCaughtBits(s16 sceneId, s32 day);
+void Fishmod_RosterSetCaught(s16 sceneId, s32 day, s32 index);
 void Fishmod_OnSceneLoad(struct PlayState* play);
 void Fishmod_PlayUpdate(struct PlayState* play);
 s32 Fishmod_CanUseRod(struct PlayState* play);

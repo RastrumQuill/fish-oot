@@ -228,6 +228,9 @@ endif
 FISHMOD_OPT ?= 0
 CPP_DEFINES += -DFISHMOD_OPT=$(FISHMOD_OPT)
 # 3 = all of 2 plus billboards for distant fish, deeper AI throttling, dormant far fish, Expansion Pak memory
+# 4 = all of 3 plus the fish manager (roster, one draw for all fish, AI budget), fish rigs (only moving limbs get
+#     matrices, static fins baked per species), reduced rigs for mid-distance and small fish, fixed whiskers, cheaper
+#     water lookups
 # FISHMOD_FASTTRIG=1: polynomial sin/cos in place of the sine table (Math_SinS/Math_CosS, whole game)
 FISHMOD_FASTTRIG ?= 0
 CPP_DEFINES += -DFISHMOD_FASTTRIG=$(FISHMOD_FASTTRIG)
