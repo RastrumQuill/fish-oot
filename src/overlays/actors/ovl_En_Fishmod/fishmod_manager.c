@@ -33,6 +33,7 @@
 #define THINK_BUDGET 16           // full AI updates per frame for fish cruising far from Link and the bobber
 #define THINK_FAR_DIST 300.0f
 #define LOD_FULL_DIST 200.0f      // closer than this: the full rig (and whiskers)
+#define DRAW_WHISKERS 0           // catfish whiskers are off for now: too thin to see (to be redone)
 
 typedef struct FishmodRosterFish {
     Vec3f home;
@@ -334,7 +335,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
                     }
                 }
             }
-            item->whiskers = (fish->species->lookFlags & FISHMOD_LOOK_WHISKERS) &&
+            item->whiskers = DRAW_WHISKERS && (fish->species->lookFlags & FISHMOD_LOOK_WHISKERS) &&
                              (item->variant == FISH_RIG_FULL) && (close || (dist < LOD_FULL_DIST));
         }
     }
