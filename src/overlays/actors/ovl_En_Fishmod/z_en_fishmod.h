@@ -127,6 +127,7 @@ typedef struct EnFishmod {
     /* 0x3FC */ s16 lastThink;                     // timer value when it last ran its AI (FISHMOD_OPT 4)
     /* 0x3FE */ s16 startleBend;                   // the C-bend of a startle (sign: which way), 0 otherwise
     /* 0x400 */ u8 rigReady;                       // the manager can draw it (FISHMOD_OPT 4)
+    /* 0x404 */ s32 waterCell;                     // the water grid cell waterY/floorY are for (FISHMOD_OPT 5)
 #if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
@@ -216,6 +217,7 @@ void EnFishmod_WaterGridDestroy(struct PlayState* play);
 void EnFishmod_WaterNewFrame(void);
 s32 EnFishmod_WaterFloor(struct PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative);
 s32 EnFishmod_OpenWaterDir(struct PlayState* play, f32 x, f32 z, s16* yaw);
+s32 EnFishmod_WaterCell(struct PlayState* play, f32 x, f32 z);
 
 s32 EnFishmod_FindWaterPoint(struct PlayState* play, Vec3f* center, f32 radius, f32 minDepth, Vec3f* out,
                              f32* outSurface, f32* outFloor);
@@ -244,6 +246,7 @@ typedef struct EnFishmodShared {
     Vec3f bobberPos;
     s32 bobberIn;
     s32 thinksLeft;
+    f32 light; // Fishmod_Light: 0 dark night - 1 full day (FISHMOD_OPT 5)
 } EnFishmodShared;
 EnFishmodShared* EnFishmod_Shared(struct PlayState* play);
 void EnFishmod_ManagerEnsure(struct PlayState* play);

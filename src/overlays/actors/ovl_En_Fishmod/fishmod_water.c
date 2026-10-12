@@ -573,4 +573,23 @@ s32 EnFishmod_OpenWaterDir(PlayState* play, f32 x, f32 z, s16* yaw) {
     }
     return false;
 }
+
+/** Which grid cell a point is in (a number that changes when it crosses into another), or -1 outside the grids. */
+s32 EnFishmod_WaterCell(PlayState* play, f32 x, f32 z) {
+    s32 i;
+
+    for (i = 0; i < sGridCount; i++) {
+        FishmodWaterGrid* grid = &sGrids[i];
+        WaterBox* box = grid->box;
+
+        if ((x >= box->xMin) && (x <= box->xMin + box->xLength) && (z >= box->zMin) &&
+            (z <= box->zMin + box->zLength)) {
+            s32 ix = (s32)((x - grid->x0) * grid->invCell);
+            s32 iz = (s32)((z - grid->z0) * grid->invCell);
+
+            return (i << 24) | (iz * grid->width + ix);
+        }
+    }
+    return -1;
+}
 #endif
