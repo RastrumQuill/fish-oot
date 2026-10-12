@@ -239,8 +239,8 @@ def main():
         load_vanilla("gFishingRockModel", "gFishingRockTex.rgba16.png", 32, 32),
         load_vanilla("gFishingWoodPostModel", "gFishingWoodPostTex.rgba16.png", 32, 32),
     ]
-    new_names = ["reed_clump", "ribbon_weed", "bush_weed", "sunken_log", "drowned_tree", "pebble_patch",
-                 "silt_patch"]
+    skip = {"stump", "stump_top", "lily_flower", "lily_centre"}
+    new_names = sorted(f[:-4] for f in os.listdir(MESH) if f.endswith(".obj") and f[:-4] not in skip)
     new = [load_obj(n) for n in new_names]
     stump = [load_obj("stump"), load_obj("stump_top")]
     flower = [load_obj("lily_flower"), load_obj("lily_centre")]
@@ -252,31 +252,31 @@ def main():
 
     v = os.path.join(SCENES, "misc", "turibori")
     s = os.path.join(SCENES, "overworld", "spot06")
-    tex_pairs = [
-        (os.path.join(v, "turibori_scene_00003CE0_Tex.rgba16.png"), "vanilla pond reeds"),
-        (os.path.join(ART, "reed_card.png"), "new reed card"),
-        (os.path.join(ART, "ribbon_card.png"), "new ribbon card"),
-        (os.path.join(ART, "bush_card.png"), "new bush card"),
-        (os.path.join(v, "turibori_scene_0000FCE0_Tex.rgba16.png"), "vanilla pebbles"),
-        (os.path.join(ART_ROM, "pebbles.png"), "new pebbles (vanilla)"),
-        (os.path.join(v, "turibori_scene_0000ECE0_Tex.rgba16.png"), "vanilla pond moss"),
-        (os.path.join(ART, "silt.png"), "new silt decal"),
-        (os.path.join(OBJ_FISH, "gFishingWoodPostTex.rgba16.png"), "vanilla wood post"),
-        (os.path.join(ART_ROM, "bark.png"), "new bark (from post)"),
-        (os.path.join(ART, "log_rings.png"), "new log rings"),
-        (os.path.join(OBJ_FISH, "gFishingLilyPadTex.rgba16.png"), "vanilla lily pad"),
-        (os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "objects", "object_dy_obj",
-                      "gGreatFairyFlowerTex.ia16.png"), "vanilla fairy flower"),
-        (os.path.join(ART_ROM, "lily_flower.png"), "new lily (from it)"),
-        (os.path.join(s, "spot06_scene_000170B8_Tex.rgba16.png"), "vanilla lake bed"),
-        (os.path.join(s, "spot06_scene_0000C2B8_Tex.rgba16.png"), "vanilla lake sand"),
-    ]
+    V = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets")
+    tex_pairs = []
+    for src, new_name in (
+            ("scenes/misc/turibori/turibori_scene_00003CE0_Tex.rgba16.png", "reed_card"),
+            ("objects/gameplay_keep/gUnusedGrassBladesTex.rgba16.png", "grass_card"),
+            (None, "ribbon_card"),
+            ("objects/gameplay_field_keep/gFieldBushTex.rgba16.png", "broadleaf_card"),
+            ("objects/gameplay_keep/gCuttableShrubTex.rgba16.png", "bush_card"),
+            ("scenes/misc/turibori/turibori_scene_000059E0_Tex.ia8.png", "roots_card"),
+            ("objects/gameplay_field_keep/gHanaLeafTex.rgba16.png", "float_leaf"),
+            ("objects/gameplay_keep/gWitheredLeafTex.rgba16.png", "leaf_litter"),
+            ("scenes/misc/turibori/turibori_scene_0000FCE0_Tex.rgba16.png", "pebbles"),
+            ("objects/object_fish/gFishingWoodPostTex.rgba16.png", "bark"),
+            ("objects/object_dy_obj/gGreatFairyFlowerTex.ia16.png", "lily_flower")):
+        if src:
+            tex_pairs.append((os.path.join(V, src), "vanilla " + os.path.basename(src)[:10]))
+        tex_pairs.append((os.path.join(ART_ROM, new_name + ".png"), "new " + new_name))
     panel2 = grid([tex_tile(p, l) for p, l in tex_pairs], 8)
 
     # a weed bed by a drop-off: one hero (the log), secondaries (weed clumps), small pieces (pebbles, a rock)
     rock = vanilla[2]
     cluster = [
-        load_obj("silt_patch").moved((0, 0, 0), 1.6),
+        load_obj("leaf_litter").moved((0, 0, 0), 1.6), load_obj("grass_tuft").moved((-20, 0, 10)),
+        load_obj("grass_tuft").moved((30, 0, -10), 1.2, 1.0), load_obj("grass_tuft").moved((-50, 0, 40), 0.9, 2.0),
+        load_obj("broadleaf").moved((40, 0, 40), 1.0, 0.5), load_obj("old_posts").moved((150, 0, 40), 1.0, 0.3),
         load_obj("sunken_log").moved((10, 0, 20), 0.8, 0.5),
         load_obj("ribbon_weed").moved((-60, 0, -30)), load_obj("ribbon_weed").moved((-40, 0, -60), 1.2, 1.0),
         load_obj("ribbon_weed").moved((-80, 0, -70), 0.9, 2.0),

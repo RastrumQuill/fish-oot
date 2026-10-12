@@ -54,140 +54,6 @@ def save(img, name):
 # Textures
 
 
-def card_blades(w, h, blades, seed, width=(1.5, 3.0), bend=4.0, taper=True):
-    """Greyscale + alpha card of grass-like blades (an IA texture: tinted by vertex colour)."""
-    rnd = random.Random(seed)
-    s = 4
-    img = Image.new("LA", (w * s, h * s), (0, 0))
-    px = img.load()
-    for _ in range(blades):
-        x0 = rnd.uniform(0.15, 0.85) * w
-        top = rnd.uniform(0.0, 0.35) * h
-        lean = rnd.uniform(-bend, bend)
-        bw = rnd.uniform(*width)
-        shade = rnd.uniform(0.6, 1.0)
-        for yy in range(int(top * s), h * s):
-            t = (yy / s - top) / (h - top)  # 0 at the tip, 1 at the base
-            cx = x0 + lean * (1 - t) ** 2
-            half = bw * (0.25 + 0.75 * t if taper else 1.0) * 0.5
-            for xx in range(int((cx - half) * s), int((cx + half) * s) + 1):
-                if 0 <= xx < w * s:
-                    # lighter toward the tip, darker down the middle edge
-                    edge = abs(xx / s - cx) / max(half, 0.01)
-                    v = int(255 * shade * (0.75 + 0.25 * (1 - t)) * (1.0 - 0.25 * edge))
-                    if v > px[xx, yy][0] or px[xx, yy][1] == 0:
-                        px[xx, yy] = (v, 255)
-    img = img.resize((w, h), Image.BOX)
-    # 1-bit alpha (as the N64 alpha compare uses it): solid where the blade covers most of a texel
-    out = Image.new("LA", (w, h))
-    for y in range(h):
-        for x in range(w):
-            v, a = img.getpixel((x, y))
-            out.putpixel((x, y), (min(255, int(v * 255 / max(a, 1))) if a else 0, 255 if a > 110 else 0))
-    return out
-
-
-def tex_reed():
-    return card_blades(32, 64, 14, 11, width=(1.6, 2.6), bend=5.0)
-
-
-def tex_ribbon():
-    """Eelgrass ribbons: few, long, flat, bending one way (the current)."""
-    rnd = random.Random(21)
-    w, h, s = 16, 64, 4
-    img = Image.new("LA", (w * s, h * s), (0, 0))
-    px = img.load()
-    for r in range(4):
-        x0 = (r + 0.5) * w / 4 + rnd.uniform(-1, 1)
-        top = rnd.uniform(0.0, 0.25) * h
-        phase = rnd.uniform(0, math.pi)
-        bw = rnd.uniform(2.2, 3.0)
-        for yy in range(int(top * s), h * s):
-            t = (yy / s - top) / (h - top)
-            cx = x0 + 2.2 * math.sin(phase + t * 4.0) * (1 - t) + 2.0 * (1 - t)
-            half = bw * 0.5
-            for xx in range(int((cx - half) * s), int((cx + half) * s) + 1):
-                if 0 <= xx < w * s:
-                    v = int(255 * (0.6 + 0.4 * (1 - t)) * (0.85 + 0.15 * math.sin(yy * 0.3)))
-                    px[xx, yy] = (v, 255)
-    img = img.resize((w, h), Image.BOX)
-    out = Image.new("LA", (w, h))
-    for y in range(h):
-        for x in range(w):
-            v, a = img.getpixel((x, y))
-            out.putpixel((x, y), (min(255, int(v * 255 / max(a, 1))) if a else 0, 255 if a > 110 else 0))
-    return out
-
-
-def tex_bush():
-    """Coontail / milfoil: soft bushy stems with irregular whorls of fine leaves."""
-    rnd = random.Random(31)
-    w, h, s = 32, 32, 4
-    img = Image.new("LA", (w * s, h * s), (0, 0))
-    px = img.load()
-    for _ in range(6):
-        x0, lean = rnd.uniform(9, 23), rnd.uniform(-6, 6)
-        top = rnd.uniform(1, 8)
-        y = top
-        while y < h - 1:
-            t = (y - top) / (h - top)
-            cx = x0 + lean * (1 - t) ** 1.5
-            # a whorl: short leaves fanning out and up at random angles
-            for _ in range(rnd.randint(3, 6)):
-                ang = rnd.uniform(-2.6, -0.5) if rnd.random() < 0.5 else rnd.uniform(-2.6, -0.5) + math.pi * 0.0
-                ln = rnd.uniform(2.0, 4.5) * (0.6 + 0.4 * (1 - t))
-                side = rnd.choice((-1, 1))
-                for k in range(int(ln * s)):
-                    xx = int((cx + side * math.cos(ang) * k / s) * s)
-                    yy = int((y + math.sin(ang) * k / s * 0.6) * s)
-                    if 0 <= xx < w * s and 0 <= yy < h * s:
-                        v = int(255 * (0.55 + 0.45 * rnd.random()) * (0.7 + 0.3 * (1 - t)))
-                        for d in (0, 1):
-                            if xx + d < w * s:
-                                px[xx + d, yy] = (v, 255)
-            y += rnd.uniform(1.3, 2.4)
-        for yy in range(int(top * s), h * s):
-            t = (yy / s - top) / (h - top)
-            xx = int((x0 + lean * (1 - t) ** 1.5) * s)
-            for d in (-1, 0, 1):
-                if 0 <= xx + d < w * s:
-                    px[xx + d, yy] = (110, 255)
-    img = img.resize((w, h), Image.BOX)
-    out = Image.new("LA", (w, h))
-    for y in range(h):
-        for x in range(w):
-            v, a = img.getpixel((x, y))
-            out.putpixel((x, y), (min(255, int(v * 255 / max(a, 1))) if a else 0, 255 if a > 70 else 0))
-    return out
-
-
-def tex_silt():
-    """A soft patch of silt with a ragged edge (a decal on the lake bed): alpha cut-out."""
-    rnd = random.Random(51)
-    pal = [hexc(c) for c in PALETTES["pond_moss"]]
-    w = h = 32
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    # value noise
-    grid = [[rnd.random() for _ in range(9)] for _ in range(9)]
-
-    def noise(x, y):
-        gx, gy = x / w * 8, y / h * 8
-        ix, iy = int(gx), int(gy)
-        fx, fy = gx - ix, gy - iy
-        a = grid[iy][ix] * (1 - fx) + grid[iy][ix + 1] * fx
-        b = grid[iy + 1][ix] * (1 - fx) + grid[iy + 1][ix + 1] * fx
-        return a * (1 - fy) + b * fy
-
-    for y in range(h):
-        for x in range(w):
-            r = math.hypot(x - 15.5, y - 15.5) / 15.5
-            n = noise(x, y)
-            if r + (n - 0.5) * 0.5 < 0.9:
-                col = pal[int(n * 5.99) % len(pal)]
-                img.putpixel((x, y), col + (255,))
-    return img
-
-
 def tex_bark():
     """Waterlogged bark: dark wood with vertical grooves and a green-brown algae tint."""
     rnd = random.Random(61)
@@ -308,7 +174,79 @@ def rom_bark():
     return out
 
 
+def ia_card(path, crop=None, size=None, gamma=1.0):
+    """A vanilla texture as a greyscale card with its cut-out (an IA texture tinted by vertex colour, so one card
+    gives many plants), detail kept."""
+    src = vanilla(path)
+    if crop:
+        src = src.crop(crop)
+    if size:
+        src = src.resize(size, Image.NEAREST if size[0] <= src.width else Image.BILINEAR)
+    out = Image.new("LA", src.size)
+    lo, hi = 255, 0
+    for y in range(src.height):
+        for x in range(src.width):
+            r, g, b, a = src.getpixel((x, y))
+            if a >= 128:
+                lo, hi = min(lo, luma((r, g, b))), max(hi, luma((r, g, b)))
+    for y in range(src.height):
+        for x in range(src.width):
+            r, g, b, a = src.getpixel((x, y))
+            v = (luma((r, g, b)) - lo) / max(hi - lo, 1)
+            out.putpixel((x, y), (int(255 * (0.25 + 0.75 * v ** gamma)), 255 if a >= 128 else 0))
+    return out
+
+
+def rom_reed_card():
+    return ia_card("scenes/misc/turibori/turibori_scene_00003CE0_Tex.rgba16.png")
+
+
+def rom_grass_card():
+    return ia_card("objects/gameplay_keep/gUnusedGrassBladesTex.rgba16.png")
+
+
+def rom_ribbon_card():
+    # the pond's reeds squeezed narrow and stretched tall: long ribbons
+    return ia_card("scenes/misc/turibori/turibori_scene_00003CE0_Tex.rgba16.png", None, (32, 64))
+
+
+def rom_broadleaf_card():
+    return ia_card("objects/gameplay_field_keep/gFieldBushTex.rgba16.png")
+
+
+def rom_bush_card():
+    return ia_card("objects/gameplay_keep/gCuttableShrubTex.rgba16.png", gamma=1.3)
+
+
+def rom_roots_card():
+    return ia_card("scenes/misc/turibori/turibori_scene_000059E0_Tex.ia8.png")
+
+
+def rom_float_leaf():
+    """Floating leaves (spatterdock-like): Hana's leaf, darkened to a pond green."""
+    src = vanilla("objects/gameplay_field_keep/gHanaLeafTex.rgba16.png")
+    out = Image.new("RGBA", src.size)
+    for y in range(src.height):
+        for x in range(src.width):
+            r, g, b, a = src.getpixel((x, y))
+            v = luma((r, g, b)) / 255.0
+            out.putpixel((x, y), lerp(hexc("#1c3a10"), hexc("#7a9a40"), v) + (255 if a >= 128 else 0,))
+    return out
+
+
+def rom_leaf_litter():
+    return vanilla("objects/gameplay_keep/gWitheredLeafTex.rgba16.png")
+
+
 ROM_TEXTURES = {
+    "reed_card": (rom_reed_card, "ia8"),
+    "grass_card": (rom_grass_card, "ia8"),
+    "ribbon_card": (rom_ribbon_card, "ia8"),
+    "broadleaf_card": (rom_broadleaf_card, "ia8"),
+    "bush_card": (rom_bush_card, "ia8"),
+    "roots_card": (rom_roots_card, "ia8"),
+    "float_leaf": (rom_float_leaf, "ci4"),
+    "leaf_litter": (rom_leaf_litter, "ci4"),
     "bark": (rom_bark, "ci4"),
     "pebbles": (rom_pebbles, "ci4"),
     "lily_flower": (rom_lily_flower, "ci4"),
@@ -317,10 +255,6 @@ ROM_TEXTURES = {
 
 
 TEXTURES = {
-    "reed_card": (tex_reed, "ia8"),
-    "ribbon_card": (tex_ribbon, "ia8"),
-    "bush_card": (tex_bush, "ia8"),
-    "silt": (tex_silt, "ci4"),
     "log_rings": (tex_rings, "ci4"),
 }
 
@@ -499,7 +433,49 @@ def mesh_lily_centre():
     return m
 
 
+def crossed_cards_v(name, texture, width, height, planes, base_col, tip_col, seed, lean=0.0, v_repeat=1.0):
+    """crossed_cards with the texture repeated up the card (tall weed columns)."""
+    m = crossed_cards(name, texture, width, height, planes, base_col, tip_col, seed, lean)
+    m.vt = [(u, v * v_repeat) for u, v in m.vt]
+    return m
+
+
+def mesh_flat_scatter(name, texture, count, spread, size, y, col, seed):
+    """Small flat quads scattered around (floating leaves on the surface, leaf litter on the bed)."""
+    rnd = random.Random(seed)
+    m = Mesh(name, texture)
+    for _ in range(count):
+        cx, cz = rnd.uniform(-spread, spread), rnd.uniform(-spread, spread)
+        ang = rnd.uniform(0, math.pi)
+        sz = size * rnd.uniform(0.7, 1.2)
+        c, sn = math.cos(ang) * sz, math.sin(ang) * sz
+        pts = [(cx - c + sn, cz - sn - c), (cx + c + sn, cz + sn - c), (cx + c - sn, cz + sn + c), (cx - c - sn, cz - sn + c)]
+        uv = [(0, 0), (1, 0), (1, 1), (0, 1)]
+        ids = [m.vert((px, y + rnd.uniform(0, 0.4), pz), t, col) for (px, pz), t in zip(pts, uv)]
+        m.quad(ids[0], ids[3], ids[2], ids[1])
+    return m
+
+
+def mesh_branch():
+    m = Mesh("branch", "bark")
+    dark, light = hexc("#2b2311"), hexc("#707346")
+    cylinder(m, (-70, 4, 0), (70, 7, 10), 4, 2.5, 4, dark, light, v_repeat=3.0)
+    cylinder(m, (10, 6, 4), (35, 30, 30), 2.2, 1, 3, dark, light, v_repeat=1.0)
+    cylinder(m, (-30, 5, 2), (-45, 22, -20), 2, 1, 3, dark, light, v_repeat=1.0)
+    return m
+
+
 MESHES = [
+    lambda: crossed_cards("grass_tuft", "grass_card", 34, 16, 2, hexc("#1c3a12"), hexc("#6c7a3b"), 104),
+    lambda: crossed_cards_v("tall_weed", "ribbon_card", 26, 190, 3, hexc("#0d260b"), hexc("#5a6a30"), 105, lean=18,
+                            v_repeat=2.0),
+    lambda: crossed_cards("broadleaf", "broadleaf_card", 38, 40, 3, hexc("#1a3a12"), hexc("#7a8a40"), 106),
+    lambda: crossed_cards("old_posts", "roots_card", 70, 60, 2, hexc("#2b2311"), hexc("#8a8a70"), 107),
+    lambda: crossed_cards("cattails", "reed_card", 44, 110, 3, hexc("#3a4a18"), hexc("#b8b070"), 108, lean=3),
+    lambda: mesh_flat_scatter("float_leaves", "float_leaf", 5, 22, 7, 0.5, (255, 255, 255), 109),
+    lambda: mesh_flat_scatter("leaf_litter", "leaf_litter", 9, 40, 5, 0.6, (200, 200, 200), 110),
+    mesh_branch,
+
     lambda: crossed_cards("reed_clump", "reed_card", 40, 95, 3, hexc("#184217"), hexc("#8f9342"), 101, lean=4),
     lambda: crossed_cards("ribbon_weed", "ribbon_card", 18, 80, 3, hexc("#133611"), hexc("#6c7a3b"), 102, lean=10),
     lambda: crossed_cards("bush_weed", "bush_card", 46, 42, 3, hexc("#082b07"), hexc("#525d28"), 103),
@@ -508,7 +484,6 @@ MESHES = [
     mesh_stump_top,
     mesh_drowned_tree,
     lambda: mesh_decal("pebble_patch", "pebbles", 120, (255, 255, 255)),
-    lambda: mesh_decal("silt_patch", "silt", 140, (255, 255, 255)),
     mesh_lily_flower,
     mesh_lily_centre,
 ]
