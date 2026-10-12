@@ -78,7 +78,7 @@ def load_obj(name):
         if parts[0] == "v":
             vs.append(tuple(float(x) for x in parts[1:]))
         elif parts[0] == "vt":
-            vts.append((float(parts[1]), float(parts[2])))
+            vts.append((float(parts[1]), 1.0 - float(parts[2])))  # OBJ's v points up
         elif parts[0] == "f":
             idx = [tuple(int(i) for i in p.split("/")) for p in parts[1:]]
             tris.append([(vs[i - 1][:3], vts[t - 1], vs[i - 1][3:6]) for i, t in idx])
