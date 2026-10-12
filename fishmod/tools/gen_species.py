@@ -202,8 +202,8 @@ def gen_index(data):
                  "Pages are generated from [`fishmod/data/species.json`](../data/species.json); "
                  "behavior and sizes match the game.")
     lines.append("")
-    lines.append("- [How the fish are modeled](modeling.md)")
-    lines.append("- [Research notes and sources](research.md)")
+    lines.append("- [How the fish are modeled](../docs/modeling.md)")
+    lines.append("- [Research notes and sources](../docs/research/README.md)")
     lines.append("- [Bait](baits.md)")
     lines.append("")
     lines.append("## Fish")

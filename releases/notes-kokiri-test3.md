@@ -39,5 +39,5 @@ New since test build 2:
 - The pause menu's background no longer turns to garbage with the rod out. (If the menu ever hangs for a
   moment when pausing with the rod out, please say so: it showed up in the emulator but may not on hardware.)
 
-**Planning:** Lake Hylia planning has started (fishmod/LAKE_HYLIA.md): sub-biomes, the performance benchmark
+**Planning:** Lake Hylia planning has started (fishmod/docs/lake-hylia.md): sub-biomes, the performance benchmark
 plan, species sized to the water, and ideas for other areas.

@@ -1,6 +1,6 @@
 # Study: what makes acclaimed fishing feel good
 
-Part of the fishmod study (see [study.md](study.md)). It builds on [research.md](research.md), which covers TP's bobber
+Part of the fishmod research (see [README.md](README.md)). It builds on [fishing-games.md](fishing-games.md), which covers TP's bobber
 bite, journal and species, and Sega Bass Fishing's follow-and-flick and tension gauge; this doesn't repeat those.
 
 **How it was researched:** the research sandbox couldn't open the pages themselves, so every claim comes from

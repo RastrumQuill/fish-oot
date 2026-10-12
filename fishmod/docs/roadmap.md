@@ -30,29 +30,16 @@ Options 1 and 2 are the target. 3 and 4 only if they pass the performance rule.
 Target hardware is a real N64 with a flashcart (EverDrive, SummerCart64), so a bigger save than vanilla's is
 fine, and the Expansion Pak (8 MB) may be used. Lake Hylia and the long-term goals below need a lot of headroom.
 
-### Optimization to-do for kokiri-test4
+### kokiri-test4 optimizations (status)
 
-Planned for kokiri-test4 if test 3 has no major issues. Each one is measured (debug timing line, test-mode FPS
-counter, Kokiri vs Lake Hylia) and dropped if it doesn't help.
-
-1. **Billboards for distant fish:** past some distance, draw a fish as a camera-facing quad or an 8-vertex
-   "stretched hexagon" in solid vertex colours, with no texture: no texture loads (TMEM). It must be opaque or
-   alpha-test only; blended edges would bring the fill cost back.
-2. **More AI throttling by distance:** far fish already think every other frame (build B). Add further steps:
-   every 4th frame, then every 8th, for fish further out.
-3. **Sub-biome unloading:** unload fish (keeping each zone's count) when their zone is far from Link, and stop
-   processing them (the "fish near Link only" part of fishmod/LAKE_HYLIA.md).
-4. **More matrix skipping:** extend the limb shortcuts and pose caching (builds A/B) to every fish that isn't
-   changing shape, not just distant ones.
-5. **Folded-polynomial sin/cos:** Kaze's polynomial over 1/8 of the wave (symmetry for the rest, sqrtf for the
-   other half) in place of the sine table, behind a flag. Measure first: it only helps if trig cache misses
-   show up in CPU time.
-6. **Techniques from Majora's Mask:** borrow MM engine optimizations where they apply (MM runs a busier world on
-   the same hardware; its decomp, zeldaret/mm, is the reference).
-7. **Expansion Pak:** OoT doesn't use the extra 4 MB on its own. Change the memory setup to use it when present
-   (bigger arenas and caches, e.g. the water floor cache), keeping the game working without it if possible.
-8. **F3DEX3 on hardware:** the build flag exists (`fishmod/build.sh --f3dex3`) but has only been tested in ares.
-   Test it on the flashcart.
+1. **Billboards for distant fish:** done (opt3).
+2. **More AI throttling by distance:** done (opt3: every 2nd/4th/8th frame, dormant past 1600 units).
+3. **Sub-biome unloading:** done as the fish manager's roster (opt4): fish exist only near their homes.
+4. **More matrix skipping:** done as fish rigs (opt4): only moving limbs get matrices.
+5. **Folded-polynomial sin/cos:** built behind `--fasttrig`; a small win only, not in the releases.
+6. **Techniques from Majora's Mask:** not started.
+7. **Expansion Pak:** done (opt3): the extra 4 MB holds the framebuffers, a bigger scene and the water cache.
+8. **F3DEX3 on hardware:** the only flag that helps fish up close in ares; still to be tested on a flashcart.
 
 ### Measured (kokiri-test4 work, ares, `fishmod/tools/bench_matrix.sh`)
 
@@ -69,7 +56,7 @@ wait for the hardware readout. Every variant looked right (no broken graphics).
 | Expansion Pak memory (item 7) | — | frees room (water cache ×4, +2 MB for the scene); no speed change expected |
 
 Up close (the lab tank: 36 fish around Link, all within LOD range) opt1 and opt3 cost the same, ~44 of the 50 ms
-frame on the CPU. That case needs the cheaper AI and fish manager from [wiki/study.md](wiki/study.md).
+frame on the CPU. That case needed the fish manager and rigs (opt4, below).
 
 **Opt level 4** (`fishmod/build.sh --opt 4`): the fish manager, fish rigs, reduced rigs, fixed whiskers and cheaper
 water lookups. Profiled with `read_stats.py --prof`, ares, ms per frame, debug builds (the debug readout block,
@@ -93,7 +80,39 @@ different set of fish from opt3's random ones; per frame the update is within no
 Renders: the full rig is identical to the old skeleton (photo booth, every species, side and three-quarter views);
 the reduced rig is identical at rest. Whiskers are now fixed to the head.
 
-Still to do for the update side: the AI itself (~170 µs per fish) is next; see [wiki/study.md](wiki/study.md).
+Lab tank capacity at opt4 (all fish close): about 60–65 fish at 20 fps in debug builds, about 90 in release builds
+(the debug readout costs ~0.16 ms a fish). The AI itself (~170 µs per fish) is now the biggest fish cost.
+
+### Next
+
+**Fish animation** (found with the animation studio, `--script anim`):
+- Larger fish pinch just behind the head when they bend: the first body joint bends too hard and the head sways in
+  another phase. Real fish of this shape barely bend at the front; the wave should start near zero and build toward
+  the tail.
+- Turning swings the body around the head like a pendulum: the model turns about its origin, which is at the head.
+  Real fish pivot about a third of the way back from the snout.
+- Catfish whiskers are off (too thin to see); to be redone.
+
+**Performance** (from [research/](research/README.md)):
+1. Profile cache misses (ares' built-in profiler) and check whether frames are CPU- or RCP-bound.
+2. AI hot path: one look-ahead and a cached side check instead of the per-move floor probes and bank raycasts;
+   squared-distance compares instead of `sqrtf`.
+3. Fewer limbs for small and far fish where it doesn't show (partly done with the reduced rig).
+4. A hardware timing readout in test-mode builds (render and sound time can't be measured in ares).
+
+**AI v2** (on the fish manager): a real yaw + pitch heading like vanilla's pond fish, a central flock array with
+separation for dense packing, small species as school particles promoted to full fish when they go for the bait,
+habitats and obstacles as simple shapes, then senses and mood (sight cone, lateral line, scent, hunger and fear,
+shyness per bait, fishing pressure per spot).
+
+**Fishing feel** (one at a time): visible reactions (notice, follow, inspect, strike); retrieve style as the lure
+skill (steady, twitch, jerk, stop-and-go; many strikes on the pause); a nibble-nibble-bite rhythm on the bobber, a
+sound and rumble; fights steered against the run with rumble and rod bend as the gauge; telegraphed jumps and head
+shakes; failure messages that name the cause; rare fish gated by knowledge (time, rain, spot, bait), not chance.
+
+**Not now:** inline assembly, fixed-point matrices, resolution tricks, engine-wide collision rewrites, occlusion
+planes, triangle snakes, voxel or distance-field navigation, full boids for big fish, line wear as a consumable.
+
 
 ### Done
 
@@ -112,7 +131,7 @@ Still to do for the update side: the AI itself (~170 µs per fish) is next; see 
 - **Fireflies:** a new bait. Small glowing bugs (fairy-style glow without the wings) that can be caught in a bottle.
 - **Strength and casting:** the strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) raise the
   longest possible cast.
-- **Lake Hylia:** planning has started (see [LAKE_HYLIA.md](LAKE_HYLIA.md)): sub-biomes that fish are anchored
+- **Lake Hylia:** planning has started (see [lake-hylia.md](lake-hylia.md)): sub-biomes that fish are anchored
   to (shallows, weed beds, a dry dock, drop-offs, deep water, the inflow), the performance benchmark plan, and
   ideas for the other areas.
 - **Size of water:** choose species to fit the size of the water body (big fish need big water). Kokiri's

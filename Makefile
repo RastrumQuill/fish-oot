@@ -223,7 +223,7 @@ ifeq ($(F3DEX3),1)
   COMPARE := 0
 endif
 
-# Performance test sets (see fishmod/test-builds): 1 = line strip, limb shortcuts, faster collision table clear;
+# Performance test sets (see releases/notes-perf-builds.md and fishmod/docs/roadmap.md): 1 = line strip, limb shortcuts, faster collision table clear;
 # 2 = all of 1 plus distant-fish pose caching, half-rate far fish AI, fewer rod matrices, palette textures
 FISHMOD_OPT ?= 0
 CPP_DEFINES += -DFISHMOD_OPT=$(FISHMOD_OPT)
