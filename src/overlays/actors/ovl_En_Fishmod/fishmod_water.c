@@ -7,6 +7,7 @@
  */
 
 #include "z_en_fishmod.h"
+#include "fishmod.h"
 
 #include "bgcheck.h"
 #include "play_state.h"
@@ -131,10 +132,13 @@ static f32 EnFishmod_RaycastFloor(PlayState* play, f32 x, f32 y, f32 z) {
     CollisionPoly* poly;
     Vec3f pos;
 
+    f32 floor;
+
     pos.x = x;
     pos.y = y;
     pos.z = z;
-    return BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &pos);
+    FISHMOD_PROF(FISHMOD_PROF_U_RAYCAST, floor = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &pos));
+    return floor;
 }
 
 /** The floor at one grid corner, raycasting it the first time. */
@@ -172,7 +176,24 @@ static f32 EnFishmod_ExactFloor(PlayState* play, f32 x, f32 z, f32 surface) {
  * `conservative` gives the highest of the surrounding grid corners instead of interpolating them: the floor is then
  * never lower than the real one, which keeps fish from swimming into the bed or a bank.
  */
+#if FISHMOD_DEBUG
+static s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative);
+
+// with a profile timer around it (debug builds only)
 s32 EnFishmod_WaterFloor(PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative) {
+    s32 found;
+
+    FISHMOD_PROF(FISHMOD_PROF_U_WATER, found = EnFishmod_WaterFloorImpl(play, x, z, surface, floor, conservative));
+    return found;
+}
+#else
+#define EnFishmod_WaterFloorImpl EnFishmod_WaterFloor
+#endif
+
+#if FISHMOD_DEBUG
+static
+#endif
+s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative) {
     WaterBox* waterBox;
     FishmodWaterGrid* grid = NULL;
     s32 i;

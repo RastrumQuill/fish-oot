@@ -2509,7 +2509,14 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                     if (actor->colorFilterTimer != 0) {
                         actor->colorFilterTimer--;
                     }
-                    actor->update(actor, play);
+#if FISHMOD_DEBUG
+                    if (actor->id == ACTOR_EN_FISHMOD) {
+                        FISHMOD_PROF(FISHMOD_PROF_U_ENGINE, actor->update(actor, play));
+                    } else
+#endif
+                    {
+                        actor->update(actor, play);
+                    }
                     DynaPoly_UnsetAllInteractFlags(play, &play->colCtx.dyna, actor);
                 }
 
@@ -2956,7 +2963,14 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
                     } else {
                         if (!DEBUG_FEATURES || (HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) ||
                             (HREG(72) == 0)) {
-                            Actor_Draw(play, actor);
+#if FISHMOD_DEBUG
+                            if (actor->id == ACTOR_EN_FISHMOD) {
+                                FISHMOD_PROF(FISHMOD_PROF_D_ENGINE, Actor_Draw(play, actor));
+                            } else
+#endif
+                            {
+                                Actor_Draw(play, actor);
+                            }
                             actor->isDrawn = true;
                         }
                     }
