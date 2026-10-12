@@ -264,6 +264,9 @@ void EnFishmod_ManagerInit(EnFishmod* this, PlayState* play) {
     // after the fish in the actor lists, so their culling is already worked out when the manager draws them
     Actor_ChangeCategory(play, &play->actorCtx, &this->actor, ACTORCAT_MISC);
     EnFishmod_WaterGridAcquire(play);
+#if FISHMOD_OPT >= 5
+    EnFishmod_ScatterLoad(play);
+#endif
     Manager_BuildRoster(play);
 }
 
@@ -275,6 +278,9 @@ void EnFishmod_ManagerDestroy(EnFishmod* this, PlayState* play) {
     }
     sRosterCount = 0;
     EnFishmod_RigFreeAll();
+#if FISHMOD_OPT >= 5
+    EnFishmod_ScatterUnload();
+#endif
     EnFishmod_WaterGridRelease(play);
     if (sManager == this) {
         sManager = NULL;
@@ -337,6 +343,11 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         gFishmodPhoto.backdropFrame = play->gameplayFrames;
         EnFishmod_DrawPhotoBackdrop(play);
     }
+#if FISHMOD_OPT >= 5
+    if (!gFishmodPhoto.active) {
+        FISHMOD_PROF(FISHMOD_PROF_D_SCATTER, EnFishmod_ScatterDraw(play));
+    }
+#endif
 
     // which fish, and how
     for (actor = play->actorCtx.actorLists[ACTORCAT_NPC].head; actor != NULL; actor = actor->next) {

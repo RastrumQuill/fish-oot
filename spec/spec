@@ -1510,3 +1510,11 @@ beginseg
     romalign 0x1000
     include "$(BUILD_DIR)/src/fishmod_data/fishmod_wm_hylia_labo.o"
 endseg
+
+// fishmod: habitat props scattered at build time (fishmod/tools/gen_scatter.py)
+beginseg
+    name "fishmod_sc_spot06"
+    compress
+    romalign 0x1000
+    include "$(BUILD_DIR)/src/fishmod_data/fishmod_sc_spot06.o"
+endseg

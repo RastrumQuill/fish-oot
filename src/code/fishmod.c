@@ -776,6 +776,39 @@ static const FishmodWaterMapRom sWaterMaps[] = {
 #undef FISHMOD_WATERMAP
 };
 
+#define FISHMOD_SCATTER(sceneId, segment) DECLARE_ROM_SEGMENT(segment)
+#include "fishmod_scatter_scenes.h"
+#undef FISHMOD_SCATTER
+
+static const FishmodWaterMapRom sScatters[] = {
+#define FISHMOD_SCATTER(sceneId, segment) \
+    { sceneId, (uintptr_t)_##segment##SegmentRomStart, (uintptr_t)_##segment##SegmentRomEnd },
+#include "fishmod_scatter_scenes.h"
+#undef FISHMOD_SCATTER
+};
+
+FishmodScatterHeader* Fishmod_LoadScatter(s16 sceneId) {
+    s32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sScatters); i++) {
+        if (sScatters[i].sceneId == sceneId) {
+            size_t size = sScatters[i].romEnd - sScatters[i].romStart;
+            FishmodScatterHeader* sc = ZeldaArena_Malloc(size);
+
+            if (sc == NULL) {
+                return NULL;
+            }
+            DmaMgr_RequestSync(sc, sScatters[i].romStart, size);
+            if (sc->magic != FISHMOD_SCATTER_MAGIC) {
+                ZeldaArena_Free(sc);
+                return NULL;
+            }
+            return sc;
+        }
+    }
+    return NULL;
+}
+
 FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId) {
     s32 i;
 

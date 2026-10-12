@@ -85,6 +85,10 @@ fi
 
 # the water floor maps, baked from the extracted scenes (generated, not committed)
 python3 fishmod/tools/gen_watermap.py
+# the habitat props: textures edited from vanilla ones, models, and where they go (generated, not committed)
+python3 fishmod/tools/gen_habitat.py > /dev/null
+python3 fishmod/tools/assets.py --manifest src/fishmod_data/props_manifest.json > /dev/null
+python3 fishmod/tools/gen_scatter.py --c
 
 make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
