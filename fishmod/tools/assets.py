@@ -20,7 +20,8 @@ The manifest:
       "texture": "gFishmodRockTex",        // optional: a texture from "textures" to load and map with the OBJ's
                                            // UVs (its size and format come from that entry)
       "color": [255, 255, 255],            // vertex colour when the OBJ has none (default white)
-      "lighting": false }                  // true: write normals instead of colours (for lit materials)
+      "lighting": false,                   // true: write normals instead of colours (for lit materials)
+      "separateMaterial": false }          // true: the texture load in its own <name>Material display list
   ]
 }
 Paths are from the repo root. Entries with the same "out" go into the same file, in manifest order. A file is only
@@ -250,7 +251,14 @@ def convert_model(entry, textures):
         vtx_lines.append(f"    VTX({x}, {y}, {z}, {s}, {t}, 0x{r:02X}, 0x{g:02X}, 0x{b:02X}, 0xFF),")
     vtx_lines.append("};")
 
-    dl.append(f"Gfx {name}[] = {{")
+    # "separateMaterial": the texture load goes in its own <name>Material display list, drawn once before many
+    # copies of the model (props scattered by the hundred); the model itself is then geometry only
+    separate = entry.get("separateMaterial", False)
+    mat = []
+    if separate:
+        dl.append(f"Gfx {name}Material[] = {{")
+    else:
+        dl.append(f"Gfx {name}[] = {{")
     dl.append("    gsDPPipeSync(),")
     if tex:
         bits, gfmt, gsiz = FORMATS[tex["format"]]
@@ -263,6 +271,11 @@ def convert_model(entry, textures):
         dl.append(f"    {load}({tex['name']}, {gfmt}, {siz}{tw}, {th}, 0, G_TX_WRAP, G_TX_WRAP, "
                   f"{(tw - 1).bit_length()}, {(th - 1).bit_length()}, G_TX_NOLOD, G_TX_NOLOD),")
         dl.append("    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),")
+    if separate:
+        dl.append("    gsSPEndDisplayList(),")
+        dl.append("};")
+        dl.append("")
+        dl.append(f"Gfx {name}[] = {{")
     start = 0
     for bverts, bfaces in batches:
         dl.append(f"    gsSPVertex(&{name}Vtx[{start}], {len(bverts)}, 0),")
@@ -274,7 +287,7 @@ def convert_model(entry, textures):
                 a = bfaces[i]
                 dl.append(f"    gsSP1Triangle({a[0]}, {a[1]}, {a[2]}, 0),")
         start += len(bverts)
-    if tex:
+    if tex and not separate:
         dl.append("    gsSPTexture(0, 0, 0, G_TX_RENDERTILE, G_OFF),")
     dl.append("    gsSPEndDisplayList(),")
     dl.append("};")

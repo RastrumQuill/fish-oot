@@ -226,6 +226,11 @@ s32 EnFishmod_WaterFloor(struct PlayState* play, f32 x, f32 z, f32* surface, f32
 s32 EnFishmod_OpenWaterDir(struct PlayState* play, f32 x, f32 z, s16* yaw);
 s32 EnFishmod_WaterCell(struct PlayState* play, f32 x, f32 z);
 
+/* Habitat props (fishmod_scatter.c, FISHMOD_OPT 5) */
+void EnFishmod_ScatterLoad(struct PlayState* play);
+void EnFishmod_ScatterUnload(void);
+void EnFishmod_ScatterDraw(struct PlayState* play);
+
 s32 EnFishmod_FindWaterPoint(struct PlayState* play, Vec3f* center, f32 radius, f32 minDepth, Vec3f* out,
                              f32* outSurface, f32* outFloor);
 

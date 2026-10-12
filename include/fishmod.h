@@ -304,6 +304,7 @@ typedef enum FishmodProfSlot {
     FISHMOD_PROF_U_SPOOK,    //   (in AI) checking for splashes and Link
     FISHMOD_PROF_U_SEE,      //   (in AI) open water between it and a point (noticing the bobber, escapes)
     FISHMOD_PROF_U_UNSTICK,  //   (in AI) the stuck watchdog
+    FISHMOD_PROF_D_SCATTER,  // the habitat props (drawn by the fish manager)
     FISHMOD_PROF_MAX
 } FishmodProfSlot;
 extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
@@ -344,6 +345,9 @@ typedef struct FishmodAutoplayStep {
 // The scene's baked water floor map, loaded into the zelda arena (free it with ZeldaArena_Free), or NULL if it has
 // none
 FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId);
+#include "fishmod_scatter.h"
+// The scene's scattered habitat props (fishmod/tools/gen_scatter.py), or NULL
+FishmodScatterHeader* Fishmod_LoadScatter(s16 sceneId);
 
 // Time: the 20 minute day and the hidden clock for places where time stands still (fishmod.c)
 void Fishmod_AdvanceTime(struct PlayState* play);
