@@ -21,6 +21,7 @@
 #include "z_lib.h"
 #include "array_count.h"
 #include "bgcheck.h"
+#include "save.h"
 #include "libc/math.h"
 #include "ultra64.h"
 #include "zelda_arena.h"
@@ -84,6 +85,12 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_BRANCH].drawDist = DIST_MID;
     sKinds[FISHMOD_PROP_LILY_FLOWER].drawDist = DIST_MID;
     sKinds[FISHMOD_PROP_LILY_CENTRE].drawDist = DIST_MID;
+    sKinds[FISHMOD_PROP_RUSH_TUFT].drawDist = DIST_MID;
+    sKinds[FISHMOD_PROP_MARIGOLD].drawDist = DIST_MID;
+    sKinds[FISHMOD_PROP_VINE_STRAND].drawDist = DIST_MID;
+    sKinds[FISHMOD_PROP_BIG_PONDWEED].drawDist = DIST_MID;
+    sKinds[FISHMOD_PROP_SPATTERDOCK].floating = true;
+    sKinds[FISHMOD_PROP_VINE_CURTAIN].floating = true;
     sKinds[FISHMOD_PROP_LILY_PAD].floating = true;
     sKinds[FISHMOD_PROP_FLOAT_LEAVES].floating = true;
     sKinds[FISHMOD_PROP_LILY_FLOWER].floating = true;
@@ -101,6 +108,12 @@ static FishmodScatterHeader* sScatter;
 static u16* sChunkStart;
 static s16* sChunkSurface;
 static FishmodProp* sProps;
+// Per chunk: the water there is lower than the props were placed for (the drained lake). Placement is all done at
+// build time; the one thing only the game knows is which water level this visit has (vanilla picks it from the save:
+// adult before the Water Temple is cleared). So it is worked out once, on the first frame drawn (the lake's own actor
+// sets the level during the scene's first update), and again only if that save flag changes.
+static u8* sChunkDry;
+static s8 sDryFor = -1; // the flag the table was made for; -1: not made yet
 
 void EnFishmod_ScatterLoad(PlayState* play) {
     EnFishmod_ScatterUnload();
@@ -111,6 +124,8 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sChunkStart = (u16*)((u8*)sScatter + sScatter->chunkStartOffset);
     sChunkSurface = (s16*)((u8*)sScatter + sScatter->chunkSurfaceOffset);
     sProps = (FishmodProp*)((u8*)sScatter + sScatter->propsOffset);
+    sChunkDry = ZeldaArena_Malloc(sScatter->width * sScatter->depth);
+    sDryFor = -1;
     Scatter_InitKinds();
 }
 
@@ -118,6 +133,10 @@ void EnFishmod_ScatterUnload(void) {
     if (sScatter != NULL) {
         ZeldaArena_Free(sScatter);
         sScatter = NULL;
+    }
+    if (sChunkDry != NULL) {
+        ZeldaArena_Free(sChunkDry);
+        sChunkDry = NULL;
     }
 }
 
@@ -127,38 +146,80 @@ static Mtx sMtxPool[2][PROP_BUDGET];
 static s32 sMtxFrame;
 static s32 sMtxUsed;
 
-/** A prop's matrix: turned about Y, scaled, placed. Written straight into the fixed-point Mtx. */
-static Mtx* Scatter_Matrix(GraphicsContext* gfxCtx, FishmodProp* prop, s32 flatScale) {
+/** One s15.16 entry of a fixed-point Mtx (row r, column c). */
+#define MTX_SET(mtx, r, c, fixed)                         \
+    {                                                     \
+        s32 f_ = (fixed);                                 \
+        (mtx)->intPart[r][c] = (u32)f_ >> 16;             \
+        (mtx)->fracPart[r][c] = f_ & 0xFFFF;              \
+    }                                                     \
+    (void)0
+
+/**
+ * A prop's matrix: turned about Y, scaled, placed. Written straight into the fixed-point Mtx (guMtxF2L converts all
+ * sixteen entries from floats; here only the three that aren't 0, 1 or a whole-number position need it).
+ */
+static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
     Mtx* mtx = &sMtxPool[sMtxFrame][sMtxUsed++];
-    MtxF mf;
     s16 yaw = prop->yaw << 8;
-    f32 s = prop->scale * (1.0f / 64.0f);
-    f32 c = Math_CosS(yaw) * s;
-    f32 sn = Math_SinS(yaw) * s;
+    f32 s = prop->scale * (65536.0f / 64.0f);
+    s32 c = (s32)(Math_CosS(yaw) * s);
+    s32 sn = (s32)(Math_SinS(yaw) * s);
 
     // rows are the images of the x, y and z axes; the last row is the position
-    mf.mf[0][0] = c;
-    mf.mf[0][1] = 0.0f;
-    mf.mf[0][2] = -sn;
-    mf.mf[0][3] = 0.0f;
-    mf.mf[1][0] = 0.0f;
-    mf.mf[1][1] = flatScale ? 1.0f : s;
-    mf.mf[1][2] = 0.0f;
-    mf.mf[1][3] = 0.0f;
-    mf.mf[2][0] = sn;
-    mf.mf[2][1] = 0.0f;
-    mf.mf[2][2] = c;
-    mf.mf[2][3] = 0.0f;
-    mf.mf[3][0] = prop->x;
-    mf.mf[3][1] = prop->y;
-    mf.mf[3][2] = prop->z;
-    mf.mf[3][3] = 1.0f;
-    guMtxF2L(mf.mf, mtx);
+    MTX_SET(mtx, 0, 0, c);
+    MTX_SET(mtx, 0, 1, 0);
+    MTX_SET(mtx, 0, 2, -sn);
+    MTX_SET(mtx, 0, 3, 0);
+    MTX_SET(mtx, 1, 0, 0);
+    MTX_SET(mtx, 1, 1, flatScale ? 0x10000 : prop->scale << 10);
+    MTX_SET(mtx, 1, 2, 0);
+    MTX_SET(mtx, 1, 3, 0);
+    MTX_SET(mtx, 2, 0, sn);
+    MTX_SET(mtx, 2, 1, 0);
+    MTX_SET(mtx, 2, 2, c);
+    MTX_SET(mtx, 2, 3, 0);
+    mtx->intPart[3][0] = prop->x;
+    mtx->intPart[3][1] = prop->y;
+    mtx->intPart[3][2] = prop->z;
+    mtx->intPart[3][3] = 1;
+    mtx->fracPart[3][0] = 0;
+    mtx->fracPart[3][1] = 0;
+    mtx->fracPart[3][2] = 0;
+    mtx->fracPart[3][3] = 0;
     return mtx;
 }
 
+static void Scatter_UpdateDry(PlayState* play) {
+    s8 flag = GET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA) ? 1 : 0;
+    s32 c;
+
+    if (flag == sDryFor) {
+        return;
+    }
+    sDryFor = flag;
+    for (c = 0; c < sScatter->width * sScatter->depth; c++) {
+        WaterBox* box;
+        f32 surface;
+
+        sChunkDry[c] = false;
+        if ((sChunkSurface[c] != -0x8000) && (sChunkStart[c] != sChunkStart[c + 1])) {
+            f32 mx = sScatter->x0 + ((c % sScatter->width) + 0.5f) * sScatter->chunk;
+            f32 mz = sScatter->z0 + ((c / sScatter->width) + 0.5f) * sScatter->chunk;
+
+            if (!BgCheck_GetWaterSurface(play, &play->colCtx, mx, mz, &surface, &box) ||
+                (surface < sChunkSurface[c] - 20.0f)) {
+                sChunkDry[c] = true;
+            }
+        }
+    }
+}
+
 void EnFishmod_ScatterDraw(PlayState* play) {
-    static u16 sVisible[64]; // chunks near the camera
+    static u16 sVisible[64];                                       // chunks near the camera
+    static f32 sDistSq[ARRAY_COUNT(sVisible)];                     // their centres' distance from the eye, squared
+    static u8 sLowered[ARRAY_COUNT(sVisible)];                     // the water there has gone down (the drained lake)
+    static u16 sKindStart[ARRAY_COUNT(sVisible)][FISHMOD_PROP_KIND_MAX + 1]; // each kind's first prop in the chunk
     Vec3f eye = play->view.eye;
     Vec3f at = play->view.at;
     f32 lookX;
@@ -176,9 +237,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     s32 budget = PROP_BUDGET;
     s32 pass;
 
-    if (sScatter == NULL) {
+    if ((sScatter == NULL) || (sChunkDry == NULL)) {
         return;
     }
+    Scatter_UpdateDry(play);
     // a camera being set up can give a nonsense eye for a frame (and turning a NaN into an integer is a crash on
     // the N64): skip the props that frame
     if (!(eye.x == eye.x) || !(eye.z == eye.z) || (fabsf(eye.x) > 30000.0f) || (fabsf(eye.z) > 30000.0f) ||
@@ -224,7 +286,6 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     }
     // nearest first
     {
-        static f32 sDistSq[ARRAY_COUNT(sVisible)];
         s32 i;
         s32 j;
 
@@ -242,6 +303,28 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             sVisible[j + 1] = c;
         }
     }
+    // Once per chunk, not per kind: whether it's dry, and where each kind's props start (they are sorted by kind
+    // within the chunk, so one pass finds them all)
+    {
+        s32 v;
+
+        for (v = 0; v < visibleCount; v++) {
+            s32 c = sVisible[v];
+            s32 i = sChunkStart[c];
+            s32 end = sChunkStart[c + 1];
+            s32 k = 0;
+
+            sLowered[v] = sChunkDry[c];
+            for (; i < end; i++) {
+                while (k <= sProps[i].kind) {
+                    sKindStart[v][k++] = i;
+                }
+            }
+            while (k <= FISHMOD_PROP_KIND_MAX) {
+                sKindStart[v][k++] = end;
+            }
+        }
+    }
 
     sMtxFrame ^= 1;
     sMtxUsed = 0;
@@ -255,47 +338,33 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         f32 maxSq = SQ(info->drawDist);
         s32 vanilla = (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK);
         s32 material = false;
+        f32 reachSq;
         s32 v;
 
         if (info->drawDist != ((pass == 0) ? DIST_SMALL : (pass == 1) ? DIST_MID : DIST_FAR)) {
             continue;
         }
 
+        // a chunk whose nearest corner is out of this kind's reach is skipped whole (the half-diagonal is ~0.71)
+        reachSq = SQ(info->drawDist + chunk * 0.71f);
+
         for (v = 0; v < visibleCount; v++) {
-            s32 c = sVisible[v];
             s32 i;
-            s32 end = sChunkStart[c + 1];
-            WaterBox* box;
-            f32 surface;
-            s32 lowered;
+            s32 end = sKindStart[v][kind + 1];
 
-            // the water here now (the drained lake): floating props wait for it, plants don't grow on dry land
-            lowered = false;
-            if ((sChunkSurface[c] != -0x8000) && (info->floating || info->plant)) {
-                f32 mx = sScatter->x0 + ((c % sScatter->width) + 0.5f) * chunk;
-                f32 mz = sScatter->z0 + ((c / sScatter->width) + 0.5f) * chunk;
-
-                if (!BgCheck_GetWaterSurface(play, &play->colCtx, mx, mz, &surface, &box) ||
-                    (surface < sChunkSurface[c] - 20.0f)) {
-                    lowered = true;
-                }
+            if (sDistSq[v] > reachSq) {
+                break; // nearest first: the rest are further still
             }
-            if (lowered) {
-                continue;
+            if (sLowered[v] && (info->floating || info->plant)) {
+                continue; // floating props wait for the water, plants don't grow on dry land
             }
 
-            for (i = sChunkStart[c]; i < end; i++) {
+            for (i = sKindStart[v][kind]; i < end; i++) {
                 FishmodProp* prop = &sProps[i];
                 f32 dx;
                 f32 dz;
                 u8 t;
 
-                if (prop->kind != kind) {
-                    if (prop->kind > kind) {
-                        break; // sorted by kind within the chunk
-                    }
-                    continue;
-                }
                 dx = prop->x - eye.x;
                 dz = prop->z - eye.z;
                 if ((SQ(dx) + SQ(dz)) > maxSq) {
@@ -326,7 +395,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 }
                 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
                 gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, t, t, t, 255);
-                gSPMatrix(POLY_OPA_DISP++, Scatter_Matrix(play->state.gfxCtx, prop, kind == FISHMOD_PROP_LILY_PAD),
+                gSPMatrix(POLY_OPA_DISP++, Scatter_Matrix(prop, kind == FISHMOD_PROP_LILY_PAD),
                           G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
                 gSPDisplayList(POLY_OPA_DISP++, info->model);
             }
