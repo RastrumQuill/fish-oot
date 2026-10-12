@@ -91,6 +91,18 @@ the reduced rig is identical at rest. Whiskers are now fixed to the head.
 Lab tank capacity at opt4 (all fish close): about 60–65 fish at 20 fps in debug builds, about 90 in release builds
 (the debug readout costs ~0.16 ms a fish). The AI itself (~170 µs per fish) is now the biggest fish cost.
 
+**Spine rig** (after kokiri-test4: 5–7 body bones instead of 3 joints), opt4 debug builds, 400 s each, ms per frame:
+
+| | Lab 36 fish, old rig | Lab 36, spine rig | Lab 90, old rig | Lab 90, spine rig |
+|---|---|---|---|---|
+| Fish draw | 2.07 | 2.74 | 5.19 | 6.77 |
+| — per drawn fish (close) | 88 µs | 151 µs | 99 µs | 168 µs |
+| CPU draw | 8.17 | 9.83 | 13.07 | 14.72 |
+| RSP | 14.40 | 14.13 | 23.86 | 24.06 |
+| Frame (avg / worst) | 50.15 / 53.85 | 50.14 / 54.29 | 62.99 / 75.67 | 63.06 / 75.08 |
+
+The extra bones cost about 65 µs of CPU per close fish, but frame times didn't change: the AI dominates the frame.
+
 ### Next
 
 **Fish animation** (found with the animation studio, `--script anim`):
