@@ -258,26 +258,39 @@ def rom_pebbles():
 
 
 def rom_lily_flower():
-    """A water lily seen from above, from the Great Fairy fountain's flower (a white photo-made flower): petals pink
-    at the base fading to white, a yellow centre."""
+    """Half of the Great Fairy fountain's flower (a photo-made white flower): a fan of petals, for billboards stood
+    in a ring to make a cupped water lily. Pink at the base fading to white tips."""
     src = vanilla("objects/object_dy_obj/gGreatFairyFlowerTex.ia16.png")
     w, h = src.size
-    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    pink, white, yellow, gold = hexc("#d8708c"), hexc("#f8f0f0"), hexc("#f0d040"), hexc("#c89020")
-    cx, cy = (w - 1) / 2.0, (h - 1) / 2.0
-    for y in range(h):
+    half = src.crop((0, 0, w, h // 2))  # the top half: petals fanning out from the centre at the bottom edge
+    out = Image.new("RGBA", (w, h // 2), (0, 0, 0, 0))
+    pink, white = hexc("#d8708c"), hexc("#fbf3f3")
+    cx, cy = (w - 1) / 2.0, h / 2.0
+    for y in range(h // 2):
         for x in range(w):
-            r, g, b, a = src.getpixel((x, y))
+            r, g, b, a = half.getpixel((x, y))
             if a < 128:
                 continue
             v = luma((r, g, b)) / 255.0
             d = math.hypot(x - cx, y - cy) / (w / 2.0)
-            if d < 0.22:
-                col = lerp(gold, yellow, v)
-            else:
-                col = lerp(pink, white, min(1.0, (d - 0.22) / 0.6))
-                col = tuple(int(c * (0.55 + 0.45 * v)) for c in col)
-            out.putpixel((x, y), col + (255,))
+            col = lerp(pink, white, min(1.0, max(0.0, (d - 0.15) / 0.7)))
+            out.putpixel((x, y), tuple(int(c * (0.6 + 0.4 * v)) for c in col) + (255,))
+    return out
+
+
+def rom_lily_centre():
+    """The flower's centre: the middle of the fairy flower, tinted yellow."""
+    src = vanilla("objects/object_dy_obj/gGreatFairyFlowerTex.ia16.png")
+    w, h = src.size
+    c = src.crop((w // 4, h // 4, w * 3 // 4, h * 3 // 4))
+    out = Image.new("RGBA", c.size, (0, 0, 0, 0))
+    gold, yellow = hexc("#b88018"), hexc("#f4d848")
+    for y in range(c.height):
+        for x in range(c.width):
+            r, g, b, a = c.getpixel((x, y))
+            if a < 128 or math.hypot(x - c.width / 2 + 0.5, y - c.height / 2 + 0.5) > c.width * 0.42:
+                continue
+            out.putpixel((x, y), lerp(gold, yellow, luma((r, g, b)) / 255.0) + (255,))
     return out
 
 
@@ -299,6 +312,7 @@ ROM_TEXTURES = {
     "bark": (rom_bark, "ci4"),
     "pebbles": (rom_pebbles, "ci4"),
     "lily_flower": (rom_lily_flower, "ci4"),
+    "lily_centre": (rom_lily_centre, "ci4"),
 }
 
 
@@ -452,16 +466,36 @@ def mesh_decal(name, texture, size, col):
 
 
 def mesh_lily_flower():
-    """An open water lily resting on its pad: a flat quad a little above the water, and a smaller one tilted up
-    for the inner petals so it has some depth from the side."""
+    """A cupped water lily: half-flower billboards stood in a ring around the centre, tilted outward (an outer ring
+    of five, an inner ring of three standing straighter), and a small flat centre."""
     m = Mesh("lily_flower", "lily_flower")
     white = (255, 255, 255)
-    for size, y in ((9, 1.0), (5, 3.0)):
-        a = m.vert((-size, y, -size), (0, 0), white)
-        b = m.vert((size, y, -size), (1, 0), white)
-        c = m.vert((size, y, size), (1, 1), white)
-        d = m.vert((-size, y, size), (0, 1), white)
-        m.quad(a, d, c, b)
+    for ring, count, width, height, tilt, turn in ((0, 5, 12, 7, 0.75, 0.0), (1, 3, 8, 6, 0.35, 0.6)):
+        for k in range(count):
+            ang = 2 * math.pi * k / count + turn
+            # the card's base sits on a small circle, facing outward, leaning out by `tilt`
+            ox, oz = math.cos(ang), math.sin(ang)
+            tx, tz = -oz, ox  # along the card
+            base = 1.5 + ring * 0.5
+            bx, bz = ox * base, oz * base
+            lean = math.sin(tilt) * height
+            up = math.cos(tilt) * height
+            a = m.vert((bx - tx * width / 2, 0.5, bz - tz * width / 2), (0, 1), white)
+            b = m.vert((bx + tx * width / 2, 0.5, bz + tz * width / 2), (1, 1), white)
+            c = m.vert((bx + tx * width / 2 + ox * lean, 0.5 + up, bz + tz * width / 2 + oz * lean), (1, 0), white)
+            d = m.vert((bx - tx * width / 2 + ox * lean, 0.5 + up, bz - tz * width / 2 + oz * lean), (0, 0), white)
+            m.quad(a, b, c, d)
+    return m
+
+
+def mesh_lily_centre():
+    m = Mesh("lily_centre", "lily_centre")
+    s, y, white = 2.5, 2.5, (255, 255, 255)
+    a = m.vert((-s, y, -s), (0, 0), white)
+    b = m.vert((s, y, -s), (1, 0), white)
+    c = m.vert((s, y, s), (1, 1), white)
+    d = m.vert((-s, y, s), (0, 1), white)
+    m.quad(a, d, c, b)
     return m
 
 
@@ -476,6 +510,7 @@ MESHES = [
     lambda: mesh_decal("pebble_patch", "pebbles", 120, (255, 255, 255)),
     lambda: mesh_decal("silt_patch", "silt", 140, (255, 255, 255)),
     mesh_lily_flower,
+    mesh_lily_centre,
 ]
 
 
