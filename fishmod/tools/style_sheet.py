@@ -26,6 +26,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OBJ_FISH = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "objects", "object_fish")
 SCENES = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "scenes")
 ART = os.path.join(ROOT, "fishmod", "art", "habitat")
+ART_ROM = os.path.join(ROOT, "fishmod", "art", "habitat_rom")  # edited from vanilla textures (not committed)
 MESH = os.path.join(ROOT, "fishmod", "assets", "habitat")
 
 BG_TOP = np.array([0x6e, 0x8f, 0x8a], float)  # the lake bed's teal (Lake Hylia's bed texture), lighter at the top
@@ -81,9 +82,12 @@ def load_obj(name):
         elif parts[0] == "f":
             idx = [tuple(int(i) for i in p.split("/")) for p in parts[1:]]
             tris.append([(vs[i - 1][:3], vts[t - 1], vs[i - 1][3:6]) for i, t in idx])
-    img = Image.open(os.path.join(ART, tex_name + ".png"))
+    path = os.path.join(ART_ROM, tex_name + ".png")
+    if not os.path.exists(path):
+        path = os.path.join(ART, tex_name + ".png")
+    img = Image.open(path)
     mode = "ia" if img.mode in ("LA", "L") else "rgba"
-    return Model(tris, load_png(os.path.join(ART, tex_name + ".png")), mode, name)
+    return Model(tris, load_png(path), mode, name)
 
 
 def load_vanilla(model, tex, tex_w, tex_h):
@@ -253,14 +257,16 @@ def main():
         (os.path.join(ART, "ribbon_card.png"), "new ribbon card"),
         (os.path.join(ART, "bush_card.png"), "new bush card"),
         (os.path.join(v, "turibori_scene_0000FCE0_Tex.rgba16.png"), "vanilla pebbles"),
-        (os.path.join(ART, "pebbles.png"), "new pebbles"),
+        (os.path.join(ART_ROM, "pebbles.png"), "new pebbles (vanilla)"),
         (os.path.join(v, "turibori_scene_0000ECE0_Tex.rgba16.png"), "vanilla pond moss"),
         (os.path.join(ART, "silt.png"), "new silt decal"),
         (os.path.join(OBJ_FISH, "gFishingWoodPostTex.rgba16.png"), "vanilla wood post"),
-        (os.path.join(ART, "bark.png"), "new bark"),
+        (os.path.join(ART_ROM, "bark.png"), "new bark (from post)"),
         (os.path.join(ART, "log_rings.png"), "new log rings"),
         (os.path.join(OBJ_FISH, "gFishingLilyPadTex.rgba16.png"), "vanilla lily pad"),
-        (os.path.join(ART, "lily_flower.png"), "new lily flower"),
+        (os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "objects", "object_dy_obj",
+                      "gGreatFairyFlowerTex.ia16.png"), "vanilla fairy flower"),
+        (os.path.join(ART_ROM, "lily_flower.png"), "new lily (from it)"),
         (os.path.join(s, "spot06_scene_000170B8_Tex.rgba16.png"), "vanilla lake bed"),
         (os.path.join(s, "spot06_scene_0000C2B8_Tex.rgba16.png"), "vanilla lake sand"),
     ]

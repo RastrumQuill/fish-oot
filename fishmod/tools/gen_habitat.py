@@ -161,44 +161,6 @@ def tex_bush():
     return out
 
 
-def tex_pebbles():
-    """Rounded river stones packed together (the inflow bed), colours from the pond's pebbles."""
-    rnd = random.Random(41)
-    pal = [hexc(c) for c in PALETTES["pond_pebbles"]] + [hexc(c) for c in PALETTES["lake_cobble"][:4]]
-    w = h = 32
-    img = Image.new("RGB", (w, h), hexc("#19170d"))
-    px = img.load()
-    stones = []
-    # packed like a river bed: stones of a few sizes, touching but not overlapping (tiling across the edges)
-    for _ in range(600):
-        x, y, r = rnd.uniform(0, w), rnd.uniform(0, h), rnd.uniform(2.6, 5.0)
-        ok = True
-        for sx, sy, sr, _, _ in stones:
-            dx = min(abs(x - sx), w - abs(x - sx))
-            dy = min(abs(y - sy), h - abs(y - sy))
-            if math.hypot(dx, dy) < (r + sr) * 0.92:
-                ok = False
-                break
-        if ok:
-            stones.append((x, y, r, rnd.uniform(0.75, 1.0), rnd.choice([pal[0], pal[3], pal[4], pal[7], pal[9], pal[10], pal[11]])))
-    for y in range(h):
-        for x in range(w):
-            best = None
-            for sx, sy, r, sq, col in stones:
-                # tile seamlessly: nearest copy
-                dx = min(abs(x - sx), w - abs(x - sx))
-                dy = min(abs(y - sy), h - abs(y - sy))
-                d = math.hypot(dx, dy / sq) / (r * 1.32)  # grown so neighbours meet
-                if d < 1.0 and (best is None or d < best[0]):
-                    best = (d, col, (x - sx) / r, (y - sy) / r)
-            if best:
-                d, col, ux, uy = best
-                light = min(1.08, 1.02 - 0.55 * d ** 3 - 0.22 * uy - 0.12 * ux)  # lit from the top left, a dark rim
-                grain = 0.9 + 0.2 * ((x * 7 + y * 13) * 2654435761 % 97) / 97.0  # a little grit
-                px[x, y] = tuple(max(0, min(255, int(c * light * grain))) for c in col)
-    return img
-
-
 def tex_silt():
     """A soft patch of silt with a ragged edge (a decal on the lake bed): alpha cut-out."""
     rnd = random.Random(51)
@@ -255,39 +217,97 @@ def tex_rings():
     return img
 
 
-def tex_lily_flower():
-    """A water lily flower seen from the side: a cup of broad pink-white petals and a yellow centre (alpha cut-out),
-    chunky like OoT's flowers."""
-    w = h = 16
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    pink, light, yellow = hexc("#e890a8"), hexc("#f4f0e8"), hexc("#e8c030")
-    # petals: five broad pointed lobes fanning up from the base
-    for p in range(5):
-        ang = math.pi * (0.18 + 0.64 * p / 4)
-        for y in range(h):
-            for x in range(w):
-                dx, dy = x + 0.5 - 8, 13.5 - (y + 0.5)
-                r = math.hypot(dx, dy)
-                a = math.atan2(dy, dx)
-                # a lobe: wide near its middle, pointed at the tip
-                da = abs(a - ang)
-                if r < 7.5 and da < 0.42 * (1 - (r / 7.5) ** 2) + 0.05 and dy > -1:
-                    img.putpixel((x, y), lerp(pink, light, min(1.0, r / 7.5 + 0.2)) + (255,))
-    for x in range(6, 10):
-        for y in range(11, 14):
-            img.putpixel((x, y), yellow + (255,))
-    return img
+# ---------------------------------------------------------------------------------------------------------------
+# Textures edited from vanilla ones (OoT's textures are edited photos; editing them keeps that look). Made from the
+# extracted assets of the user's own ROM at build time, never committed: written to fishmod/art/habitat_rom/.
+
+VANILLA = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets")
+ART_ROM = os.path.join(ROOT, "fishmod", "art", "habitat_rom")
+
+
+def vanilla(path):
+    return Image.open(os.path.join(VANILLA, path)).convert("RGBA")
+
+
+def luma(c):
+    return (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000.0
+
+
+def ramp(palette, t):
+    """A colour from a palette sorted dark to light, t in 0-1."""
+    cols = sorted((hexc(c) for c in palette), key=luma)
+    t = max(0.0, min(1.0, t)) * (len(cols) - 1)
+    i = min(int(t), len(cols) - 2)
+    return lerp(cols[i], cols[i + 1], t - i)
+
+
+def rom_pebbles():
+    """The Fishing Pond's river stones, recoloured toward Lake Hylia's cobble and sand: keeps the photo detail."""
+    src = vanilla("scenes/misc/turibori/turibori_scene_0000FCE0_Tex.rgba16.png")
+    out = Image.new("RGB", src.size)
+    pal = PALETTES["lake_cobble"] + PALETTES["lake_sand"][:4]
+    lo = min(luma(src.getpixel((x, y))) for y in range(src.height) for x in range(src.width))
+    hi = max(luma(src.getpixel((x, y))) for y in range(src.height) for x in range(src.width))
+    for y in range(src.height):
+        for x in range(src.width):
+            r, g, b, a = src.getpixel((x, y))
+            t = (luma((r, g, b)) - lo) / max(hi - lo, 1)
+            # keep a little of the original colour so stones differ from each other
+            out.putpixel((x, y), lerp(ramp(pal, t), (r, g, b), 0.3))
+    return out
+
+
+def rom_lily_flower():
+    """A water lily seen from above, from the Great Fairy fountain's flower (a white photo-made flower): petals pink
+    at the base fading to white, a yellow centre."""
+    src = vanilla("objects/object_dy_obj/gGreatFairyFlowerTex.ia16.png")
+    w, h = src.size
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    pink, white, yellow, gold = hexc("#d8708c"), hexc("#f8f0f0"), hexc("#f0d040"), hexc("#c89020")
+    cx, cy = (w - 1) / 2.0, (h - 1) / 2.0
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = src.getpixel((x, y))
+            if a < 128:
+                continue
+            v = luma((r, g, b)) / 255.0
+            d = math.hypot(x - cx, y - cy) / (w / 2.0)
+            if d < 0.22:
+                col = lerp(gold, yellow, v)
+            else:
+                col = lerp(pink, white, min(1.0, (d - 0.22) / 0.6))
+                col = tuple(int(c * (0.55 + 0.45 * v)) for c in col)
+            out.putpixel((x, y), col + (255,))
+    return out
+
+
+def rom_bark():
+    """Waterlogged wood: the Fishing Pond's wood post, darkened and tinted with algae, its grain kept."""
+    src = vanilla("objects/object_fish/gFishingWoodPostTex.rgba16.png")
+    moss = [hexc(c) for c in PALETTES["pond_moss"]]
+    out = Image.new("RGB", src.size)
+    for y in range(src.height):
+        for x in range(src.width):
+            r, g, b, a = src.getpixel((x, y))
+            v = luma((r, g, b)) / 255.0
+            dark = (int(r * 0.35), int(g * 0.32), int(b * 0.28))
+            out.putpixel((x, y), lerp(dark, moss[(x * 3 + y) % 4], 0.25 + 0.2 * (1 - v)))
+    return out
+
+
+ROM_TEXTURES = {
+    "bark": (rom_bark, "ci4"),
+    "pebbles": (rom_pebbles, "ci4"),
+    "lily_flower": (rom_lily_flower, "ci4"),
+}
 
 
 TEXTURES = {
     "reed_card": (tex_reed, "ia8"),
     "ribbon_card": (tex_ribbon, "ia8"),
     "bush_card": (tex_bush, "ia8"),
-    "pebbles": (tex_pebbles, "ci4"),
     "silt": (tex_silt, "ci4"),
-    "bark": (tex_bark, "ci4"),
     "log_rings": (tex_rings, "ci4"),
-    "lily_flower": (tex_lily_flower, "ci4"),
 }
 
 
@@ -432,16 +452,16 @@ def mesh_decal(name, texture, size, col):
 
 
 def mesh_lily_flower():
+    """An open water lily resting on its pad: a flat quad a little above the water, and a smaller one tilted up
+    for the inner petals so it has some depth from the side."""
     m = Mesh("lily_flower", "lily_flower")
     white = (255, 255, 255)
-    for p in range(2):
-        ang = math.pi * p / 2
-        dx, dz = math.cos(ang) * 6, math.sin(ang) * 6
-        a = m.vert((-dx, 0, -dz), (0, 1), white)
-        b = m.vert((dx, 0, dz), (1, 1), white)
-        c = m.vert((dx, 10, dz), (1, 0), white)
-        d = m.vert((-dx, 10, -dz), (0, 0), white)
-        m.quad(a, b, c, d)
+    for size, y in ((9, 1.0), (5, 3.0)):
+        a = m.vert((-size, y, -size), (0, 0), white)
+        b = m.vert((size, y, -size), (1, 0), white)
+        c = m.vert((size, y, size), (1, 1), white)
+        d = m.vert((-size, y, size), (0, 1), white)
+        m.quad(a, d, c, b)
     return m
 
 
@@ -462,6 +482,12 @@ MESHES = [
 def main():
     for name, (fn, fmt) in TEXTURES.items():
         save(fn(), name)
+    if os.path.isdir(VANILLA):
+        os.makedirs(ART_ROM, exist_ok=True)
+        for name, (fn, fmt) in ROM_TEXTURES.items():
+            fn().save(os.path.join(ART_ROM, name + ".png"))
+    else:
+        print("note: no extracted assets, so the textures edited from vanilla ones aren't made")
     meshes = [f().write() for f in MESHES]
     for m in meshes:
         print(f"{m.name}: {len(m.v)} verts, {len(m.f)} tris, texture {m.texture}")

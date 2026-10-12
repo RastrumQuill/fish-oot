@@ -15,7 +15,7 @@
 | Rarity | Very rare (4/5) |
 | Sell price | 90 rupees (more for bigger fish) |
 | Depth | mid |
-| Most active | dawn, dusk |
+| Most active | dawn, dusk, night |
 | Found in | Lake Hylia (planned) |
 
 ## Behavior

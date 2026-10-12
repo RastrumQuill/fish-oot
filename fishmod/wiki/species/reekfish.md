@@ -15,7 +15,7 @@
 | Rarity | Legendary (5/5) |
 | Sell price | 200 rupees (more for bigger fish) |
 | Depth | mid |
-| Most active | day, dusk, night, dawn |
+| Most active | dawn, day, dusk, night |
 | Found in | Zora's Domain (planned) |
 
 ## Behavior
