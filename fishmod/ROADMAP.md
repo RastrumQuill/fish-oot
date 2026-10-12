@@ -54,6 +54,23 @@ counter, Kokiri vs Lake Hylia) and dropped if it doesn't help.
 8. **F3DEX3 on hardware:** the build flag exists (`fishmod/build.sh --f3dex3`) but has only been tested in ares.
    Test it on the flashcart.
 
+### Measured (kokiri-test4 work, ares, `fishmod/tools/bench_matrix.sh`)
+
+CPU numbers only: ares doesn't time the RSP or RDP accurately, and its audio time reads 0, so render and sound time
+wait for the hardware readout. Every variant looked right (no broken graphics).
+
+| Change | Where it shows | Result |
+|---|---|---|
+| Distance AI levels + dormant far fish (opt3, items 2–3) | Lake Hylia overlook | fish update 9.4 → **0.07 ms**, CPU update 18.7 → 9.4 ms |
+| Billboards for far fish (opt3, item 1) | Kokiri moat | fish draw 5.2 → **1.4 ms** |
+| Fast trig (item 5) | Kokiri moat | fish draw 1.4 → 0.5 ms; elsewhere within noise |
+| F3DEX3 (item 8) | Lab tank, 36 fish up close | fish draw 15.5 → **10.6 ms**, CPU draw 23.3 → 19.5 ms (fewer commands to build) |
+| Shared water floor cache | Lab tank (no rod) | fish update 88 → **12 ms** (fish had been raycasting every query) |
+| Expansion Pak memory (item 7) | — | frees room (water cache ×4, +2 MB for the scene); no speed change expected |
+
+Up close (the lab tank: 36 fish around Link, all within LOD range) opt1 and opt3 cost the same, ~44 of the 50 ms
+frame on the CPU. That case needs the cheaper AI and fish manager from [wiki/study.md](wiki/study.md).
+
 ### Done
 
 - **Lines as one vertex strip:** the fishing line (optimization 1, build A and later).
