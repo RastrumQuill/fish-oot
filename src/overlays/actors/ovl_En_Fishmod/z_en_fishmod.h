@@ -14,7 +14,7 @@
 #define FISHMOD_SMALL_RIG_LENGTH 9.0f // (FISHMOD_OPT 4) fish shorter than this (inches) always use the reduced rig
 
 // Fish rigs (fishmod_rig.c, FISHMOD_OPT 4)
-#define FISH_RIG_MAX_SLOTS 8
+#define FISH_RIG_MAX_SLOTS 12
 typedef enum FishRigVariant {
     /* 0 */ FISH_RIG_FULL,    // every moving limb: head, body joints, jaw, pectoral fins
     /* 1 */ FISH_RIG_REDUCED, // head, middle and tail
@@ -121,6 +121,7 @@ typedef struct EnFishmod {
     /* 0x3FA */ u8 rosterIndex;                    // its record in the scene's roster, 0xFF if none (FISHMOD_OPT 4)
     /* 0x3FB */ u8 rigReady;                       // the manager can draw it (FISHMOD_OPT 4)
     /* 0x3FC */ s16 lastThink;                     // timer value when it last ran its AI (FISHMOD_OPT 4)
+    /* 0x3FE */ s16 startleBend;                   // the C-bend of a startle (sign: which way), 0 otherwise
 #if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];

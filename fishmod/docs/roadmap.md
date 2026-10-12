@@ -8,6 +8,14 @@ and are not being worked on yet.
 Visual extras only go in if they don't cost performance. Each one gets measured in ares with the debug timing line
 (RSP/RDP, CPU update/draw, frame time) against the build without it, and it is dropped if the frame gets slower.
 
+## To do for test5
+
+- **Deep water fishing (Lake Hylia).** Fishing only works in shallow water: fish keep deep in the lake and never come
+  near a bait dangling about 4 inches under the bobber. Equipment, AI or both: a way to fish deep (adjustable line
+  depth, sinking baits and lures), and/or fish that rise to the surface to feed (by time of day, weather, species).
+- **Longer days.** OoT's day runs about 5x faster than MM's (MM: 18 min 26 s). Aim for a 20 or 24 minute day, so
+  hanging out at a spot to meet its different fish by time and weather is possible (and it makes Dampé easier).
+
 ## Planned
 
 ### Individual fish looks

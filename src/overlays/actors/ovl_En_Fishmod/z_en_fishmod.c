@@ -1433,7 +1433,10 @@ static void EnFishmod_UpdateSwim(EnFishmod* this) {
         for (i = 0; i < 4; i++) {
             this->bodyYaw[i] += dir * 0x900 * (left > 4 ? 1.0f : -0.6f) * (0.5f + i * 0.3f);
         }
+        this->startleBend = dir * 0x900 * (left > 4 ? 1.0f : -0.6f);
         this->startle -= dir;
+    } else {
+        this->startleBend = 0;
     }
     this->finYaw = (Math_SinS(this->timer * 0x900) * 1800.0f) + 1800.0f;
 }

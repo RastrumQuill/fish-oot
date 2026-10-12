@@ -41,6 +41,11 @@ bite window14 frames (0.70 s) to set the hook
 | Bug | none |
 | Worm | none |
 | Coral Earring | ×1.0 |
+| Spinner | none |
+| Crankbait | none |
+| Popper | none |
+| Frog Lure | none |
+| Sinking Lure | none |
 
 ## Tips
 

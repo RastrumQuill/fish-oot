@@ -21,7 +21,8 @@ WIKI = os.path.join(ROOT, "fishmod", "wiki")
 BASES = {"bass": "FISHMOD_BASE_BASS", "loach": "FISHMOD_BASE_LOACH", "jabu": "FISHMOD_BASE_JABU", "small": "FISHMOD_BASE_SMALL"}
 DEPTHS = {"surface": "FISHMOD_DEPTH_SURFACE", "mid": "FISHMOD_DEPTH_MID", "bottom": "FISHMOD_DEPTH_BOTTOM"}
 TIMES = ["dawn", "day", "dusk", "night"]
-BAITS = ["none", "bee_larva", "bug", "worm", "coral_earring", "fish"]
+BAITS = ["none", "bee_larva", "bug", "worm", "coral_earring", "fish",
+         "lure_spinner", "lure_crankbait", "lure_popper", "lure_frog", "lure_sinking"]
 SCENE_IDS = {
     "KOKIRI_FOREST": "SCENE_KOKIRI_FOREST",
     "LAKE_HYLIA": "SCENE_LAKE_HYLIA",
