@@ -1,12 +1,12 @@
 # Assets
 
-New art for the mod (textures, icons, small models) goes through one manifest, `assets.json` here, and one
+New art for the mod (textures, icons, small models) goes through one manifest, `fishmod/assets/assets.json`, and one
 tool, `fishmod/tools/assets.py`, which turns it into C that the build compiles. `fishmod/build.sh` runs the tool
 before every build, so editing a PNG or OBJ and rebuilding is enough.
 
 ## Adding a texture
 
-1. Put the PNG somewhere under `fishmod/` (generated art goes in `fishmod/art/`, hand-made sources can live here).
+1. Put the PNG somewhere under `fishmod/` (generated art goes in `fishmod/art/`, hand-made sources in `fishmod/assets/`).
 2. Add an entry to `"textures"`:
 
    ```json

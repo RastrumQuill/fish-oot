@@ -1,6 +1,6 @@
 # Study: efficient fish AI on the N64
 
-Part of the fishmod study (see [study.md](study.md)). The strongest material here is decomp code read directly
+Part of the fishmod research (see [README.md](README.md)). The strongest material here is decomp code read directly
 (vanilla OoT's pond fish, Twilight Princess's fish, Majora's Mask's lab fish) and the ares emulator's CPU timing
 table. Points about Reynolds, Abzû, Subnautica and Sega Bass Fishing internals come from search summaries and are
 weaker. Cycle counts are emulator figures and instruction counts, not hardware profiling.

@@ -64,4 +64,4 @@ from a three-quarter view. The capture script reads a colored marker in the corn
 screen and saves `fishmod/wiki/img/<species>.jpg` and `<species>_34.jpg`. Renders are from
 [ares](https://ares-emu.net/), an accurate N64 emulator, so they look the way the game does on hardware.
 
-[← Wiki home](README.md)
+[← Docs](README.md)

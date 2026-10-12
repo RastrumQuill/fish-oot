@@ -3,7 +3,7 @@
 [F3DEX3](https://github.com/HackerN64/F3DEX3) by Sauraen is a faster replacement for the game's F3DZEX2 graphics
 microcode. Build with `F3DEX3=1` (`fishmod/build.sh --f3dex3`) to use it.
 
-The microcode isn't stored here directly: these BPS patches (from [HackerOoT](https://github.com/HackerN64/HackerOoT))
+The microcode isn't stored in the repository directly: the BPS patches in `fishmod/f3dex3/` (from [HackerOoT](https://github.com/HackerN64/HackerOoT))
 turn the F3DZEX2 microcode extracted from your own ROM into F3DEX3 at build time.
 
 | Patch | Variant |

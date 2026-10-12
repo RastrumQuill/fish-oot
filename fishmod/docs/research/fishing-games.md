@@ -53,4 +53,4 @@ What the mod borrows from Twilight Princess and Sega Bass Fishing, and where it 
 - [Retro Replay: SEGA Bass Fishing](https://retro-replay.com/db/arcade/sega-bass-fishing/)
 - [Nintendo Life: SEGA Bass Fishing (Wii)](https://www.nintendolife.com/reviews/2008/04/sega_bass_fishing_wii)
 
-[← Wiki home](README.md)
+[← Research](README.md)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generates the bait bottle icons (32x32 RGBA32, like the vanilla bottle icons) from the vanilla empty bottle: bee
 larvae suspended in honey, as in Twilight Princess, with the honey at 3/3, 2/3 and 1/3 for the three uses left.
-Writes the PNGs (and 4x previews) to fishmod/art/; the asset manifest (fishmod/assets/assets.json,
+Writes the PNGs to fishmod/art/ (4x previews to fishmod/out/); the asset manifest (fishmod/assets/assets.json,
 fishmod/tools/assets.py) turns them into C. Needs the extracted assets and Pillow."""
 import math
 import os
@@ -123,7 +123,8 @@ def main():
     for count in (3, 2, 1):
         img = icon(count)
         img.save(os.path.join(OUT_ART, f"bottle_larva_{count}.png"))
-        img.resize((128, 128), Image.NEAREST).save(os.path.join(OUT_ART, f"bottle_larva_{count}_x4.png"))
+        os.makedirs(os.path.join(ROOT, "fishmod", "out"), exist_ok=True)
+        img.resize((128, 128), Image.NEAREST).save(os.path.join(ROOT, "fishmod", "out", f"bottle_larva_{count}_x4.png"))
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ It ships as a `.bps` patch for your own ROM and runs on real hardware (no Expans
 emulators like [ares](https://ares-emu.net/).
 
 > **Status:** early. Kokiri Forest only for now; the fishing loop is being tuned there before any other area
-> gets fish. Longer-term goals are in the [roadmap](fishmod/ROADMAP.md).
+> gets fish. Longer-term goals are in the [roadmap](fishmod/docs/roadmap.md).
 
 <img src="fishmod/wiki/img/lineup.jpg" width="420">
 
@@ -43,8 +43,8 @@ shakes the hook. Reel a tired fish in to land it.
 ## Fish
 
 See the **[wiki](fishmod/wiki/README.md)** for every species with in-game renders, flavor text, size and
-weight ranges, behavior and bait, plus [how the fish are modeled](fishmod/wiki/modeling.md) and the
-[research notes](fishmod/wiki/research.md).
+weight ranges, behavior and bait, plus [how the fish are modeled](fishmod/docs/modeling.md) and the
+[research notes](fishmod/docs/research/README.md).
 
 | Kokiri Forest | |
 |---|---|
@@ -64,7 +64,7 @@ in [docs/DECOMP_README.md](docs/DECOMP_README.md) for version `ntsc-1.2` (Linux 
 ```bash
 cp /path/to/your/rom baseroms/ntsc-1.2/baserom.z64   # .z64, .v64 or .n64
 make setup VERSION=ntsc-1.2
-fishmod/build.sh                                     # -> fishmod/out/fish-oot.z64 and fish-oot.bps
+fishmod/build.sh --opt 4                             # -> fishmod/out/fish-oot.bps (what releases use)
 ```
 
 `fishmod/build.sh` needs [Flips](https://github.com/Alcaro/Flips) on `PATH` (or `FLIPS=/path/to/flips`).
@@ -79,11 +79,16 @@ To check the toolchain on an unmodified tree, `make VERSION=ntsc-1.2 REGION=US r
 | `src/overlays/actors/ovl_En_Fishmod/` | the fish (`z_en_fishmod.c`), the fishing controller: rod, bobber, camera, fight (`fishmod_rod.c`), and the cached ground height under the water (`fishmod_water.c`) |
 | `src/code/fishmod.c` | which scenes have fishing, loading the fish model there, the rod on L |
 | `fishmod/build.sh --debug` | debug build: boots straight into Kokiri with the rod and shows debug text |
-| `fishmod/build.sh --f3dex3` | build with the [F3DEX3](fishmod/f3dex3/README.md) graphics microcode (off by default: no measurable gain in Kokiri, and it doesn't run on HLE emulators) |
-| `fishmod/build.sh --script NAME` | debug build that plays `fishmod/scripts/NAME.inc.c`: `angler` (a bot that fishes by itself), `shore` (the bot, standing back from the water), `follow` (camera chases a fish), `photo` (wiki renders), `cast` |
+| `fishmod/build.sh --opt N` | performance level 0–4 (see the Makefile); releases use 4, the others are for comparing |
+| `fishmod/build.sh --f3dex3` | build with the [F3DEX3](fishmod/docs/f3dex3.md) graphics microcode (off by default: no measurable gain in Kokiri, and it doesn't run on HLE emulators) |
+| `fishmod/build.sh --script NAME` | debug build that plays `fishmod/scripts/NAME.inc.c`: `angler` (a bot that fishes by itself), `shore` (the bot, standing back from the water), `follow` (camera chases a fish), `photo` (wiki renders), `anim` (the animation studio), `bench_*` (benchmark scenes), `cast` |
 | `fishmod/tools/photo_capture.py` | captures the wiki renders from the photo build in ares |
 | `fishmod/tools/water_map.py` | maps fishable water and shore spots in a scene |
 | `fishmod/tools/model_preview.py` | renders a model's limbs offline to identify parts |
+| `fishmod/tools/bench.sh`, `bench_matrix.sh`, `read_stats.py` | benchmark builds in ares and read their timing stats (`--prof`: where fish time goes) |
+| `fishmod/tools/assets.py` | new art (PNG/OBJ) into C, from `fishmod/assets/assets.json` ([docs](fishmod/docs/assets.md)) |
+| `fishmod/docs/` | [roadmap](fishmod/docs/roadmap.md), plans, research and developer notes |
+| `releases/` | every patch and its notes |
 
 ## Credits
 
