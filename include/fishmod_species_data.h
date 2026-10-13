@@ -21,7 +21,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 235, 245, 235 }, { 235, 245, 235 }, { 235, 245, 235 }, { 150, 180, 95 }, { 90, 130, 70 }, { 230, 170, 90 }, { 230, 170, 90 } },
         { { 100, 100, 100 }, { 100, 115, 100 }, { 100, 100, 100 }, { 85, 100, 100 }, { 100, 120, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
-        0x3E, 38, 140, 26, 76, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0x3E, 38, 140, 26, 76, 0, 4, 8, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_HYRULE_MINNOW */ {
         "Hyrule Minnow",
@@ -37,7 +37,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 110, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
-        0x7E, 0, 89, 0, 102, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0x7E, 0, 89, 0, 102, 0, 5, 9, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_HYRULE_BASS */ {
         "Hyrule Bass",
@@ -53,7 +53,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 205, 220, 160 }, { 215, 230, 170 }, { 205, 222, 160 }, { 190, 200, 140 }, { 170, 180, 125 }, { 200, 205, 160 }, { 200, 205, 160 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 105, 110, 100 }, { 100, 115, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
-        0x7B, 89, 217, 128, 128, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0x7B, 89, 217, 128, 128, 0, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_ORDON_CATFISH */ {
         "Ordon Catfish",
@@ -69,7 +69,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 255, 250, 240 }, { 255, 250, 240 }, { 255, 250, 240 }, { 150, 135, 100 }, { 130, 115, 85 }, { 150, 135, 100 }, { 150, 135, 100 } },
         { { 120, 80, 155 }, { 100, 100, 125 }, { 100, 100, 100 }, { 90, 120, 100 }, { 80, 80, 100 }, { 140, 100, 140 }, { 100, 100, 100 } },
         FISHMOD_LOOK_WHISKERS,
-        0xE1, 191, 255, 115, 204, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0xE1, 191, 255, 115, 204, 0, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_HYLIAN_LOACH */ {
         "Hylian Loach",
@@ -85,7 +85,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
-        0x93, 204, 255, 76, 178, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0x93, 204, 255, 76, 178, 0, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_SANKE_CARP */ {
         "Sanke Carp",
@@ -101,7 +101,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 245, 235 }, { 240, 235, 225 }, { 255, 245, 235 }, { 255, 245, 235 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 115, 110, 100 }, { 100, 100, 100 }, { 120, 100, 120 }, { 100, 100, 100 } },
         0,
-        0x6E, 0, 128, 51, 26, 3, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0x6E, 0, 128, 51, 26, 3, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_HYLIAN_PIKE */ {
         "Hylian Pike",
@@ -117,7 +117,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 175, 210, 160 }, { 175, 210, 160 }, { 175, 210, 160 }, { 175, 210, 160 }, { 175, 210, 160 }, { 175, 210, 160 }, { 175, 210, 160 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
-        0x3B, 51, 153, 76, 76, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0x3B, 51, 153, 76, 76, 0, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_REEKFISH */ {
         "Reekfish",
@@ -133,7 +133,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 255, 110, 90 }, { 255, 110, 90 }, { 255, 110, 90 }, { 255, 110, 90 }, { 255, 110, 90 }, { 255, 110, 90 }, { 255, 110, 90 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
-        0xAA, 76, 178, 51, 102, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0xAA, 76, 178, 51, 102, 0, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_HEARTY_BASS */ {
         "Hearty Bass",
@@ -149,7 +149,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 255, 175, 200 }, { 255, 175, 200 }, { 255, 175, 200 }, { 255, 175, 200 }, { 255, 175, 200 }, { 255, 175, 200 }, { 255, 175, 200 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
-        0xB7, 128, 242, 153, 153, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0xB7, 128, 242, 153, 153, 0, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_JABU_FRY */ {
         "Jabu-Jabu Fry",
@@ -165,7 +165,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { { 210, 220, 255 }, { 210, 220, 255 }, { 210, 220, 255 }, { 210, 220, 255 }, { 210, 220, 255 }, { 210, 220, 255 }, { 210, 220, 255 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 } },
         0,
-        0xAA, 0, 76, 0, 51, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */
+        0xAA, 0, 76, 0, 51, 0, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
 };
 

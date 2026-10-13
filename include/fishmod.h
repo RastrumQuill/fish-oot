@@ -104,6 +104,8 @@ typedef struct FishmodSpecies {
     /* 0x58 */ u8 rise;        // how far up the band moves when it's active and the light is low (feeding)
     /* 0x59 */ u8 lightShy;    // how much bright light pushes it deeper
     /* 0x5A */ u8 chronotype;  // each fish's clock is shifted by up to this many hours
+    /* 0x5B */ u8 schoolMin;   // lives in schools of this many to schoolMax (0: on its own)
+    /* 0x5C */ u8 schoolMax;
 } FishmodSpecies;
 
 #define FISHMOD_ACTIVITY(species, tod) (((species)->activity >> (2 * (tod))) & 3)
@@ -319,6 +321,7 @@ extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
         gFishmodProfCount[slot]++;                      \
     }
 extern Vec3f gFishmodDebugFocus; // the fish nearest to Link, for the follow camera
+extern s32 gFishmodDebugFocusSchool; // the follow camera follows school leaders only
 extern s16 gFishmodDebugFocusYaw;
 #else
 #define FISHMOD_PROF(slot, stmt) \
@@ -329,7 +332,7 @@ extern s16 gFishmodDebugFocusYaw;
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */
 
-#define FISHMOD_DEBUG_LINES 11
+#define FISHMOD_DEBUG_LINES 12
 #define FISHMOD_DEBUG_LINE_LEN 40
 
 typedef struct FishmodAutoplayStep {

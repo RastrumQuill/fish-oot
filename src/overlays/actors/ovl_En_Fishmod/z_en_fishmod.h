@@ -38,6 +38,17 @@ typedef enum FishRigModel {
     /* 3 */ FISH_RIG_MODELS
 } FishRigModel;
 
+/**
+ * A fish's mood (FISHMOD_OPT 5), 0-255 each. Hunger rises with time (faster in its active hours) and falls when it
+ * feeds; fear rises when it's spooked or something disturbs the water near it, and fades. They scale what the AI
+ * already does: how far it notices a bait and how keen it is, how readily it bites, how long it rests, how far it
+ * strays from home cover and how easily it spooks.
+ */
+typedef struct FishmodMood {
+    u8 hunger;
+    u8 fear;
+} FishmodMood;
+
 // The bass's jaw (limb index, 0-based) and how far it turns to shut: the model's rest pose gapes
 #define FISHMOD_BASS_JAW_LIMB 12
 #if FISHMOD_OPT >= 5
@@ -143,6 +154,9 @@ typedef struct EnFishmod {
     /* 0x400 */ u8 rigReady;                       // the manager can draw it (FISHMOD_OPT 4)
     /* 0x404 */ s32 waterCell;                     // the water grid cell waterY/floorY are for (FISHMOD_OPT 5)
     /* 0x408 */ u8 biteStruck;                     // the strike reached the bait (after the wind-up; FISHMOD_OPT 5)
+    /* 0x409 */ FishmodMood mood;                  // hunger and fear (kept in its roster record while away; FISHMOD_OPT 5)
+    /* 0x40C */ u16 leaderIndex;                   // roster record of its school's leader, FISHMOD_NO_ROSTER if it leads
+                                                   // or is on its own (FISHMOD_OPT 5)
 #if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
@@ -281,8 +295,15 @@ typedef struct EnFishmodShared {
     s32 bobberIn;
     s32 thinksLeft;
     f32 light; // Fishmod_Light: 0 dark night - 1 full day (FISHMOD_OPT 5)
+    s32 raining;     // (FISHMOD_OPT 5)
+    Vec3f splashPos; // the last thing to land in the water (the bobber), and when (FISHMOD_OPT 5)
+    u32 splashFrame;
 } EnFishmodShared;
 EnFishmodShared* EnFishmod_Shared(struct PlayState* play);
+#if FISHMOD_OPT >= 5
+struct EnFishmod* EnFishmod_RosterFish(s32 index);
+void EnFishmod_Disturb(struct PlayState* play, Vec3f* pos, f32 radius, s32 fear);
+#endif
 void EnFishmod_ManagerEnsure(struct PlayState* play);
 void EnFishmod_ManagerInit(struct EnFishmod* this, struct PlayState* play);
 void EnFishmod_ManagerDestroy(struct EnFishmod* this, struct PlayState* play);

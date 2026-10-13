@@ -53,6 +53,10 @@ ActorProfile En_Fishmod_Profile = {
     /**/ EnFishmod_Draw,
 };
 
+// a fish's mood as 0-1 (FISHMOD_OPT 5)
+#define MOOD_HUNGER(this) ((this)->mood.hunger * (1.0f / 255.0f))
+#define MOOD_FEAR(this) ((this)->mood.fear * (1.0f / 255.0f))
+
 /*
  * Which part of the fish each limb is (0-based limb index). Found with fishmod/tools/model_preview.py
  * and confirmed in game. FISHMOD_PART_NONE limbs are joints with little or no geometry.
@@ -472,6 +476,12 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         this->actor.cullingVolumeScale = this->halfLength * 2.0f + 20.0f;
         this->actor.cullingVolumeDownward = this->halfLength * 2.0f + 20.0f;
     }
+#if FISHMOD_OPT >= 5
+    // middling: a roster fish gets its own from its record when the manager spawns it
+    this->mood.hunger = 128;
+    this->mood.fear = 0;
+    this->leaderIndex = FISHMOD_NO_ROSTER;
+#endif
 #if FISHMOD_OPT >= 4
     this->rosterIndex = FISHMOD_NO_ROSTER;
     {
@@ -756,11 +766,20 @@ static void EnFishmod_PickWanderTarget(EnFishmod* this, PlayState* play) {
     f32 surface;
     f32 floor;
 
-    if (EnFishmod_FindWaterPoint(play, &this->actor.home.pos, 75.0f,
+#if FISHMOD_OPT >= 5
+    // a frightened fish keeps close to its home cover; a hungry one goes down to pick at the bottom more
+    f32 range = 75.0f * (1.0f - 0.6f * MOOD_FEAR(this));
+    f32 forage = 0.25f + 0.35f * MOOD_HUNGER(this);
+#else
+    f32 range = 75.0f;
+    f32 forage = 0.25f;
+#endif
+
+    if (EnFishmod_FindWaterPoint(play, &this->actor.home.pos, range,
                                  CLAMP_MIN(12.0f, this->halfHeight * 2.0f + this->halfLength * 0.5f), &point,
                                  &surface, &floor)) {
         point.y = EnFishmod_DepthY(this, play, surface, floor);
-        if ((Rand_ZeroOne() < 0.25f) && (point.y - floor < 80.0f)) {
+        if ((Rand_ZeroOne() < forage) && (point.y - floor < 80.0f)) {
             // down to pick at the bottom, if it's near
             point.y = floor + this->halfHeight + 1.0f;
         }
@@ -1069,27 +1088,89 @@ static s32 EnFishmod_SwimToward(EnFishmod* this, PlayState* play, Vec3f* target,
 #define EnFishmod_SwimToward EnFishmod_SwimTowardImpl
 #endif
 
+#if FISHMOD_OPT >= 5
+static void EnFishmod_AddFear(EnFishmod* this, s32 amount) {
+    this->mood.fear = CLAMP_MAX(this->mood.fear + amount, 255);
+}
+
+/** Whether it can see `pos`: ahead of it (fish see wide, but not behind), lit enough and near enough. */
+static s32 EnFishmod_CanSee(EnFishmod* this, PlayState* play, Vec3f* pos, f32 range) {
+    EnFishmodShared* shared = EnFishmod_Shared(play);
+    s16 off = Math_Vec3f_Yaw(&this->actor.world.pos, pos) - this->actor.shape.rot.y;
+
+    // night and rain shorten it (rain breaks up the surface)
+    range *= (0.55f + 0.45f * shared->light) * (shared->raining ? 0.75f : 1.0f);
+    return (ABS(off) < 0x5800) && (Math_Vec3f_DistXYZ(&this->actor.world.pos, pos) < range);
+}
+#endif
+
+#if FISHMOD_OPT >= 5
+/** A school member took fright: its leader bolts too, and the rest follow the leader (EnFishmod_SchoolFollow). */
+static void EnFishmod_SchoolAlarm(EnFishmod* this) {
+    EnFishmod* lead = (this->leaderIndex != FISHMOD_NO_ROSTER) ? EnFishmod_RosterFish(this->leaderIndex) : NULL;
+
+    if ((lead != NULL) && (lead->fishState == FISH_STATE_WANDER)) {
+        EnFishmod_FishSetState(lead, FISH_STATE_FLEE);
+        lead->runYaw = this->runYaw;
+        lead->fleeFromLink = true;
+        EnFishmod_AddFear(lead, 60);
+    }
+}
+#endif
+
 static void EnFishmod_CheckSpookImpl(EnFishmod* this, PlayState* play) {
     FishmodRod* rod = &gFishmodRodState;
     Player* player = GET_PLAYER(play);
     f32 warySq = 30.0f + this->species->behavior.wariness * 0.7f;
+#if FISHMOD_OPT >= 5
+    // a frightened fish startles at less, from further
+    f32 nerves = 1.0f + MOOD_FEAR(this) * 0.7f;
 
+    warySq *= nerves;
+    // the bobber landing right beside it (felt along its side, seen or not): a hungry, calm fish only flinches
+    // unless it lands almost on top of it
+    if (rod->splashed &&
+        (Math_Vec3f_DistXZ(&this->actor.world.pos, &rod->bobberPos) <
+         warySq * (((this->mood.hunger > 170) && (this->mood.fear < 60)) ? 0.4f : 1.0f))) {
+        EnFishmod_FishSetState(this, FISH_STATE_FLEE);
+        EnFishmod_AddFear(this, 60);
+        this->runYaw = Math_Vec3f_Yaw(&rod->bobberPos, &this->actor.world.pos);
+        EnFishmod_SchoolAlarm(this);
+        return;
+    }
+#else
     if (rod->splashed && (Math_Vec3f_DistXZ(&this->actor.world.pos, &rod->bobberPos) < warySq)) {
         EnFishmod_FishSetState(this, FISH_STATE_FLEE);
         return;
     }
+#endif
     // Link: wading in nearby, running along the bank, or simply too close (nothing lets itself be stepped on)
     {
         f32 dist = Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
         f32 calm = 20.0f + this->species->behavior.wariness * 0.6f + this->halfLength;
-        s32 scared = (dist < this->halfLength + 25.0f) ||
-                     ((player->actor.depthInWater > 0.0f) && (dist < calm * 1.3f)) ||
-                     ((player->actor.speed > 4.0f) && (dist < calm));
+        s32 scared;
+
+#if FISHMOD_OPT >= 5
+        // rain hides the bank from the water
+        calm *= nerves * (EnFishmod_Shared(play)->raining ? 0.8f : 1.0f);
+#endif
+        scared = (dist < this->halfLength + 25.0f) || ((player->actor.depthInWater > 0.0f) && (dist < calm * 1.3f)) ||
+                 ((player->actor.speed > 4.0f) && (dist < calm));
+#if FISHMOD_OPT >= 5
+        // a nervous fish doesn't wait for him to move: it's enough to see him close
+        if (!scared && (this->mood.fear > 100) && EnFishmod_CanSee(this, play, &player->actor.world.pos, calm)) {
+            scared = true;
+        }
+#endif
 
         if (scared) {
             EnFishmod_FishSetState(this, FISH_STATE_FLEE);
             this->runYaw = Math_Vec3f_Yaw(&player->actor.world.pos, &this->actor.world.pos);
             this->fleeFromLink = true;
+#if FISHMOD_OPT >= 5
+            EnFishmod_AddFear(this, 90);
+            EnFishmod_SchoolAlarm(this);
+#endif
         }
     }
 }
@@ -1100,6 +1181,85 @@ static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
 }
 #else
 #define EnFishmod_CheckSpook EnFishmod_CheckSpookImpl
+#endif
+
+#if FISHMOD_OPT >= 5
+/**
+ * A school member keeping its place: behind and to one side of its leader (sides alternating, further back the
+ * further down the school), resting when the leader rests and bolting when it bolts. Costs a steer toward the slot
+ * instead of its own wandering. False when it's on its own (it leads, or its leader is away at the bobber, caught
+ * or not spawned): then it wanders by itself.
+ */
+static s32 EnFishmod_SchoolFollow(EnFishmod* this, PlayState* play) {
+    EnFishmod* lead;
+    Vec3f slot;
+    s32 k;
+    f32 unit;
+    f32 side;
+    f32 back;
+    f32 fx;
+    f32 fz;
+    f32 gap;
+
+    if (this->leaderIndex == FISHMOD_NO_ROSTER) {
+        return false;
+    }
+    lead = EnFishmod_RosterFish(this->leaderIndex);
+    if ((lead == NULL) || (lead == this)) {
+        return false;
+    }
+    if (lead->fishState == FISH_STATE_FLEE) {
+        // the school bolts together, the same way
+        EnFishmod_FishSetState(this, FISH_STATE_FLEE);
+        this->runYaw = lead->runYaw;
+        this->fleeFromLink = true;
+        return true;
+    }
+    if (lead->fishState != FISH_STATE_WANDER) {
+        return false;
+    }
+    k = this->rosterIndex - this->leaderIndex; // 1, 2, ... down the school
+    unit = lead->halfLength * 1.3f + 3.0f;
+    side = ((k & 1) ? 1.0f : -1.0f) * unit * (0.7f + 0.25f * (k % 3));
+    back = unit * (0.4f + 0.55f * ((k + 1) / 2));
+    fx = Math_SinS(lead->actor.shape.rot.y);
+    fz = Math_CosS(lead->actor.shape.rot.y);
+    slot.x = lead->actor.world.pos.x - fx * back + fz * side;
+    slot.z = lead->actor.world.pos.z - fz * back - fx * side;
+    slot.y = lead->actor.world.pos.y + ((k * 5) % 7 - 3) * 1.2f;
+    gap = Math_Vec3f_DistXYZ(&this->actor.world.pos, &slot);
+    // keep up: the leader's pace, more while it's out of place
+    EnFishmod_SwimToward(this, play, &slot, lead->speed + CLAMP(gap * 0.05f, 0.0f, 1.5f), 0x500);
+    if (gap < unit) {
+        // in place: face the way the school faces, and swim like the leader
+        Math_SmoothStepToS(&this->actor.shape.rot.y, lead->actor.shape.rot.y, 6, 0x200, 0x20);
+        this->swimPhaseStep = lead->swimPhaseStep;
+        this->swimMag = lead->swimMag;
+    } else {
+        this->swimPhaseStep = 0.15f + this->speed * 0.12f;
+        this->swimMag = 1300.0f;
+    }
+    this->restTimer = 0;
+    this->target = this->actor.world.pos;
+    this->stateTimer = 1;
+#if FISHMOD_DEBUG
+    {
+        // how the schools are doing: followers with their leader, and how many are in their places
+        static u32 sFrame;
+        static s32 sWith;
+        static s32 sInPlace;
+
+        if (sFrame != play->gameplayFrames) {
+            Fishmod_DebugPrintf(3, "schools: %d following, %d in place", sWith, sInPlace);
+            sFrame = play->gameplayFrames;
+            sWith = sInPlace = 0;
+        }
+        sWith++;
+        sInPlace += (gap < unit * 1.5f);
+    }
+#endif
+    return true;
+}
 #endif
 
 /** True if there's water deep enough for this fish all the way from it to `to` (it can see and reach it). */
@@ -1305,6 +1465,14 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             // Fish don't roam about at random: they hold station near home for a while (resting, fins
             // working), then make a short cruise somewhere nearby (sometimes down to pick at the bottom), and
             // settle again. Fish out of their active time of day rest longer.
+#if FISHMOD_OPT >= 5
+            if (EnFishmod_SchoolFollow(this, play)) {
+                // with its school
+                if (this->fishState != FISH_STATE_WANDER) {
+                    break;
+                }
+            } else
+#endif
             if (this->restTimer > 0) {
                 this->restTimer--;
                 // holding the spot it stopped at (the target was set there), gliding to a stop
@@ -1324,8 +1492,15 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             } else {
                 if ((this->stateTimer == 0) || (Math_Vec3f_DistXYZ(&this->actor.world.pos, &this->target) < 8.0f)) {
 #if FISHMOD_OPT >= 5
-                    // the more active its time of day, the shorter its rests (about 1.5 to 12 seconds)
-                    this->restTimer = 30 + (s16)Rand_ZeroFloat(220.0f - EnFishmod_Activity(this) * 55.0f);
+                    // the more active its time of day, the shorter its rests (about 1.5 to 12 seconds); hungry fish
+                    // rest less (they're out looking), frightened ones more (lying low)
+                    this->restTimer =
+                        (30 + (s16)Rand_ZeroFloat(220.0f - EnFishmod_Activity(this) * 55.0f)) *
+                        (1.25f - 0.5f * MOOD_HUNGER(this) + 0.6f * MOOD_FEAR(this));
+                    if ((this->stateTimer != 0) && (this->target.y < this->floorY + this->halfHeight + 3.0f)) {
+                        // reached the bottom it went down to: it picks at it and finds something
+                        this->mood.hunger = CLAMP_MIN(this->mood.hunger - 30, 0);
+                    }
 #else
                     this->restTimer = 40 + (s16)Rand_ZeroFloat(EnFishmod_ActiveNow(this) ? 120.0f : 300.0f);
 #endif
@@ -1342,18 +1517,43 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             if ((this->fishState == FISH_STATE_WANDER) && (this->cooldown == 0) && EnFishmod_RodBobberInWater() &&
                 (rod->fish == NULL) && (((play->gameplayFrames + this->actor.params) % 10) == 0)) {
                 f32 notice = 30.0f + b->curiosity * 1.0f;
-
-                if (rod->twitchTimer > 0) {
-                    notice += 30.0f;
-                }
 #if FISHMOD_OPT >= 5
+                f32 keen = (0.3f + 1.4f * MOOD_HUNGER(this)) * (1.0f - MOOD_FEAR(this));
+                EnFishmodShared* shared = EnFishmod_Shared(play);
+
+                // hungry fish look further; frightened ones don't come out at all
+                notice *= 0.6f + 0.8f * MOOD_HUNGER(this);
+                if (this->mood.fear > 140) {
+                    notice = 0.0f;
+                }
+                // a plop nearby: the hungry come to see what fell in (felt all round, seen or not)
+                if ((play->gameplayFrames - shared->splashFrame < 60) && (this->mood.hunger > 150) &&
+                    (Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->splashPos) < notice + 60.0f)) {
+                    keen *= 3.0f;
+                    notice += 60.0f;
+                }
+                if (rod->twitchTimer > 0) {
+                    // a twitch is felt all round too
+                    notice += 30.0f;
+                } else if (!EnFishmod_CanSee(this, play, &rod->bobberPos, notice + 20.0f) &&
+                           (bobberDist > this->halfLength + 25.0f)) {
+                    // otherwise it has to see it (or have it right beside it)
+                    notice = 0.0f;
+                }
                 // it has to be able to see the bait: not too far above or below it either (deep fish need the bait
                 // brought down to them, or to have come up to feed)
                 if (ABS(FISHMOD_ROD_BAIT_Y(rod) - this->actor.world.pos.y) > notice * 1.2f) {
                     notice = 0.0f;
                 }
+#else
+                f32 keen = 1.0f;
+
+                if (rod->twitchTimer > 0) {
+                    notice += 30.0f;
+                }
 #endif
-                if ((bobberDist < notice) && (Rand_ZeroOne() < b->curiosity * 0.0015f * EnFishmod_BaitAppeal(this)) &&
+                if ((bobberDist < notice) &&
+                    (Rand_ZeroOne() < b->curiosity * 0.0015f * EnFishmod_BaitAppeal(this) * keen) &&
                     EnFishmod_OpenWaterTo(this, play, &rod->bobberPos)) {
                     this->fishState = FISH_STATE_APPROACH;
                     this->stateTimer = 200;
@@ -1389,6 +1589,12 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                 if ((rod->fish == NULL) || (rod->fish == this)) {
                     rod->fish = this;
                     this->nibblesLeft = b->nibbles;
+#if FISHMOD_OPT >= 5
+                    // a hungry fish doesn't fuss as long
+                    if ((this->mood.hunger > 190) && (this->nibblesLeft > 0)) {
+                        this->nibblesLeft--;
+                    }
+#endif
                     this->interest = 0.0f;
                     EnFishmod_FishSetState(this, FISH_STATE_INSPECT);
                 } else {
@@ -1442,7 +1648,12 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
             if (this->stateTimer == 0) {
                 if (this->nibblesLeft > 0) {
                     EnFishmod_FishSetState(this, FISH_STATE_NIBBLE);
+#if FISHMOD_OPT >= 5
+                } else if (Rand_ZeroOne() <
+                           (b->aggression * 0.012f * (0.6f + this->interest) * (0.5f + MOOD_HUNGER(this)))) {
+#else
                 } else if (Rand_ZeroOne() < (b->aggression * 0.012f * (0.6f + this->interest))) {
+#endif
                     this->fishState = FISH_STATE_BITE;
 #if FISHMOD_OPT >= 5
                     // a wind-up first: it draws back, then strikes (the bite comes when it reaches the bait)
@@ -1964,11 +2175,23 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
             sCount = 0;
         }
         sCount++;
+#if FISHMOD_OPT >= 5
+        // the school camera (FISHMOD_VIEW_SCHOOL) only follows school leaders
+        if (gFishmodDebugFocusSchool &&
+            !((this->leaderIndex == FISHMOD_NO_ROSTER) && (this->species->schoolMax > 0))) {
+            dist = 99999.0f;
+        }
+#endif
         if (dist < sBestDist) {
             sBestDist = dist;
             gFishmodDebugFocus = this->actor.world.pos;
             gFishmodDebugFocusYaw = this->actor.shape.rot.y;
+#if FISHMOD_OPT >= 5
+            Fishmod_DebugPrintf(5, "fish%d %s %s h%d f%d", sCount, this->species->name, sStateNames[this->fishState],
+                                this->mood.hunger, this->mood.fear);
+#else
             Fishmod_DebugPrintf(5, "fish%d %s %s", sCount, this->species->name, sStateNames[this->fishState]);
+#endif
             Fishmod_DebugPrintf(6, " %d %d %d w%d f%d hh%d hl%d b%d", (s32)this->actor.world.pos.x, (s32)this->actor.world.pos.y, (s32)this->actor.world.pos.z, (s32)this->waterY, (s32)this->floorY, (s32)this->halfHeight, (s32)this->halfLength, this->blocked);
         }
     }

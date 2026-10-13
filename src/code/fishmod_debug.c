@@ -405,6 +405,11 @@ static void Fishmod_StudioUpdate(PlayState* play) {
 #endif
 
 Vec3f gFishmodDebugFocus;
+#ifdef FISHMOD_VIEW_SCHOOL
+s32 gFishmodDebugFocusSchool = true;
+#else
+s32 gFishmodDebugFocusSchool = false;
+#endif
 s16 gFishmodDebugFocusYaw;
 
 #ifdef FISHMOD_VIEW
@@ -950,10 +955,31 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     // after the script: play the fishing game from the rod's state (for testing the whole loop)
     if (!sScriptActive && sPlacedPlayer && (sScriptStepIndex >= (s32)ARRAY_COUNT(sScriptSteps))) {
         static s32 sAnglerTimer;
+        static s32 sAnglerLastState;
+        static s32 sAnglerLastBiting;
+        static s32 sAnglerCasts;
+        static s32 sAnglerBites;
+        static s32 sAnglerLanded;
+        static s32 sAnglerFloatTimer;
         u16 button = 0;
         s8 stickY = 0;
 
         sAnglerTimer++;
+        // tallies, to compare builds by how the fishing goes
+        if ((gFishmodRodInfo.state == 4) && (sAnglerLastState != 4)) {
+            sAnglerCasts++;
+        }
+        if (gFishmodRodInfo.biting && !sAnglerLastBiting) {
+            sAnglerBites++;
+        }
+        if ((gFishmodRodInfo.state == 7) && (sAnglerLastState != 7)) {
+            sAnglerLanded++;
+        }
+        sAnglerFloatTimer = (gFishmodRodInfo.state == 4) ? sAnglerFloatTimer + 1 : 0;
+        sAnglerLastState = gFishmodRodInfo.state;
+        sAnglerLastBiting = gFishmodRodInfo.biting;
+        Fishmod_DebugPrintf(11, "angler t%d casts %d bites %d landed %d", sAnglerTimer / 20, sAnglerCasts,
+                            sAnglerBites, sAnglerLanded);
         switch (gFishmodRodInfo.state) {
             case 0: // rod away
                 if ((sAnglerTimer % 40) == 0) {
@@ -970,9 +996,11 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
                     button = BTN_CLEFT;
                 }
                 break;
-            case 4: // float: strike on a real bite
+            case 4: // float: strike on a real bite; nothing for 25 seconds, reel in and cast again
                 if (gFishmodRodInfo.biting && ((sAnglerTimer % 4) == 0)) {
                     button = BTN_B;
+                } else if (sAnglerFloatTimer > 500) {
+                    button = BTN_A;
                 }
                 break;
             case 5: // on the ground: reel back
@@ -1112,7 +1140,7 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
 
     for (i = 0; i < FISHMOD_DEBUG_LINES; i++) {
         if (sDebugLines[i][0] != '\0') {
-            GfxPrint_SetPos(&printer, 2, 19 + i);
+            GfxPrint_SetPos(&printer, 2, 18 + i);
             GfxPrint_Printf(&printer, "%s", sDebugLines[i]);
         }
     }

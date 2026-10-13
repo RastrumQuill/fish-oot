@@ -440,6 +440,12 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     ROD->overTimer = ROD->slackTimer = 0;
     ROD->bait = FISHMOD_BAIT_NONE; // the fish took it
     EnFishmod_FishSetState(fish, FISH_STATE_HOOKED);
+#if FISHMOD_OPT >= 5
+    // it ate (the bait), and it's terrified; its thrashing scares the fish round about
+    fish->mood.hunger = 30;
+    fish->mood.fear = 255;
+    EnFishmod_Disturb(play, &fish->actor.world.pos, 220.0f, 120);
+#endif
     Rumble_Override(0.0f, 180, 20, 10);
     Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
     EnFishmod_RodMessage(1, "Hooked!", NULL);
@@ -903,6 +909,9 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->bobberPos.y = waterY;
                 ROD->dip = 6.0f;
                 ROD->splashed = true;
+#if FISHMOD_OPT >= 5
+                EnFishmod_Disturb(play, &ROD->bobberPos, 0.0f, 0);
+#endif
                 // the bait starts sinking under the bobber: A stops it at a depth (once per cast), or it stops by
                 // itself a little above the bottom
                 ROD->baitDepth = BAIT_DEPTH_START;

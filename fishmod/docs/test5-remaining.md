@@ -88,6 +88,12 @@ Original plan:
 
 ## 6. Looks and animation
 
+Decided (after the habitat work): 7 first, then 6. The bass keeps its mouth shut (done: the model's rest pose
+gaped). Koi: a handful of fixed koi patterns picked by each carp's seed, not a stamped texture per fish (much
+cheaper, still varied). Per-fish colour and pattern shift from the roster index. Small fish swim in bursts.
+
+Original plan:
+
 - **Per-fish looks:** each fish gets its own small hue and brightness shift of its species' colours, and its pattern
   shifted and/or mirrored, from its roster seed (so the same fish looks the same when it comes back).
 - **Koi patterns (Sanke Carp):** a per-fish 32×32 pattern texture stamped from the seed at spawn (a few red and
@@ -96,6 +102,20 @@ Original plan:
 - **Small-fish swim phase:** small fish beat their tails faster and in short bursts, not the slow wave of the big ones.
 
 ## 7. Behaviour
+
+Decided, performance first:
+- **Mood** (done, first pass): hunger and fear, two bytes per roster fish, moved on a slice of the roster a frame
+  (each fish about once a second); events (a fish hooked) applied once over the roster, not polled by every fish.
+  They scale what the AI already does, 1.0 at middling hunger and no fear, so bite rates stay as tuned on average.
+  Tells: hungry fish rest less and pick at the bottom more; frightened ones stay by home cover, rest longer, spook
+  further and won't come to a bait.
+- **Senses** (done, first pass): sight is a wide cone ahead, shortened at night and in rain; a twitch, a plop and
+  anything right beside it are felt all round. A plop draws hungry fish in.
+- **Weather and time:** light and rain feed sight and Link's spook range; activity by time of day feeds hunger.
+- **Schools:** minnows and greengill. A leader thinks; followers hold a slot off it with only the water grid's
+  floor and surface (no shore steering), so a school costs about one fish's AI.
+
+Original plan:
 
 - **Senses:** sight (a cone ahead, shorter in murky or dark water, longer by day), the lateral line (vibration:
   a bobber landing, Link wading or a fish fighting nearby, felt all round at short range).
