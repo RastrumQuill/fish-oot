@@ -22,13 +22,13 @@ W, H = 320, 240
 # fishmod_scatter.c (keep in step)
 SETTINGS = {
     "emu": {"dist": {"small": 800, "mid": 1200, "far": 1600}, "budget": 900, "xlu_max": 200},
-    # FISHMOD_HW: every other big plant card, none the camera is inside or right against
-    "hw": {"dist": {"small": 800, "mid": 1200, "far": 1600}, "budget": 900, "xlu_max": 200, "thin": True,
-           "near": 0.6},
+    # FISHMOD_HW: no plant card the camera is inside or right against
+    "hw": {"dist": {"small": 800, "mid": 1200, "far": 1600}, "budget": 900, "xlu_max": 200, "near": 0.6},
 }
 DIST_UNDER_FOG = 900.0  # under water nothing further is drawn
 SURFACE_Y = -1313.0     # Lake Hylia's full lake
-# the big plant cards and their heights at scale 1 (gen_scatter.py HEIGHT): what FISHMOD_HW thins and near-skips
+# the big plant cards and their heights at scale 1 (gen_scatter.py HEIGHT): what FISHMOD_HW skips with the camera
+# inside
 THIN = {"GRASS_TUFT": 16, "RIBBON_WEED": 80, "TALL_WEED": 190, "BROADLEAF": 40, "BUSH_WEED": 42, "KELP_FROND": 260,
         "VINE_STRAND": 150, "BIG_PONDWEED": 52, "FAN_WEED": 44}
 VIEW_COS = 0.68
@@ -126,9 +126,7 @@ def pick(plist, eye, look, cfg):
         dsq = dx * dx + dz * dz
         if dsq > dist * dist:
             continue
-        if cfg.get("thin") and kid in THIN:
-            if ((p[0] + p[2]) >> 3) & 1:
-                continue
+        if cfg.get("near") and kid in THIN:
             h = THIN[kid] * p[5] / 64.0
             if dsq + (p[1] + h / 2 - eye[1]) ** 2 < (h * cfg["near"] + 20.0) ** 2:
                 continue

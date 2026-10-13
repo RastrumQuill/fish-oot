@@ -46,14 +46,13 @@ the game does from a camera pose, projects their triangles and counts how often 
 hardware settings).
 
 - **Both versions:** under water, props are drawn no further than the haze lets anything be seen (900 units).
-- **Original hardware (`fishmod/build.sh --hw`, `FISHMOD_HW`):** every other big plant card is left out (always the
-  same ones, so nothing pops; beds thinner), the big underwater plants are two crossed cards instead of three or
-  four and the tall weed's patches one clump (`gen_habitat.py`, `FISHMOD_HW=1`), plants the camera is inside or
-  right against aren't drawn, and the plant cutouts are plain instead of anti-aliased (no read of the frame's colour
-  per pixel; not `G_RM_ZB_OPA_SURF2`, whose coverage-as-alpha cuts nothing out).
+- **Original hardware (`fishmod/build.sh --hw`, `FISHMOD_HW`):** nothing that makes the beds less lush (thinning the
+  beds and simpler plants were tried and dropped: too bare). Plants the camera is inside or right against aren't
+  drawn (a blur across the screen), and the plant cutouts are plain instead of anti-aliased (no read of the frame's
+  colour per pixel; not `G_RM_ZB_OPA_SURF2`, whose coverage-as-alpha cuts nothing out).
 
-Props' overdraw on the tour (screens' worth; emulator version -> hardware version): stop 1 2.8 -> 1.3, stop 11 5.1 ->
-2.2, stop 16 4.1 -> 1.2; every other stop under 1 on hardware.
+Props' overdraw on hardware (screens' worth): stop 1 2.0 (about 3 when it slowed down), stop 11 2.6, stop 16 3.3.
+Fitting the cards to their textures' shapes would save little (a trapezoid per card: grass 30%, the rest 3-15%).
 
 ## 2. Habitat tuning — tentatively done
 
