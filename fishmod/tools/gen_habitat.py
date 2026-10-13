@@ -361,6 +361,14 @@ def crossed_cards(name, texture, width, height, planes, base_col, tip_col, seed,
 # to place and draw (each prop costs a matrix and a draw call however small it is). gen_scatter.py thins these kinds
 # by the same number.
 PATCH = {"grass_tuft": 4, "ribbon_weed": 3, "bush_weed": 2, "tall_weed": 2}
+# The original-hardware version (FISHMOD_HW=1 in the environment, fishmod/build.sh --hw): the big underwater plants
+# are two crossed cards, not three or four (the RDP pays for every pixel of every card; from most angles an X of two
+# looks the same), and the tall weed's patches are one clump, not two (the beds as wide, half as thick)
+HW = os.environ.get("FISHMOD_HW") == "1"
+
+
+def cards(n):
+    return min(n, 2) if HW else n
 
 
 def patch(name, count, radius, seed, make):
@@ -586,9 +594,10 @@ def mesh_curtain():
 MESHES = [
     lambda: crossed_cards("rush_tuft", "rush_card", 40, 26, 2, hexc("#24401a"), hexc("#9aa050"), 111),
     lambda: crossed_cards("iris", "iris_card", 30, 85, 3, hexc("#2a4a1c"), hexc("#a0b060"), 112, lean=4),
-    lambda: crossed_cards("big_pondweed", "bigleaf_card", 40, 52, 4, hexc("#1a3412"), hexc("#7a8a40"), 113),
+    lambda: crossed_cards("big_pondweed", "bigleaf_card", 40, 52, cards(4), hexc("#1a3412"), hexc("#7a8a40"), 113),
     mesh_spatterdock,
-    lambda: crossed_cards("kelp_frond", "frond_card", 26, 260, 3, hexc("#0c200a"), hexc("#6a7a38"), 114, lean=30),
+    lambda: crossed_cards("kelp_frond", "frond_card", 26, 260, cards(3), hexc("#0c200a"), hexc("#6a7a38"), 114,
+                          lean=30),
     lambda: crossed_cards_v("vine_strand", "vine_card", 28, 150, 2, hexc("#122a0e"), hexc("#7a8a48"), 115,
                             lean=10, v_repeat=2.0),
     mesh_curtain,
@@ -598,9 +607,9 @@ MESHES = [
 
     lambda: patch("grass_tuft", PATCH["grass_tuft"], 26, 204, lambda i: crossed_cards(
         "grass_tuft", "grass_card", 34, 16, 2, hexc("#1c3a12"), hexc("#6c7a3b"), 104 + i)),
-    lambda: patch("tall_weed", PATCH["tall_weed"], 30, 205, lambda i: crossed_cards_v(
+    lambda: patch("tall_weed", 1 if HW else PATCH["tall_weed"], 30, 205, lambda i: crossed_cards_v(
         "tall_weed", "ribbon_card", 26, 190, 2, hexc("#0d260b"), hexc("#5a6a30"), 105 + i, lean=18, v_repeat=2.0)),
-    lambda: crossed_cards("broadleaf", "broadleaf_card", 38, 40, 3, hexc("#1a3a12"), hexc("#7a8a40"), 106),
+    lambda: crossed_cards("broadleaf", "broadleaf_card", 38, 40, cards(3), hexc("#1a3a12"), hexc("#7a8a40"), 106),
     lambda: crossed_cards("old_posts", "roots_card", 70, 60, 2, hexc("#2b2311"), hexc("#8a8a70"), 107),
     lambda: crossed_cards("cattails", "reed_card", 44, 110, 3, hexc("#3a4a18"), hexc("#b8b070"), 108, lean=3),
     lambda: mesh_flat_scatter("float_leaves", "float_leaf", 5, 22, 7, 0.5, (255, 255, 255), 109),
@@ -613,7 +622,7 @@ MESHES = [
     lambda: patch("ribbon_weed", PATCH["ribbon_weed"], 22, 202, lambda i: crossed_cards(
         "ribbon_weed", "ribbon_card", 18, 80, 2, hexc("#133611"), hexc("#6c7a3b"), 102 + i, lean=10)),
     lambda: patch("bush_weed", PATCH["bush_weed"], 30, 203, lambda i: crossed_cards(
-        "bush_weed", "bush_card", 46, 42, 3, hexc("#082b07"), hexc("#525d28"), 103 + i)),
+        "bush_weed", "bush_card", 46, 42, cards(3), hexc("#082b07"), hexc("#525d28"), 103 + i)),
     mesh_log,
     lambda: mesh_decal("pebble_patch", "pebbles", 120, (255, 255, 255)),
     mesh_lily_flower,

@@ -138,6 +138,12 @@ def lie_on_bed(floor_at, x, z, surface, here, yaw, half_len, half_wid):
 
 FLAT_KINDS = {"pebble_patch", "leaf_litter"}  # flat on the bed
 FLOATING = {"lily_pad", "float_leaves", "spatterdock", "vine_curtain"}  # sit on the surface, not the bed
+# Leaves floating on the surface lie side by side, not on top of each other: each one's round footprint (radius,
+# and its centre's offset in the model: vanilla's lily pad sits off its origin) at scale 1, and how far apart a
+# cluster's leaves are scattered. Two may touch, overlapping a little at the edges, no more.
+FLOAT_SPACE = {"lily_pad": (58.0, -32.0, -6.0), "spatterdock": (31.0, 0.0, 0.0), "float_leaves": (35.0, 0.0, 0.0)}
+FLOAT_SPREAD = {"lily_pad": 45.0, "spatterdock": 32.0, "float_leaves": 32.0}
+FLOAT_OVERLAP = 0.95
 
 
 def place(scene, seed=1):
@@ -170,6 +176,25 @@ def place(scene, seed=1):
         return finder.floor(int(x), int(z), surf + 60)
 
     out = []
+    # the floating leaves placed so far, by 64-unit cell: (centre x, centre z, radius)
+    floats = {}
+
+    def leaf_circle(kind, x, z, yaw, scale):
+        r, ox, oz = FLOAT_SPACE[kind]
+        c, s_ = math.cos(yaw), math.sin(yaw)
+        # as the game turns the model: x' = x cos + z sin, z' = -x sin + z cos
+        return (x + (ox * c + oz * s_) * scale, z + (-ox * s_ + oz * c) * scale, r * scale)
+
+    def leaf_free(circle):
+        cx, cz, r = circle
+        gx, gz = int(cx // 64), int(cz // 64)
+        for ix in range(gx - 2, gx + 3):
+            for iz in range(gz - 2, gz + 3):
+                for ox, oz, orr in floats.get((ix, iz), ()):
+                    if (cx - ox) ** 2 + (cz - oz) ** 2 < ((r + orr) * FLOAT_OVERLAP) ** 2:
+                        return False
+        return True
+
     xs = [b["xMin"] for b in boxes] + [b["xMin"] + b["xLen"] for b in boxes]
     zs = [b["zMin"] for b in boxes] + [b["zMin"] + b["zLen"] for b in boxes]
     for gz in range(min(zs), max(zs), STEP):
@@ -206,9 +231,12 @@ def place(scene, seed=1):
                 if rnd.random() >= chance:
                     continue
                 n = rnd.randint(*cluster)
+                spread = FLOAT_SPREAD.get(kind, 14.0)
+                if kind in FLOAT_SPACE:
+                    n *= 6  # leaves that would overlap are skipped: more tries, so the bed still fills in
                 for k in range(n):
-                    px = x + (rnd.gauss(0, 14) if k else 0)
-                    pz = z + (rnd.gauss(0, 14) if k else 0)
+                    px = x + (rnd.gauss(0, spread) if k else 0)
+                    pz = z + (rnd.gauss(0, spread) if k else 0)
                     ps = surface_at(px, pz)
                     if ps is None or excluded(px, pz):
                         continue
@@ -251,6 +279,11 @@ def place(scene, seed=1):
                         y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, TILTED[kind][0] * sc, TILTED[kind][1] * sc)
                         if max(abs(tilt[0]), abs(tilt[1])) > math.radians(25):
                             continue  # too steep: it would have rolled further down
+                    if kind in FLOAT_SPACE:
+                        circle = leaf_circle(kind, px, pz, yaw, sc)
+                        if not leaf_free(circle):
+                            continue  # it would lie on top of another leaf
+                        floats.setdefault((int(circle[0] // 64), int(circle[1] // 64)), []).append(circle)
                     out.append({"kind": kind, "x": px, "y": y, "z": pz, "yaw": yaw, "tilt": tilt,
                                 "scale": sc, "tint": rnd.uniform(0.82, 1.08)})
                 break  # one rule per candidate: keeps kinds from stacking on one spot
@@ -322,8 +355,11 @@ def write_c(scene, instances):
             continue
         props.append((it["x"], it["y"], it["z"], kind, it["yaw"], it["scale"], it["tint"], it.get("tilt", (0.0, 0.0))))
         if kind == "lily_pad" and rnd.random() < 0.15:
-            # a flower on some of the pads
-            ox, oz = rnd.uniform(-4, 4), rnd.uniform(-4, 4)
+            # a flower on some of the pads, near the pad's middle (vanilla's pad sits off its origin)
+            r, cx, cz = FLOAT_SPACE["lily_pad"]
+            c, sn = math.cos(it["yaw"]), math.sin(it["yaw"])
+            ox = (cx * c + cz * sn) * it["scale"] + rnd.uniform(-4, 4)
+            oz = (-cx * sn + cz * c) * it["scale"] + rnd.uniform(-4, 4)
             for part in ("lily_flower", "lily_centre"):
                 props.append((it["x"] + ox, it["y"] + 0.5, it["z"] + oz, part, it["yaw"], 1.0, 1.0, (0.0, 0.0)))
     x0 = int(min(p[0] for p in props)) - 1

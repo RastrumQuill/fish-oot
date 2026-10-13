@@ -83,3 +83,15 @@ Fifth update (same name, rebuilt): fish looks
   the fish you caught;
 - catfish curl hard into their turns and lie curled on the bed when they rest;
 - small fish (greengill, minnows) swim in bursts: a few quick beats of the tail, then a glide.
+
+Sixth update: an original-hardware version, and lily pads
+- two patches now: `fish-oot-lake-tour1.bps` for emulators (as before) and `fish-oot-lake-tour1-hw.bps` for a real
+  N64. Emulators draw pixels for free; the N64 pays for every pixel of every plant card, and the weed beds seen
+  across from under the water stack many cards on each pixel (the slowdown at stop 1). The hardware version leaves
+  out every other big plant card (always the same ones: no popping, but the beds are thinner), draws the big
+  underwater plants as two crossed cards instead of three or four, doesn't draw a plant the camera is right inside,
+  and uses plain cutouts instead of anti-aliased ones. Measured (props only, screens' worth of pixels): stop 1 2.8 ->
+  1.3, stop 11 5.1 -> 2.2, stop 16 4.1 -> 1.2; every other stop under 1;
+- both versions: under water, props past the haze (about 900 units, where nothing can be seen) aren't drawn;
+- lily pads, spatterdock and floating leaves lie side by side, touching, no longer piled on each other, and lily
+  flowers sit in the middle of their pads (the scatter was regenerated, so plants elsewhere are in new spots too).

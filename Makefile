@@ -231,6 +231,10 @@ CPP_DEFINES += -DFISHMOD_OPT=$(FISHMOD_OPT)
 # 4 = all of 3 plus the fish manager (roster, one draw for all fish, AI budget), fish rigs (only moving limbs get
 #     matrices, static fins baked per species), reduced rigs for mid-distance and small fish, fixed whiskers, cheaper
 #     water lookups
+# FISHMOD_HW=1: the original-hardware version (fewer, cheaper pixels for the RDP; see fishmod_scatter.c)
+FISHMOD_HW ?= 0
+CPP_DEFINES += -DFISHMOD_HW=$(FISHMOD_HW)
+
 # FISHMOD_FASTTRIG=1: polynomial sin/cos in place of the sine table (Math_SinS/Math_CosS, whole game)
 FISHMOD_FASTTRIG ?= 0
 CPP_DEFINES += -DFISHMOD_FASTTRIG=$(FISHMOD_FASTTRIG)
