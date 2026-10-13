@@ -238,11 +238,18 @@ static void Fishmod_PhotoUpdate(PlayState* play) {
  * turns, startles, a hooked thrash and hovering, seen from above and then from a three-quarter view. The corner
  * marker (gFishmodPhoto.marker) tells fishmod/tools/anim_capture.py which species and view is on screen.
  */
+#ifdef FISHMOD_STUDIO_ORBIT
+// one species seen from all round (for finding angles it vanishes from): above, three-quarter, nose-on, from
+// behind, from below, low from the side
+static u8 sStudioSpecies[] = { FISHMOD_STUDIO_ORBIT };
+#define STUDIO_VIEWS 6
+#else
 static u8 sStudioSpecies[] = {
     FISHMOD_SPECIES_GREENGILL,    FISHMOD_SPECIES_HYRULE_BASS, FISHMOD_SPECIES_ORDON_CATFISH,
     FISHMOD_SPECIES_HYLIAN_LOACH, FISHMOD_SPECIES_SANKE_CARP,  FISHMOD_SPECIES_HYRULE_MINNOW,
 };
 #define STUDIO_VIEWS 2
+#endif
 #define STUDIO_FISH 3
 
 typedef struct StudioPhase {
@@ -369,11 +376,22 @@ static void Fishmod_StudioUpdate(PlayState* play) {
         eye.x = at.x;
         eye.y = at.y + dist;
         eye.z = at.z - dist * 0.08f;
-    } else {
+    } else if ((sStudioSegment % STUDIO_VIEWS) == 1) {
         dist *= 1.3f;
         eye.x = at.x + dist * 0.45f;
         eye.y = at.y + dist * 0.45f;
         eye.z = at.z + dist * 0.75f;
+    } else {
+        // (FISHMOD_STUDIO_ORBIT) nose-on, from behind, from below, low from the side
+        static const f32 sDir[4][3] = { { 0.05f, 0.1f, 1.0f }, { 0.05f, 0.1f, -1.0f }, { 0.08f, -1.0f, 0.1f },
+                                        { 1.0f, -0.2f, 0.05f } };
+        const f32* d = sDir[(sStudioSegment % STUDIO_VIEWS) - 2];
+
+        // nose-on close up, into the open mouth
+        dist *= ((sStudioSegment % STUDIO_VIEWS) == 2) ? 0.3f : 1.3f;
+        eye.x = at.x + d[0] * dist;
+        eye.y = at.y + d[1] * dist;
+        eye.z = at.z + d[2] * dist;
     }
     Play_SetCameraAtEye(play, sStudioCamId, &at, &eye);
     Play_SetCameraFov(play, sStudioCamId, 25.0f);

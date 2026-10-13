@@ -57,3 +57,14 @@ Second update (same name, rebuilt):
 - the props cost much less: what's drawn is only worked out again when the camera moves (lake bench: 1.1 ms a
   frame, was 5.5), and more plants are patches;
 - the first two stops are under the water over the west weed flat (from above you can't see through the surface).
+
+Third update (same name, rebuilt):
+- no plants sticking out of the water at the edges: an underwater plant's size is now checked against the shallowest
+  bed all round it, not just under its middle, so on a slope (the island's shelf, the foot of the back walls) the
+  shallow side no longer pokes out; rushes and other plants that stand out of the water grow only on gentle banks;
+- the island's fallen wood lies along the bed, tilted to its slope (pieces that would sit too steeply aren't placed);
+- the bass's open mouth no longer shows a hole straight through the fish: the bass draws both sides of its
+  surfaces, so through the mouth you see the inside of its head and body (about 0.2 ms of RDP time in the lake
+  bench);
+- far fish (the flat shape past 750 units) also face the camera from every side now: nose-on or tail-on they're a
+  short oval, not a line seen edge-on.

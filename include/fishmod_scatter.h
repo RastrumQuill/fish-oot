@@ -16,7 +16,9 @@ typedef struct FishmodProp {
     /* 0x07 */ u8 yaw;   // 256 per turn
     /* 0x08 */ u8 scale; // 64 = 1.0
     /* 0x09 */ u8 tint;  // 128 = 1.0, times the vertex colours
-} FishmodProp; // size = 0x0A
+    /* 0x0A */ s8 tiltX; // props lying on the bed (logs): tilt about its width, 256 per turn
+    /* 0x0B */ s8 tiltZ; // and about its length
+} FishmodProp; // size = 0x0C
 
 typedef struct FishmodScatterHeader {
     /* 0x00 */ u32 magic;

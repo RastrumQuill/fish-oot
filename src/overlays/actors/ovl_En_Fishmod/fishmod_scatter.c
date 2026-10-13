@@ -324,6 +324,46 @@ static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
     s32 c = (s32)(Math_CosS(yaw) * s);
     s32 sn = (s32)(Math_SinS(yaw) * s);
 
+    if ((prop->tiltX != 0) || (prop->tiltZ != 0)) {
+        // lying on the bed (logs): tilted about its length and width before it is turned, M = Rz * Rx * Ry * scale
+        f32 k = prop->scale * (1.0f / 64.0f);
+        f32 ct = Math_CosS(prop->tiltZ << 8);
+        f32 st = Math_SinS(prop->tiltZ << 8);
+        f32 cp = Math_CosS(prop->tiltX << 8);
+        f32 sp = Math_SinS(prop->tiltX << 8);
+        f32 cy = Math_CosS(yaw);
+        f32 sy = Math_SinS(yaw);
+        // Rz * Rx (rows: where the model's axes go before the turn)
+        f32 r[3][3];
+        s32 i;
+
+        r[0][0] = ct;
+        r[0][1] = st * cp;
+        r[0][2] = st * sp;
+        r[1][0] = -st;
+        r[1][1] = ct * cp;
+        r[1][2] = ct * sp;
+        r[2][0] = 0.0f;
+        r[2][1] = -sp;
+        r[2][2] = cp;
+        for (i = 0; i < 3; i++) {
+            // then turned about y: (x, y, z) -> (x cy + z sy, y, -x sy + z cy)
+            MTX_SET(mtx, i, 0, (s32)((r[i][0] * cy + r[i][2] * sy) * k * 65536.0f));
+            MTX_SET(mtx, i, 1, (s32)(r[i][1] * k * 65536.0f));
+            MTX_SET(mtx, i, 2, (s32)((-r[i][0] * sy + r[i][2] * cy) * k * 65536.0f));
+            MTX_SET(mtx, i, 3, 0);
+        }
+        mtx->intPart[3][0] = prop->x;
+        mtx->intPart[3][1] = prop->y;
+        mtx->intPart[3][2] = prop->z;
+        mtx->intPart[3][3] = 1;
+        mtx->fracPart[3][0] = 0;
+        mtx->fracPart[3][1] = 0;
+        mtx->fracPart[3][2] = 0;
+        mtx->fracPart[3][3] = 0;
+        return mtx;
+    }
+
     // rows are the images of the x, y and z axes; the last row is the position
     MTX_SET(mtx, 0, 0, c);
     MTX_SET(mtx, 0, 1, 0);

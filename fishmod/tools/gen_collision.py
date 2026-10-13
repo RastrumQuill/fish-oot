@@ -47,7 +47,7 @@ def props(base):
                        .split("#define FISHMOD_PROP_KINDS_GENERATED")[0])
     src = open(os.path.join(DATA, f"fishmod_sc_{base}.c")).read()
     out = []
-    for m in re.findall(r"\{ (-?\d+), (-?\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+) \}", src):
+    for m in re.findall(r"\{ (-?\d+), (-?\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+), -?\d+, -?\d+ \}", src):
         x, y, z, k, yaw, sc, tint = map(int, m)
         out.append({"x": x, "y": y, "z": z, "kind": kinds[k], "yaw": yaw, "scale": sc / 64.0})
     return out
