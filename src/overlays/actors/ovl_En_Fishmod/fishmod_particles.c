@@ -3,7 +3,8 @@
  * Overlay: ovl_En_Fishmod
  * Description: water particles (FISHMOD_OPT 5): now and then a few bubbles rising from the weed near the camera
  * (vanilla's bubble, the one Ruto's letter and Link give off, popping at the surface with vanilla's ripple, so they
- * show from above the water too), and, while the camera is under the surface, faint specks drifting round it.
+ * show from above the water too), and, while the camera is under the surface, faint specks drifting round it (the
+ * soft dot of vanilla's Kokiri Forest dust motes, much smaller).
  *
  * Cheaper than spawning vanilla's bubble effect: no effect slots, no water lookups each frame (a bubble learns the
  * surface once, from the baked water map, when it's made), and one setup for all of them; each is then a matrix and
@@ -25,11 +26,13 @@
 #include "ultra64.h"
 #include "assets/objects/gameplay_keep/gameplay_keep_0x55DB0.h"
 #include "assets/objects/gameplay_keep/eff_bubble.h"
+#include "assets/objects/gameplay_keep/gameplay_keep_0x4D160.h"
+#include "assets/objects/gameplay_keep/sun_textures.h"
 
 #if FISHMOD_OPT >= 5
 
 #define BUBBLE_MAX 24
-#define SPECK_MAX 40
+#define SPECK_MAX 60
 #define BUBBLE_SPAWN_EVERY 25  // frames between bubble trails (an occasional one, not a stream like Ruto's bottle)
 #define BUBBLE_RANGE 450.0f    // from the camera: born this close, gone past 700
 #define SPECK_RANGE 260.0f     // specks live in a ball this big round the camera
@@ -49,9 +52,12 @@ typedef struct FishmodBubble {
 typedef struct FishmodSpeck {
     Vec3f pos;
     Vec3f vel;
+    s16 phase;
     u8 alive;
-    u8 alpha;
-    u8 size; // 1/100 of vanilla's 15-unit bubble sprite
+    u8 alpha; // how bright it gets
+    u8 fade;  // 0-255: fading in when it appears, out before it goes
+    u8 size;  // 1/1000 of vanilla's 31-unit dust mote
+    u8 leaving;
 } FishmodSpeck;
 
 static FishmodBubble sBubbles[BUBBLE_MAX];
@@ -116,11 +122,14 @@ static void Particles_PlaceSpeck(PlayState* play, FishmodSpeck* s, Vec3f* eye) {
         if (EnFishmod_WaterFloor(play, p.x, p.z, &surface, &floor, false) && (p.y < surface - 4.0f) &&
             (p.y > floor + 2.0f)) {
             s->pos = p;
-            s->vel.x = Rand_CenteredFloat(0.3f);
-            s->vel.y = -0.05f - Rand_ZeroFloat(0.1f);
-            s->vel.z = Rand_CenteredFloat(0.3f);
-            s->alpha = 110 + (s32)Rand_ZeroFloat(80.0f);
-            s->size = 10 + (s32)Rand_ZeroFloat(8.0f); // about 1.5 to 2.5 units across
+            s->vel.x = Rand_CenteredFloat(0.16f);
+            s->vel.y = -0.02f - Rand_ZeroFloat(0.05f);
+            s->vel.z = Rand_CenteredFloat(0.16f);
+            s->phase = (s16)Rand_ZeroFloat(65535.0f);
+            s->alpha = 90 + (s32)Rand_ZeroFloat(90.0f);
+            s->size = 50 + (s32)Rand_ZeroFloat(25.0f); // a little dot, about a unit across with a soft edge
+            s->fade = 0;
+            s->leaving = false;
             s->alive = true;
             return;
         }
@@ -176,11 +185,23 @@ void EnFishmod_ParticlesUpdate(PlayState* play) {
         FishmodSpeck* s = &sSpecks[i];
 
         if (s->alive) {
-            s->pos.x += s->vel.x;
-            s->pos.y += s->vel.y;
-            s->pos.z += s->vel.z;
-            if ((SQ(s->pos.x - eye.x) + SQ(s->pos.y - eye.y) + SQ(s->pos.z - eye.z)) > SQ(SPECK_RANGE + 20.0f)) {
-                s->alive = false;
+            // a slow wander: its drift, plus a gentle sway that turns over every few seconds
+            s->phase += 0x180;
+            s->pos.x += s->vel.x + Math_SinS(s->phase) * 0.05f;
+            s->pos.y += s->vel.y + Math_SinS((s16)(s->phase * 3 / 4 + 0x2000)) * 0.03f;
+            s->pos.z += s->vel.z + Math_CosS((s16)(s->phase * 5 / 4)) * 0.05f;
+            if ((SQ(s->pos.x - eye.x) + SQ(s->pos.y - eye.y) + SQ(s->pos.z - eye.z)) > SQ(SPECK_RANGE)) {
+                s->leaving = true;
+            }
+            // fade in, and out before going (no popping)
+            if (s->leaving) {
+                if (s->fade <= 12) {
+                    s->alive = false;
+                } else {
+                    s->fade -= 12;
+                }
+            } else if (s->fade < 255) {
+                s->fade = (s->fade > 255 - 6) ? 255 : s->fade + 6;
             }
         }
         // a few each frame, so arriving under water doesn't place them all at once
@@ -190,30 +211,33 @@ void EnFishmod_ParticlesUpdate(PlayState* play) {
     }
 }
 
-/** A matrix that places and sizes (the display list's own billboard turns it to the camera). */
-static Mtx* Particles_Matrix(Vec3f* pos, f32 scale) {
-    Mtx* mtx;
-    s32 s = (s32)(scale * 0x10000);
-    s32 i;
+/** An s15.16 entry of a fixed-point matrix. */
+static void Particles_Set(Mtx* mtx, s32 r, s32 c, f32 v) {
+    s32 f = (s32)(v * 65536.0f);
 
-    mtx = &sPartMtx[sPartFrame][sPartUsed++];
-    for (i = 0; i < 4; i++) {
-        mtx->m[0][i] = 0;
-        mtx->m[1][i] = 0;
-        mtx->m[2][i] = 0;
-        mtx->m[3][i] = 0;
+    mtx->intPart[r][c] = (u32)f >> 16;
+    mtx->fracPart[r][c] = f & 0xFFFF;
+}
+
+/**
+ * A particle's matrix: sized and placed, and turned to face the camera with `billboard` (or NULL when the display
+ * list does that itself). Positions keep their fractions, so slow movement is smooth.
+ */
+static Mtx* Particles_Matrix(Vec3f* pos, f32 scale, MtxF* billboard) {
+    Mtx* mtx = &sPartMtx[sPartFrame][sPartUsed++];
+    s32 r;
+    s32 c;
+
+    for (r = 0; r < 3; r++) {
+        for (c = 0; c < 3; c++) {
+            Particles_Set(mtx, r, c, (billboard != NULL) ? billboard->mf[r][c] * scale : ((r == c) ? scale : 0.0f));
+        }
+        Particles_Set(mtx, r, 3, 0.0f);
     }
-    // integer parts in the first half, fractions in the second (s15.16)
-    mtx->intPart[0][0] = (u32)s >> 16;
-    mtx->fracPart[0][0] = s & 0xFFFF;
-    mtx->intPart[1][1] = (u32)s >> 16;
-    mtx->fracPart[1][1] = s & 0xFFFF;
-    mtx->intPart[2][2] = (u32)s >> 16;
-    mtx->fracPart[2][2] = s & 0xFFFF;
-    mtx->intPart[3][0] = (s16)pos->x;
-    mtx->intPart[3][1] = (s16)pos->y;
-    mtx->intPart[3][2] = (s16)pos->z;
-    mtx->intPart[3][3] = 1;
+    Particles_Set(mtx, 3, 0, pos->x);
+    Particles_Set(mtx, 3, 1, pos->y);
+    Particles_Set(mtx, 3, 2, pos->z);
+    Particles_Set(mtx, 3, 3, 1.0f);
     return mtx;
 }
 
@@ -246,25 +270,33 @@ void EnFishmod_ParticlesDraw(PlayState* play) {
             lastTex = b->tex;
             gSPSegment(POLY_OPA_DISP++, 0x08, tex[b->tex]);
         }
-        gSPMatrix(POLY_OPA_DISP++, Particles_Matrix(&b->pos, b->scale * 0.01f),
-                  G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        gSPDisplayList(POLY_OPA_DISP++, SEGMENTED_TO_VIRTUAL(gEffBubbleDL));
-    }
-    // specks: the same little sprite (15 units across) at about a tenth of its size, murky-coloured
-    gSPSegment(POLY_OPA_DISP++, 0x08, tex[0]);
-    gDPSetEnvColor(POLY_OPA_DISP++, 70, 90, 80, 0);
-    for (i = 0; i < SPECK_MAX; i++) {
-        FishmodSpeck* s = &sSpecks[i];
-
-        if (!s->alive) {
-            continue;
-        }
-        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 200, 210, 190, s->alpha);
-        gSPMatrix(POLY_OPA_DISP++, Particles_Matrix(&s->pos, s->size * 0.01f),
+        gSPMatrix(POLY_OPA_DISP++, Particles_Matrix(&b->pos, b->scale * 0.01f, NULL),
                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         gSPDisplayList(POLY_OPA_DISP++, SEGMENTED_TO_VIRTUAL(gEffBubbleDL));
     }
     gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+
+    // specks: vanilla's dust mote (a soft dot), tiny, faint and the colour of the water, see-through
+    if (sUnder) {
+        POLY_XLU_DISP = Gfx_SetupDL(POLY_XLU_DISP, SETUPDL_20);
+        gSPSegment(POLY_XLU_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(gSun1Tex));
+        gSPDisplayList(POLY_XLU_DISP++, gKokiriDustMoteMaterialDL);
+        for (i = 0; i < SPECK_MAX; i++) {
+            FishmodSpeck* s = &sSpecks[i];
+            u8 a;
+
+            if (!s->alive || (s->fade == 0)) {
+                continue;
+            }
+            a = s->alpha * s->fade / 255;
+            gDPPipeSync(POLY_XLU_DISP++);
+            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 220, 230, 210, a);
+            gDPSetEnvColor(POLY_XLU_DISP++, 90, 120, 100, a);
+            gSPMatrix(POLY_XLU_DISP++, Particles_Matrix(&s->pos, s->size * 0.001f, &play->billboardMtxF),
+                      G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+            gSPDisplayList(POLY_XLU_DISP++, gKokiriDustMoteModelDL);
+        }
+    }
     CLOSE_DISPS(gfxCtx, "../fishmod_particles.c", __LINE__);
 }
 
