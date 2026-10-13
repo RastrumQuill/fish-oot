@@ -182,6 +182,99 @@ static void EnFishmod_LoadToCI8(Gfx* g, Gfx* dlStart) {
 }
 #endif
 
+#if FISHMOD_OPT >= 5
+// the render tile set after each role's texture load, as the model had it (EnFishmod_LookTable mirrors it)
+static Gfx sRoleTile[3][FISHMOD_TEX_ROLE_MAX];
+
+/**
+ * A fish's own looks, from its look byte (saved with it in a bottle, so a fish let go is the fish that was caught):
+ * brightness (bits 0-2) and warmth (bits 3-5) shift its species' colours a little, and bit 6 mirrors its pattern
+ * along the body (every other repeat of it). Built per fish while drawing and pointed at by segment
+ * FISHMOD_SEG_LOOK: the part colours (the rig's tint branches), then each texture role's render tile.
+ */
+static void EnFishmod_LookColor(EnFishmod* this, const u8* tint, u8* out) {
+    s32 bright = 226 + (this->look & 7) * 9; // 0.88 to 1.13
+    s32 warm = (((this->look >> 3) & 7) - 3) * 5;
+
+    out[0] = CLAMP_MAX((tint[0] * (bright + warm)) >> 8, 255);
+    out[1] = CLAMP_MAX((tint[1] * bright) >> 8, 255);
+    out[2] = CLAMP_MAX((tint[2] * (bright - warm)) >> 8, 255);
+}
+
+/*
+ * Koi: each Sanke carp's red and black blotches sit in one of four places along and round its body (its look's top
+ * two bits): the carp's own side and back patterns, and three copies shifted round (patterns repeat along the body),
+ * made once.
+ */
+#define KOI_ROLES 2
+static const u8 sKoiRoles[KOI_ROLES] = { FISHMOD_TEX_ROLE_SIDE, FISHMOD_TEX_ROLE_BACK };
+static u8 sKoiPatterns[3][KOI_ROLES][16 * 16] ALIGNED(8);
+static u8 sKoiReady;
+
+static u8* EnFishmod_KoiPattern(s32 variant, s32 r) {
+    u8* src = sSpeciesTexturesCI[FISHMOD_SPECIES_SANKE_CARP][sKoiRoles[r]];
+
+    if (variant == 0) {
+        return src;
+    }
+    if (!sKoiReady) {
+        static const u8 sShift[3][2] = { { 5, 9 }, { 10, 3 }, { 13, 12 } };
+        s32 v;
+        s32 k;
+        s32 x;
+        s32 y;
+
+        for (v = 0; v < 3; v++) {
+            for (k = 0; k < KOI_ROLES; k++) {
+                u8* from = sSpeciesTexturesCI[FISHMOD_SPECIES_SANKE_CARP][sKoiRoles[k]];
+
+                for (y = 0; y < 16; y++) {
+                    for (x = 0; x < 16; x++) {
+                        sKoiPatterns[v][k][y * 16 + x] = from[((y + sShift[v][1]) & 15) * 16 + ((x + sShift[v][0]) & 15)];
+                    }
+                }
+            }
+        }
+        sKoiReady = true;
+    }
+    return sKoiPatterns[variant - 1][r];
+}
+
+void EnFishmod_LookTable(EnFishmod* this, PlayState* play) {
+    Gfx* table = GRAPH_ALLOC(play->state.gfxCtx, (FISHMOD_PART_MAX + FISHMOD_TEX_ROLE_MAX) * 2 * sizeof(Gfx));
+    Gfx* g = table;
+    s32 texSet = EnFishmod_TexSet(this->species);
+    s32 i;
+
+    if (this->species == &gFishmodSpecies[FISHMOD_SPECIES_SANKE_CARP]) {
+        OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+        for (i = 0; i < KOI_ROLES; i++) {
+            gSPSegment(POLY_OPA_DISP++, 0x08 + sKoiRoles[i], EnFishmod_KoiPattern(this->look >> 6, i));
+        }
+        CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+    }
+
+    for (i = 0; i < FISHMOD_PART_MAX; i++) {
+        u8 c[3];
+
+        EnFishmod_LookColor(this, this->species->partTint[i], c);
+        gDPSetPrimColor(g++, 0, 0x80, c[0], c[1], c[2], 255);
+        gSPEndDisplayList(g++);
+    }
+    for (i = 0; i < FISHMOD_TEX_ROLE_MAX; i++) {
+        *g = sRoleTile[texSet][i];
+        if ((this->look & 0x40) && (g->words.w0 != 0)) {
+            g->words.w1 |= G_TX_MIRROR << 8; // mirrored along s (the length of the body)
+        }
+        g++;
+        gSPEndDisplayList(g++);
+    }
+    OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+    gSPSegment(POLY_OPA_DISP++, FISHMOD_SEG_LOOK, table);
+    CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+}
+#endif
+
 static void EnFishmod_PatchSkeleton(FlexSkeletonHeader* skelHeader, s32 texSet) {
     void** limbs = SEGMENTED_TO_VIRTUAL(skelHeader->sh.segment);
     s32 i;
@@ -222,6 +315,16 @@ static void EnFishmod_PatchSkeleton(FlexSkeletonHeader* skelHeader, s32 texSet) 
                         gfx->words.w1 = (u32)(0x08 + role) << 24;
 #if FISHMOD_OPT >= 2
                         EnFishmod_LoadToCI8(gfx, SEGMENTED_TO_VIRTUAL(limb->dList));
+#endif
+#if FISHMOD_OPT >= 5
+                        // the render tile's settings come from the fish's own table (EnFishmod_LookTable), so each
+                        // fish can mirror its pattern
+                        if (((gfx[5].words.w0 >> 24) == G_SETTILE) && (((gfx[5].words.w1 >> 24) & 7) == 0)) {
+                            sRoleTile[texSet][role] = gfx[5];
+                            gfx[5].words.w0 = G_DL << 24;
+                            gfx[5].words.w1 =
+                                SEGMENT_ADDR(FISHMOD_SEG_LOOK, (FISHMOD_PART_MAX * 2 + role * 2) * sizeof(Gfx));
+                        }
 #endif
                         break;
                     }
@@ -452,6 +555,7 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
                                       ? gFishmodStudio.spawnLength
                                       : this->species->lengthTypical);
         this->fishState = FISH_STATE_PHOTO;
+        this->look = gFishmodStudio.active ? gFishmodStudio.spawnLook : FISHMOD_LOOK_NEUTRAL;
     } else {
         // length: triangular distribution between min and max, peaking at the typical size
         f32 lo = this->species->lengthMin;
@@ -463,9 +567,16 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         EnFishmod_SetLength(this, lo + (hi - lo) * f);
         this->fishState = FISH_STATE_WANDER;
         this->stateTimer = 0;
+        // its looks (a roster fish gets its own from the manager)
+        this->look = (u8)Rand_ZeroFloat(256.0f);
         if (gFishmodSpawnLength > 0.0f) {
-            // poured back from a bottle: its own size, and off it goes
+            // poured back from a bottle: its own size and looks, and off it goes
             EnFishmod_SetLength(this, gFishmodSpawnLength);
+            this->look = gFishmodSpawnLook;
+#if FISHMOD_DEBUG
+            Fishmod_DebugPrintf(4, "released %s %d.%d in, look %02X", this->species->name, (s32)gFishmodSpawnLength,
+                                (s32)(gFishmodSpawnLength * 10.0f) % 10, this->look);
+#endif
             this->fishState = FISH_STATE_FLEE;
             this->stateTimer = 50;
             this->cooldown = 600;
@@ -512,6 +623,7 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
     this->swimPhaseStep = 0.25f;
     this->swimMag = 1500.0f;
     this->swimPhase = Rand_ZeroFloat(6.28f);
+    this->swimGain = 1.0f;
     this->depthPref = (u8)Rand_ZeroFloat(255.9f);
 #if FISHMOD_OPT >= 5
     this->waterCell = -2;
@@ -1977,7 +2089,26 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
 static void EnFishmod_UpdateSwim(EnFishmod* this) {
     s32 i;
 
+#if FISHMOD_OPT >= 5
+    // Small schooling fish swim in bursts: a few quick beats of the tail, then a glide (the big fish's steady wave
+    // looks wrong on a minnow). Only while swimming, not resting.
+    if ((this->species->schoolMax > 0) && (this->swimMag > 900.0f)) {
+        s32 t = (this->timer + this->actor.params * 7) % 24;
+
+        if (t < 9) {
+            this->swimPhase += this->swimPhaseStep * 2.2f;
+            Math_ApproachF(&this->swimGain, 1.3f, 0.5f, 0.2f);
+        } else {
+            this->swimPhase += this->swimPhaseStep * 0.25f;
+            Math_ApproachF(&this->swimGain, 0.35f, 0.3f, 0.1f);
+        }
+    } else {
+        this->swimPhase += this->swimPhaseStep;
+        Math_ApproachF(&this->swimGain, 1.0f, 0.3f, 0.1f);
+    }
+#else
     this->swimPhase += this->swimPhaseStep;
+#endif
     if (this->swimPhase > 2.0f * M_PI) {
         this->swimPhase -= 2.0f * M_PI;
     }
@@ -1988,6 +2119,17 @@ static void EnFishmod_UpdateSwim(EnFishmod* this) {
         s16 turn = this->actor.shape.rot.y - this->lastYaw;
         s16 bendTarget = CLAMP(turn * 5, -0x1400, 0x1400);
 
+#if FISHMOD_OPT >= 5
+        if (this->species == &gFishmodSpecies[FISHMOD_SPECIES_ORDON_CATFISH]) {
+            // a catfish is all body: it curls hard into its turns, and lies curled on the bed when it rests (to its
+            // own side, every time)
+            bendTarget = CLAMP(turn * 9, -0x2400, 0x2400);
+            if ((this->fishState == FISH_STATE_WANDER) && (this->restTimer > 0) &&
+                (this->actor.world.pos.y - this->floorY < this->halfHeight + 8.0f)) {
+                bendTarget += (this->look & 0x80) ? 0x1800 : -0x1800;
+            }
+        }
+#endif
         this->lastYaw = this->actor.shape.rot.y;
         Math_SmoothStepToS(&this->turnBend, bendTarget, 3, 0x600, 0x40);
     }
@@ -1996,6 +2138,7 @@ static void EnFishmod_UpdateSwim(EnFishmod* this) {
 #if FISHMOD_OPT >= 4
         // the sine table instead of cosf: the same wave to well under a degree
         this->bodyYaw[i] = Math_CosS((s16)((this->swimPhase - (i * 1.1f)) * (0x8000 / M_PI))) * this->swimMag *
+                               this->swimGain *
                                (0.6f + (i * 0.55f)) -
                            this->turnBend * (0.25f + i * 0.2f);
 #else
@@ -2265,7 +2408,16 @@ s32 EnFishmod_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
 #endif
 
         OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+#if FISHMOD_OPT >= 5
+        {
+            u8 own[3];
+
+            EnFishmod_LookColor(this, tint, own);
+            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, own[0], own[1], own[2], 255);
+        }
+#else
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, tint[0], tint[1], tint[2], 255);
+#endif
         CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
     }
 
@@ -2684,7 +2836,9 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
         vtx[i].v.flag = 0;
 #if FISHMOD_OPT >= 5
         {
-            const u8* c = this->species->partTint[sPart[i]];
+            u8 c[3];
+
+            EnFishmod_LookColor(this, this->species->partTint[sPart[i]], c);
 
             // belly lighter, as on the model
             shade = (i >= 4) ? 235 : (i == 3) ? 170 : 205;
@@ -2995,6 +3149,8 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     FISHMOD_PROF(FISHMOD_PROF_D_POSE, EnFishmod_DrawPose(this, play));
 #else
 #if FISHMOD_OPT >= 5
+    // its own pattern (the patched display lists take their render tiles from it)
+    EnFishmod_LookTable(this, play);
     // The bass's display lists don't set culling (EnFishmod_PatchSkeleton): with its mouth open you look at the
     // inside of the head and body, their back faces, so it draws both sides then; shut, it culls them
     if (this->species->base == FISHMOD_BASE_BASS) {

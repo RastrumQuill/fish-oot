@@ -54,6 +54,7 @@ typedef struct FishmodRosterFish {
     FishmodMood mood; // while the fish isn't spawned (spawned, the fish's own is the one that counts)
     u16 leader;       // the record of its school's leader (its own for a leader or a fish on its own)
 #endif
+    u8 look;          // its looks: the same fish every visit (from the roster's seed)
 } FishmodRosterFish;
 
 static FishmodRosterFish sRoster[FISHMOD_ROSTER_MAX];
@@ -221,6 +222,7 @@ static void Manager_BuildRoster(PlayState* play) {
             rec->yaw = (s16)Rand_ZeroFloat(0xFFFF);
             rec->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, sRosterCount);
             rec->fish = NULL;
+            rec->look = (u8)Rand_ZeroFloat(256.0f);
 #if FISHMOD_OPT >= 5
             // some hungry, some not (from the index, not the shared random numbers)
             rec->mood.hunger = 40 + ((sRosterCount * 97 + play->sceneId * 31) % 170);
@@ -245,6 +247,7 @@ static void Manager_BuildRoster(PlayState* play) {
                     }
                     mate->length = CLAMP(sRoster[leader].length * (0.8f + Rand_ZeroOne() * 0.4f), lo, hi);
                     mate->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, sRosterCount);
+                    mate->look = (u8)Rand_ZeroFloat(256.0f);
                     mate->mood.hunger = 40 + ((sRosterCount * 97 + play->sceneId * 31) % 170);
                     mate->leader = leader;
                     sRosterCount++;
@@ -371,6 +374,7 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
             if (fish != NULL) {
                 fish->room = -1;
                 rec->fish = (EnFishmod*)fish;
+                rec->fish->look = rec->look;
 #if FISHMOD_OPT >= 5
                 rec->fish->mood = rec->mood;
                 rec->fish->leaderIndex = (rec->leader != i) ? rec->leader : FISHMOD_NO_ROSTER;

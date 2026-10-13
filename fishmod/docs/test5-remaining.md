@@ -88,6 +88,10 @@ Original plan:
 
 ## 6. Looks and animation
 
+Done (first pass): per-fish looks from one byte saved with the fish (the bottle record's spare byte): brightness,
+warmth and a mirrored pattern for every fish, one of four koi patterns for carp; a released fish is the one that was
+caught. Catfish curl; small schooling fish swim in bursts.
+
 Decided (after the habitat work): 7 first, then 6. The bass keeps its mouth shut (done: the model's rest pose
 gaped). Koi: a handful of fixed koi patterns picked by each carp's seed, not a stamped texture per fish (much
 cheaper, still varied). Per-fish colour and pattern shift from the roster index. Small fish swim in bursts.

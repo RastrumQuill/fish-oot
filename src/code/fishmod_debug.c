@@ -295,6 +295,16 @@ static void Fishmod_StudioSpawn(PlayState* play, s32 species) {
     sStudioSpacing = typical * 1.64f * 1.3f + 6.0f;
     for (i = 0; i < STUDIO_FISH; i++) {
         gFishmodStudio.spawnLength = (i == 2) ? small : typical;
+#ifdef FISHMOD_STUDIO_ORBIT
+        {
+            // to compare: dark and cool; bright, warm and mirrored; plain colours (koi: three different patterns)
+            static const u8 sLooks[] = { 0x00, 0x7F, 0xDB };
+
+            gFishmodStudio.spawnLook = sLooks[i % 3];
+        }
+#else
+        gFishmodStudio.spawnLook = 0x1B;
+#endif
         gFishmodStudio.rig[i] = (i == 0) ? 1 : 2;
         gFishmodStudio.fish[i] =
             Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sStudioPos.x + (i - 1) * sStudioSpacing, sStudioPos.y,
@@ -882,6 +892,19 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
                 Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, x, y, z, 0, (s16)(n * 0x2800), 0,
                             FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sKinds[n % ARRAY_COUNT(sKinds)]));
             }
+        }
+#endif
+#ifdef FISHMOD_SCRIPT_TEST_RELEASE
+        {
+            // a fish with known looks in the first bottle, poured into the water ahead (the fish that appears
+            // reports its looks: they must match)
+            Vec3f at = FISHMOD_SCRIPT_TEST_RELEASE;
+
+            FISHMOD_SAVE->bottleFish[0].species = FISHMOD_SPECIES_SANKE_CARP + 1;
+            FISHMOD_SAVE->bottleFish[0].lengthTenths = 180;
+            FISHMOD_SAVE->bottleFish[0].look = 0xAB;
+            gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1] = ITEM_BOTTLE_FISH;
+            Fishmod_ReleaseBottleFish(play, SLOT_BOTTLE_1, &at, player->actor.shape.rot.y);
         }
 #endif
 #ifdef FISHMOD_SCRIPT_TEST_HIVE
