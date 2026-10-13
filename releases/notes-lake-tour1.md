@@ -31,5 +31,16 @@ Updated (same name, rebuilt):
 - the only wood is branches and a log under the island's dead tree; no drowned or fallen trees;
 - a bobber's bait sinks at most about 5 m (180 units): the deep basin and the Water Temple gate are out of its reach.
 
-Known: the underwater haze isn't in yet (the water looks like vanilla's under the surface); the pond reeds don't
-sway yet.
+Second update (same name, rebuilt):
+- fish: their level of detail and their AI follow the camera (and the bobber), not Link, so fish keep swimming
+  wherever the camera is; full model to 300 units, the reduced model to 750, then a far shape that now carries the
+  species' own scale pattern and colours (back, belly, head), drawn to 1300;
+- nothing in front of the Zora's Domain tunnel (it opens at the bottom of the plaza, under the walkway's end): the
+  way out through the plaza is clear, and fewer rocks round the ruins;
+- the Gerudo river inflow: no props under overhangs or inside the bank, flat pebble patches only on flat ground and
+  under water;
+- plants sway (weed slowly with the water, reeds faster in the wind), neighbours together like a wave;
+- underwater haze: the fog comes in when the camera goes under, and props draw less far there;
+- the props cost much less: what's drawn is only worked out again when the camera moves (lake bench: 1.1 ms a
+  frame, was 5.5), and more plants are patches;
+- the first two stops are under the water over the west weed flat (from above you can't see through the surface).

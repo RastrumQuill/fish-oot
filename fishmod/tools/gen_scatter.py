@@ -87,8 +87,8 @@ RULES = {
     "broadleaf": ((20, 160), 0.03, {4: 0.25, 12: 0.2, 13: 0.2}, (2, 4), (0.8, 1.4), False),
     "bush_weed": ((60, 290), 0.03, {12: 0.1, 6: 0.1, 7: 0.15}, (2, 4), (0.8, 1.5), False),
     "tall_weed": ((110, 340), 0.0, {}, (3, 7), (0.8, 1.3), True),
-    "rock": ((-10, 600), 0.006, {5: 0.35, 14: 0.4, 1: 0.25, 9: 0.1}, (1, 4), (0.15, 0.6), False),
-    "pebble_patch": ((-4, 60), 0.0, {1: 0.4, 3: 0.05, 15: 0.05}, (1, 3), (0.6, 1.2), False),
+    "rock": ((-10, 600), 0.006, {5: 0.35, 14: 0.12, 1: 0.25, 9: 0.1}, (1, 4), (0.15, 0.6), False),
+    "pebble_patch": ((8, 60), 0.0, {1: 0.4, 3: 0.05, 15: 0.05}, (1, 3), (0.6, 1.2), False),
     # Wood: the lake's one tree is the dead tree on the main island, so wood is only what has fallen from it, in the
     # water round the island (zone 16); no drowned or fallen trees
     "sunken_log": ((25, 260), 0.0, {16: 0.05}, (1, 1), (0.7, 1.1), False),
@@ -112,6 +112,7 @@ RULES = {
 HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 190, "broadleaf": 40, "bush_weed": 42, "kelp_frond": 260,
           "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44,
           "old_posts": 60, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
+FLAT_KINDS = {"pebble_patch", "leaf_litter"}  # flat on the bed
 FLOATING = {"lily_pad", "float_leaves", "spatterdock", "vine_curtain"}  # sit on the surface, not the bed
 
 
@@ -190,6 +191,17 @@ def place(scene, seed=1):
                     pd = ps - pf
                     if not (drange[0] - 4 <= pd <= drange[1] + 10):
                         continue
+                    # open water above the bed: not under an overhang, inside a bank or beside a waterfall (the
+                    # bridges are the exception)
+                    top = finder.floor(int(px), int(pz), 100000)
+                    if top is not None and top > pf + 4 and max(zin.get(5, 0.0), zin.get(10, 0.0)) == 0.0:
+                        continue
+                    # flat patches (pebbles, leaf litter) only on flat ground, not hanging over an edge
+                    if kind in FLAT_KINDS:
+                        r = 50 * scale[1]
+                        corners = [floor_at(px + dx, pz + dz, ps) for dx, dz in ((r, 0), (-r, 0), (0, r), (0, -r))]
+                        if any(c is None or abs(c - pf) > 6 for c in corners):
+                            continue
                     y = (ps + 1) if kind in FLOATING else pf  # floating: a unit above the water, not z-fighting it
                     sc = rnd.uniform(*scale)
                     if kind in HEIGHT:

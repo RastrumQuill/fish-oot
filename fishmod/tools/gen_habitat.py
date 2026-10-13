@@ -357,7 +357,7 @@ def crossed_cards(name, texture, width, height, planes, base_col, tip_col, seed,
 # Patches: a few clumps baked into one mesh, so the commonest small plants are a third to a quarter as many props
 # to place and draw (each prop costs a matrix and a draw call however small it is). gen_scatter.py thins these kinds
 # by the same number.
-PATCH = {"grass_tuft": 4, "ribbon_weed": 3}
+PATCH = {"grass_tuft": 4, "ribbon_weed": 3, "bush_weed": 2, "tall_weed": 2}
 
 
 def patch(name, count, radius, seed, make):
@@ -545,8 +545,8 @@ MESHES = [
 
     lambda: patch("grass_tuft", PATCH["grass_tuft"], 26, 204, lambda i: crossed_cards(
         "grass_tuft", "grass_card", 34, 16, 2, hexc("#1c3a12"), hexc("#6c7a3b"), 104 + i)),
-    lambda: crossed_cards_v("tall_weed", "ribbon_card", 26, 190, 3, hexc("#0d260b"), hexc("#5a6a30"), 105, lean=18,
-                            v_repeat=2.0),
+    lambda: patch("tall_weed", PATCH["tall_weed"], 30, 205, lambda i: crossed_cards_v(
+        "tall_weed", "ribbon_card", 26, 190, 2, hexc("#0d260b"), hexc("#5a6a30"), 105 + i, lean=18, v_repeat=2.0)),
     lambda: crossed_cards("broadleaf", "broadleaf_card", 38, 40, 3, hexc("#1a3a12"), hexc("#7a8a40"), 106),
     lambda: crossed_cards("old_posts", "roots_card", 70, 60, 2, hexc("#2b2311"), hexc("#8a8a70"), 107),
     lambda: crossed_cards("cattails", "reed_card", 44, 110, 3, hexc("#3a4a18"), hexc("#b8b070"), 108, lean=3),
@@ -557,7 +557,8 @@ MESHES = [
     lambda: crossed_cards("reed_clump", "reed_card", 40, 95, 3, hexc("#184217"), hexc("#8f9342"), 101, lean=4),
     lambda: patch("ribbon_weed", PATCH["ribbon_weed"], 22, 202, lambda i: crossed_cards(
         "ribbon_weed", "ribbon_card", 18, 80, 2, hexc("#133611"), hexc("#6c7a3b"), 102 + i, lean=10)),
-    lambda: crossed_cards("bush_weed", "bush_card", 46, 42, 3, hexc("#082b07"), hexc("#525d28"), 103),
+    lambda: patch("bush_weed", PATCH["bush_weed"], 30, 203, lambda i: crossed_cards(
+        "bush_weed", "bush_card", 46, 42, 3, hexc("#082b07"), hexc("#525d28"), 103 + i)),
     mesh_log,
     lambda: mesh_decal("pebble_patch", "pebbles", 120, (255, 255, 255)),
     mesh_lily_flower,

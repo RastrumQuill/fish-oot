@@ -15,7 +15,13 @@
 #define FISHMOD_ROSTER_MAX 30       // (FISHMOD_OPT 4) the most a scene's roster can hold
 #endif
 #define FISHMOD_NO_ROSTER 0xFFFF
+#if FISHMOD_OPT >= 5
+#define FISHMOD_LOD_DIST 750.0f     // farther from the camera than this: the flat far shape (textured)
+#define FISHMOD_CULL_DIST 1300.0f   // and past this not drawn at all
+#else
 #define FISHMOD_LOD_DIST 380.0f     // (FISHMOD_OPT 3) farther from the camera than this: the flat far shape
+#define FISHMOD_CULL_DIST 900.0f
+#endif
 #define FISHMOD_SMALL_RIG_LENGTH 9.0f // (FISHMOD_OPT 4) fish shorter than this (inches) always use the reduced rig
 
 // Fish rigs (fishmod_rig.c, FISHMOD_OPT 4)
@@ -251,12 +257,14 @@ void EnFishmod_RigFreeAll(void);
 void EnFishmod_RigSetSpecies(struct EnFishmod* this, struct PlayState* play, s32 variant);
 void EnFishmod_RigRestoreSegments(struct PlayState* play);
 void EnFishmod_RigDraw(struct EnFishmod* this, struct PlayState* play, s32 variant, s32 wantBounds);
+void EnFishmod_BillboardMaterial(struct EnFishmod* this, struct PlayState* play);
 
 // Fish manager (fishmod_manager.c)
 typedef struct EnFishmodShared {
     u32 frame;
     Vec3f linkPos;
-    Vec3f rosterFocus; // where fish are woken around: Link (the debug tour: its camera)
+    Vec3f rosterFocus; // where fish are woken around: the camera
+    Vec3f camPos;      // the camera (last frame's): fish near it or the bobber get full attention
     Vec3f bobberPos;
     s32 bobberIn;
     s32 thinksLeft;
@@ -269,6 +277,7 @@ void EnFishmod_ManagerDestroy(struct EnFishmod* this, struct PlayState* play);
 void EnFishmod_ManagerUpdate(struct EnFishmod* this, struct PlayState* play);
 void EnFishmod_ManagerDraw(struct EnFishmod* this, struct PlayState* play);
 s32 EnFishmod_ThinkAllowed(struct EnFishmod* this, struct PlayState* play);
+f32 EnFishmod_AttentionDist(struct EnFishmod* this, struct PlayState* play);
 f32 EnFishmod_RosterLength(s32 index);
 void EnFishmod_RosterCaught(struct PlayState* play, struct EnFishmod* fish);
 void EnFishmod_RosterForget(struct EnFishmod* fish);
