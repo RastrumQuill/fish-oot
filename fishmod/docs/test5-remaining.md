@@ -11,6 +11,9 @@ before it, and the frame must hold 50 ms (20 fps) with 300 fish in the lake.
 
 Adult Link walks the lake bed with the Iron Boots, so solid props must be solid; plants stay without collision.
 
+- **Chunky is fine:** vanilla's collision is coarse, so a rough hull per rock won't show. Rocks that overlap or touch
+  (they're scattered in clusters) get one shared hull per cluster instead of one each, with the faces buried inside
+  neighbours dropped; that keeps the triangle count, and the work BgCheck does per lookup, down.
 - **How:** bake it into the scene's own collision at build time, not as actors. `gen_scatter.py` already knows every
   rock (position, turn, size). A new step writes a small hull per rock (about 6-8 triangles: a low cap and sides,
   matching the vanilla rock's shape closely enough to stand on) and appends them to Lake Hylia's collision list
@@ -26,7 +29,13 @@ Adult Link walks the lake bed with the Iron Boots, so solid props must be solid;
   rock on a slope with gaps under it. Checked with Iron Boots on the bed (a script that walks Link across a few).
 - **Measure:** BgCheck time in the lake bench, scene load time.
 
-## 2. Habitat tuning (waits on your tour notes)
+## 2. Habitat tuning — tentatively done
+
+Done in the tour builds (lake-tour1): densities and placement fixes, longer ranges with no grow-in, culling to the
+view, sway, the underwater haze (fog only, complete by about 900 units), bubbles and specks. **Tentative until
+tested on original hardware**, which is the real indicator for performance and for how the fog and particles look.
+
+Original notes:
 
 - Densities and draw distances per kind, from the stop numbers you send.
 - **Underwater haze:** when the camera is under the surface, pull the fog in (set the underwater light setting's
@@ -98,7 +107,12 @@ Only if the budget allows after 1-7:
 - **Benches:** the full set against the test4 release and against this start of the test5 work.
 - **Release lake-test5:** the patch, notes, and a test-mode variant; the tour stays as a separate feedback build.
 
-## Order
+## Order (updated)
+
+1 (collision) and 3 (the dock) come before anything else: the lake isn't finished as a place until you can walk the
+bed and the dock. 6 (looks) and 7 (behaviour) follow.
+
+## Order (original)
 
 1 (collision) and 2 (tuning, once your notes are in) first, since they change the lake everything else is tested in.
 Then 5 (feel) and 7 (behaviour) together, since bites depend on mood and senses. Then 3, 4, 6. 8 last, if there's room.
