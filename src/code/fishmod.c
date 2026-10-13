@@ -30,6 +30,7 @@
 #include "libc64/sprintf.h"
 #include "rand.h"
 #include "bgcheck.h"
+#include "libc/math.h"
 #include "ultra64/convert.h"
 #include "speed_meter.h"
 #include "libu64/gfxprint.h"
@@ -893,8 +894,44 @@ void Fishmod_AdvanceTime(PlayState* play) {
 }
 
 /** Once a frame: a sunset or sunrise that played out (or Sun's Song) means nothing is owed any more. */
+#if FISHMOD_OPT >= 5
+/*
+ * Underwater haze: with the camera under the surface, the fog comes in closer than vanilla's underwater fog (the
+ * water's own lights still give its colour), easing in and out over a few frames. gFishmodHaze (0 above water,
+ * 1 under) also shortens the habitat props' draw distances, since the fog hides what's past them.
+ */
+#define HAZE_FOG_NEAR 968 // the fog's start (of 1000; vanilla's water is about 990)
+#define HAZE_Z_FAR 3200   // and the far plane, past which nothing is drawn
+f32 gFishmodHaze;
+
+static void Fishmod_UpdateHaze(PlayState* play) {
+    Vec3f eye = play->view.eye;
+    WaterBox* box;
+    f32 surface;
+    s32 under = false;
+    EnvironmentContext* env = &play->envCtx;
+
+    if ((eye.x == eye.x) && (eye.z == eye.z) && (fabsf(eye.x) < 30000.0f) && (fabsf(eye.z) < 30000.0f)) {
+        under = BgCheck_GetWaterSurface(play, &play->colCtx, eye.x, eye.z, &surface, &box) && (eye.y < surface);
+    }
+    if (!under && (gFishmodHaze <= 0.0f)) {
+        return;
+    }
+    Math_StepToF(&gFishmodHaze, under ? 1.0f : 0.0f, 0.1f);
+    env->adjFogNear = (env->lightSettings.fogNear > HAZE_FOG_NEAR)
+                          ? (s16)((HAZE_FOG_NEAR - env->lightSettings.fogNear) * gFishmodHaze)
+                          : 0;
+    env->adjZFar = (env->lightSettings.zFar > HAZE_Z_FAR) ? (s16)((HAZE_Z_FAR - env->lightSettings.zFar) * gFishmodHaze)
+                                                          : 0;
+}
+#endif
+
 void Fishmod_TimeUpdate(PlayState* play) {
     u16 now = gSaveContext.save.dayTime;
+
+#if FISHMOD_OPT >= 5
+    Fishmod_UpdateHaze(play);
+#endif
 
     if ((now != sTimeLast) && Fishmod_TimeCrossesBarrier(sTimeLast, now)) {
         sTimeOwed = 0;

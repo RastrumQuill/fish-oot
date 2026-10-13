@@ -13,11 +13,10 @@ static FishmodAutoplayStep sScriptSteps[] = {
 
 // The water's surface is at y -1313 (the full lake).
 static FishmodTourStop sTourStops[] = {
-    { { -1200, 1500, 2600 }, { -1200, -1450, 6200 }, "The whole lake",
-      "From up here the props are too far",
-      "to draw (they show within ~950", "units); the stops below go close." },
-    { { -1100, 3200, 5500 }, { -1100, -1400, 5650 }, "Straight down",
-      "The same from overhead. Bare patches", "are on purpose (beds are patchy);", "tell me where it looks empty." },
+    { { -3500, -1325, 4850 }, { -3900, -1450, 5600 }, "Across the west flat (under)",
+      "Just under the surface, looking", "across the beds: props and fish go", "from full detail to far shapes." },
+    { { -4000, -1322, 5450 }, { -4000, -1450, 5500 }, "Straight down (under)",
+      "Looking straight down from just", "under the surface: the weed bed", "and the fish over it." },
     { { -700, -1200, 2900 }, { -400, -1330, 3600 }, "North beach",
       "Kept open for casting from the bench", "and a dock to come: sand, a few", "tufts, no reed walls here." },
     { { -500, -1340, 3500 }, { -200, -1420, 3950 }, "Beach shallows (under)",

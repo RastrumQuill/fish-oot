@@ -460,7 +460,7 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         }
         // don't draw fish that are off screen or far away (they still swim)
         this->actor.flags &= ~ACTOR_FLAG_DRAW_CULLING_DISABLED;
-        this->actor.cullingVolumeDistance = 900.0f;
+        this->actor.cullingVolumeDistance = FISHMOD_CULL_DIST;
         this->actor.cullingVolumeScale = this->halfLength * 2.0f + 20.0f;
         this->actor.cullingVolumeDownward = this->halfLength * 2.0f + 20.0f;
     }
@@ -1847,26 +1847,24 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     }
 
 #if FISHMOD_OPT >= 3
-    // Far from Link a fish does less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200
-    // every 8th (gliding on in between), and past 1600 it goes dormant: it holds still and isn't drawn (its
-    // drawing is culled at 900) until Link comes closer.
+    // Away from attention (FISHMOD_OPT 5: the camera or the bobber, whichever is nearer; before: Link) a fish does
+    // less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200 every 8th (gliding on in
+    // between), and past 1600 it goes dormant: it holds still (and is out of drawing range) until attention comes.
     if ((this->fishState == FISH_STATE_WANDER) && !gFishmodPhoto.active) {
-        f32 linkDist = Math_Vec3f_DistXZ(&this->actor.world.pos, &GET_PLAYER(play)->actor.world.pos);
+        f32 attnDist = EnFishmod_AttentionDist(this, play);
 
-        if (linkDist > 1600.0f) {
+        if (attnDist > 1600.0f) {
             return;
         }
-        this->thinkMask = (linkDist > 1200.0f) ? 7 : (linkDist > 800.0f) ? 3 : (linkDist > 500.0f) ? 1 : 0;
+        this->thinkMask = (attnDist > 1200.0f) ? 7 : (attnDist > 800.0f) ? 3 : (attnDist > 500.0f) ? 1 : 0;
     } else {
         this->thinkMask = 0;
     }
 #endif
 #if FISHMOD_OPT >= 2
-    // far from Link and the bobber, a wandering fish thinks every other frame and glides on in between
+    // away from attention, a wandering fish thinks every other frame and glides on in between
     if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !gFishmodPhoto.active &&
-        (Math_Vec3f_DistXZ(&this->actor.world.pos, &GET_PLAYER(play)->actor.world.pos) > 500.0f) &&
-        (!EnFishmod_RodBobberInWater() ||
-         (Math_Vec3f_DistXZ(&this->actor.world.pos, &gFishmodRodState.bobberPos) > 300.0f))) {
+        (EnFishmod_AttentionDist(this, play) > 500.0f)) {
         FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
         return;
     }
@@ -2285,10 +2283,47 @@ static void EnFishmod_DrawPose(EnFishmod* this, PlayState* play) {
 }
 #endif
 
+#if FISHMOD_OPT >= 5
+/**
+ * The far shape's material for a species (FISHMOD_OPT 5): its side texture (the scale pattern the model tiles along
+ * the body) with its palette, coloured by the vertex colours. The manager sets it once per species.
+ */
+void EnFishmod_BillboardMaterial(EnFishmod* this, PlayState* play) {
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    s32 speciesIndex = this->species - gFishmodSpecies;
+    u8* tex = sSpeciesTexturesCI[speciesIndex][FISHMOD_TEX_ROLE_SIDE];
+
+    OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+    Gfx_SetupDL_25Opa(gfxCtx);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH | G_TEXTURE_GEN);
+    if ((tex != NULL) && (sSpeciesPalettes[speciesIndex] != NULL)) {
+        s32 big = (speciesIndex == FISHMOD_SPECIES_ORDON_CATFISH) || (speciesIndex == FISHMOD_SPECIES_HYLIAN_LOACH);
+
+        gDPLoadTLUT_pal256(POLY_OPA_DISP++, sSpeciesPalettes[speciesIndex]);
+        gDPSetTextureLUT(POLY_OPA_DISP++, G_TT_RGBA16);
+        if (big) {
+            gDPLoadTextureBlock(POLY_OPA_DISP++, tex, G_IM_FMT_CI, G_IM_SIZ_8b, 32, 32, 0, G_TX_WRAP | G_TX_NOMIRROR,
+                                G_TX_WRAP | G_TX_NOMIRROR, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
+        } else {
+            gDPLoadTextureBlock(POLY_OPA_DISP++, tex, G_IM_FMT_CI, G_IM_SIZ_8b, 16, 16, 0, G_TX_WRAP | G_TX_NOMIRROR,
+                                G_TX_WRAP | G_TX_NOMIRROR, 4, 4, G_TX_NOLOD, G_TX_NOLOD);
+        }
+        gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
+        gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIDECALA, G_CC_MODULATEIDECALA);
+    } else {
+        gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+        gDPSetCombineMode(POLY_OPA_DISP++, G_CC_SHADE, G_CC_SHADE);
+    }
+    CLOSE_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+}
+#endif
+
 #if FISHMOD_OPT >= 3
 /**
- * A distant fish: a flat hexagon (nose, back, tail, belly) in the fish's own colour, turned about its long axis to
- * face the camera. Vertex colours only, so no texture loads, and opaque, so it costs no blending.
+ * A distant fish: a flat hexagon (nose, back, tail, belly) turned about its long axis to face the camera. Before
+ * FISHMOD_OPT 5 in the fish's own colour (vertex colours only); from 5 with its scale pattern tiled along it and
+ * coloured like the model (head, back and belly colours), set by EnFishmod_BillboardMaterial.
  */
 void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     GraphicsContext* gfxCtx = play->state.gfxCtx;
@@ -2308,6 +2343,16 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     static const f32 sShape[6][2] = {
         { 1.0f, 0.0f }, { 0.3f, 1.0f }, { -0.5f, 0.7f }, { -1.0f, 0.0f }, { -0.5f, -0.7f }, { 0.3f, -1.0f },
     };
+#if FISHMOD_OPT >= 5
+    // nose, back (front), back (rear), tail, belly (rear), belly (front)
+    static const u8 sPart[6] = { FISHMOD_PART_HEAD,      FISHMOD_PART_BODY_FRONT, FISHMOD_PART_BODY_REAR,
+                                 FISHMOD_PART_TAIL,      FISHMOD_PART_FIN_BELLY,  FISHMOD_PART_BODY_FRONT };
+    // the pattern tiled about twice along the body and once across, like on the model
+    s32 texSize = ((this->species - gFishmodSpecies) == FISHMOD_SPECIES_ORDON_CATFISH) ||
+                          ((this->species - gFishmodSpecies) == FISHMOD_SPECIES_HYLIAN_LOACH)
+                      ? 32
+                      : 16;
+#endif
     const u8* tint = this->species->tint;
     s32 i;
 
@@ -2330,19 +2375,35 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
         vtx[i].v.ob[1] = (s16)(uy * across);
         vtx[i].v.ob[2] = (s16)(fz * along + uz * across);
         vtx[i].v.flag = 0;
+#if FISHMOD_OPT >= 5
+        {
+            const u8* c = this->species->partTint[sPart[i]];
+
+            // belly lighter, as on the model
+            shade = (i >= 4) ? 235 : (i == 3) ? 170 : 205;
+            vtx[i].v.tc[0] = (s16)((1.0f - sShape[i][0]) * texSize * 32.0f);
+            vtx[i].v.tc[1] = (s16)((1.0f - sShape[i][1]) * 0.5f * texSize * 32.0f);
+            vtx[i].v.cn[0] = c[0] * shade / 255;
+            vtx[i].v.cn[1] = c[1] * shade / 255;
+            vtx[i].v.cn[2] = c[2] * shade / 255;
+        }
+#else
         vtx[i].v.tc[0] = vtx[i].v.tc[1] = 0;
         vtx[i].v.cn[0] = tint[0] * shade / 255;
         vtx[i].v.cn[1] = tint[1] * shade / 255;
         vtx[i].v.cn[2] = tint[2] * shade / 255;
+#endif
         vtx[i].v.cn[3] = 255;
     }
 
     OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+#if FISHMOD_OPT < 5
     Gfx_SetupDL_25Opa(gfxCtx);
     gDPPipeSync(POLY_OPA_DISP++);
     gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
     gDPSetCombineMode(POLY_OPA_DISP++, G_CC_SHADE, G_CC_SHADE);
     gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH | G_TEXTURE_GEN);
+#endif
     Matrix_Translate(this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z, MTXMODE_NEW);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx, "../z_en_fishmod.c", __LINE__);
     gSPVertex(POLY_OPA_DISP++, vtx, 6, 0);
@@ -2514,6 +2575,9 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     // far from the camera, a flat shape in the fish's colour instead of the textured skeleton
     if ((this->type == FISHMOD_TYPE_FISH) && !gFishmodPhoto.active && (this->fishState != FISH_STATE_CAUGHT) &&
         (Math_Vec3f_DistXYZ(&this->actor.world.pos, &play->view.eye) > FISHMOD_LOD_DIST)) {
+#if FISHMOD_OPT >= 5
+        EnFishmod_BillboardMaterial(this, play);
+#endif
         FISHMOD_PROF(FISHMOD_PROF_D_BILLBOARD, EnFishmod_DrawBillboard(this, play));
         return;
     }

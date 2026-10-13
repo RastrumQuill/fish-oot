@@ -365,14 +365,14 @@ s32 Fishmod_WeatherRoll(s16 sceneId, s32 day);
 void Fishmod_OnEnvironmentInit(struct PlayState* play);
 s32 Fishmod_Weather(struct PlayState* play);
 f32 Fishmod_Light(struct PlayState* play);
+// Underwater haze, 0 (camera above water) to 1 (under) (FISHMOD_OPT 5)
+extern f32 gFishmodHaze;
 
 #if FISHMOD_DEBUG
 void Fishmod_DebugBoot(void);
 // True if the autoplay script wants a normal boot (logo, title, file select) instead of going straight to Kokiri
 s32 Fishmod_DebugNormalBoot(void);
 s32 Fishmod_DebugWantsFish(void);
-// The debug tour's camera target, where fish should be woken instead of around Link; false when no tour runs
-s32 Fishmod_DebugRosterFocus(Vec3f* focus);
 // Fish per scene roster wanted by the autoplay script (benchmarks), 0 = the game's own count
 s32 Fishmod_DebugRosterCount(void);
 void Fishmod_AutoplayInput(struct GameState* gameState, Input* inputs);

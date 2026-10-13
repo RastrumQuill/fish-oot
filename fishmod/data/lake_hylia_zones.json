@@ -192,22 +192,29 @@
           -1110,
           3240,
           -740,
-          3930
+          3700
+        ],
+        [
+          "rect",
+          -1260,
+          3600,
+          -580,
+          4320
         ],
         [
           "circle",
           -800,
           3950,
-          140
+          160
         ],
         [
           "circle",
           -1050,
           4250,
-          160
+          180
         ]
       ],
-      "_exclude_doc": "No props on the entrance itself: the stone walkway from the shore, the sunken plaza and right round the pillars (a path that's used). Plants and stones next to it are fine."
+      "_exclude_doc": "No props on the entrance or in front of it: the stone walkway from the shore, the sunken plaza, the way out of the Zora's Domain tunnel (it opens at the bottom of the plaza, x -916 z 3600 y -1553, under the walkway's end) and right round the pillars. Plants and stones beside all that are fine."
     },
     {
       "id": 15,

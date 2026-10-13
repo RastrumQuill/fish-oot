@@ -34,7 +34,11 @@
 #define ROSTER_SPAWNS_PER_FRAME 2  // (FISHMOD_OPT 5) fish woken per frame
 #define THINK_BUDGET 16           // full AI updates per frame for fish cruising far from Link and the bobber
 #define THINK_FAR_DIST 300.0f
+#if FISHMOD_OPT >= 5
+#define LOD_FULL_DIST 300.0f      // closer than this: the full rig (and whiskers); then the reduced rig to the far shape
+#else
 #define LOD_FULL_DIST 200.0f      // closer than this: the full rig (and whiskers)
+#endif
 #define DRAW_WHISKERS 0           // catfish whiskers are off for now: too thin to see (to be redone)
 
 typedef struct FishmodRosterFish {
@@ -62,10 +66,15 @@ EnFishmodShared* EnFishmod_Shared(PlayState* play) {
 
         sShared.frame = play->gameplayFrames;
         sShared.linkPos = player->actor.world.pos;
-        sShared.rosterFocus = sShared.linkPos;
-#if FISHMOD_DEBUG
-        Fishmod_DebugRosterFocus(&sShared.rosterFocus);
+        sShared.camPos = sShared.linkPos;
+#if FISHMOD_OPT >= 5
+        // attention follows the camera, not Link (a NaN guard: a camera being set up can give one for a frame)
+        if ((play->view.eye.x == play->view.eye.x) && (play->view.eye.z == play->view.eye.z) &&
+            (fabsf(play->view.eye.x) < 30000.0f) && (fabsf(play->view.eye.z) < 30000.0f)) {
+            sShared.camPos = play->view.eye;
+        }
 #endif
+        sShared.rosterFocus = sShared.camPos;
         sShared.bobberIn = EnFishmod_RodBobberInWater();
         sShared.bobberPos = gFishmodRodState.bobberPos;
         sShared.thinksLeft = THINK_BUDGET;
@@ -314,12 +323,26 @@ void EnFishmod_ManagerUpdate(EnFishmod* this, PlayState* play) {
     }
 }
 
+/**
+ * How far a fish is from attention: the camera (FISHMOD_OPT 5; Link before) or the bobber in the water, whichever is
+ * nearer. The AI does less the farther away it is (the drawing's detail goes by the camera alone).
+ */
+f32 EnFishmod_AttentionDist(EnFishmod* this, PlayState* play) {
+    EnFishmodShared* shared = EnFishmod_Shared(play);
+    f32 dist = Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->camPos);
+
+    if (shared->bobberIn) {
+        dist = CLAMP_MAX(dist, Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->bobberPos));
+    }
+    return dist;
+}
+
 /** May this fish run its full AI this frame? Cruising fish far from Link and the bobber share a budget. */
 s32 EnFishmod_ThinkAllowed(EnFishmod* this, PlayState* play) {
     EnFishmodShared* shared = EnFishmod_Shared(play);
 
     if ((this->fishState != FISH_STATE_WANDER) || gFishmodPhoto.active ||
-        (Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->linkPos) < THINK_FAR_DIST) ||
+        (Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->camPos) < THINK_FAR_DIST) ||
         (shared->bobberIn && (Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->bobberPos) < THINK_FAR_DIST))) {
         return true;
     }
@@ -456,9 +479,32 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         }
     }
 
+#if FISHMOD_OPT >= 5
+    // far shapes by species, so each species' pattern and palette are loaded once
+    for (i = 1; i < farCount; i++) {
+        EnFishmod* fish = far[i];
+
+        for (j = i - 1; (j >= 0) && (far[j]->species > fish->species); j--) {
+            far[j + 1] = far[j];
+        }
+        far[j + 1] = fish;
+    }
+    for (i = 0; i < farCount; i++) {
+        if ((i == 0) || (far[i]->species != far[i - 1]->species)) {
+            EnFishmod_BillboardMaterial(far[i], play);
+        }
+        FISHMOD_PROF(FISHMOD_PROF_D_BILLBOARD, EnFishmod_DrawBillboard(far[i], play));
+    }
+    if (farCount > 0) {
+        OPEN_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+        gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+        CLOSE_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+    }
+#else
     for (i = 0; i < farCount; i++) {
         FISHMOD_PROF(FISHMOD_PROF_D_BILLBOARD, EnFishmod_DrawBillboard(far[i], play));
     }
+#endif
 }
 
 #endif
