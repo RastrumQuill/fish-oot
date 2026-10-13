@@ -38,6 +38,14 @@ typedef enum FishRigModel {
     /* 3 */ FISH_RIG_MODELS
 } FishRigModel;
 
+// The bass's jaw (limb index, 0-based) and how far it turns to shut: the model's rest pose gapes
+#define FISHMOD_BASS_JAW_LIMB 12
+#if FISHMOD_OPT >= 5
+#define FISHMOD_BASS_JAW_SHUT 3800
+#else
+#define FISHMOD_BASS_JAW_SHUT 0
+#endif
+
 // Texture roles: each is drawn from its own segment (0x08 + role) so species can swap in patterned textures.
 typedef enum FishmodTexRole {
     /* 0 */ FISHMOD_TEX_ROLE_BACK,

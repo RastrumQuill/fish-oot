@@ -467,6 +467,10 @@ static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
         }
     }
     SkelAnime_GetFrameData(Rig_Anim(model), 0, base->limbCount + 1, base->pose);
+    if (model == FISH_RIG_BASS) {
+        // the bass's rest pose gapes: its jaw shut (jawRot opens it from there)
+        base->pose[FISHMOD_BASS_JAW_LIMB + 1].z += FISHMOD_BASS_JAW_SHUT;
+    }
 
     base->bodyBones = def->bodyBones[variant];
     base->tailLimb = def->tailLimb;
@@ -957,7 +961,18 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
 
     OPEN_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
     gSPSegment(POLY_OPA_DISP++, RIG_SEG_MTX, mtx);
-    gSPDisplayList(POLY_OPA_DISP++, base->dl);
+    // the bass's display lists don't set culling (EnFishmod_PatchSkeleton): a shut mouth culls back faces, an open
+    // one draws both sides, or you'd see through the mouth and out the fish
+    if ((model == FISH_RIG_BASS) && (this->jawRot > 0)) {
+        gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+        gSPDisplayList(POLY_OPA_DISP++, base->dl);
+        gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+    } else {
+        if (model == FISH_RIG_BASS) {
+            gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+        }
+        gSPDisplayList(POLY_OPA_DISP++, base->dl);
+    }
     CLOSE_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
 #if FISHMOD_DEBUG
     gFishmodProf[FISHMOD_PROF_D_POSE] += osGetTime() - profStart;
