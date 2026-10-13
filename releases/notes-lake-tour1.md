@@ -67,3 +67,11 @@ Third update (same name, rebuilt):
   then draws both sides of its surfaces, so you don't see out through the mouth; a fish that gets away shuts it;
 - far fish (the flat shape past 750 units) also face the camera from every side now: nose-on or tail-on they're a
   short oval, not a line seen edge-on.
+
+Fourth update (same name, rebuilt): fish behaviour, first pass
+- mood: each fish is more or less hungry and more or less frightened. Hungry fish rest less, pick at the bottom
+  more, notice a bait from further and bite sooner; frightened ones (spooked, or near a fish being caught) stay by
+  their home cover, rest longer, startle at less and won't come to a bait until they calm down (about a minute);
+- senses: a fish sees a bait or Link ahead of it, not behind, and less far at night or in rain; a bobber plopping
+  in nearby draws hungry fish to look;
+- schools: greengill swim in schools of 4 to 8 behind a leader, and bolt together when one is scared.

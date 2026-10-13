@@ -90,7 +90,8 @@ def gen_header(data):
         band = sp["depthBand"]
         out.append(f"        0x{activity:02X}, {int(round(band[0] * 255))}, {int(round(band[1] * 255))}, "
                    f"{int(round(sp['rise'] * 255))}, {int(round(sp['lightShy'] * 255))}, {sp.get('chronotypeHours', 0)},"
-                   " /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype */")
+                   f" {sp.get('school', [0, 0])[0]}, {sp.get('school', [0, 0])[1]},"
+                   " /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */")
         out.append("    },")
     out.append("};")
     out.append("")

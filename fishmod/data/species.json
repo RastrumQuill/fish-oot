@@ -37,7 +37,7 @@
         0.55
       ],
       "rise": 0.1,
-      "lightShy": 0.3,
+      "lightShy": 0.3, "school": [4, 8],
       "behavior": {
         "curiosity": 80,
         "aggression": 70,
@@ -245,7 +245,7 @@
         0.35
       ],
       "rise": 0.0,
-      "lightShy": 0.4,
+      "lightShy": 0.4, "school": [5, 9],
       "behavior": {
         "curiosity": 95,
         "aggression": 80,

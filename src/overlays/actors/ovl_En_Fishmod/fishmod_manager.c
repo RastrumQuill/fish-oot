@@ -50,6 +50,10 @@ typedef struct FishmodRosterFish {
     u8 species;
     u8 caught;
     EnFishmod* fish;
+#if FISHMOD_OPT >= 5
+    FishmodMood mood; // while the fish isn't spawned (spawned, the fish's own is the one that counts)
+    u16 leader;       // the record of its school's leader (its own for a leader or a fish on its own)
+#endif
 } FishmodRosterFish;
 
 static FishmodRosterFish sRoster[FISHMOD_ROSTER_MAX];
@@ -82,6 +86,7 @@ EnFishmodShared* EnFishmod_Shared(PlayState* play) {
         sShared.thinksLeft = THINK_BUDGET;
 #if FISHMOD_OPT >= 5
         sShared.light = Fishmod_Light(play);
+        sShared.raining = (Fishmod_Weather(play) == FISHMOD_WEATHER_RAIN);
 #endif
     }
     return &sShared;
@@ -98,6 +103,13 @@ static FishmodRosterFish* Manager_Record(EnFishmod* fish) {
     }
     return &sRoster[fish->rosterIndex];
 }
+
+#if FISHMOD_OPT >= 5
+/** The spawned fish of a roster record, or NULL. */
+EnFishmod* EnFishmod_RosterFish(s32 index) {
+    return ((index >= 0) && (index < sRosterCount)) ? sRoster[index].fish : NULL;
+}
+#endif
 
 f32 EnFishmod_RosterLength(s32 index) {
     return ((index >= 0) && (index < sRosterCount)) ? sRoster[index].length : 0.0f;
@@ -119,6 +131,9 @@ void EnFishmod_RosterForget(EnFishmod* fish) {
     FishmodRosterFish* rec = Manager_Record(fish);
 
     if ((rec != NULL) && (rec->fish == fish)) {
+#if FISHMOD_OPT >= 5
+        rec->mood = fish->mood;
+#endif
         rec->fish = NULL;
     }
 }
@@ -206,11 +221,109 @@ static void Manager_BuildRoster(PlayState* play) {
             rec->yaw = (s16)Rand_ZeroFloat(0xFFFF);
             rec->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, sRosterCount);
             rec->fish = NULL;
+#if FISHMOD_OPT >= 5
+            // some hungry, some not (from the index, not the shared random numbers)
+            rec->mood.hunger = 40 + ((sRosterCount * 97 + play->sceneId * 31) % 170);
+            rec->mood.fear = 0;
+            rec->leader = sRosterCount;
+#endif
             sRosterCount++;
+#if FISHMOD_OPT >= 5
+            // schooling fish: the rest of its school around it, about its size (they count toward the total)
+            if (species->schoolMax > 0) {
+                s32 leader = sRosterCount - 1;
+                s32 more = species->schoolMin - 1 +
+                           (s32)Rand_ZeroFloat(species->schoolMax - species->schoolMin + 0.99f);
+
+                while ((more-- > 0) && (n + 1 < count) && (sRosterCount < FISHMOD_ROSTER_MAX)) {
+                    FishmodRosterFish* mate = &sRoster[sRosterCount];
+
+                    *mate = sRoster[leader];
+                    if (!EnFishmod_FindWaterPoint(play, &sRoster[leader].home, 30.0f, 15.0f, &mate->home, &surface,
+                                                  &floor)) {
+                        continue;
+                    }
+                    mate->length = CLAMP(sRoster[leader].length * (0.8f + Rand_ZeroOne() * 0.4f), lo, hi);
+                    mate->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, sRosterCount);
+                    mate->mood.hunger = 40 + ((sRosterCount * 97 + play->sceneId * 31) % 170);
+                    mate->leader = leader;
+                    sRosterCount++;
+                    n++;
+                }
+            }
+#endif
         }
     }
     Rand_Seed((u32)osGetTime());
 }
+
+#if FISHMOD_OPT >= 5
+#define MOOD_SLICE 16 // roster records whose mood moves on each frame: 300 fish come round about once a second
+
+/** The mood that counts for a record: the fish's own while it's spawned. */
+static FishmodMood* Manager_Mood(FishmodRosterFish* rec) {
+    return (rec->fish != NULL) ? &rec->fish->mood : &rec->mood;
+}
+
+/**
+ * Moods move on (a slice of the roster each frame). Hunger rises by 1 to 4 a turn with how active the species is
+ * at this time of day, and a fish feeds by itself when it gets to 200 (so from fed to hungry takes under a minute to
+ * a few minutes, and hunger cycles round the middle). Fear fades by 3 a turn (terrified to calm in under 90 s).
+ */
+static void Manager_UpdateMoods(void) {
+    static s32 sNext;
+    s32 n = MIN(sRosterCount, MOOD_SLICE);
+    s32 time = gSaveContext.save.dayTime;
+    s32 tod = ((time >= CLOCK_TIME(4, 0)) && (time < CLOCK_TIME(8, 0)))    ? FISHMOD_TIME_DAWN
+              : ((time >= CLOCK_TIME(8, 0)) && (time < CLOCK_TIME(17, 0))) ? FISHMOD_TIME_DAY
+              : ((time >= CLOCK_TIME(17, 0)) && (time < CLOCK_TIME(20, 0))) ? FISHMOD_TIME_DUSK
+                                                                            : FISHMOD_TIME_NIGHT;
+
+    while (n-- > 0) {
+        FishmodRosterFish* rec;
+        FishmodMood* mood;
+        s32 hunger;
+
+        if (sNext >= sRosterCount) {
+            sNext = 0;
+        }
+        rec = &sRoster[sNext++];
+        mood = Manager_Mood(rec);
+        hunger = mood->hunger + 1 + FISHMOD_ACTIVITY(&gFishmodSpecies[rec->species], tod);
+        if (hunger >= 200) {
+            hunger -= 150; // it found something to eat (so hunger cycles round the middle, not up to starving)
+        }
+        mood->hunger = CLAMP_MAX(hunger, 255);
+        mood->fear = CLAMP_MIN(mood->fear - 3, 0);
+    }
+}
+
+/**
+ * Something disturbed the water at `pos` (a bobber landing, a fish hooked and thrashing): fish within `radius` get
+ * up to `fear` more of it, less the further off they are. Once per event over the roster, not every fish every frame.
+ */
+void EnFishmod_Disturb(PlayState* play, Vec3f* pos, f32 radius, s32 fear) {
+    EnFishmodShared* shared = EnFishmod_Shared(play);
+    s32 i;
+
+    if (fear <= 0) {
+        // only a plop, which the hungry may come to see (EnFishmod_Update's notice check)
+        shared->splashPos = *pos;
+        shared->splashFrame = play->gameplayFrames;
+        return;
+    }
+    for (i = 0; i < sRosterCount; i++) {
+        FishmodRosterFish* rec = &sRoster[i];
+        f32 d = Math_Vec3f_DistXYZ((rec->fish != NULL) ? &rec->fish->actor.world.pos : &rec->home, pos);
+
+        if (d < radius) {
+            FishmodMood* mood = Manager_Mood(rec);
+
+            mood->fear = CLAMP_MAX(mood->fear + (s32)(fear * (1.0f - d / radius)), 255);
+        }
+    }
+}
+#endif
 
 /** Spawns the fish whose homes Link is near and removes the ones he's left far behind. */
 static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
@@ -258,10 +371,17 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
             if (fish != NULL) {
                 fish->room = -1;
                 rec->fish = (EnFishmod*)fish;
+#if FISHMOD_OPT >= 5
+                rec->fish->mood = rec->mood;
+                rec->fish->leaderIndex = (rec->leader != i) ? rec->leader : FISHMOD_NO_ROSTER;
+#endif
             }
         } else if ((rec->fish != NULL) && (dist > ROSTER_SLEEP_DIST) &&
                    (rec->fish->fishState == FISH_STATE_WANDER) && (gFishmodRodState.fish != rec->fish)) {
             // it swims back home while nobody's looking
+#if FISHMOD_OPT >= 5
+            rec->mood = rec->fish->mood;
+#endif
             Actor_Kill(&rec->fish->actor);
             rec->fish = NULL;
         }
@@ -324,6 +444,7 @@ void EnFishmod_ManagerUpdate(EnFishmod* this, PlayState* play) {
         Manager_UpdateRoster(this, play);
     }
 #if FISHMOD_OPT >= 5
+    Manager_UpdateMoods();
     EnFishmod_ParticlesUpdate(play);
     // Lake Hylia's gossip stones keep vanilla's default draw range (about 1350 units), so across the lake they pop in
     // and out: they get a longer one (three simple models)
