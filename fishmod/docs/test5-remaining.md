@@ -7,7 +7,15 @@ habitat part.
 Rule kept from the main plan: every change is measured on the benches (lab 36/90, lakeside 300) against the build
 before it, and the frame must hold 50 ms (20 fps) with 300 fish in the lake.
 
-## 1. Collision for rocks (new)
+## 1. Collision for rocks — done (check with the Iron Boots)
+
+Built: fishmod/tools/gen_collision.py. Rocks within a gap of each other share one convex hull (the rock garden
+merged coarser); each rock is an 8-point stand-in of vanilla's (keeping 88% of its volume); faces facing down or
+under the bed dropped. About 1200 triangles for ~200 rocks (it varies with the scatter), added to the scene's
+collision at load; Lake Hylia's lookup grid is 32x4x32 (from 16x4x16) so it costs no more than vanilla's. The fish's
+bed map includes the rocks. Checked in game with a raycast; to check by hand: adult Link, Iron Boots, the rock garden.
+
+Original plan:
 
 Adult Link walks the lake bed with the Iron Boots, so solid props must be solid; plants stay without collision.
 
@@ -44,7 +52,13 @@ Original notes:
 - **Pond reeds sway:** vanilla sways them by turning each reed a little over time. In our matrices that's a small
   shear by a sine of time and position, per kind with a sway amount (reeds, ribbon weed, kelp). No per-vertex work.
 
-## 3. A larger prop or two
+## 3. A larger prop or two — the dock done
+
+The north-beach dock: 420 long, 60 wide, the Fishing Pond's planks and wood; pilings, beams, a mooring post; solid
+(the bridges' wooden surface), nothing scattered under it. Checked in game: Link stands on it. One more hero piece is
+still open (your call).
+
+Original plan:
 
 - **The north-beach dock** (zone 15): pilings and boards, built from the bridge's own plank and post textures,
   with collision (item 1's pipeline) so Link can walk out on it and fish from the end. Placed by hand, not

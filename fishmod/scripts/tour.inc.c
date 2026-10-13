@@ -18,7 +18,7 @@ static FishmodTourStop sTourStops[] = {
     { { -4000, -1322, 5450 }, { -4000, -1450, 5500 }, "Straight down (under)",
       "Looking straight down from just", "under the surface: the weed bed", "and the fish over it." },
     { { -700, -1200, 2900 }, { -400, -1330, 3600 }, "North beach",
-      "Kept open for casting from the bench", "and a dock to come: sand, a few", "tufts, no reed walls here." },
+      "Open for casting from the bench, and", "the new dock: walk out to its end", "and fish from there." },
     { { -380, -1345, 3440 }, { -150, -1420, 3950 }, "Beach shallows (under)",
       "Grass tufts and ribbon weed starting", "as the bed drops. Minnows and", "greengill live here by day." },
     { { -500, -1150, 3500 }, { -950, -1350, 3900 }, "Pillar ruins",

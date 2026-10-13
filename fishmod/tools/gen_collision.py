@@ -145,6 +145,45 @@ def bed_surface_type(d):
     return max(counts, key=counts.get) if counts else 0
 
 
+BRIDGE_SURFACE = 23  # Lake Hylia's bridges' surface type (SURFACE_MATERIAL_BRIDGE: wooden footsteps)
+
+
+def box_tris(x0, x1, y0, y1, z0, z1, stype, top=True):
+    """An axis-aligned box's faces (no bottom), outward, as (tri, normal, type)."""
+    quads = [((x0, y0, z0), (x0, y1, z0), (x1, y1, z0), (x1, y0, z0)),  # -z
+             ((x1, y0, z1), (x1, y1, z1), (x0, y1, z1), (x0, y0, z1)),  # +z
+             ((x0, y0, z1), (x0, y1, z1), (x0, y1, z0), (x0, y0, z0)),  # -x
+             ((x1, y0, z0), (x1, y1, z0), (x1, y1, z1), (x1, y0, z1))]  # +x
+    if top:
+        quads.append(((x0, y1, z0), (x0, y1, z1), (x1, y1, z1), (x1, y1, z0)))
+    out = []
+    for a, b, c, d in quads:
+        for t in ((a, b, c), (a, c, d)):
+            n = cross(sub(t[1], t[0]), sub(t[2], t[0]))
+            ln = math.sqrt(dot(n, n))
+            out.append((t, (n[0] / ln, n[1] / ln, n[2] / ln), stype))
+    return out
+
+
+def dock_tris(scene):
+    """The north-beach dock's collision, from the same numbers its mesh is made from (gen_habitat.py)."""
+    gh = load_tool("gen_habitat")
+    if gh.DOCK["scene"] != scene:
+        return []
+    ox, oy, oz = gh.DOCK["x"], gh.DOCK["y"], gh.DOCK["z"]
+    hw = gh.DOCK_WIDTH / 2
+    out = box_tris(ox - hw, ox + hw, oy - gh.DOCK_THICK, oy, oz, oz + gh.DOCK_LENGTH, BRIDGE_SURFACE)
+    r = gh.DOCK_PILING_R
+    for z in gh.DOCK_PILING_ROWS:
+        for x in (-gh.DOCK_PILING_X, gh.DOCK_PILING_X):
+            out += box_tris(ox + x - r, ox + x + r, oy - gh.DOCK_PILING_DEPTH, oy - gh.DOCK_THICK, oz + z - r,
+                            oz + z + r, BRIDGE_SURFACE, top=False)
+    mx, mz, mh = gh.DOCK_MOORING
+    out += box_tris(ox + mx - 6, ox + mx + 6, oy - gh.DOCK_PILING_DEPTH, oy + mh, oz + mz - 6, oz + mz + 6,
+                    BRIDGE_SURFACE)
+    return out
+
+
 def clusters(rocks, gap_of):
     """Union-find: rocks whose footprints come within the gap of each other."""
     parent = list(range(len(rocks)))
@@ -196,6 +235,7 @@ def main():
             else:
                 groups.append(g)
 
+        bed_type_rock = bed_surface_type(d)
         tris = []
         for g in groups:
             pts = []
@@ -213,16 +253,17 @@ def main():
                 beds = [finder.floor(int(v[0]), int(v[2]), v[1] + 200) for v in f]
                 if all(bd is not None and v[1] < bd - 2 for v, bd in zip(f, beds)):
                     continue  # wholly under the lake bed
-                tris.append((f, n))
+                tris.append((f, n, bed_type_rock))
 
-        # the lake bed's surface type: the commonest among the scene's underwater floors
-        bed_type = bed_surface_type(d)
+        rock_tris = len(tris)
+        dock_polys = dock_tris(scene)
+        tris += dock_polys
 
         # the game's data: shared vertices, polys with normals and plane distances
         vindex = {}
         verts = []
         polys = []
-        for f, n in tris:
+        for f, n, stype in tris:
             ids = []
             for v in f:
                 key = tuple(int(round(c)) for c in v)
@@ -232,7 +273,7 @@ def main():
                 ids.append(vindex[key])
             nx, ny, nz = (int(round(c * 0x7FFF)) for c in n)
             dist = int(round(-(n[0] * verts[ids[0]][0] + n[1] * verts[ids[0]][1] + n[2] * verts[ids[0]][2])))
-            polys.append((ids, (nx, ny, nz), dist))
+            polys.append((stype, ids, (nx, ny, nz), dist))
 
         os.makedirs(DATA, exist_ok=True)
         with open(os.path.join(DATA, f"fishmod_col_{base}.c"), "w") as fo:
@@ -241,17 +282,19 @@ def main():
             fo.write(f"typedef struct {{\n    FishmodColHeader header;\n    Vec3s vtx[{len(verts)}];\n"
                      f"    FishmodColPoly polys[{len(polys)}];\n}} FishmodCol_{base};\n\n")
             fo.write(f"FishmodCol_{base} gFishmodCol_{base} = {{\n")
-            fo.write(f"    {{ FISHMOD_COL_MAGIC, {len(verts)}, {len(polys)}, {bed_type}, 0 }},\n    {{\n")
+            fo.write(f"    {{ FISHMOD_COL_MAGIC, {len(verts)}, {len(polys)} }},\n    {{\n")
             for v in verts:
                 fo.write(f"        {{ {v[0]}, {v[1]}, {v[2]} }},\n")
             fo.write("    },\n    {\n")
-            for ids, n, dist in polys:
-                fo.write(f"        {{ {{ {ids[0]}, {ids[1]}, {ids[2]} }}, {{ {n[0]}, {n[1]}, {n[2]} }}, {dist} }},\n")
+            for stype, ids, n, dist in polys:
+                fo.write(f"        {{ {stype}, {{ {ids[0]}, {ids[1]}, {ids[2]} }}, {{ {n[0]}, {n[1]}, {n[2]} }}, {dist} }},\n")
             fo.write("    },\n};\n")
         with open(os.path.join(DATA, f"fishmod_col_{base}.json"), "w") as fo:
-            json.dump([[list(v) for v in f] for f, _ in tris], fo)
+            # the rocks only: the fish's map of the bed (the dock is above the water)
+            json.dump([[list(v) for v in f] for f, _, _ in tris[:rock_tris]], fo)
         if report or True:
             print(f"rock stand-in: {len(model)} points")
+            print(f"{scene}: dock {len(dock_polys)} triangles")
             print(f"{scene}: {len(rocks)} rocks -> {len(groups)} clusters "
                   f"({sum(1 for g in groups if g[0]['garden'])} in the rock garden), "
                   f"{len(polys)} triangles, {len(verts)} vertices")

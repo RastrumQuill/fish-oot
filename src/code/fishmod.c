@@ -844,8 +844,8 @@ void Fishmod_AddPropCollision(PlayState* play, CollisionHeader* colHeader) {
                 CollisionPoly* p = &poly[colHeader->numPolygons + n];
                 FishmodColPoly* e = &extraPoly[n];
 
-                // the lake bed's surface (sound, footsteps), picked at build time
-                p->type = col->surfaceType;
+                // the surface (footsteps, sound): picked at build time
+                p->type = e->type;
                 p->vtxData[0] = COLPOLY_VTX(colHeader->numVertices + e->vtx[0], 0);
                 p->vtxData[1] = COLPOLY_VTX(colHeader->numVertices + e->vtx[1], 0);
                 p->vtxData[2] = colHeader->numVertices + e->vtx[2];

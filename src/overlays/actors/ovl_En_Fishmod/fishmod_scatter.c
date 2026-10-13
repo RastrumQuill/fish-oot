@@ -26,6 +26,7 @@
 #include "ultra64.h"
 #include "zelda_arena.h"
 #include "rand.h"
+#include "ultra64/libc.h"
 #include "assets/objects/object_fish/object_fish.h"
 
 #if FISHMOD_OPT >= 5
@@ -135,6 +136,8 @@ static void Scatter_InitKinds(void) {
     SWAY(IRIS, 35, 76);
     SWAY(POND_REED, 18, 72);
 #undef SWAY
+    sKinds[FISHMOD_PROP_DOCK_DECK].plant = false;
+    sKinds[FISHMOD_PROP_DOCK_POSTS].plant = false;
     sKinds[FISHMOD_PROP_ROCK].plant = false;
     sKinds[FISHMOD_PROP_PEBBLE_PATCH].plant = false;
     sKinds[FISHMOD_PROP_SUNKEN_LOG].plant = false;
@@ -677,6 +680,30 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         gSPDisplayList((*disp)++, info->model);
     }
     if ((lastKind >= 0) && !sKinds[lastKind].xlu) {
+        gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+    }
+    // the dock, placed by hand: always drawn when in reach (one deck, a few posts)
+    if ((play->sceneId == FISHMOD_DOCK_SCENE) &&
+        ((SQ(eye.x - (FISHMOD_DOCK_X)) + SQ(eye.z - (FISHMOD_DOCK_Z + 210))) < SQ(3000.0f))) {
+        static Mtx sDockMtx;
+        static s32 sDockMtxMade;
+        s32 k;
+
+        if (!sDockMtxMade) {
+            // a translation: the dock's own space is the world's, moved to its shore end
+            bzero(&sDockMtx, sizeof(Mtx));
+            sDockMtx.intPart[0][0] = sDockMtx.intPart[1][1] = sDockMtx.intPart[2][2] = sDockMtx.intPart[3][3] = 1;
+            sDockMtx.intPart[3][0] = FISHMOD_DOCK_X;
+            sDockMtx.intPart[3][1] = FISHMOD_DOCK_Y;
+            sDockMtx.intPart[3][2] = FISHMOD_DOCK_Z;
+            sDockMtxMade = true;
+        }
+        for (k = FISHMOD_PROP_DOCK_DECK; k <= FISHMOD_PROP_DOCK_POSTS; k++) {
+            opa = Scatter_Material(opa, &sKinds[k], k);
+            gDPSetPrimColor(opa++, 0, 0, 255, 255, 255, 255);
+            gSPMatrix(opa++, &sDockMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+            gSPDisplayList(opa++, sKinds[k].model);
+        }
         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
     }
     gSPEndDisplayList(opa++);
