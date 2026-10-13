@@ -306,6 +306,7 @@ typedef enum FishmodProfSlot {
     FISHMOD_PROF_U_SEE,      //   (in AI) open water between it and a point (noticing the bobber, escapes)
     FISHMOD_PROF_U_UNSTICK,  //   (in AI) the stuck watchdog
     FISHMOD_PROF_D_SCATTER,  // the habitat props (drawn by the fish manager)
+    FISHMOD_PROF_D_PARTICLES, // underwater bubbles and specks
     FISHMOD_PROF_MAX
 } FishmodProfSlot;
 extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
