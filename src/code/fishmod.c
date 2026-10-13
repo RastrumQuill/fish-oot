@@ -897,11 +897,10 @@ void Fishmod_AdvanceTime(PlayState* play) {
 #if FISHMOD_OPT >= 5
 /*
  * Underwater haze: with the camera under the surface, the fog comes in closer than vanilla's underwater fog (the
- * water's own lights still give its colour), easing in and out over a few frames. gFishmodHaze (0 above water,
- * 1 under) also shortens the habitat props' draw distances, since the fog hides what's past them.
+ * water's own lights still give its colour), easing in and out over a few frames. Only the fog: the far plane
+ * (and what the scene draws) stays vanilla's. gFishmodHaze: 0 above water, 1 under.
  */
-#define HAZE_FOG_NEAR 968 // the fog's start (of 1000; vanilla's water is about 990)
-#define HAZE_Z_FAR 3200   // and the far plane, past which nothing is drawn
+#define HAZE_FOG_NEAR 953 // the fog's start (of 1000, with vanilla's far plane; vanilla's water is about 990)
 f32 gFishmodHaze;
 
 static void Fishmod_UpdateHaze(PlayState* play) {
@@ -921,8 +920,6 @@ static void Fishmod_UpdateHaze(PlayState* play) {
     env->adjFogNear = (env->lightSettings.fogNear > HAZE_FOG_NEAR)
                           ? (s16)((HAZE_FOG_NEAR - env->lightSettings.fogNear) * gFishmodHaze)
                           : 0;
-    env->adjZFar = (env->lightSettings.zFar > HAZE_Z_FAR) ? (s16)((HAZE_Z_FAR - env->lightSettings.zFar) * gFishmodHaze)
-                                                          : 0;
 }
 #endif
 

@@ -367,6 +367,8 @@ s32 Fishmod_Weather(struct PlayState* play);
 f32 Fishmod_Light(struct PlayState* play);
 // Underwater haze, 0 (camera above water) to 1 (under) (FISHMOD_OPT 5)
 extern f32 gFishmodHaze;
+// where the underwater fog is complete (of 1000; vanilla: 1000, the far plane)
+#define FISHMOD_HAZE_FOG_FAR 990
 
 #if FISHMOD_DEBUG
 void Fishmod_DebugBoot(void);

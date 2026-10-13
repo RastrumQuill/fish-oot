@@ -40,7 +40,9 @@ Second update (same name, rebuilt):
 - the Gerudo river inflow: no props under overhangs or inside the bank, flat pebble patches only on flat ground and
   under water;
 - plants sway (weed slowly with the water, reeds faster in the wind), neighbours together like a wave;
-- underwater haze: the fog comes in when the camera goes under, and props draw less far there;
+- underwater haze: a thick fog when the camera goes under, complete by about 900 units, so far props and fish come
+  and go inside it (no growing or shrinking, no change to the scene's far plane or what of the level is drawn);
+- props draw further (800 / 1200 / 1600 units by kind) and only what's on screen;
 - the props cost much less: what's drawn is only worked out again when the camera moves (lake bench: 1.1 ms a
   frame, was 5.5), and more plants are patches;
 - the first two stops are under the water over the west weed flat (from above you can't see through the surface).
