@@ -91,9 +91,9 @@ RULES = {
     "pebble_patch": ((8, 60), 0.0, {1: 0.4, 3: 0.05, 15: 0.05}, (1, 3), (0.6, 1.2), False),
     # Wood: the lake's one tree is the dead tree on the main island, so wood is only what has fallen from it, in the
     # water round the island (zone 16); no drowned or fallen trees
-    "sunken_log": ((25, 260), 0.0, {16: 0.05}, (1, 1), (0.7, 1.1), False),
-    "branch": ((15, 260), 0.0, {16: 0.12}, (1, 2), (0.7, 1.2), False),
-    "rush_tuft": ((-4, 20), 0.05, {13: 0.1, 4: 0.1, 6: 0.1, 11: 0.1}, (2, 5), (0.8, 1.3), False),
+    "sunken_log": ((6, 260), 0.0, {16: 0.3}, (1, 1), (0.4, 0.65), False),
+    "branch": ((6, 260), 0.0, {16: 0.45}, (1, 2), (0.5, 0.9), False),
+    "rush_tuft": ((-4, 20), 0.01, {13: 0.1, 4: 0.1, 6: 0.1, 11: 0.1}, (2, 5), (0.8, 1.3), False),
     "iris": ((-4, 18), 0.015, {4: 0.2, 13: 0.2, 6: 0.08, 11: 0.06}, (2, 4), (0.8, 1.2), False),
     "marigold": ((-6, 8), 0.01, {4: 0.12, 13: 0.12, 11: 0.08}, (1, 3), (0.8, 1.2), False),
     "big_pondweed": ((30, 180), 0.01, {12: 0.12, 6: 0.12, 4: 0.1}, (2, 4), (0.8, 1.3), False),
@@ -112,6 +112,30 @@ RULES = {
 HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 190, "broadleaf": 40, "bush_weed": 42, "kelp_frond": 260,
           "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44,
           "old_posts": 60, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
+# how far a prop spreads from its middle (patches spread wider): the bed is checked all round it
+FOOTPRINT = {"grass_tuft": 40, "ribbon_weed": 32, "bush_weed": 50, "tall_weed": 42, "broadleaf": 22,
+             "big_pondweed": 30, "kelp_frond": 15, "vine_strand": 12, "fan_weed": 22, "bank_roots": 35}
+# props that lie along the bed, tilted to its slope: half their length (along the model's x) and half their width
+TILTED = {"sunken_log": (150, 15), "branch": (70, 6)}
+
+
+def lie_on_bed(floor_at, x, z, surface, here, yaw, half_len, half_wid):
+    """Where a long prop rests and how it tilts: the bed under both ends and both sides. Returns (y, (tilt about its
+    width, tilt about its length)) in radians, as the game builds the matrix (fishmod_scatter.c)."""
+    c, s = math.cos(yaw), math.sin(yaw)
+    ax, az = c, -s  # the model's x axis, turned (its length)
+    bx, bz = s, c   # the model's z axis, turned (its width)
+    ends = [floor_at(x + ax * d, z + az * d, surface) for d in (-half_len, half_len)]
+    sides = [floor_at(x + bx * d, z + bz * d, surface) for d in (-half_wid, half_wid)]
+    ends = [here if e is None else e for e in ends]
+    sides = [here if e is None else e for e in sides]
+    tz = math.atan2(ends[1] - ends[0], 2 * half_len)
+    tx = -math.atan2(sides[1] - sides[0], 2 * half_wid)
+    clamp = math.radians(40)
+    return (min(ends + [here]) + (sum(ends) / 2 - min(ends + [here])) * 0.8,
+            (max(-clamp, min(clamp, tx)), max(-clamp, min(clamp, tz))))
+
+
 FLAT_KINDS = {"pebble_patch", "leaf_litter"}  # flat on the bed
 FLOATING = {"lily_pad", "float_leaves", "spatterdock", "vine_curtain"}  # sit on the surface, not the bed
 
@@ -172,6 +196,9 @@ def place(scene, seed=1):
                 chance = base + sum(b * zin.get(zid, 0.0) for zid, b in boosts.items())
                 if kind in ("reed_clump", "pond_reed", "cattails", "rush_tuft", "iris", "marigold"):
                     chance *= 1.0 - min(1.0, open_shore * 3.0)
+                    # standing out of the water only on gentle banks: at the foot of a cliff or the island's steep
+                    # shelf they read as grass stuck on the wall
+                    chance *= max(0.0, min(1.0, (0.6 - slope) / 0.3))
                 if steep:
                     chance += 0.35 * max(0.0, min(1.0, (slope - 0.6) / 0.8))
                 # patchy: dense in some places, none in others
@@ -204,13 +231,27 @@ def place(scene, seed=1):
                             continue
                     y = (ps + 1) if kind in FLOATING else pf  # floating: a unit above the water, not z-fighting it
                     sc = rnd.uniform(*scale)
+                    yaw = rnd.uniform(0, 2 * math.pi)
+                    tilt = (0.0, 0.0)
                     if kind in HEIGHT:
-                        # stay a little under the surface (rocks and logs may show in the shallows)
-                        room = pd - (2 if kind in ("rock", "boulder", "sunken_log", "branch") else 8)
+                        # stay a little under the surface (rocks and logs may show in the shallows), all over the
+                        # prop's footprint: on a slope a patch's shallow side is what pokes out
+                        shallowest = pf
+                        r = FOOTPRINT.get(kind, 20)
+                        for fx, fz in ((r, 0), (-r, 0), (0, r), (0, -r)):
+                            fy = floor_at(px + fx, pz + fz, ps)
+                            if fy is not None:
+                                shallowest = max(shallowest, fy)
+                        room = (ps - shallowest) - (2 if kind in ("rock", "boulder", "sunken_log", "branch") else 8)
                         sc = min(sc, room / HEIGHT[kind])
                         if sc < 0.35:
                             continue
-                    out.append({"kind": kind, "x": px, "y": y, "z": pz, "yaw": rnd.uniform(0, 2 * math.pi),
+                    if kind in TILTED:
+                        # lying along the bed: tilted to its slope along the length and across it
+                        y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, TILTED[kind][0] * sc, TILTED[kind][1] * sc)
+                        if max(abs(tilt[0]), abs(tilt[1])) > math.radians(25):
+                            continue  # too steep: it would have rolled further down
+                    out.append({"kind": kind, "x": px, "y": y, "z": pz, "yaw": yaw, "tilt": tilt,
                                 "scale": sc, "tint": rnd.uniform(0.82, 1.08)})
                 break  # one rule per candidate: keeps kinds from stacking on one spot
     return out
@@ -279,12 +320,12 @@ def write_c(scene, instances):
         # patch kinds are several clumps per mesh: keep one in that many
         if kind in gh.PATCH and rnd.random() >= 1.0 / gh.PATCH[kind]:
             continue
-        props.append((it["x"], it["y"], it["z"], kind, it["yaw"], it["scale"], it["tint"]))
+        props.append((it["x"], it["y"], it["z"], kind, it["yaw"], it["scale"], it["tint"], it.get("tilt", (0.0, 0.0))))
         if kind == "lily_pad" and rnd.random() < 0.15:
             # a flower on some of the pads
             ox, oz = rnd.uniform(-4, 4), rnd.uniform(-4, 4)
             for part in ("lily_flower", "lily_centre"):
-                props.append((it["x"] + ox, it["y"] + 0.5, it["z"] + oz, part, it["yaw"], 1.0, 1.0))
+                props.append((it["x"] + ox, it["y"] + 0.5, it["z"] + oz, part, it["yaw"], 1.0, 1.0, (0.0, 0.0)))
     x0 = int(min(p[0] for p in props)) - 1
     z0 = int(min(p[2] for p in props)) - 1
     w = int((max(p[0] for p in props) - x0) // CHUNK) + 1
@@ -320,14 +361,15 @@ def write_c(scene, instances):
              f"    {{ FISHMOD_SCATTER_MAGIC, {x0}, {z0}, {CHUNK}, {w}, {h}, {n}, {o_start}, {o_surf}, {o_props} }},",
              "    { " + ", ".join(str(v) for v in starts) + " },",
              "    { " + ", ".join(str(v) for v in surfaces) + " },", "    {"]
-    for x, y, z, kind, yaw, scale, tint in props:
+    for x, y, z, kind, yaw, scale, tint, tilt in props:
+        tx, tz = (int(round(t / (2 * math.pi) * 256)) for t in tilt)
         lines.append(f"        {{ {int(x)}, {int(y)}, {int(z)}, {kinds.index(kind)}, {int(yaw / (2 * math.pi) * 256) & 255}, "
-                     f"{max(1, min(255, int(scale * 64)))}, {max(1, min(255, int(tint * 128)))} }},")
+                     f"{max(1, min(255, int(scale * 64)))}, {max(1, min(255, int(tint * 128)))}, {tx}, {tz} }},")
     lines += ["    },", "};", ""]
     os.makedirs(os.path.join(ROOT, "src", "fishmod_data"), exist_ok=True)
     with open(os.path.join(ROOT, "src", "fishmod_data", f"fishmod_sc_{base}.c"), "w") as f:
         f.write("\n".join(lines))
-    print(f"{scene}: {n} props in {w}x{h} chunks of {CHUNK}, {(o_props + 10 * n) / 1024:.1f} KB")
+    print(f"{scene}: {n} props in {w}x{h} chunks of {CHUNK}, {(o_props + 12 * n) / 1024:.1f} KB")
 
 
 def main():

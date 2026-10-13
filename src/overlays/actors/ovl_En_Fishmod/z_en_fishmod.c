@@ -202,6 +202,14 @@ static void EnFishmod_PatchSkeleton(FlexSkeletonHeader* skelHeader, s32 texSet) 
             if (opcode == G_SETPRIMCOLOR) {
                 gfx->words.w0 = G_NOOP << 24;
                 gfx->words.w1 = 0;
+#if FISHMOD_OPT >= 5
+            } else if ((texSet == TEXSET_BASS) && (opcode == G_GEOMETRYMODE) && (gfx->words.w1 == G_CULL_BACK) &&
+                       ((gfx->words.w0 & 0xFFFFFF) == 0xFFFFFF)) {
+                // the bass draws both sides (EnFishmod_Draw turns culling off around it): its mouth gapes, and
+                // through it you see the inside of the head and body, which culling would leave as a hole
+                gfx->words.w0 = G_NOOP << 24;
+                gfx->words.w1 = 0;
+#endif
             } else if (opcode == G_SETTIMG) {
                 // load role textures from their segments instead
                 for (role = 0; role < FISHMOD_TEX_ROLE_MAX; role++) {
@@ -2032,6 +2040,7 @@ s32 EnFishmod_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
         CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
     }
 
+
     // Per-part scale. Scaling a limb would also scale its children, so each limb undoes its parent's scale,
     // moves its joint by the parent's scale so it stays attached, then applies its own scale.
     scale = &this->limbScale[li];
@@ -2347,6 +2356,24 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     f32 vx = this->actor.world.pos.x - play->view.eye.x;
     f32 vy = this->actor.world.pos.y - play->view.eye.y;
     f32 vz = this->actor.world.pos.z - play->view.eye.z;
+#if FISHMOD_OPT >= 5
+    // Facing the camera, its length foreshortened by the angle it's seen at (nose-on it's a short oval, never a line
+    // seen edge-on, which made fish vanish from straight ahead or behind): along = F with the line of sight taken out
+    f32 vl = sqrtf(SQ(vx) + SQ(vy) + SQ(vz));
+    f32 ax;
+    f32 ay;
+    f32 az;
+    f32 al;
+    f32 fore;
+    f32 ux;
+    f32 uy;
+    f32 uz;
+    f32 ul;
+    f32 hl = this->halfLength;
+    f32 hh = this->halfHeight * 1.3f;
+
+#define BILLBOARD_ALONG_Y (ay * fore)
+#else
     // across the body, at right angles to both the fish and the line of sight: U = F x V, F = (fx, 0, fz)
     f32 ux = -fz * vy;
     f32 uy = fz * vx - fx * vz;
@@ -2354,6 +2381,8 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     f32 ul = sqrtf(SQ(ux) + SQ(uy) + SQ(uz));
     f32 hl = this->halfLength;
     f32 hh = this->halfHeight * 1.3f;
+#define BILLBOARD_ALONG_Y 0.0f
+#endif
     static const f32 sShape[6][2] = {
         { 1.0f, 0.0f }, { 0.3f, 1.0f }, { -0.5f, 0.7f }, { -1.0f, 0.0f }, { -0.5f, -0.7f }, { 0.3f, -1.0f },
     };
@@ -2370,6 +2399,41 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     const u8* tint = this->species->tint;
     s32 i;
 
+#if FISHMOD_OPT >= 5
+    if (vl < 0.001f) {
+        vl = 0.001f;
+    }
+    vx /= vl;
+    vy /= vl;
+    vz /= vl;
+    {
+        f32 d = fx * vx + fz * vz; // F . V (F is level)
+
+        ax = fx - d * vx;
+        ay = -d * vy;
+        az = fz - d * vz;
+    }
+    al = sqrtf(SQ(ax) + SQ(ay) + SQ(az)); // the sine of the angle between the fish and the line of sight
+    if (al < 0.05f) {
+        // dead ahead or behind: any direction across the view will do (the oval is round enough)
+        ax = vz;
+        ay = 0.0f;
+        az = -vx;
+        al = sqrtf(SQ(ax) + SQ(az)) + 0.0001f;
+    }
+    ax /= al;
+    ay /= al;
+    az /= al;
+    fore = CLAMP(al, hh / CLAMP_MIN(hl, 1.0f), 1.0f);
+    // across: at right angles to the length and the line of sight
+    ux = ay * vz - az * vy;
+    uy = az * vx - ax * vz;
+    uz = ax * vy - ay * vx;
+    ul = sqrtf(SQ(ux) + SQ(uy) + SQ(uz));
+    // the drawing below uses (fx, 0, fz) as the length: the foreshortened direction instead
+    fx = ax * fore;
+    fz = az * fore;
+#endif
     if (ul < 0.001f) {
         ux = 0.0f;
         uy = 1.0f;
@@ -2386,7 +2450,7 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
         u8 shade = (i == 3) ? 150 : (i == 0) ? 200 : 175;
 
         vtx[i].v.ob[0] = (s16)(fx * along + ux * across);
-        vtx[i].v.ob[1] = (s16)(uy * across);
+        vtx[i].v.ob[1] = (s16)(BILLBOARD_ALONG_Y * along + uy * across);
         vtx[i].v.ob[2] = (s16)(fz * along + uz * across);
         vtx[i].v.flag = 0;
 #if FISHMOD_OPT >= 5
@@ -2425,6 +2489,7 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     gSP2Triangles(POLY_OPA_DISP++, 0, 3, 4, 0, 0, 4, 5, 0);
     CLOSE_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
 }
+#undef BILLBOARD_ALONG_Y
 #endif
 
 #if FISHMOD_OPT >= 4
@@ -2700,9 +2765,25 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
 #if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     FISHMOD_PROF(FISHMOD_PROF_D_POSE, EnFishmod_DrawPose(this, play));
 #else
+#if FISHMOD_OPT >= 5
+    // The bass's mouth opens wide: through it you look at the inside of the head and body, their back faces,
+    // which culling would leave as a hole straight through the fish. So the bass draws both sides.
+    if (this->species->base == FISHMOD_BASE_BASS) {
+        OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+        gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+        CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+    }
+#endif
     FISHMOD_PROF(FISHMOD_PROF_D_POSE,
                  SkelAnime_DrawFlexOpa(play, this->skelAnime.skeleton, this->skelAnime.jointTable,
                                        this->skelAnime.dListCount, FISHMOD_LIMB_OVERRIDE, FISHMOD_LIMB_POST, this));
+#if FISHMOD_OPT >= 5
+    if (this->species->base == FISHMOD_BASE_BASS) {
+        OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+        gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+        CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+    }
+#endif
 #endif
 
     if (this->species->lookFlags & FISHMOD_LOOK_WHISKERS) {

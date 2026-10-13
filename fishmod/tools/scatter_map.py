@@ -34,7 +34,7 @@ def main():
     kinds = re.findall(r"X\(\w+, (\w+)\)", open(os.path.join(ROOT, "src", "fishmod_data",
                                                                   "fishmod_props_kinds.h")).read().split("#define FISHMOD_PROP_KINDS_GENERATED")[0])
     src = open(os.path.join(ROOT, "src", "fishmod_data", "fishmod_sc_spot06.c")).read()
-    props = [tuple(map(int, m)) for m in re.findall(r"\{ (-?\d+), (-?\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+) \}", src)]
+    props = [tuple(map(int, m)) for m in re.findall(r"\{ (-?\d+), (-?\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+), -?\d+, -?\d+ \}", src)]
     folder, (x0, x1, z0, z1), landmarks = zm.SCENES["SCENE_LAKE_HYLIA"]
     d = os.path.join(gw.SCENES, folder)
     vtx = gw.parse_vtx(gw.one(d, "*_VtxList.inc.c"))
