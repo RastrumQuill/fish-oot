@@ -37,6 +37,24 @@ Adult Link walks the lake bed with the Iron Boots, so solid props must be solid;
   rock on a slope with gaps under it. Checked with Iron Boots on the bed (a script that walks Link across a few).
 - **Measure:** BgCheck time in the lake bench, scene load time.
 
+## Emulator and original-hardware versions
+
+Emulators (ares included) don't charge for pixels: the N64's RDP pays for every pixel of every triangle, see-through
+texels too, and the frame timings from the emulator's RDP counters say nothing about it. So the stop 1 slowdown on
+hardware never showed in the benches. `fishmod/tools/overdraw.py` measures it instead: it picks the props the way
+the game does from a camera pose, projects their triangles and counts how often each pixel is drawn (`--hw` for the
+hardware settings).
+
+- **Both versions:** under water, props are drawn no further than the haze lets anything be seen (900 units).
+- **Original hardware (`fishmod/build.sh --hw`, `FISHMOD_HW`):** every other big plant card is left out (always the
+  same ones, so nothing pops; beds thinner), the big underwater plants are two crossed cards instead of three or
+  four and the tall weed's patches one clump (`gen_habitat.py`, `FISHMOD_HW=1`), plants the camera is inside or
+  right against aren't drawn, and the plant cutouts are plain instead of anti-aliased (no read of the frame's colour
+  per pixel; not `G_RM_ZB_OPA_SURF2`, whose coverage-as-alpha cuts nothing out).
+
+Props' overdraw on the tour (screens' worth; emulator version -> hardware version): stop 1 2.8 -> 1.3, stop 11 5.1 ->
+2.2, stop 16 4.1 -> 1.2; every other stop under 1 on hardware.
+
 ## 2. Habitat tuning — tentatively done
 
 Done in the tour builds (lake-tour1): densities and placement fixes, longer ranges with no grow-in, culling to the

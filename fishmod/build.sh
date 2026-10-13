@@ -9,6 +9,7 @@
 #   --opt N        performance test set N (1 or 2, see the Makefile); outputs get an -optN suffix
 #   --testmode     new files skip the intro and start with testing items; outputs get a -test suffix
 #   --fasttrig     polynomial sin/cos instead of the sine table; outputs get a -trig suffix
+#   --hw           the original-hardware version (fewer, cheaper pixels for the RDP); outputs get a -hw suffix
 # Needs `flips` on PATH (or FLIPS=/path/to/flips) for the release patch.
 set -euo pipefail
 
@@ -27,6 +28,7 @@ F3DEX3=0
 OPT=0
 TESTMODE=0
 FASTTRIG=0
+HW=0
 MAKE_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -36,6 +38,7 @@ while [ $# -gt 0 ]; do
         --opt) OPT="$2"; shift ;;
         --testmode) TESTMODE=1 ;;
         --fasttrig) FASTTRIG=1 ;;
+        --hw) HW=1 ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
     shift
@@ -63,7 +66,7 @@ mkdir -p "$OUT_DIR"
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT testmode=$TESTMODE fasttrig=$FASTTRIG"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT testmode=$TESTMODE fasttrig=$FASTTRIG hw=$HW"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -84,7 +87,7 @@ else
 fi
 
 # the habitat props: textures edited from vanilla ones, models, and where they go (generated, not committed)
-python3 fishmod/tools/gen_habitat.py > /dev/null
+FISHMOD_HW=$HW python3 fishmod/tools/gen_habitat.py > /dev/null
 python3 fishmod/tools/assets.py --manifest src/fishmod_data/props_manifest.json > /dev/null
 python3 fishmod/tools/gen_scatter.py --c
 # the solid props' collision (rocks), added to the scene's at load (generated, not committed)
@@ -92,7 +95,7 @@ python3 fishmod/tools/gen_collision.py
 # the water floor maps, baked from the extracted scenes and the props' collision (generated, not committed)
 python3 fishmod/tools/gen_watermap.py
 
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG FISHMOD_HW=$HW \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -110,6 +113,9 @@ if [ "$FASTTRIG" = 1 ]; then
 fi
 if [ "$TESTMODE" = 1 ]; then
     SUFFIX="$SUFFIX-test"
+fi
+if [ "$HW" = 1 ]; then
+    SUFFIX="$SUFFIX-hw"
 fi
 
 if [ "$DEBUG" = 1 ]; then

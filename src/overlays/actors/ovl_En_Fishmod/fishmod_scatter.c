@@ -51,6 +51,8 @@ typedef struct FishmodPropKindInfo {
     u8 xlu;      // drawn see-through (the Fishing Pond's reed, as vanilla draws it)
     u8 sway;     // how far its top sways (per mille of its height per unit of height); 0: still
     u8 swayRate; // how fast (a turn takes 0x10000 / (swayRate * 16) frames)
+    u8 thin;     // a big plant card: the original-hardware version draws every other one (FISHMOD_HW)
+    u16 height;  // how tall it is at scale 1 (gen_scatter.py HEIGHT), for the camera-inside test (FISHMOD_HW)
 } FishmodPropKindInfo;
 
 #define DIST_SMALL 800.0f
@@ -71,6 +73,22 @@ typedef struct FishmodPropKindInfo {
 #define PROP_RADIUS 90.0f
 // See-through props (the pond reeds) drawn per frame at most
 #define XLU_MAX 200
+// Under water the haze hides everything past about this far: nothing further is drawn (it would only be painted over
+// by the fog, at the RDP's full cost)
+#define DIST_UNDER_FOG 900.0f
+
+/*
+ * The original-hardware version (FISHMOD_HW). Emulators draw pixels for free; the N64's RDP pays for every pixel of
+ * every triangle (see-through texels too), and the weed beds seen edge-on under water stack many cards on a pixel
+ * (fishmod/tools/overdraw.py measures it: up to about 9 screens' worth at the tour's stop 11). So on hardware:
+ * - every other big plant card is left out (always the same ones, so nothing pops): beds a little sparser;
+ * - a plant the camera is inside or right against isn't drawn (one card there can fill the screen);
+ * - plain cutouts instead of anti-aliased ones (no read of the frame's colour for every pixel).
+ * Together they bring the worst of the tour from about 9 screens of props to under 3.
+ */
+#if FISHMOD_HW
+#define HW_NEAR 0.6f // the camera-inside test: closer than this times the plant's height (plus a little)
+#endif
 
 static FishmodPropKindInfo sKinds[FISHMOD_PROP_KIND_MAX];
 
@@ -136,6 +154,23 @@ static void Scatter_InitKinds(void) {
     SWAY(IRIS, 35, 76);
     SWAY(POND_REED, 18, 72);
 #undef SWAY
+    {
+        // the big plant cards and their heights (gen_scatter.py HEIGHT)
+        static const struct {
+            u8 kind;
+            u16 height;
+        } sCards[] = {
+            { FISHMOD_PROP_GRASS_TUFT, 16 },  { FISHMOD_PROP_RIBBON_WEED, 80 },  { FISHMOD_PROP_TALL_WEED, 190 },
+            { FISHMOD_PROP_BROADLEAF, 40 },   { FISHMOD_PROP_BUSH_WEED, 42 },    { FISHMOD_PROP_KELP_FROND, 260 },
+            { FISHMOD_PROP_VINE_STRAND, 150 }, { FISHMOD_PROP_BIG_PONDWEED, 52 }, { FISHMOD_PROP_FAN_WEED, 44 },
+        };
+        s32 i;
+
+        for (i = 0; i < ARRAY_COUNT(sCards); i++) {
+            sKinds[sCards[i].kind].thin = true;
+            sKinds[sCards[i].kind].height = sCards[i].height;
+        }
+    }
     sKinds[FISHMOD_PROP_DOCK_DECK].plant = false;
     sKinds[FISHMOD_PROP_DOCK_POSTS].plant = false;
     sKinds[FISHMOD_PROP_ROCK].plant = false;
@@ -424,7 +459,16 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind) {
     gDPPipeSync(gfx++);
     gDPSetTextureLUT(gfx++, G_TT_NONE);
     gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0, COMBINED);
+#if FISHMOD_HW
+    // A plain cutout (texels under half alpha dropped), no anti-aliasing: the RDP doesn't read the frame's colour.
+    // Not G_RM_ZB_OPA_SURF2: its ALPHA_CVG_SEL makes the pixel's alpha its coverage, and nothing gets cut out.
+    gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A,
+                     Z_CMP | Z_UPD | CVG_DST_FULL | ZMODE_OPA | GBL_c2(G_BL_CLR_IN, G_BL_0, G_BL_CLR_IN, G_BL_1));
+    gDPSetAlphaCompare(gfx++, G_AC_THRESHOLD);
+    gDPSetBlendColor(gfx++, 0, 0, 0, 0x80);
+#else
     gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_TEX_EDGE2);
+#endif
     gSPClearGeometryMode(gfx++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
     gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
     gSPDisplayList(gfx++, info->material);
@@ -486,7 +530,9 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 visibleCount = 0;
     s32 chunk = sScatter->chunk;
     f32 distScale = 1.0f;
-    f32 distFar = DIST_FAR * distScale;
+    // under water: no further than the haze lets anything be seen
+    f32 distCap = (gFishmodHaze > 0.5f) ? DIST_UNDER_FOG : DIST_FAR;
+    f32 distFar = MIN(DIST_FAR * distScale, distCap);
     s32 cx0;
     s32 cx1;
     s32 cz0;
@@ -555,7 +601,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     bandCount[0] = bandCount[1] = bandCount[2] = 0;
     for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
         FishmodPropKindInfo* info = &sKinds[kind];
-        f32 maxDist = info->drawDist * distScale;
+        f32 maxDist = MIN(info->drawDist * distScale, distCap);
         f32 maxSq = SQ(maxDist);
         f32 reachSq = SQ(maxDist + chunk * 0.71f);
 
@@ -582,6 +628,22 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 if (dSq > maxSq) {
                     continue;
                 }
+#if FISHMOD_HW
+                if (info->thin) {
+                    f32 h;
+                    f32 r;
+
+                    if (((prop->x + prop->z) >> 3) & 1) {
+                        continue; // every other card (by place, so always the same ones)
+                    }
+                    // the camera inside it or right against it
+                    h = info->height * prop->scale * (1.0f / 64.0f);
+                    r = h * HW_NEAR + 20.0f;
+                    if ((dSq + SQ(prop->y + h * 0.5f - eye.y)) < SQ(r)) {
+                        continue;
+                    }
+                }
+#endif
                 // outside the view cone (with room for the prop's size), unless it's right by the camera; squared,
                 // no square roots: front + R < cos * dist  <=>  (front + R)^2 < cos^2 * dist^2 (when front + R >= 0)
                 front = dx * lookX + dy * lookY + dz * lookZ + PROP_RADIUS;
