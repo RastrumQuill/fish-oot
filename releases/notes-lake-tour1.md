@@ -47,7 +47,8 @@ Second update (same name, rebuilt):
   vanilla's ripple, so they show from above too; under water, faint specks drift round the camera;
 - Lake Hylia's three gossip stones draw from much further (vanilla stops drawing them past about 1350 units);
 - tall plants sway less (every tip moves about the same few units);
-- the drifting specks are big enough to see now (they were under a pixel);
+- the drifting specks are little soft dots now (vanilla's Kokiri Forest dust mote, much smaller, the water's colour),
+  drifting smoothly and fading in and out;
 - fish rest for shorter spells, look alive while they do (fins working, a slight hover), and their rest runs at the
   same pace far from the camera as near it (before, a fish that had been far off was often still resting, frozen,
   for a few seconds when the camera arrived);
