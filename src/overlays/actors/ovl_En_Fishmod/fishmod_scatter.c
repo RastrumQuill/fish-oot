@@ -51,7 +51,7 @@ typedef struct FishmodPropKindInfo {
     u8 xlu;      // drawn see-through (the Fishing Pond's reed, as vanilla draws it)
     u8 sway;     // how far its top sways (per mille of its height per unit of height); 0: still
     u8 swayRate; // how fast (a turn takes 0x10000 / (swayRate * 16) frames)
-    u8 thin;     // a big plant card: the original-hardware version draws every other one (FISHMOD_HW)
+    u8 card;     // a big plant card: not drawn with the camera inside it (FISHMOD_HW)
     u16 height;  // how tall it is at scale 1 (gen_scatter.py HEIGHT), for the camera-inside test (FISHMOD_HW)
 } FishmodPropKindInfo;
 
@@ -81,10 +81,9 @@ typedef struct FishmodPropKindInfo {
  * The original-hardware version (FISHMOD_HW). Emulators draw pixels for free; the N64's RDP pays for every pixel of
  * every triangle (see-through texels too), and the weed beds seen edge-on under water stack many cards on a pixel
  * (fishmod/tools/overdraw.py measures it: up to about 9 screens' worth at the tour's stop 11). So on hardware:
- * - every other big plant card is left out (always the same ones, so nothing pops): beds a little sparser;
- * - a plant the camera is inside or right against isn't drawn (one card there can fill the screen);
+ * - a plant the camera is inside or right against isn't drawn (one card there can fill the screen with a blur);
  * - plain cutouts instead of anti-aliased ones (no read of the frame's colour for every pixel).
- * Together they bring the worst of the tour from about 9 screens of props to under 3.
+ * Nothing that makes the beds less lush: every plant and every card is drawn.
  */
 #if FISHMOD_HW
 #define HW_NEAR 0.6f // the camera-inside test: closer than this times the plant's height (plus a little)
@@ -167,7 +166,7 @@ static void Scatter_InitKinds(void) {
         s32 i;
 
         for (i = 0; i < ARRAY_COUNT(sCards); i++) {
-            sKinds[sCards[i].kind].thin = true;
+            sKinds[sCards[i].kind].card = true;
             sKinds[sCards[i].kind].height = sCards[i].height;
         }
     }
@@ -629,13 +628,10 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                     continue;
                 }
 #if FISHMOD_HW
-                if (info->thin) {
+                if (info->card) {
                     f32 h;
                     f32 r;
 
-                    if (((prop->x + prop->z) >> 3) & 1) {
-                        continue; // every other card (by place, so always the same ones)
-                    }
                     // the camera inside it or right against it
                     h = info->height * prop->scale * (1.0f / 64.0f);
                     r = h * HW_NEAR + 20.0f;

@@ -95,3 +95,12 @@ Sixth update: an original-hardware version, and lily pads
 - both versions: under water, props past the haze (about 900 units, where nothing can be seen) aren't drawn;
 - lily pads, spatterdock and floating leaves lie side by side, touching, no longer piled on each other, and lily
   flowers sit in the middle of their pads (the scatter was regenerated, so plants elsewhere are in new spots too).
+
+Seventh update: the hardware version keeps every plant; tall weed fixed
+- the hardware version is as lush as the emulator one again: every plant card, every card in each plant. It keeps
+  only what can't be seen: nothing past the underwater haze, no plant drawn with the camera inside it (it would only
+  be a blur across the screen), and plain cutouts instead of anti-aliased ones (cheaper pixels, edges a touch
+  harder). Measured props on hardware, screens' worth of pixels: stop 1 2.0 (it was about 3 when it slowed down),
+  stop 11 2.6, stop 16 3.3;
+- tall weed is one clump stretched up its whole height, not a second clump stacked on the first's blade tips (that
+  pinched in the middle and stood off to one side), and leans less.
