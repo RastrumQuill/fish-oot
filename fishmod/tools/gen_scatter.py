@@ -104,7 +104,7 @@ RULES = {
     "bank_roots": ((0, 60), 0.0, {10: 0.05, 11: 0.05, 6: 0.05, 13: 0.04}, (1, 2), (0.8, 1.3), True),
     "fan_weed": ((300, 1100), 0.0, {9: 0.3, 8: 0.01}, (1, 3), (0.8, 1.4), False),
     "boulder": ((-20, 700), 0.0, {5: 0.06, 14: 0.08, 7: 0.03, 1: 0.03, 9: 0.05}, (1, 2), (0.9, 2.2), False),
-    "old_posts": ((5, 200), 0.0, {15: 0.15, 2: 0.08}, (1, 2), (0.8, 1.2), False),  # old pilings at the docks
+    "old_posts": ((5, 200), 0.0, {2: 0.08}, (1, 2), (0.8, 1.2), False),  # old pilings by the lab's shore
     "leaf_litter": ((10, 120), 0.005, {11: 0.05, 13: 0.04, 4: 0.04}, (1, 1), (0.8, 1.3), False),
 }
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing

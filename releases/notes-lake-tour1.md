@@ -49,6 +49,8 @@ Second update (same name, rebuilt):
 - tall plants sway less (every tip moves about the same few units);
 - the drifting specks are little soft dots now (vanilla's Kokiri Forest dust mote, much smaller, the water's colour),
   drifting smoothly and fading in and out;
+- rocks are solid (walk the bed with the Iron Boots): chunky shared hulls, the rock garden merged coarser;
+- a dock on the north beach (the Fishing Pond's planks), solid with wooden footsteps: walk out and fish from its end;
 - fish rest for shorter spells, look alive while they do (fins working, a slight hover), and their rest runs at the
   same pace far from the camera as near it (before, a fish that had been far off was often still resting, frozen,
   for a few seconds when the camera arrived);

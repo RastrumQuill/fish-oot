@@ -226,8 +226,18 @@
         260
       ],
       "bed": "sand and planks",
-      "props": "a short dock on pilings, a boat's mooring later, sedge along the beach",
-      "fish": "minnows and greengill around the pilings, bass at dawn"
+      "props": "the dock (placed by hand), sedge along the beach",
+      "fish": "minnows and greengill around the pilings, bass at dawn",
+      "exclude": [
+        [
+          "rect",
+          -460,
+          3040,
+          -340,
+          3540
+        ]
+      ],
+      "_exclude_doc": "The dock's footprint (fishmod/tools/gen_habitat.py DOCK): nothing scattered under or through it."
     },
     {
       "id": 16,

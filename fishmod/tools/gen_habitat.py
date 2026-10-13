@@ -289,6 +289,9 @@ ROM_TEXTURES = {
     "float_leaf": (rom_float_leaf, "ci4"),
     "leaf_litter": (rom_leaf_litter, "ci4"),
     "bark": (rom_bark, "ci4"),
+    # the north-beach dock: the Fishing Pond's own weathered planks and plain wood
+    "dock_planks": (lambda: rom_colour("scenes/misc/turibori/turibori_scene_0000ACE0_Tex.rgba16.png"), "ci8"),
+    "dock_wood": (lambda: rom_colour("scenes/misc/turibori/turibori_scene_000081E0_Tex.rgba16.png"), "ci8"),
     "pebbles": (rom_pebbles, "ci4"),
     "lily_flower": (rom_lily_flower, "ci4"),
     "lily_centre": (rom_lily_centre, "ci4"),
@@ -509,6 +512,56 @@ def mesh_branch():
     return m
 
 
+# The dock on the north beach (zone 15): placed by hand, not scattered. Its own space has the shore end of the deck at
+# the origin, the deck's top at y 0, and the dock running out along +z. gen_collision.py makes its collision from
+# the same numbers, and the game draws it at DOCK.
+DOCK = {"scene": "SCENE_LAKE_HYLIA", "x": -400, "y": -1288, "z": 3080}
+DOCK_LENGTH = 420
+DOCK_WIDTH = 60
+DOCK_THICK = 6
+DOCK_PILING_ROWS = (100, 200, 300, 400)  # pairs of pilings, this far out
+DOCK_PILING_X = 25
+DOCK_PILING_R = 5
+DOCK_PILING_DEPTH = 150                   # down from the deck: well into the bed all along
+DOCK_MOORING = (-25, 412, 30)              # x, z, height above the deck
+
+
+def quad_uv(m, corners, col, uv):
+    """A quad (corners in order round it) with UVs (u0, v0, u1, v1) across it."""
+    u0, v0, u1, v1 = uv
+    ids = [m.vert(c, t, col) for c, t in zip(corners, ((u0, v0), (u1, v0), (u1, v1), (u0, v1)))]
+    m.quad(*ids)
+
+
+def mesh_dock_deck():
+    """The deck: weathered planks across it, top, sides, far end and underside (seen from under the water)."""
+    m = Mesh("dock_deck", "dock_planks")
+    hw, L, t = DOCK_WIDTH / 2, DOCK_LENGTH, DOCK_THICK
+    top, side, under = (235, 230, 220), (170, 165, 155), (110, 110, 105)
+    rep = L / 30.0  # one plank-texture tile per 30 units of deck
+    quad_uv(m, ((-hw, 0, 0), (hw, 0, 0), (hw, 0, L), (-hw, 0, L)), top, (0, 0, 1, rep))
+    quad_uv(m, ((-hw, -t, L), (hw, -t, L), (hw, -t, 0), (-hw, -t, 0)), under, (0, 0, 1, rep))
+    quad_uv(m, ((hw, -t, 0), (hw, -t, L), (hw, 0, L), (hw, 0, 0)), side, (0, 0.8, rep, 1))
+    quad_uv(m, ((-hw, -t, L), (-hw, -t, 0), (-hw, 0, 0), (-hw, 0, L)), side, (0, 0.8, rep, 1))
+    quad_uv(m, ((hw, -t, L), (-hw, -t, L), (-hw, 0, L), (hw, 0, L)), side, (0, 0.8, 1, 1))
+    return m
+
+
+def mesh_dock_posts():
+    """The pilings (pairs, down into the bed), a cross beam under the deck at each pair, and a mooring post."""
+    m = Mesh("dock_posts", "dock_wood")
+    dark, light = hexc("#4a3a28"), hexc("#a08a68")
+    for z in DOCK_PILING_ROWS:
+        for x in (-DOCK_PILING_X, DOCK_PILING_X):
+            cylinder(m, (x, -DOCK_PILING_DEPTH, z), (x, -DOCK_THICK, z), DOCK_PILING_R, DOCK_PILING_R, 6, dark, light,
+                     v_repeat=4.0)
+        cylinder(m, (-DOCK_PILING_X - 8, -DOCK_THICK - 4, z), (DOCK_PILING_X + 8, -DOCK_THICK - 4, z), 4, 4, 4, dark,
+                 light, v_repeat=1.5)
+    x, z, h = DOCK_MOORING
+    cylinder(m, (x, -DOCK_PILING_DEPTH, z), (x, h, z), 6, 6, 6, dark, light, v_repeat=5.0)
+    return m
+
+
 def mesh_spatterdock():
     """Floating leaves: three round pads on the surface."""
     rnd = random.Random(121)
@@ -553,6 +606,8 @@ MESHES = [
     lambda: mesh_flat_scatter("float_leaves", "float_leaf", 5, 22, 7, 0.5, (255, 255, 255), 109),
     lambda: mesh_flat_scatter("leaf_litter", "leaf_litter", 9, 40, 5, 0.6, (200, 200, 200), 110),
     mesh_branch,
+    mesh_dock_deck,
+    mesh_dock_posts,
 
     lambda: crossed_cards("reed_clump", "reed_card", 40, 95, 3, hexc("#184217"), hexc("#8f9342"), 101, lean=4),
     lambda: patch("ribbon_weed", PATCH["ribbon_weed"], 22, 202, lambda i: crossed_cards(
@@ -592,6 +647,8 @@ PROP_KINDS = [
     ("bank_roots", "bankroot_card", "ia8"),
     ("marigold", "marigold", "ci8"),
     ("fan_weed", "fan_card", "ia8"),
+    ("dock_deck", "dock_planks", "ci8"),
+    ("dock_posts", "dock_wood", "ci8"),
     ("lily_flower", "lily_flower", "ci4"),
     ("lily_centre", "lily_centre", "ci4"),
 ]
@@ -625,6 +682,9 @@ def write_props_manifest():
         f.write("#define FISHMOD_PROP_KINDS(X) \\\n")
         for k in kinds:
             f.write(f"    X({k.upper()}, {k}) \\\n")
+        f.write("\n// the north-beach dock (placed by hand): its scene and where its shore end is\n")
+        f.write(f"#define FISHMOD_DOCK_SCENE {DOCK['scene']}\n")
+        f.write(f"#define FISHMOD_DOCK_X {DOCK['x']}\n#define FISHMOD_DOCK_Y {DOCK['y']}\n#define FISHMOD_DOCK_Z {DOCK['z']}\n")
         f.write("\n#define FISHMOD_PROP_KINDS_GENERATED(X) \\\n")
         for k, _, _ in PROP_KINDS:
             f.write(f"    X({k.upper()}, {k}) \\\n")
