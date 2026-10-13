@@ -47,6 +47,10 @@ Second update (same name, rebuilt):
   vanilla's ripple, so they show from above too; under water, faint specks drift round the camera;
 - Lake Hylia's three gossip stones draw from much further (vanilla stops drawing them past about 1350 units);
 - tall plants sway less (every tip moves about the same few units);
+- the drifting specks are big enough to see now (they were under a pixel);
+- fish rest for shorter spells, look alive while they do (fins working, a slight hover), and their rest runs at the
+  same pace far from the camera as near it (before, a fish that had been far off was often still resting, frozen,
+  for a few seconds when the camera arrived);
 - the props cost much less: what's drawn is only worked out again when the camera moves (lake bench: 1.1 ms a
   frame, was 5.5), and more plants are patches;
 - the first two stops are under the water over the west weed flat (from above you can't see through the surface).

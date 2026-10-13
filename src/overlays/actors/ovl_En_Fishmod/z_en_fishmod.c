@@ -1296,16 +1296,23 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
                 this->restTimer--;
                 // holding the spot it stopped at (the target was set there), gliding to a stop
                 EnFishmod_SwimToward(this, play, &this->target, 0.15f, 0x100);
+#if FISHMOD_OPT >= 5
+                // still alive while it rests: fins working, a slow hover up and down
+                this->swimPhaseStep = 0.1f;
+                this->swimMag = 650.0f;
+                this->target.y += Math_SinS((s16)(this->timer * 0x300 + this->actor.params * 0x1234)) * 0.08f;
+#else
                 this->swimPhaseStep = 0.06f;
                 this->swimMag = 450.0f;
+#endif
                 if (this->restTimer == 0) {
                     EnFishmod_PickWanderTarget(this, play);
                 }
             } else {
                 if ((this->stateTimer == 0) || (Math_Vec3f_DistXYZ(&this->actor.world.pos, &this->target) < 8.0f)) {
 #if FISHMOD_OPT >= 5
-                    // the more active its time of day, the shorter its rests
-                    this->restTimer = 40 + (s16)Rand_ZeroFloat(400.0f - EnFishmod_Activity(this) * 100.0f);
+                    // the more active its time of day, the shorter its rests (about 1.5 to 12 seconds)
+                    this->restTimer = 30 + (s16)Rand_ZeroFloat(220.0f - EnFishmod_Activity(this) * 55.0f);
 #else
                     this->restTimer = 40 + (s16)Rand_ZeroFloat(EnFishmod_ActiveNow(this) ? 120.0f : 300.0f);
 #endif
@@ -1819,6 +1826,13 @@ static void EnFishmod_Glide(EnFishmod* this) {
     if (this->stateTimer > 0) {
         this->stateTimer--;
     }
+#if FISHMOD_OPT >= 5
+    // its rest runs on whether it thinks this frame or not (else a far fish rests many times as long, and is still
+    // resting, frozen, when the camera comes close)
+    if (this->restTimer > 1) {
+        this->restTimer--;
+    }
+#endif
     if (this->cooldown > 0) {
         this->cooldown--;
     }

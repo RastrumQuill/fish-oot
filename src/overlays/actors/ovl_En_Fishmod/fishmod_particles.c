@@ -51,6 +51,7 @@ typedef struct FishmodSpeck {
     Vec3f vel;
     u8 alive;
     u8 alpha;
+    u8 size; // 1/100 of vanilla's 15-unit bubble sprite
 } FishmodSpeck;
 
 static FishmodBubble sBubbles[BUBBLE_MAX];
@@ -118,7 +119,8 @@ static void Particles_PlaceSpeck(PlayState* play, FishmodSpeck* s, Vec3f* eye) {
             s->vel.x = Rand_CenteredFloat(0.3f);
             s->vel.y = -0.05f - Rand_ZeroFloat(0.1f);
             s->vel.z = Rand_CenteredFloat(0.3f);
-            s->alpha = 50 + (s32)Rand_ZeroFloat(70.0f);
+            s->alpha = 110 + (s32)Rand_ZeroFloat(80.0f);
+            s->size = 10 + (s32)Rand_ZeroFloat(8.0f); // about 1.5 to 2.5 units across
             s->alive = true;
             return;
         }
@@ -248,7 +250,7 @@ void EnFishmod_ParticlesDraw(PlayState* play) {
                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         gSPDisplayList(POLY_OPA_DISP++, SEGMENTED_TO_VIRTUAL(gEffBubbleDL));
     }
-    // specks: the same little sprite, tiny, dim and murky-coloured
+    // specks: the same little sprite (15 units across) at about a tenth of its size, murky-coloured
     gSPSegment(POLY_OPA_DISP++, 0x08, tex[0]);
     gDPSetEnvColor(POLY_OPA_DISP++, 70, 90, 80, 0);
     for (i = 0; i < SPECK_MAX; i++) {
@@ -258,7 +260,8 @@ void EnFishmod_ParticlesDraw(PlayState* play) {
             continue;
         }
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 200, 210, 190, s->alpha);
-        gSPMatrix(POLY_OPA_DISP++, Particles_Matrix(&s->pos, 0.035f), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPMatrix(POLY_OPA_DISP++, Particles_Matrix(&s->pos, s->size * 0.01f),
+                  G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         gSPDisplayList(POLY_OPA_DISP++, SEGMENTED_TO_VIRTUAL(gEffBubbleDL));
     }
     gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
