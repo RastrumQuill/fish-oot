@@ -1518,3 +1518,11 @@ beginseg
     romalign 0x1000
     include "$(BUILD_DIR)/src/fishmod_data/fishmod_sc_spot06.o"
 endseg
+
+// fishmod: collision for the habitat props (rocks), added to the scene's at load (fishmod/tools/gen_collision.py)
+beginseg
+    name "fishmod_col_spot06"
+    compress
+    romalign 0x1000
+    include "$(BUILD_DIR)/src/fishmod_data/fishmod_col_spot06.o"
+endseg

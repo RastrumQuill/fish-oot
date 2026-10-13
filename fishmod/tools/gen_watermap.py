@@ -16,6 +16,7 @@ Writes src/fishmod_data/fishmod_wm_<scene>.c and include/fishmod_watermap_scenes
 Usage: fishmod/tools/gen_watermap.py        (needs the extracted assets)
 """
 import glob
+import json
 import os
 import re
 import sys
@@ -129,7 +130,20 @@ def grid_for(box, corners_left):
 def bake(scene_name, folder):
     scene_dir = os.path.join(SCENES, folder)
     vtx = parse_vtx(one(scene_dir, "*_VtxList.inc.c"))
-    finder = FloorFinder(parse_floors(one(scene_dir, "*_PolyList.inc.c"), vtx))
+    floors = parse_floors(one(scene_dir, "*_PolyList.inc.c"), vtx)
+    # the habitat props' collision (rocks, from gen_collision.py), which the game adds to the scene's: the fish see
+    # the rocks as bed too
+    extra = os.path.join(os.path.dirname(__file__), "..", "..", "src", "fishmod_data",
+                         "fishmod_col_" + os.path.basename(folder) + ".json")
+    if os.path.exists(extra):
+        for tri in json.load(open(extra)):
+            a, b, c = tri
+            ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2])
+            ln = sum(v * v for v in ((b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), ny,
+                                     (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]))) ** 0.5
+            if ln > 0 and ny / ln > 0.5:  # floors only, as above
+                floors.append(tuple(tuple(v) for v in tri))
+    finder = FloorFinder(floors)
     boxes = parse_waterboxes(one(scene_dir, "*_WaterBoxes.inc.c"))
     left = CORNER_BUDGET
     out = []

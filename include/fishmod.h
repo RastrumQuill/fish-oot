@@ -350,6 +350,9 @@ FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId);
 #include "fishmod_scatter.h"
 // The scene's scattered habitat props (fishmod/tools/gen_scatter.py), or NULL
 FishmodScatterHeader* Fishmod_LoadScatter(s16 sceneId);
+// Adds the scene's habitat-prop collision (rocks) to its collision header, before BgCheck reads it
+struct CollisionHeader;
+void Fishmod_AddPropCollision(struct PlayState* play, struct CollisionHeader* colHeader);
 
 // Time: the 20 minute day and the hidden clock for places where time stands still (fishmod.c)
 void Fishmod_AdvanceTime(struct PlayState* play);

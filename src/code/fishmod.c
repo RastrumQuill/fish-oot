@@ -759,6 +759,8 @@ s32 Fishmod_CanUseRod(PlayState* play) {
 #include "dma.h"
 #include "segment_symbols.h"
 #include "zelda_arena.h"
+#include "tha.h"
+#include "fishmod_collision.h"
 
 #define FISHMOD_WATERMAP(sceneId, segment) DECLARE_ROM_SEGMENT(segment)
 #include "fishmod_watermap_scenes.h"
@@ -787,6 +789,78 @@ static const FishmodWaterMapRom sScatters[] = {
 #include "fishmod_scatter_scenes.h"
 #undef FISHMOD_SCATTER
 };
+
+#define FISHMOD_COLLISION(sceneId, segment) DECLARE_ROM_SEGMENT(segment)
+#include "fishmod_collision_scenes.h"
+#undef FISHMOD_COLLISION
+
+static const FishmodWaterMapRom sPropCollisions[] = {
+#define FISHMOD_COLLISION(sceneId, segment) \
+    { sceneId, (uintptr_t)_##segment##SegmentRomStart, (uintptr_t)_##segment##SegmentRomEnd },
+#include "fishmod_collision_scenes.h"
+#undef FISHMOD_COLLISION
+};
+
+/**
+ * Adds the scene's prop collision (its rocks, as chunky hulls) to the scene's own: new vertex and polygon lists,
+ * vanilla's followed by the props', in the game state's memory (like BgCheck's own tables), so they last the scene.
+ * Called as the scene's collision header is read, before BgCheck builds its lookup from it.
+ */
+void Fishmod_AddPropCollision(PlayState* play, CollisionHeader* colHeader) {
+#if FISHMOD_OPT >= 5
+    s32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sPropCollisions); i++) {
+        if (sPropCollisions[i].sceneId == play->sceneId) {
+            size_t size = sPropCollisions[i].romEnd - sPropCollisions[i].romStart;
+            FishmodColHeader* col = THA_AllocTailAlign16(&play->state.tha, size);
+            Vec3s* extraVtx;
+            FishmodColPoly* extraPoly;
+            Vec3s* vtx;
+            CollisionPoly* poly;
+            s32 n;
+
+            if (col == NULL) {
+                return;
+            }
+            DmaMgr_RequestSync(col, sPropCollisions[i].romStart, size);
+            if ((col->magic != FISHMOD_COL_MAGIC) ||
+                (colHeader->numVertices + col->numVertices > COLPOLY_VTX_INDEX(0xFFFF)) ||
+                (colHeader->numPolygons + col->numPolygons > 0x7FFF)) {
+                return;
+            }
+            extraVtx = (Vec3s*)(col + 1);
+            extraPoly = (FishmodColPoly*)(extraVtx + col->numVertices);
+            vtx = THA_AllocTailAlign16(&play->state.tha, (colHeader->numVertices + col->numVertices) * sizeof(Vec3s));
+            poly = THA_AllocTailAlign16(&play->state.tha,
+                                        (colHeader->numPolygons + col->numPolygons) * sizeof(CollisionPoly));
+            if ((vtx == NULL) || (poly == NULL)) {
+                return;
+            }
+            bcopy(colHeader->vtxList, vtx, colHeader->numVertices * sizeof(Vec3s));
+            bcopy(extraVtx, vtx + colHeader->numVertices, col->numVertices * sizeof(Vec3s));
+            bcopy(colHeader->polyList, poly, colHeader->numPolygons * sizeof(CollisionPoly));
+            for (n = 0; n < col->numPolygons; n++) {
+                CollisionPoly* p = &poly[colHeader->numPolygons + n];
+                FishmodColPoly* e = &extraPoly[n];
+
+                // the lake bed's surface (sound, footsteps), picked at build time
+                p->type = col->surfaceType;
+                p->vtxData[0] = COLPOLY_VTX(colHeader->numVertices + e->vtx[0], 0);
+                p->vtxData[1] = COLPOLY_VTX(colHeader->numVertices + e->vtx[1], 0);
+                p->vtxData[2] = colHeader->numVertices + e->vtx[2];
+                p->normal = e->normal;
+                p->dist = e->dist;
+            }
+            colHeader->vtxList = vtx;
+            colHeader->polyList = poly;
+            colHeader->numVertices += col->numVertices;
+            colHeader->numPolygons += col->numPolygons;
+            return;
+        }
+    }
+#endif
+}
 
 FishmodScatterHeader* Fishmod_LoadScatter(s16 sceneId) {
     s32 i;

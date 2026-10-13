@@ -83,12 +83,14 @@ else
     echo "note: Pillow isn't installed, so fishmod/assets isn't regenerated (the committed C is used)"
 fi
 
-# the water floor maps, baked from the extracted scenes (generated, not committed)
-python3 fishmod/tools/gen_watermap.py
 # the habitat props: textures edited from vanilla ones, models, and where they go (generated, not committed)
 python3 fishmod/tools/gen_habitat.py > /dev/null
 python3 fishmod/tools/assets.py --manifest src/fishmod_data/props_manifest.json > /dev/null
 python3 fishmod/tools/gen_scatter.py --c
+# the solid props' collision (rocks), added to the scene's at load (generated, not committed)
+python3 fishmod/tools/gen_collision.py
+# the water floor maps, baked from the extracted scenes and the props' collision (generated, not committed)
+python3 fishmod/tools/gen_watermap.py
 
 make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
