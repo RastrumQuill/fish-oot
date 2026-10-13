@@ -49,6 +49,11 @@ typedef struct FishmodMood {
     u8 fear;
 } FishmodMood;
 
+// A fish's own looks table (EnFishmod_LookTable): part colours, then each texture role's render tile. The same
+// segment as the rig's species tints (fishmod_rig.c RIG_SEG_TINT), so the rig's colour branches find the fish's own.
+#define FISHMOD_SEG_LOOK 0x0F
+#define FISHMOD_LOOK_NEUTRAL 0x1B // the species' own colours, pattern as the model has it (the wiki photos)
+
 // The bass's jaw (limb index, 0-based) and how far it turns to shut: the model's rest pose gapes
 #define FISHMOD_BASS_JAW_LIMB 12
 #if FISHMOD_OPT >= 5
@@ -157,6 +162,8 @@ typedef struct EnFishmod {
     /* 0x409 */ FishmodMood mood;                  // hunger and fear (kept in its roster record while away; FISHMOD_OPT 5)
     /* 0x40C */ u16 leaderIndex;                   // roster record of its school's leader, FISHMOD_NO_ROSTER if it leads
                                                    // or is on its own (FISHMOD_OPT 5)
+    /* 0x40E */ u8 look;                           // its own looks: EnFishmod_LookTable (saved with it in a bottle)
+    /* 0x410 */ f32 swimGain;                      // the tail beat's size on top of swimMag (small fish's bursts)
 #if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
     // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
     Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
@@ -301,6 +308,7 @@ typedef struct EnFishmodShared {
 } EnFishmodShared;
 EnFishmodShared* EnFishmod_Shared(struct PlayState* play);
 #if FISHMOD_OPT >= 5
+void EnFishmod_LookTable(struct EnFishmod* this, struct PlayState* play);
 struct EnFishmod* EnFishmod_RosterFish(s32 index);
 void EnFishmod_Disturb(struct PlayState* play, Vec3f* pos, f32 radius, s32 fear);
 #endif

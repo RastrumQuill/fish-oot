@@ -845,7 +845,7 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
     Vec3f pivot;
     const u8* shape = this->species->shape;
     // the wave's size from the swim strength (1500 = cruising); small fish move bigger
-    f32 amp = this->swimMag * (1.0f / 1500.0f) *
+    f32 amp = this->swimMag * this->swimGain * (1.0f / 1500.0f) *
               ((this->lengthInches < FISHMOD_SMALL_RIG_LENGTH) ? 1.3f : 1.0f);
     // turns and startles bend the whole body into a curve (radians across the body behind the pivot)
     f32 curve = (-this->turnBend * 3.0f + this->startleBend * 5.4f) * (M_PI / 0x8000);
@@ -959,6 +959,10 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
         }
     }
 
+#if FISHMOD_OPT >= 5
+    // its own colours and pattern (in place of the species' tints at the same segment)
+    EnFishmod_LookTable(this, play);
+#endif
     OPEN_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
     gSPSegment(POLY_OPA_DISP++, RIG_SEG_MTX, mtx);
     // the bass's display lists don't set culling (EnFishmod_PatchSkeleton): a shut mouth culls back faces, an open

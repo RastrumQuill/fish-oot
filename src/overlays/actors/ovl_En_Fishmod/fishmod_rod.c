@@ -1033,7 +1033,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->choice = 0;
                 if (fish != NULL) {
                     if (decided == 1) {
-                        Fishmod_BottleFish(fish->species - gFishmodSpecies, fish->lengthInches);
+                        Fishmod_BottleFish(fish->species - gFishmodSpecies, fish->lengthInches, fish->look);
                         Item_Give(play, ITEM_BOTTLE_FISH);
 #if FISHMOD_OPT >= 4
                         EnFishmod_RosterCaught(play, fish);

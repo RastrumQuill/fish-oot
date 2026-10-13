@@ -180,6 +180,7 @@ typedef struct FishmodStudio {
     /* 0x14 */ f32 spawnLength;  // size for the next fish spawned (inches), 0 = typical
     /* 0x18 */ struct Actor* fish[FISHMOD_STUDIO_MAX];
     /* 0x28 */ u8 rig[FISHMOD_STUDIO_MAX]; // per fish: 0 = as the game picks, 1 = full rig, 2 = reduced rig
+    /* 0x2C */ u8 spawnLook;  // looks for the next fish spawned (FISHMOD_LOOK_NEUTRAL for the photos)
 } FishmodStudio;
 
 extern FishmodStudio gFishmodStudio;
@@ -216,7 +217,7 @@ typedef struct FishmodSpeciesRecord {
 // What's in a bottle with a fish in it (the item itself only says "fish")
 typedef struct FishmodBottleFish {
     /* 0x00 */ u8 species;      // species + 1; 0 for a fish bottled some other way (a vanilla fish)
-    /* 0x01 */ u8 pad;
+    /* 0x01 */ u8 look;         // its own looks (colour and pattern), so it's the same fish when it's let go
     /* 0x02 */ u16 lengthTenths;
 } FishmodBottleFish; // size = 0x4
 
@@ -251,10 +252,11 @@ s32 Fishmod_ItemNameIndex(s32 item);
 void Fishmod_OnBottleCatch(s32 actorId, s32 slot);
 
 // Bottled fish: what went into a bottle, and letting it go again (returns true if fishmod handled the release)
-void Fishmod_BottleFish(s32 species, f32 lengthInches);
+void Fishmod_BottleFish(s32 species, f32 lengthInches, s32 look);
 s32 Fishmod_ReleaseBottleFish(struct PlayState* play, s32 slot, Vec3f* pos, s16 yaw);
 // A length for the next fish spawned (0 for a random one), used by Fishmod_ReleaseBottleFish
 extern f32 gFishmodSpawnLength;
+extern u8 gFishmodSpawnLook; // with gFishmodSpawnLength: the released fish's looks
 extern Vec3f gFishmodHivePos;
 
 /** Records a catch. Returns true if it is a new size record for its species. */

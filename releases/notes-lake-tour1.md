@@ -75,3 +75,11 @@ Fourth update (same name, rebuilt): fish behaviour, first pass
 - senses: a fish sees a bait or Link ahead of it, not behind, and less far at night or in rain; a bobber plopping
   in nearby draws hungry fish to look;
 - schools: greengill swim in schools of 4 to 8 behind a leader, and bolt together when one is scared.
+
+Fifth update (same name, rebuilt): fish looks
+- every fish has its own looks: a little brighter or darker, warmer or cooler than the rest of its species, and its
+  pattern mirrored or not; Sanke carp also have their red and black blotches in one of four places. A fish keeps
+  its looks: the same fish every visit, and one you bottle and let go (anywhere, after saving and reloading too) is
+  the fish you caught;
+- catfish curl hard into their turns and lie curled on the bed when they rest;
+- small fish (greengill, minnows) swim in bursts: a few quick beats of the tail, then a glide.

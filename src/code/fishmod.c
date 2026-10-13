@@ -271,6 +271,7 @@ void Fishmod_PlayUpdate(PlayState* play) {
 }
 
 f32 gFishmodSpawnLength;
+u8 gFishmodSpawnLook;
 // a fishmod fish poured out on land (the game's flopping fish stands in for it until it's bottled again)
 static FishmodBottleFish sFloppingFish;
 
@@ -348,13 +349,14 @@ void Fishmod_OnBottleCatch(s32 actorId, s32 slot) {
 }
 
 /** Notes what just went into a bottle: the first empty one, which is where Item_Give puts a fish. */
-void Fishmod_BottleFish(s32 species, f32 lengthInches) {
+void Fishmod_BottleFish(s32 species, f32 lengthInches, s32 look) {
     s32 i;
 
     for (i = 0; i < 4; i++) {
         if (gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1 + i] == ITEM_BOTTLE_EMPTY) {
             FISHMOD_SAVE->bottleFish[i].species = species + 1;
             FISHMOD_SAVE->bottleFish[i].lengthTenths = (u16)(lengthInches * 10.0f);
+            FISHMOD_SAVE->bottleFish[i].look = look;
             return;
         }
     }
@@ -405,12 +407,14 @@ s32 Fishmod_ReleaseBottleFish(PlayState* play, s32 slot, Vec3f* pos, s16 yaw) {
     if (bottle->species != 0) {
         species = bottle->species - 1;
         gFishmodSpawnLength = bottle->lengthTenths * 0.1f;
+        gFishmodSpawnLook = bottle->look;
     } else {
         species = spawns->entries[(s32)Rand_ZeroFloat(spawns->count - 0.01f)].species;
         gFishmodSpawnLength = 0.0f;
     }
     bottle->species = 0;
     bottle->lengthTenths = 0;
+    bottle->look = 0;
     Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, pos->x + Math_SinS(yaw) * (i * 20.0f), surface - 6.0f,
                 pos->z + Math_CosS(yaw) * (i * 20.0f), 0, yaw, 0, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, species));
     gFishmodSpawnLength = 0.0f;
