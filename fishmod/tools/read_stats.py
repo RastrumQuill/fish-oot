@@ -64,6 +64,7 @@ PROF = [
     ("  AI: see", "open water to a point (in AI)"),
     ("  AI: unstick", "the stuck watchdog (in AI)"),
     ("habitat props", "the scattered props (drawn by the manager)"),
+    ("particles", "underwater bubbles and specks"),
 ]
 
 

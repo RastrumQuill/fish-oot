@@ -115,24 +115,25 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_FLOAT_LEAVES].floating = true;
     sKinds[FISHMOD_PROP_LILY_FLOWER].floating = true;
     sKinds[FISHMOD_PROP_LILY_CENTRE].floating = true;
-    // swaying: weed slowly with the water's movement, reeds above it faster in the wind
+    // swaying: weed slowly with the water's movement, reeds above it faster in the wind. The shear moves a point by
+    // its height, so tall kinds get less of it: every tip moves about the same few units.
 #define SWAY(id, amount, rate)                \
     sKinds[FISHMOD_PROP_##id].sway = (amount); \
     sKinds[FISHMOD_PROP_##id].swayRate = (rate)
-    SWAY(RIBBON_WEED, 140, 44);
-    SWAY(TALL_WEED, 90, 36);
-    SWAY(KELP_FROND, 110, 32);
-    SWAY(VINE_STRAND, 110, 40);
+    SWAY(RIBBON_WEED, 70, 44);
+    SWAY(TALL_WEED, 32, 36);
+    SWAY(KELP_FROND, 30, 32);
+    SWAY(VINE_STRAND, 40, 40);
     SWAY(BIG_PONDWEED, 60, 40);
     SWAY(FAN_WEED, 70, 44);
     SWAY(BROADLEAF, 50, 48);
     SWAY(BUSH_WEED, 40, 44);
     SWAY(GRASS_TUFT, 50, 52);
-    SWAY(REED_CLUMP, 35, 80);
-    SWAY(CATTAILS, 35, 80);
+    SWAY(REED_CLUMP, 20, 80);
+    SWAY(CATTAILS, 18, 80);
     SWAY(RUSH_TUFT, 45, 84);
     SWAY(IRIS, 35, 76);
-    SWAY(POND_REED, 40, 72);
+    SWAY(POND_REED, 18, 72);
 #undef SWAY
     sKinds[FISHMOD_PROP_ROCK].plant = false;
     sKinds[FISHMOD_PROP_PEBBLE_PATCH].plant = false;
@@ -245,6 +246,39 @@ s32 EnFishmod_ScatterRandomCover(Vec3f* out) {
         FishmodProp* prop = &sProps[(s32)Rand_ZeroFloat(sScatter->count - 0.01f)];
 
         if ((prop->kind == FISHMOD_PROP_LILY_FLOWER) || (prop->kind == FISHMOD_PROP_LILY_CENTRE)) {
+            continue;
+        }
+        out->x = prop->x;
+        out->y = prop->y;
+        out->z = prop->z;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * A plant being drawn this frame within `range` of the camera (where bubbles come from), at its base. False if none
+ * was found in a few tries.
+ */
+s32 EnFishmod_ScatterRandomDrawnPlant(Vec3f* eye, f32 range, Vec3f* out) {
+    ScatterSet* set;
+    s32 tries;
+
+    if ((sBufs == NULL) || (sScatter == NULL)) {
+        return false;
+    }
+    set = &sBufs->set[sSet];
+    if (set->count == 0) {
+        return false;
+    }
+    for (tries = 0; tries < 6; tries++) {
+        FishmodProp* prop = &sProps[set->prop[(s32)Rand_ZeroFloat(set->count - 0.01f)]];
+        FishmodPropKindInfo* info = &sKinds[prop->kind];
+
+        if (!info->plant || info->floating || info->xlu) {
+            continue;
+        }
+        if ((SQ(prop->x - eye->x) + SQ(prop->z - eye->z)) > SQ(range)) {
             continue;
         }
         out->x = prop->x;

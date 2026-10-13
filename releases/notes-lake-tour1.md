@@ -43,6 +43,10 @@ Second update (same name, rebuilt):
 - underwater haze: a thick fog when the camera goes under, complete by about 900 units, so far props and fish come
   and go inside it (no growing or shrinking, no change to the scene's far plane or what of the level is drawn);
 - props draw further (800 / 1200 / 1600 units by kind) and only what's on screen;
+- now and then a bubble or two rises from the weed near the camera (vanilla's bubble) and pops at the surface with
+  vanilla's ripple, so they show from above too; under water, faint specks drift round the camera;
+- Lake Hylia's three gossip stones draw from much further (vanilla stops drawing them past about 1350 units);
+- tall plants sway less (every tip moves about the same few units);
 - the props cost much less: what's drawn is only worked out again when the camera moves (lake bench: 1.1 ms a
   frame, was 5.5), and more plants are patches;
 - the first two stops are under the water over the west weed flat (from above you can't see through the surface).

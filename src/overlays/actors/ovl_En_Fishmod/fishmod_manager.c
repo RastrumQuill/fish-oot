@@ -25,6 +25,8 @@
 #include "player.h"
 #include "save.h"
 #include "bgcheck.h"
+#include "scene.h"
+#include "libc/math.h"
 
 #if FISHMOD_OPT >= 4
 
@@ -321,6 +323,20 @@ void EnFishmod_ManagerUpdate(EnFishmod* this, PlayState* play) {
     if ((this->timer & 7) == 0) {
         Manager_UpdateRoster(this, play);
     }
+#if FISHMOD_OPT >= 5
+    EnFishmod_ParticlesUpdate(play);
+    // Lake Hylia's gossip stones keep vanilla's default draw range (about 1350 units), so across the lake they pop in
+    // and out: they get a longer one (three simple models)
+    if ((play->sceneId == SCENE_LAKE_HYLIA) && ((this->timer & 31) == 0)) {
+        Actor* actor = play->actorCtx.actorLists[ACTORCAT_PROP].head;
+
+        for (; actor != NULL; actor = actor->next) {
+            if ((actor->id == ACTOR_EN_GS) && (actor->cullingVolumeDistance < 4000.0f)) {
+                actor->cullingVolumeDistance = 4000.0f;
+            }
+        }
+    }
+#endif
 }
 
 /**
@@ -385,6 +401,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
 #if FISHMOD_OPT >= 5
     if (!gFishmodPhoto.active) {
         FISHMOD_PROF(FISHMOD_PROF_D_SCATTER, EnFishmod_ScatterDraw(play));
+        FISHMOD_PROF(FISHMOD_PROF_D_PARTICLES, EnFishmod_ParticlesDraw(play));
     }
 #endif
 

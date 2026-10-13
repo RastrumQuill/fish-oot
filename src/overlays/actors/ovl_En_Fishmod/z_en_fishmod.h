@@ -236,6 +236,10 @@ s32 EnFishmod_WaterCell(struct PlayState* play, f32 x, f32 z);
 void EnFishmod_ScatterLoad(struct PlayState* play);
 void EnFishmod_ScatterUnload(void);
 s32 EnFishmod_ScatterRandomCover(Vec3f* out);
+s32 EnFishmod_ScatterRandomDrawnPlant(Vec3f* eye, f32 range, Vec3f* out);
+// Underwater particles: bubbles from the weed, drifting specks (fishmod_particles.c, FISHMOD_OPT 5)
+void EnFishmod_ParticlesUpdate(struct PlayState* play);
+void EnFishmod_ParticlesDraw(struct PlayState* play);
 void EnFishmod_ScatterDraw(struct PlayState* play);
 
 s32 EnFishmod_FindWaterPoint(struct PlayState* play, Vec3f* center, f32 radius, f32 minDepth, Vec3f* out,
