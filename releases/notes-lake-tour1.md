@@ -63,8 +63,7 @@ Third update (same name, rebuilt):
   bed all round it, not just under its middle, so on a slope (the island's shelf, the foot of the back walls) the
   shallow side no longer pokes out; rushes and other plants that stand out of the water grow only on gentle banks;
 - the island's fallen wood lies along the bed, tilted to its slope (pieces that would sit too steeply aren't placed);
-- the bass's open mouth no longer shows a hole straight through the fish: the bass draws both sides of its
-  surfaces, so through the mouth you see the inside of its head and body (about 0.2 ms of RDP time in the lake
-  bench);
+- the bass keeps its mouth shut (the model's own pose gaped); it opens only to bite and while it fights, and
+  then draws both sides of its surfaces, so you don't see out through the mouth; a fish that gets away shuts it;
 - far fish (the flat shape past 750 units) also face the camera from every side now: nose-on or tail-on they're a
   short oval, not a line seen edge-on.

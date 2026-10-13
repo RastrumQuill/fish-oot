@@ -205,8 +205,8 @@ static void EnFishmod_PatchSkeleton(FlexSkeletonHeader* skelHeader, s32 texSet) 
 #if FISHMOD_OPT >= 5
             } else if ((texSet == TEXSET_BASS) && (opcode == G_GEOMETRYMODE) && (gfx->words.w1 == G_CULL_BACK) &&
                        ((gfx->words.w0 & 0xFFFFFF) == 0xFFFFFF)) {
-                // the bass draws both sides (EnFishmod_Draw turns culling off around it): its mouth gapes, and
-                // through it you see the inside of the head and body, which culling would leave as a hole
+                // culling is set per fish instead (EnFishmod_Draw, EnFishmod_RigDraw): off while the mouth is
+                // open, when you see the inside of the head and body through it
                 gfx->words.w0 = G_NOOP << 24;
                 gfx->words.w1 = 0;
 #endif
@@ -776,6 +776,11 @@ void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
         (state != FISH_STATE_BITE) && (state != FISH_STATE_INSPECT)) {
         EnFishmod_RodRelease(this);
     }
+#if FISHMOD_OPT >= 5
+    if ((state != FISH_STATE_HOOKED) && (state != FISH_STATE_NIBBLE) && (state != FISH_STATE_BITE)) {
+        this->jawRot = 0; // shuts its mouth (an escaped fish kept the bite's or the fight's gape)
+    }
+#endif
 
     this->fishState = state;
     switch (state) {
@@ -2014,8 +2019,9 @@ s32 EnFishmod_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
             rot->y += this->bodyYaw[limbIndex - 1];
         } else if (limbIndex == 4) {
             rot->y += this->bodyYaw[3];
-        } else if (limbIndex == 0xD) {
-            rot->z -= this->jawRot;
+        } else if (limbIndex == FISHMOD_BASS_JAW_LIMB + 1) {
+            // shut at rest (the model's own pose gapes); jawRot opens it from there
+            rot->z += FISHMOD_BASS_JAW_SHUT - this->jawRot;
         } else if (limbIndex == 0xE) {
             rot->y -= this->finYaw;
         } else if (limbIndex == 0xF) {
@@ -2766,11 +2772,15 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     FISHMOD_PROF(FISHMOD_PROF_D_POSE, EnFishmod_DrawPose(this, play));
 #else
 #if FISHMOD_OPT >= 5
-    // The bass's mouth opens wide: through it you look at the inside of the head and body, their back faces,
-    // which culling would leave as a hole straight through the fish. So the bass draws both sides.
+    // The bass's display lists don't set culling (EnFishmod_PatchSkeleton): with its mouth open you look at the
+    // inside of the head and body, their back faces, so it draws both sides then; shut, it culls them
     if (this->species->base == FISHMOD_BASE_BASS) {
         OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
-        gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+        if (this->jawRot > 0) {
+            gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+        } else {
+            gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+        }
         CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
     }
 #endif

@@ -387,11 +387,17 @@ static void Fishmod_StudioUpdate(PlayState* play) {
                                         { 1.0f, -0.2f, 0.05f } };
         const f32* d = sDir[(sStudioSegment % STUDIO_VIEWS) - 2];
 
-        // nose-on close up, into the open mouth
-        dist *= ((sStudioSegment % STUDIO_VIEWS) == 2) ? 0.3f : 1.3f;
+        // close up nose-on (into the mouth) and from the side
+        dist *= (((sStudioSegment % STUDIO_VIEWS) == 2) || ((sStudioSegment % STUDIO_VIEWS) == 5)) ? 0.3f : 1.3f;
         eye.x = at.x + d[0] * dist;
         eye.y = at.y + d[1] * dist;
         eye.z = at.z + d[2] * dist;
+        if (((sStudioSegment % STUDIO_VIEWS) == 5) && (gFishmodStudio.fish[0] != NULL)) { // the full-rig fish, from the side
+            at = gFishmodStudio.fish[0]->world.pos;
+            eye.x = at.x - dist;
+            eye.y = at.y - 0.2f * dist;
+            eye.z = at.z + 0.05f * dist;
+        }
     }
     Play_SetCameraAtEye(play, sStudioCamId, &at, &eye);
     Play_SetCameraFov(play, sStudioCamId, 25.0f);
