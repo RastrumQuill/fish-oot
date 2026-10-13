@@ -12,6 +12,7 @@ Style rules (fishmod/docs/research/visual-references.md):
 Deterministic (fixed seeds), so the output only changes when this file does.
 
 Usage: fishmod/tools/gen_habitat.py     writes fishmod/art/habitat/*.png and fishmod/assets/habitat/*.obj
+       (FISHMOD_HW=1: the original-hardware meshes, into fishmod/assets/habitat_hw/, not committed)
 """
 import math
 import os
@@ -21,7 +22,11 @@ from PIL import Image
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ART = os.path.join(ROOT, "fishmod", "art", "habitat")
-MESH = os.path.join(ROOT, "fishmod", "assets", "habitat")
+# the original-hardware version's meshes (FISHMOD_HW=1, see HW below) go elsewhere: they're made for that build only,
+# and the committed ones stay the emulator version's
+MESH = os.path.join(ROOT, "fishmod", "assets",
+                    "habitat_hw" if os.environ.get("FISHMOD_HW") == "1" else "habitat")
+os.makedirs(MESH, exist_ok=True)
 
 
 def hexc(h):
@@ -680,7 +685,7 @@ def write_props_manifest():
                 src = os.path.join(ART, tex + ".png")
             textures.append({"name": "gFishmodProp_" + tex + "Tex", "src": os.path.relpath(src, ROOT),
                              "format": fmt, "out": out})
-        models.append({"name": "gFishmodProp_" + kind + "DL", "src": f"fishmod/assets/habitat/{kind}.obj",
+        models.append({"name": "gFishmodProp_" + kind + "DL", "src": os.path.relpath(os.path.join(MESH, kind + ".obj"), ROOT),
                        "texture": "gFishmodProp_" + tex + "Tex", "out": out, "separateMaterial": True})
     with open(os.path.join(DATA, "props_manifest.json"), "w") as f:
         json.dump({"textures": textures, "models": models}, f, indent=1)
