@@ -90,6 +90,8 @@ fi
 FISHMOD_HW=$HW python3 fishmod/tools/gen_habitat.py > /dev/null
 python3 fishmod/tools/assets.py --manifest src/fishmod_data/props_manifest.json > /dev/null
 python3 fishmod/tools/gen_scatter.py --c
+# Lake Hylia's bed shaded under the water (generated, not committed)
+python3 fishmod/tools/gen_bedshade.py > /dev/null
 # the solid props' collision (rocks), added to the scene's at load (generated, not committed)
 python3 fishmod/tools/gen_collision.py
 # the water floor maps, baked from the extracted scenes and the props' collision (generated, not committed)
