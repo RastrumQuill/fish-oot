@@ -654,6 +654,7 @@ static s32 sLodHi;
 static u32 sLodFrames;
 static u16 sLodTime;
 static f32 sLodSkyRot;
+static u32 sLodStateFrames;
 
 static u16* sLodCur;   // the frame being tested, copied off the screen
 
@@ -747,6 +748,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
         sLodNoise = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT / 8, "../fishmod_debug.c", __LINE__);
         sLodCur = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
         sLodSkyRot = play->skyboxCtx.rot.y;
+        sLodStateFrames = play->state.frames;
         sLodFrames = play->gameplayFrames;
         sLodTime = gSaveContext.save.dayTime;
         gFishmodLodTest.active = true;
@@ -758,6 +760,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
     play->gameplayFrames = sLodFrames;
     gSaveContext.save.dayTime = sLodTime;
     play->skyboxCtx.rot.y = sLodSkyRot; // the sky turns slowly (and shows through the water from below)
+    play->state.frames = sLodStateFrames; // the lake's water scrolls by this count
     if (sLodState == LOD_DONE) {
         Fishmod_DebugPrintf(2, "LOD calibration done: %d stops", sLod.stops);
         return;
