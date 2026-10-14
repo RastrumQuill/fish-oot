@@ -36,6 +36,13 @@
 #include "src/fishmod_data/fishmod_props_kinds.h"
 #include "fishmod_lod.h"
 
+// Lake Hylia's bed shaded under the full lake (fishmod/tools/gen_bedshade.py, made at build time)
+typedef struct FishmodBedShade {
+    u32 offset; // of a vertex's normal in the room
+    s8 normal[3];
+} FishmodBedShade;
+#include "src/fishmod_data/fishmod_bedshade.h"
+
 typedef enum FishmodPropKind {
 #define X(id, name) FISHMOD_PROP_##id,
     FISHMOD_PROP_KINDS(X)
@@ -215,6 +222,7 @@ static FishmodProp* sProps;
 // sets the level during the scene's first update), and again only if that save flag changes.
 static u8* sChunkDry;
 static s8 sDryFor = -1; // the flag the table was made for; -1: not made yet
+static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded again is the ROM's again)
 
 // Two frames' worth of matrices and commands (the RSP reads last frame's while this one is built), in buffers of
 // their own rather than the frame's display buffer, which the scene and the fish need.
@@ -280,6 +288,7 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sProps = (FishmodProp*)((u8*)sScatter + sScatter->propsOffset);
     sChunkDry = ZeldaArena_Malloc(sScatter->width * sScatter->depth);
     sDryFor = -1;
+    sBedShadedRoom = NULL;
     Scatter_AllocBuffers();
 #if FISHMOD_DEBUG
     {
@@ -448,10 +457,37 @@ static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
     return mtx;
 }
 
+/**
+ * Lake Hylia's bed under the full lake, shaded: darker under dense weed and lily pads and in deep water (shorter
+ * normals take less of the sun: F3DEX2 doesn't normalise them). Written into the loaded room once; the drained lake
+ * is left alone.
+ */
+static void Scatter_ShadeBed(PlayState* play) {
+    u8* room = play->roomCtx.curRoom.segment;
+    u32 last = 0;
+    s32 i;
+
+    if ((play->sceneId != SCENE_LAKE_HYLIA) || (room == NULL) || (room == sBedShadedRoom) ||
+        (LINK_IS_ADULT && !GET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA))) {
+        return;
+    }
+    for (i = 0; i < FISHMOD_BEDSHADE_COUNT; i++) {
+        const FishmodBedShade* shade = &sFishmodBedShade[i];
+
+        room[shade->offset + 0] = shade->normal[0];
+        room[shade->offset + 1] = shade->normal[1];
+        room[shade->offset + 2] = shade->normal[2];
+        last = MAX(last, shade->offset + 3);
+    }
+    osWritebackDCache(room, last);
+    sBedShadedRoom = room;
+}
+
 static void Scatter_UpdateDry(PlayState* play) {
     s8 flag = GET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA) ? 1 : 0;
     s32 c;
 
+    Scatter_ShadeBed(play);
     if (flag == sDryFor) {
         return;
     }
