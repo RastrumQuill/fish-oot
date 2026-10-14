@@ -161,7 +161,13 @@ def view_proj(eye, at, fov):
     return s, u, f, 1.0 / math.tan(math.radians(fov) / 2)
 
 
-def raster(buf, kbuf, kidx, pts):
+# how much of each card's area is solid texels (the rest is cut out: no depth written there)
+COVER = {"GRASS_TUFT": 0.45, "RIBBON_WEED": 0.60, "BUSH_WEED": 0.50, "BROADLEAF": 0.49, "BIG_PONDWEED": 0.56,
+         "KELP_FROND": 0.46, "VINE_STRAND": 0.31, "FAN_WEED": 0.67, "TALL_WEED": 0.60}
+ZSTATS = {"written": 0, "hidden": 0}
+
+
+def raster(buf, kbuf, kidx, pts, zbuf=None, depths=None, cover=1.0, seed=0):
     (x0, y0), (x1, y1), (x2, y2) = pts
     area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
     if abs(area) < 1e-6:
@@ -177,6 +183,20 @@ def raster(buf, kbuf, kidx, pts):
     inside = ((w0 >= 0) & (w1 >= 0) & (w2 >= 0)) | ((w0 <= 0) & (w1 <= 0) & (w2 <= 0))
     buf[miny:maxy + 1, minx:maxx + 1] += inside
     kbuf[kidx] += int(inside.sum())
+    if zbuf is not None:
+        # depth across the triangle (1/z is linear on screen), and which texels are solid (a fixed pattern per card)
+        l0 = w0 / area if area else 0
+        l1 = w1 / area if area else 0
+        l2 = 1 - l0 - l1
+        invz = l0 / depths[0] + l1 / depths[1] + l2 / depths[2]
+        z = 1.0 / np.maximum(invz, 1e-6)
+        solid = np.random.default_rng(seed).random(inside.shape) < cover
+        sub = zbuf[miny:maxy + 1, minx:maxx + 1]
+        nearer = z < sub
+        write = inside & solid & nearer
+        ZSTATS["written"] += int(write.sum())
+        ZSTATS["hidden"] += int((inside & ~write).sum())
+        sub[write] = z[write]
 
 
 def main():
@@ -184,6 +204,7 @@ def main():
     ap.add_argument("pose", type=float, nargs=6)
     ap.add_argument("--hw", action="store_true")
     ap.add_argument("--top", type=int, default=0)
+    ap.add_argument("--zorder", help="game, near, far or bandsN (every N units): also count pixels written vs rejected")
     ap.add_argument("--png")
     ap.add_argument("--fov", type=float, default=60.0)
     args = ap.parse_args()
@@ -204,7 +225,24 @@ def main():
     kbuf = [0] * len(names)
     near = 10.0
     per_prop = []
-    for x, y, z, kid, yaw, sc, tx, tz in drawn:
+    zbuf = np.full((H, W), 1e9) if args.zorder else None
+    if args.zorder == "near":
+        drawn = sorted(drawn, key=lambda p: math.dist((p[0], p[1], p[2]), eye))
+    elif args.zorder == "game":
+        # the game's order: by distance band, then kind by kind within the band
+        def band(p):
+            dsq = (p[0] - eye[0]) ** 2 + (p[2] - eye[2]) ** 2
+            return 0 if dsq < BAND_NEAR ** 2 else 1 if dsq < BAND_MID ** 2 else 2
+        order = [k for k, _ in kind_list]
+        drawn = sorted(drawn, key=lambda p: (band(p), order.index(p[3])))
+    elif args.zorder and args.zorder.startswith("bands"):
+        # finer distance bands (every N units), kind by kind within each
+        step = float(args.zorder[5:])
+        order = [k for k, _ in kind_list]
+        drawn = sorted(drawn, key=lambda p: (int(math.dist((p[0], p[2]), (eye[0], eye[2])) // step), order.index(p[3])))
+    elif args.zorder == "far":
+        drawn = sorted(drawn, key=lambda p: -math.dist((p[0], p[1], p[2]), eye))
+    for n_prop, (x, y, z, kid, yaw, sc, tx, tz) in enumerate(drawn):
         before = sum(kbuf)
         tris = mesh.get(kid)
         if not tris:
@@ -215,6 +253,7 @@ def main():
         flat = kid == "LILY_PAD"
         for tri in tris:
             pts = []
+            dep = []
             ok = True
             for vx, vy, vz in tri:
                 # as Scatter_Matrix (no tilt: logs are few): x' = (x c + z s), z' = (-x s + z c), times the scale
@@ -229,10 +268,14 @@ def main():
                 sx = W / 2 + (d @ s) / depth * focal / aspect * W / 2
                 sy = H / 2 - (d @ u) / depth * focal * H / 2
                 pts.append((sx, sy))
-            raster(buf, kbuf, names.index(kid), pts)
+                dep.append(depth)
+            raster(buf, kbuf, names.index(kid), pts, zbuf, dep, COVER.get(kid, 0.9), n_prop)
         per_prop.append((sum(kbuf) - before, kid, math.dist((x, y, z), eye), sc))
     total = buf.sum() / (W * H)
     print(f"{len(drawn)} props drawn, overdraw {total:.2f} screens (worst pixel {buf.max()}x)")
+    if args.zorder:
+        print(f"  order {args.zorder}: written {ZSTATS['written'] / (W * H):.2f} screens, "
+              f"rejected (cut out or hidden) {ZSTATS['hidden'] / (W * H):.2f}")
     for n, c in sorted(zip(names, kbuf), key=lambda t: -t[1])[:10]:
         print(f"  {n:14s} {c / (W * H):6.2f}")
     if args.top:
