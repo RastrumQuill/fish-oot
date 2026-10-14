@@ -1,4 +1,7 @@
 #include "view.h"
+#if FISHMOD_DEBUG
+#include "fishmod.h"
+#endif
 
 #include "avoid_ub.h"
 #include "gfx.h"
@@ -259,6 +262,12 @@ void View_SetDistortion(View* view, Vec3f orientation, Vec3f scale, f32 speed) {
 s32 View_StepDistortion(View* view, Mtx* projectionMtx) {
     MtxF projectionMtxF;
 
+#if FISHMOD_DEBUG
+    // fishmod: the LOD calibrator compares still frames, and the underwater wobble keeps its own time
+    if (gFishmodLodTest.active) {
+        return false;
+    }
+#endif
     if (view->distortionSpeed == 0.0f) {
         return false;
     } else if (view->distortionSpeed == 1.0f) {

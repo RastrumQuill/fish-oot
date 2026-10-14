@@ -679,7 +679,11 @@ static s32 Lod_Compare(s32 markNoise) {
         dg = ABS((s32)((a >> 6) & 31) - (s32)((b >> 6) & 31));
         db = ABS((s32)((a >> 1) & 31) - (s32)((b >> 1) & 31));
         if ((dr > LOD_THRESHOLD) || (dg > LOD_THRESHOLD) || (db > LOD_THRESHOLD)) {
-            if (markNoise) {
+            if (markNoise == 2) {
+                if (!(sLodNoise[i >> 3] & (1 << (i & 7)))) {
+                    fb[i] = 0xF801;
+                }
+            } else if (markNoise) {
                 sLodNoise[i >> 3] |= 1 << (i & 7);
                 count++;
             } else if (!(sLodNoise[i >> 3] & (1 << (i & 7)))) {
@@ -786,6 +790,24 @@ static void Fishmod_LodUpdate(PlayState* play) {
             s32 mid = (sLodLo + sLodHi) / 2;
 
             s32 changed = Lod_Compare(false);
+
+#ifdef FISHMOD_LOD_SHOW
+            // diagnosis: stay on the first test that fails, painting what differs (red) and what's restless (blue)
+            if (changed > LOD_PIXELS) {
+                u16* fb = Lod_Frame();
+                s32 i;
+
+                Lod_Compare(2);
+                for (i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
+                    if (sLodNoise[i >> 3] & (1 << (i & 7))) {
+                        fb[i] = 0x003F;
+                    }
+                }
+                Fishmod_DebugPrintf(3, "kind %d at %d: %d", sLodKind, mid * LOD_STEP, changed);
+                sLodTimer = 2;
+                break;
+            }
+#endif
 
             if (sLod.logCount < ARRAY_COUNT(sLod.log)) {
                 sLod.log[sLod.logCount][0] = sLodKind;
