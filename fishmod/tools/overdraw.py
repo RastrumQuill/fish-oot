@@ -79,9 +79,12 @@ def parse_dl(dl_text, vtx_arrays):
     return [t for t in tris if None not in t]
 
 
+PROPS = "src/fishmod_data/fishmod_props.inc.c"
+
+
 def meshes(kind_list):
     out = {}
-    t = read("src/fishmod_data/fishmod_props.inc.c")
+    t = read(PROPS)
     arrays = {}
     for m in re.finditer(r"Vtx (\w+)\[\d+\] = \{(.*?)\};", t, re.S):
         arrays[m.group(1)] = [tuple(int(v, 0) for v in g) for g in VTX.findall(m.group(2))]
@@ -206,8 +209,12 @@ def main():
     ap.add_argument("--top", type=int, default=0)
     ap.add_argument("--zorder", help="game, near, far or bandsN (every N units): also count pixels written vs rejected")
     ap.add_argument("--png")
+    ap.add_argument("--props", help="the props' C to read (default: the build's, src/fishmod_data/fishmod_props.inc.c)")
     ap.add_argument("--fov", type=float, default=60.0)
     args = ap.parse_args()
+    if args.props:
+        global PROPS
+        PROPS = args.props
     eye, at = args.pose[:3], args.pose[3:]
     cfg = dict(SETTINGS["hw" if args.hw else "emu"])
     if eye[1] < SURFACE_Y:
