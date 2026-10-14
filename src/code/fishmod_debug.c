@@ -694,12 +694,29 @@ static s32 Lod_Compare(s32 markNoise) {
     return count;
 }
 
-static void Lod_Test(s32 kind, s32 dist) {
+static u16 sLodPending[FISHMOD_LOD_KINDS]; // the cut to test once its fresh reference is taken
+static s32 sLodFresh;                      // a fresh reference is being drawn
+
+/**
+ * Draws everything for LOD_HOLD frames and takes that as the reference, then the cut in sLodPending for LOD_HOLD
+ * frames: each test is compared with a frame from just before it, so nothing that drifts slowly (light settling,
+ * the sky) is counted.
+ */
+static void Lod_TestPending(void) {
     bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
-    if (kind >= 0) {
-        gFishmodLodTest.dist[kind] = dist;
-    }
+    sLodFresh = true;
     sLodTimer = LOD_HOLD;
+}
+
+static void Lod_Test(s32 kind, s32 dist) {
+    bzero(sLodPending, sizeof(sLodPending));
+    if (kind < 0) {
+        bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
+        sLodTimer = LOD_HOLD;
+        return;
+    }
+    sLodPending[kind] = dist;
+    Lod_TestPending();
 }
 
 static void Lod_Save(void) {
@@ -736,10 +753,18 @@ static void Fishmod_LodUpdate(PlayState* play) {
     if ((sLodState != LOD_ARRIVE) && (--sLodTimer > 0)) {
         return;
     }
+    if (sLodFresh) {
+        bcopy(Lod_Frame(), sLodRef, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
+        bcopy(sLodPending, gFishmodLodTest.dist, sizeof(sLodPending));
+        sLodFresh = false;
+        sLodTimer = LOD_HOLD;
+        return;
+    }
 
     switch (sLodState) {
         case LOD_ARRIVE:
-            if (sTourFrame >= TOUR_GLIDE + LOD_SETTLE) {
+            // the first stop waits longer: the scene's lights are still coming up after it loads
+            if (sTourFrame >= TOUR_GLIDE + LOD_SETTLE + ((stop == 0) ? 200 : 0)) {
                 Lod_Test(-1, 0);
                 sLodState = LOD_REF;
             }
@@ -772,11 +797,10 @@ static void Fishmod_LodUpdate(PlayState* play) {
                 s32 k;
 
                 // every kind at the distances found so far, together
-                bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
                 for (k = 0; k < gFishmodLodTest.kindCount; k++) {
-                    gFishmodLodTest.dist[k] = MAX(sLod.need[under][k], LOD_STEP);
+                    sLodPending[k] = MAX(sLod.need[under][k], LOD_STEP);
                 }
-                sLodTimer = LOD_HOLD;
+                Lod_TestPending();
                 sLodState = LOD_VERIFY;
                 break;
             }
