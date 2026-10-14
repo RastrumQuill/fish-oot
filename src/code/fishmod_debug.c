@@ -45,6 +45,7 @@
 #include "libc/math.h"
 #include "letterbox.h"
 #include "actor.h"
+#include "libc64/malloc.h"
 
 void Sram_InitDebugSave(void);
 
@@ -415,6 +416,7 @@ static void Fishmod_StudioUpdate(PlayState* play) {
 #endif
 
 Vec3f gFishmodDebugFocus;
+FishmodLodTest gFishmodLodTest;
 #ifdef FISHMOD_VIEW_SCHOOL
 s32 gFishmodDebugFocusSchool = true;
 #else
@@ -476,6 +478,10 @@ static u16 sTourPress;
 static s8 sTourStickX;
 static s8 sTourStickY;
 static s32 sTourDebugText;
+
+#ifdef FISHMOD_LOD_CALIBRATE
+static void Fishmod_LodUpdate(PlayState* play);
+#endif
 
 static void Fishmod_TourGo(s32 stop) {
     s32 n = ARRAY_COUNT(sTourStops);
@@ -586,13 +592,249 @@ static void Fishmod_TourUpdate(PlayState* play) {
         }
         sUnder = under;
     }
+#ifdef FISHMOD_LOD_CALIBRATE
+    Fishmod_LodUpdate(play);
+#endif
 }
+
+#ifdef FISHMOD_LOD_CALIBRATE
+/*
+ * LOD calibration: how far each habitat prop kind has to be drawn, measured on the game's own frames at the N64's
+ * resolution. At each tour stop, with everything that moves held still (the clock, the frame count that drives
+ * sway and scrolling water; no fish, no particles), the frame with every prop drawn out to 3000 units is the
+ * reference, and a few more like it mark the pixels that change by themselves. Then for each kind in view, a
+ * binary search finds the shortest distance it can stop at with no more than LOD_PIXELS pixels (not counting the
+ * restless ones) differing by more than LOD_THRESHOLD in any 5-bit channel. Pixel by pixel, not averaged: a frame
+ * that is mostly fog can't hide a prop that shows. Each kind keeps the furthest any stop needs, above water and
+ * under it, and each stop is checked again with every kind at those distances together. The results go to SRAM
+ * (0x7A40, after the save slots) for fishmod/tools/lod_calibrate.py, which writes include/fishmod_lod.h.
+ */
+#define LOD_THRESHOLD 2 // a pixel differs if a channel moves by more than this (of 31; dither moves them by 1)
+#define LOD_PIXELS 2    // pixels a kind may change by stopping short
+#define LOD_STEP 100    // distances tried: steps of this...
+#define LOD_STEPS 30    // ...out to LOD_STEP * LOD_STEPS (the reference)
+#define LOD_HOLD 5      // frames each test is drawn before its frame is read (the display runs a frame or two behind)
+#define LOD_SETTLE 40   // frames after the camera arrives before the reference
+#define LOD_NOISE_REFS 3
+
+typedef enum LodState {
+    LOD_ARRIVE,
+    LOD_REF,
+    LOD_NOISE,
+    LOD_NEXT_KIND,
+    LOD_SEARCH,
+    LOD_VERIFY,
+    LOD_DONE
+} LodState;
+
+typedef struct LodResults {
+    /* 0x000 */ u32 magic; // 'FLOD'
+    /* 0x004 */ u8 kinds;
+    /* 0x005 */ u8 stops;   // stops done so far
+    /* 0x006 */ u8 threshold;
+    /* 0x007 */ u8 pixels;
+    /* 0x008 */ u16 need[2][FISHMOD_LOD_KINDS]; // [above, under] water: the furthest any stop needs, units (0: never seen)
+    /* 0x0C8 */ u16 noise[32];  // per stop: pixels that changed by themselves
+    /* 0x108 */ u16 verify[32]; // per stop: pixels changed with every kind at its distance
+    /* 0x148 */ u8 under[32];   // per stop: the camera was under water
+    /* 0x168 */ u16 logCount;
+    /* 0x16A */ u16 log[64][3]; // the first tests: kind, distance, pixels changed (for checking the method)
+} LodResults;
+
+static LodResults sLod;
+static u16* sLodRef;   // the reference frame
+static u8* sLodNoise;  // pixels that change by themselves, a bit each
+static u16 sLodDrawn[FISHMOD_LOD_KINDS]; // props of each kind in the reference
+static s32 sLodState = LOD_ARRIVE;
+static s32 sLodTimer;
+static s32 sLodPass;
+static s32 sLodKind;
+static s32 sLodLo;
+static s32 sLodHi;
+static u32 sLodFrames;
+static u16 sLodTime;
+
+static u16* Lod_Frame(void) {
+    // what the screen shows (finished), read past the data cache
+    return (u16*)OS_PHYSICAL_TO_K1(OS_K0_TO_PHYSICAL(osViGetCurrentFramebuffer()));
+}
+
+/** Pixels differing from the reference by more than LOD_THRESHOLD; with `markNoise`, they're marked restless. */
+static s32 Lod_Compare(s32 markNoise) {
+    u16* fb = Lod_Frame();
+    s32 count = 0;
+    s32 i;
+
+    for (i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
+        u16 a = fb[i];
+        u16 b = sLodRef[i];
+        s32 dr;
+        s32 dg;
+        s32 db;
+
+        if (a == b) {
+            continue;
+        }
+        dr = ABS((s32)((a >> 11) & 31) - (s32)((b >> 11) & 31));
+        dg = ABS((s32)((a >> 6) & 31) - (s32)((b >> 6) & 31));
+        db = ABS((s32)((a >> 1) & 31) - (s32)((b >> 1) & 31));
+        if ((dr > LOD_THRESHOLD) || (dg > LOD_THRESHOLD) || (db > LOD_THRESHOLD)) {
+            if (markNoise) {
+                sLodNoise[i >> 3] |= 1 << (i & 7);
+                count++;
+            } else if (!(sLodNoise[i >> 3] & (1 << (i & 7)))) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+static void Lod_Test(s32 kind, s32 dist) {
+    bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
+    if (kind >= 0) {
+        gFishmodLodTest.dist[kind] = dist;
+    }
+    sLodTimer = LOD_HOLD;
+}
+
+static void Lod_Save(void) {
+    sLod.magic = 0x464C4F44; // 'FLOD'
+    sLod.kinds = gFishmodLodTest.kindCount;
+    sLod.threshold = LOD_THRESHOLD;
+    sLod.pixels = LOD_PIXELS;
+    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7A40, &sLod, sizeof(sLod), OS_WRITE);
+}
+
+static void Fishmod_LodUpdate(PlayState* play) {
+    s32 under = gFishmodLodTest.under;
+    s32 stop = sTourStop;
+
+    if (sLodRef == NULL) {
+        sLodRef = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
+        sLodNoise = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT / 8, "../fishmod_debug.c", __LINE__);
+        sLodFrames = play->gameplayFrames;
+        sLodTime = gSaveContext.save.dayTime;
+        gFishmodLodTest.active = true;
+        if ((sLodRef == NULL) || (sLodNoise == NULL)) {
+            sLodState = LOD_DONE;
+        }
+    }
+    // everything that moves, held still
+    play->gameplayFrames = sLodFrames;
+    gSaveContext.save.dayTime = sLodTime;
+    if (sLodState == LOD_DONE) {
+        Fishmod_DebugPrintf(2, "LOD calibration done: %d stops", sLod.stops);
+        return;
+    }
+    Fishmod_DebugPrintf(2, "LOD stop %d kind %d [%d-%d] %s", stop + 1, sLodKind, sLodLo * LOD_STEP, sLodHi * LOD_STEP,
+                        under ? "under" : "above");
+    if ((sLodState != LOD_ARRIVE) && (--sLodTimer > 0)) {
+        return;
+    }
+
+    switch (sLodState) {
+        case LOD_ARRIVE:
+            if (sTourFrame >= TOUR_GLIDE + LOD_SETTLE) {
+                Lod_Test(-1, 0);
+                sLodState = LOD_REF;
+            }
+            break;
+
+        case LOD_REF:
+            bcopy(Lod_Frame(), sLodRef, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
+            bcopy(gFishmodLodTest.drawn, sLodDrawn, sizeof(sLodDrawn));
+            bzero(sLodNoise, SCREEN_WIDTH * SCREEN_HEIGHT / 8);
+            sLodPass = 0;
+            sLod.noise[stop] = 0;
+            Lod_Test(-1, 0);
+            sLodState = LOD_NOISE;
+            break;
+
+        case LOD_NOISE:
+            sLod.noise[stop] += Lod_Compare(true);
+            if (++sLodPass < LOD_NOISE_REFS) {
+                Lod_Test(-1, 0);
+                break;
+            }
+            sLodKind = -1;
+            sLodState = LOD_NEXT_KIND;
+            // fall through
+        case LOD_NEXT_KIND:
+            do {
+                sLodKind++;
+            } while ((sLodKind < gFishmodLodTest.kindCount) && (sLodDrawn[sLodKind] == 0));
+            if (sLodKind >= gFishmodLodTest.kindCount) {
+                s32 k;
+
+                // every kind at the distances found so far, together
+                bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
+                for (k = 0; k < gFishmodLodTest.kindCount; k++) {
+                    gFishmodLodTest.dist[k] = MAX(sLod.need[under][k], LOD_STEP);
+                }
+                sLodTimer = LOD_HOLD;
+                sLodState = LOD_VERIFY;
+                break;
+            }
+            sLodLo = 1;
+            sLodHi = LOD_STEPS;
+            Lod_Test(sLodKind, ((sLodLo + sLodHi) / 2) * LOD_STEP);
+            sLodState = LOD_SEARCH;
+            break;
+
+        case LOD_SEARCH: {
+            s32 mid = (sLodLo + sLodHi) / 2;
+
+            s32 changed = Lod_Compare(false);
+
+            if (sLod.logCount < ARRAY_COUNT(sLod.log)) {
+                sLod.log[sLod.logCount][0] = sLodKind;
+                sLod.log[sLod.logCount][1] = mid * LOD_STEP;
+                sLod.log[sLod.logCount][2] = changed;
+                sLod.logCount++;
+            }
+            if (changed <= LOD_PIXELS) {
+                sLodHi = mid; // stopping there changes nothing that shows
+            } else {
+                sLodLo = mid + 1;
+            }
+            if (sLodLo < sLodHi) {
+                Lod_Test(sLodKind, ((sLodLo + sLodHi) / 2) * LOD_STEP);
+            } else {
+                sLod.need[under][sLodKind] = MAX(sLod.need[under][sLodKind], sLodHi * LOD_STEP);
+                sLodState = LOD_NEXT_KIND;
+                sLodTimer = 1;
+            }
+            break;
+        }
+
+        case LOD_VERIFY:
+            sLod.verify[stop] = Lod_Compare(false);
+            sLod.under[stop] = under;
+            sLod.stops = stop + 1;
+            Lod_Save();
+            if (stop + 1 >= (s32)ARRAY_COUNT(sTourStops)) {
+                sLodState = LOD_DONE;
+                gFishmodLodTest.active = false;
+            } else {
+                Fishmod_TourGo(stop + 1);
+                Lod_Test(-1, 0);
+                sLodState = LOD_ARRIVE;
+            }
+            break;
+    }
+}
+#endif
 
 static void Fishmod_TourDraw(Gfx** gfxP) {
     FishmodTourStop* stop = &sTourStops[sTourStop];
     GfxPrint printer;
     Gfx* gfx = *gfxP;
     s32 i;
+
+#ifdef FISHMOD_LOD_CALIBRATE
+    return; // nothing over the frames being compared
+#endif
 
     // a dark box at the bottom, like a textbox
     gfx = Gfx_SetupDL_57(gfx);

@@ -324,6 +324,18 @@ extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
     }
 extern Vec3f gFishmodDebugFocus; // the fish nearest to Link, for the follow camera
 extern s32 gFishmodDebugFocusSchool; // the follow camera follows school leaders only
+
+// The LOD calibration (FISHMOD_LOD_CALIBRATE, fishmod_debug.c): props drawn out to 3000 units, each kind no further
+// than dist[kind] (0: 3000), no fish or particles, while frames are compared.
+#define FISHMOD_LOD_KINDS 48
+typedef struct FishmodLodTest {
+    /* 0x00 */ u8 active;
+    /* 0x01 */ u8 under;     // the camera is under water (set by the scatter)
+    /* 0x02 */ u8 kindCount; // FISHMOD_PROP_KIND_MAX (set by the scatter)
+    /* 0x04 */ s16 dist[FISHMOD_LOD_KINDS];
+    /* 0x64 */ u16 drawn[FISHMOD_LOD_KINDS]; // per kind, props drawn in the last frame (set by the scatter)
+} FishmodLodTest;
+extern FishmodLodTest gFishmodLodTest;
 extern s16 gFishmodDebugFocusYaw;
 #else
 #define FISHMOD_PROF(slot, stmt) \

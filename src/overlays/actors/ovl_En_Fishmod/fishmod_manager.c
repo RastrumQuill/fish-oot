@@ -526,6 +526,11 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
 #if FISHMOD_OPT >= 5
     if (!gFishmodPhoto.active) {
         FISHMOD_PROF(FISHMOD_PROF_D_SCATTER, EnFishmod_ScatterDraw(play));
+#if FISHMOD_DEBUG
+        if (gFishmodLodTest.active) {
+            return; // the LOD calibration compares frames: nothing moving but the props
+        }
+#endif
         FISHMOD_PROF(FISHMOD_PROF_D_PARTICLES, EnFishmod_ParticlesDraw(play));
     }
 #endif

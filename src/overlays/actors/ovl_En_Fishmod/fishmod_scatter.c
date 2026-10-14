@@ -34,6 +34,7 @@
 // the props' textures and display lists (fishmod/tools/gen_habitat.py -> fishmod/tools/assets.py, made at build time)
 #include "src/fishmod_data/fishmod_props.inc.c"
 #include "src/fishmod_data/fishmod_props_kinds.h"
+#include "fishmod_lod.h"
 
 typedef enum FishmodPropKind {
 #define X(id, name) FISHMOD_PROP_##id,
@@ -45,14 +46,15 @@ typedef enum FishmodPropKind {
 typedef struct FishmodPropKindInfo {
     Gfx* material;
     Gfx* model;
-    f32 drawDist;
+    f32 drawDist;      // drawn no further than this (above water)
+    f32 drawDistUnder; // and with the camera under water (fishmod_lod.h: measured, the haze hides the rest)
     u8 floating; // on the surface: not drawn while the water there is lower than it was placed for
     u8 plant;    // a living plant: not drawn where the water has gone (the drained lake)
     u8 xlu;      // drawn see-through (the Fishing Pond's reed, as vanilla draws it)
     u8 sway;     // how far its top sways (per mille of its height per unit of height); 0: still
     u8 swayRate; // how fast (a turn takes 0x10000 / (swayRate * 16) frames)
-    u8 card;     // a big plant card: not drawn with the camera inside it (FISHMOD_HW)
-    u16 height;  // how tall it is at scale 1 (gen_scatter.py HEIGHT), for the camera-inside test (FISHMOD_HW)
+    u8 card;     // a big plant card: not drawn with the camera inside it (NEAR_SKIP)
+    u16 height;  // how tall it is at scale 1 (gen_scatter.py HEIGHT), for the camera-inside test
 } FishmodPropKindInfo;
 
 #define DIST_SMALL 800.0f
@@ -61,11 +63,16 @@ typedef struct FishmodPropKindInfo {
 // Props drawn per frame at most. They are drawn nearest band first (whatever their kind), so the budget runs out on
 // the far ones. Each is a matrix and three commands, in buffers of the props' own (allocated with the scene's props).
 #define PROP_BUDGET 900
-#define BAND_NEAR 550.0f
-#define BAND_MID 1100.0f
-#define BANDS 3
-// Props in view per band at most (before the budget)
-#define BAND_MAX 1200
+// Nearest first, in bands this wide (kind by kind within a band, so one material per kind per band): the depth
+// test then throws out most hidden pixels before they're written (fishmod/tools/overdraw.py --zorder: about a
+// quarter fewer pixels written than three bands, close to a perfect nearest-first order)
+#define BAND_WIDTH 100.0f
+#define BANDS 32
+// Props in view at most (before the budget)
+#define VISIBLE_MAX 2400
+// Material changes per frame at most (opaque, see-through): the command buffers are sized for them
+#define MAT_MAX 160
+#define MAT_MAX_XLU 24
 // The view's half-angle: the screen's corner is about 44 degrees off the look direction (60 degree field of view,
 // 4:3); a little wider, plus the props' size as room. Props outside it (behind, too far left or right, above or
 // below) aren't drawn, so the budget goes on what's on screen.
@@ -73,23 +80,18 @@ typedef struct FishmodPropKindInfo {
 #define PROP_RADIUS 90.0f
 // See-through props (the pond reeds) drawn per frame at most
 #define XLU_MAX 200
-// Under water the haze hides everything past about this far: nothing further is drawn (it would only be painted over
-// by the fog, at the RDP's full cost)
+// Under water the haze hides everything past about this far, whatever the kind (the measured distances can be less)
 #define DIST_UNDER_FOG 900.0f
-
-/*
- * The original-hardware version (FISHMOD_HW). Emulators draw pixels for free; the N64's RDP pays for every pixel of
- * every triangle (see-through texels too), and the weed beds seen edge-on under water stack many cards on a pixel
- * (fishmod/tools/overdraw.py measures it: up to about 9 screens' worth at the tour's stop 11). So on hardware:
- * - a plant the camera is inside or right against isn't drawn (one card there can fill the screen with a blur);
- * - plain cutouts instead of anti-aliased ones (no read of the frame's colour for every pixel).
- * Nothing that makes the beds less lush: every plant and every card is drawn.
- */
-#if FISHMOD_HW
-#define HW_NEAR 0.6f // the camera-inside test: closer than this times the plant's height (plus a little)
+// A plant the camera is inside or right against isn't drawn: one card there is a blur across the whole screen, at
+// the RDP's full cost (closer than this times the plant's height, plus a little)
+#define NEAR_SKIP 0.6f
+#if FISHMOD_DEBUG
+// what the LOD calibration (fishmod_debug.c, FISHMOD_LOD_CALIBRATE) draws everything out to
+#define DIST_CALIBRATE 3000.0f
 #endif
 
 static FishmodPropKindInfo sKinds[FISHMOD_PROP_KIND_MAX];
+static f32 sDistFar[2]; // the furthest any kind is drawn: above water, under it (how far the chunks are looked at)
 
 static void Scatter_InitKinds(void) {
 #define X(id, name)                                                       \
@@ -177,6 +179,29 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_SUNKEN_LOG].plant = false;
     sKinds[FISHMOD_PROP_BRANCH].plant = false;
     sKinds[FISHMOD_PROP_OLD_POSTS].plant = false;
+    {
+        s32 i;
+
+        // under water no further than the haze lets anything be seen, then what the calibration measured
+        // (fishmod_lod.h, made by fishmod/tools/lod_calibrate.py from the game's own frames)
+        for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
+            sKinds[i].drawDistUnder = MIN(sKinds[i].drawDist, DIST_UNDER_FOG);
+        }
+#define X(id, above, under)                                    \
+    if ((above) > 0) {                                         \
+        sKinds[FISHMOD_PROP_##id].drawDist = (above);          \
+    }                                                          \
+    if ((under) > 0) {                                         \
+        sKinds[FISHMOD_PROP_##id].drawDistUnder = (under);     \
+    }
+        FISHMOD_LOD_DISTANCES(X)
+#undef X
+        sDistFar[0] = sDistFar[1] = 0.0f;
+        for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
+            sDistFar[0] = MAX(sDistFar[0], sKinds[i].drawDist);
+            sDistFar[1] = MAX(sDistFar[1], sKinds[i].drawDistUnder);
+        }
+    }
 }
 
 static FishmodScatterHeader* sScatter;
@@ -200,8 +225,8 @@ static s8 sDryFor = -1; // the flag the table was made for; -1: not made yet
 // The props' commands, two frames' worth (the RSP reads last frame's while this one is built), in buffers of their
 // own rather than the frame's display buffer, which the scene and the fish need.
 typedef struct ScatterFrame {
-    Gfx opa[PROP_BUDGET * 4 + FISHMOD_PROP_KIND_MAX * BANDS * 16 + 4];
-    Gfx xlu[XLU_MAX * 3 + BANDS * 16 + 4];
+    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 64]; // (and the dock)
+    Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4];
     Mtx sway[SWAY_MAX];
 } ScatterFrame;
 // What's drawn and the props' matrices: made when the camera has moved, and kept while it holds still (fishing,
@@ -458,16 +483,7 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind) {
     gDPPipeSync(gfx++);
     gDPSetTextureLUT(gfx++, G_TT_NONE);
     gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0, COMBINED);
-#if FISHMOD_HW
-    // A plain cutout (texels under half alpha dropped), no anti-aliasing: the RDP doesn't read the frame's colour.
-    // Not G_RM_ZB_OPA_SURF2: its ALPHA_CVG_SEL makes the pixel's alpha its coverage, and nothing gets cut out.
-    gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A,
-                     Z_CMP | Z_UPD | CVG_DST_FULL | ZMODE_OPA | GBL_c2(G_BL_CLR_IN, G_BL_0, G_BL_CLR_IN, G_BL_1));
-    gDPSetAlphaCompare(gfx++, G_AC_THRESHOLD);
-    gDPSetBlendColor(gfx++, 0, 0, 0, 0x80);
-#else
     gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_TEX_EDGE2);
-#endif
     gSPClearGeometryMode(gfx++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
     gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
     gSPDisplayList(gfx++, info->material);
@@ -520,18 +536,24 @@ static void Scatter_Sway(PlayState* play, ScatterFrame* frame) {
  * within their kind's distance.
  */
 static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f32 lookZ) {
-    static u16 sVisible[128];                       // chunks near the camera
+    static u16 sVisible[256];                       // chunks near the camera
     static f32 sChunkDistSq[ARRAY_COUNT(sVisible)]; // their centres' distance from the eye, squared
-    static u16 sBand[BANDS][BAND_MAX];              // props in view, by distance band (kind by kind within a band)
+    static u16 sCand[VISIBLE_MAX];                  // props in view (kind by kind)
+    static u8 sCandBand[VISIBLE_MAX];               // and their distance bands
+    static u16 sOrdered[VISIBLE_MAX];               // nearest band first, kind by kind within a band
     static u16 sKindStart[ARRAY_COUNT(sVisible)][FISHMOD_PROP_KIND_MAX + 1]; // each kind's first prop in the chunk
     Vec3f eye = *eyeP;
-    s32 bandCount[BANDS];
+    s32 bandStart[BANDS + 1];
+    s32 candCount = 0;
     s32 visibleCount = 0;
     s32 chunk = sScatter->chunk;
-    f32 distScale = 1.0f;
-    // under water: no further than the haze lets anything be seen
-    f32 distCap = (gFishmodHaze > 0.5f) ? DIST_UNDER_FOG : DIST_FAR;
-    f32 distFar = MIN(DIST_FAR * distScale, distCap);
+    s32 under = (gFishmodHaze > 0.5f);
+    f32 distFar = sDistFar[under];
+    s32 mats = 0;
+    s32 matsXlu = 0;
+    s32 lastOpa = -1;
+    s32 lastXlu = -1;
+    s32 n;
     s32 cx0;
     s32 cx1;
     s32 cz0;
@@ -544,6 +566,15 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 budget = PROP_BUDGET;
     s32 xluLeft = XLU_MAX;
     ScatterSet* set;
+
+#if FISHMOD_DEBUG
+    if (gFishmodLodTest.active) {
+        distFar = DIST_CALIBRATE;
+        gFishmodLodTest.under = under;
+        gFishmodLodTest.kindCount = FISHMOD_PROP_KIND_MAX;
+        bzero(gFishmodLodTest.drawn, sizeof(gFishmodLodTest.drawn));
+    }
+#endif
 
     // the chunks within reach of the camera
     cx0 = CLAMP((s32)((eye.x - distFar - sScatter->x0) / chunk), 0, sScatter->width - 1);
@@ -594,15 +625,22 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
     }
 
-    // One pass over the props near the camera: in view (a cone around the look direction, any pitch), within their
-    // kind's distance, sorted into near / mid / far bands. Kinds come in order within a chunk, and the chunks are
-    // walked kind by kind, so each band is grouped by kind (one material per kind per band).
-    bandCount[0] = bandCount[1] = bandCount[2] = 0;
+    // One pass over the props near the camera: in view (a cone around the look direction, any pitch) and within their
+    // kind's distance (above or under water), kind by kind, each with its distance band.
     for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
         FishmodPropKindInfo* info = &sKinds[kind];
-        f32 maxDist = MIN(info->drawDist * distScale, distCap);
-        f32 maxSq = SQ(maxDist);
-        f32 reachSq = SQ(maxDist + chunk * 0.71f);
+        f32 maxDist = under ? info->drawDistUnder : info->drawDist;
+        f32 maxSq;
+        f32 reachSq;
+
+#if FISHMOD_DEBUG
+        if (gFishmodLodTest.active) {
+            // calibrating: everything out to DIST_CALIBRATE (the test's cut comes later, so it changes nothing else)
+            maxDist = DIST_CALIBRATE;
+        }
+#endif
+        maxSq = SQ(maxDist);
+        reachSq = SQ(maxDist + chunk * 0.71f);
 
         for (v = 0; v < visibleCount; v++) {
             s32 c = sVisible[v];
@@ -627,19 +665,15 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 if (dSq > maxSq) {
                     continue;
                 }
-#if FISHMOD_HW
                 if (info->card) {
-                    f32 h;
-                    f32 r;
-
                     // the camera inside it or right against it
-                    h = info->height * prop->scale * (1.0f / 64.0f);
-                    r = h * HW_NEAR + 20.0f;
+                    f32 h = info->height * prop->scale * (1.0f / 64.0f);
+                    f32 r = h * NEAR_SKIP + 20.0f;
+
                     if ((dSq + SQ(prop->y + h * 0.5f - eye.y)) < SQ(r)) {
                         continue;
                     }
                 }
-#endif
                 // outside the view cone (with room for the prop's size), unless it's right by the camera; squared,
                 // no square roots: front + R < cos * dist  <=>  (front + R)^2 < cos^2 * dist^2 (when front + R >= 0)
                 front = dx * lookX + dy * lookY + dz * lookZ + PROP_RADIUS;
@@ -647,32 +681,66 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                     (dSq > SQ(PROP_RADIUS * 2.0f))) {
                     continue;
                 }
-                band = (dSq < SQ(BAND_NEAR)) ? 0 : (dSq < SQ(BAND_MID)) ? 1 : 2;
-                if (bandCount[band] < BAND_MAX) {
-                    sBand[band][bandCount[band]++] = i;
+                if (candCount < VISIBLE_MAX) {
+                    sCandBand[candCount] = CLAMP_MAX((s32)(sqrtf(dSq) * (1.0f / BAND_WIDTH)), BANDS - 1);
+                    sCand[candCount++] = i;
                 }
             }
         }
     }
 
-    // into the other set, nearest band first, as far as the budget goes
+    // nearest band first, kind by kind within a band: a counting sort by band (stable, so the kinds stay together)
+    bzero(bandStart, sizeof(bandStart));
+    for (n = 0; n < candCount; n++) {
+        bandStart[sCandBand[n] + 1]++;
+    }
+    for (band = 0; band < BANDS; band++) {
+        bandStart[band + 1] += bandStart[band];
+    }
+    for (n = 0; n < candCount; n++) {
+        sOrdered[bandStart[sCandBand[n]]++] = sCand[n];
+    }
+
+    // into the other set, as far as the budget (and the room for material changes) goes
     sSet ^= 1;
     sMtxUsed = 0;
     set = &sBufs->set[sSet];
     set->count = 0;
-    for (band = 0; band < BANDS; band++) {
-        s32 n;
+    for (n = 0; (n < candCount) && (budget > 0); n++) {
+        FishmodProp* prop = &sProps[sOrdered[n]];
+        s32 k = prop->kind;
 
-        for (n = 0; (n < bandCount[band]) && (budget > 0); n++) {
-            FishmodProp* prop = &sProps[sBand[band][n]];
-
-            if (sKinds[prop->kind].xlu && (xluLeft-- <= 0)) {
+        if (sKinds[k].xlu) {
+            if ((xluLeft <= 0) || ((k != lastXlu) && (matsXlu >= MAT_MAX_XLU))) {
                 continue;
             }
-            budget--;
-            Scatter_Matrix(prop, prop->kind == FISHMOD_PROP_LILY_PAD);
-            set->prop[set->count++] = sBand[band][n];
+            xluLeft--;
+            if (k != lastXlu) {
+                matsXlu++;
+                lastXlu = k;
+            }
+        } else {
+            if ((k != lastOpa) && (mats >= MAT_MAX)) {
+                continue;
+            }
+            if (k != lastOpa) {
+                mats++;
+                lastOpa = k;
+            }
         }
+        budget--;
+#if FISHMOD_DEBUG
+        if (gFishmodLodTest.active) {
+            // the test's cut: the reference's props less these, so the budget and the materials go as before
+            if ((gFishmodLodTest.dist[k] > 0) &&
+                ((SQ(prop->x - eye.x) + SQ(prop->z - eye.z)) > SQ(gFishmodLodTest.dist[k]))) {
+                continue;
+            }
+            gFishmodLodTest.drawn[k]++;
+        }
+#endif
+        Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD);
+        set->prop[set->count++] = sOrdered[n];
     }
 }
 
@@ -684,7 +752,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     f32 lookZ;
     f32 lookLen;
     s32 kind;
-    s32 lastKind = -1;
+    s32 lastOpa = -1; // the material each list has now (the two are interleaved: nearest first, whatever the kind)
+    s32 lastXlu = -1;
     s32 n;
     Gfx* opa;
     Gfx* xlu;
@@ -720,6 +789,9 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     // remake what's drawn only when the camera has moved or turned (or now and then anyway)
     sSetAge++;
     if ((sSetAge >= REUSE_FRAMES) ||
+#if FISHMOD_DEBUG
+        gFishmodLodTest.active || // calibrating: what's drawn changes with the test, not the camera
+#endif
         ((SQ(eye.x - sSetEye.x) + SQ(eye.y - sSetEye.y) + SQ(eye.z - sSetEye.z)) > SQ(REUSE_MOVE)) ||
         ((lookX * sSetLook.x + lookY * sSetLook.y + lookZ * sSetLook.z) < REUSE_TURN_COS)) {
         Scatter_Build(play, &eye, lookX, lookY, lookZ);
@@ -756,11 +828,15 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         kind = prop->kind;
         info = &sKinds[kind];
         disp = info->xlu ? &xlu : &opa;
-        if (kind != lastKind) {
-            if ((lastKind >= 0) && !sKinds[lastKind].xlu) {
-                gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+        if (kind != (info->xlu ? lastXlu : lastOpa)) {
+            if (info->xlu) {
+                lastXlu = kind;
+            } else {
+                if (lastOpa >= 0) {
+                    gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+                }
+                lastOpa = kind;
             }
-            lastKind = kind;
             *disp = Scatter_Material(*disp, info, kind);
         }
         if (!info->xlu) {
@@ -777,7 +853,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         }
         gSPDisplayList((*disp)++, info->model);
     }
-    if ((lastKind >= 0) && !sKinds[lastKind].xlu) {
+    if (lastOpa >= 0) {
         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
     }
     // the dock, placed by hand: always drawn when in reach (one deck, a few posts)
