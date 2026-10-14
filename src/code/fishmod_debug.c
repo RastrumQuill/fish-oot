@@ -686,7 +686,10 @@ static u16* Lod_Frame(void) {
     return (u16*)OS_PHYSICAL_TO_K1(OS_K0_TO_PHYSICAL(osViGetCurrentFramebuffer()));
 }
 
-/** Copies what the screen shows to `dst`; false if the screen swapped to the other frame while it was copied. */
+/**
+ * Copies what the screen shows to `dst`. The screen may swap to the next frame while it's copied, and that's fine:
+ * the frame being copied is only drawn over by the frame after next, whose drawing starts after this update.
+ */
 static s32 Lod_Grab(u16* dst) {
     void* shown = osViGetCurrentFramebuffer();
     u16* fb = (u16*)OS_PHYSICAL_TO_K0(OS_K0_TO_PHYSICAL(shown));
@@ -694,7 +697,7 @@ static s32 Lod_Grab(u16* dst) {
     // through the cache (lines at a time: several times faster than one read each), the stale lines dropped first
     osInvalDCache(fb, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
     bcopy(fb, dst, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
-    return osViGetCurrentFramebuffer() == shown;
+    return true;
 }
 
 /** Pixels differing from the reference by more than LOD_THRESHOLD; with `markNoise`, they're marked restless. */
@@ -964,7 +967,20 @@ static void Fishmod_LodUpdate(PlayState* play) {
         }
 
         case SW_NOISE:
-            if (Lod_Compare(false) > 0) {
+            if (Lod_Compare(true) > 0) {
+#ifdef FISHMOD_LOD_SHOW
+                // diagnosis: the first noisy view's moving pixels (and its number) to SRAM 0x1000
+                static s32 sShown;
+
+                if (!sShown) {
+                    u32 v = sSweepView;
+
+                    sShown = true;
+                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x1000, &v, 4, OS_WRITE);
+                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x1010, sLodNoise,
+                                     SCREEN_WIDTH * SCREEN_HEIGHT / 8, OS_WRITE);
+                }
+#endif
                 sSweep.noisy++;
                 sSweepState = SW_NEXT_VIEW;
                 sLodTimer = 1;
