@@ -653,15 +653,26 @@ static s32 sLodLo;
 static s32 sLodHi;
 static u32 sLodFrames;
 static u16 sLodTime;
+static f32 sLodSkyRot;
+
+static u16* sLodCur;   // the frame being tested, copied off the screen
 
 static u16* Lod_Frame(void) {
     // what the screen shows (finished), read past the data cache
     return (u16*)OS_PHYSICAL_TO_K1(OS_K0_TO_PHYSICAL(osViGetCurrentFramebuffer()));
 }
 
+/** Copies what the screen shows to `dst`; false if the screen swapped to the other frame while it was copied. */
+static s32 Lod_Grab(u16* dst) {
+    u16* fb = Lod_Frame();
+
+    bcopy(fb, dst, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
+    return Lod_Frame() == fb;
+}
+
 /** Pixels differing from the reference by more than LOD_THRESHOLD; with `markNoise`, they're marked restless. */
 static s32 Lod_Compare(s32 markNoise) {
-    u16* fb = Lod_Frame();
+    u16* fb = sLodCur;
     s32 count = 0;
     s32 i;
 
@@ -734,16 +745,19 @@ static void Fishmod_LodUpdate(PlayState* play) {
     if (sLodRef == NULL) {
         sLodRef = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
         sLodNoise = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT / 8, "../fishmod_debug.c", __LINE__);
+        sLodCur = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
+        sLodSkyRot = play->skyboxCtx.rot.y;
         sLodFrames = play->gameplayFrames;
         sLodTime = gSaveContext.save.dayTime;
         gFishmodLodTest.active = true;
-        if ((sLodRef == NULL) || (sLodNoise == NULL)) {
+        if ((sLodRef == NULL) || (sLodNoise == NULL) || (sLodCur == NULL)) {
             sLodState = LOD_DONE;
         }
     }
     // everything that moves, held still
     play->gameplayFrames = sLodFrames;
     gSaveContext.save.dayTime = sLodTime;
+    play->skyboxCtx.rot.y = sLodSkyRot; // the sky turns slowly (and shows through the water from below)
     if (sLodState == LOD_DONE) {
         Fishmod_DebugPrintf(2, "LOD calibration done: %d stops", sLod.stops);
         return;
@@ -754,11 +768,22 @@ static void Fishmod_LodUpdate(PlayState* play) {
         return;
     }
     if (sLodFresh) {
-        bcopy(Lod_Frame(), sLodRef, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
+        if (!Lod_Grab(sLodRef)) {
+            sLodTimer = 1; // torn: again next frame
+            return;
+        }
         bcopy(sLodPending, gFishmodLodTest.dist, sizeof(sLodPending));
         sLodFresh = false;
         sLodTimer = LOD_HOLD;
         return;
+    }
+
+    // every state past this reads the frame (the noise passes, the tests, the check)
+    if ((sLodState == LOD_NOISE) || (sLodState == LOD_SEARCH) || (sLodState == LOD_VERIFY)) {
+        if (!Lod_Grab(sLodCur)) {
+            sLodTimer = 1;
+            return;
+        }
     }
 
     switch (sLodState) {
@@ -771,7 +796,10 @@ static void Fishmod_LodUpdate(PlayState* play) {
             break;
 
         case LOD_REF:
-            bcopy(Lod_Frame(), sLodRef, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
+            if (!Lod_Grab(sLodRef)) {
+                sLodTimer = 1;
+                return;
+            }
             bcopy(gFishmodLodTest.drawn, sLodDrawn, sizeof(sLodDrawn));
             bzero(sLodNoise, SCREEN_WIDTH * SCREEN_HEIGHT / 8);
             sLodPass = 0;
@@ -816,20 +844,34 @@ static void Fishmod_LodUpdate(PlayState* play) {
             s32 changed = Lod_Compare(false);
 
 #ifdef FISHMOD_LOD_SHOW
-            // diagnosis: stay on the first test that fails, painting what differs (red) and what's restless (blue)
-            if (changed > LOD_PIXELS) {
-                u16* fb = Lod_Frame();
-                s32 i;
+            // diagnosis: masks of what differs, to SRAM (over the save slots): the first small failure, the noise
+            // mask, the first large failure
+            {
+                static s32 sDumped;
+                s32 slot = (changed > 3000) ? 2 : (changed > LOD_PIXELS) ? 0 : -1;
 
-                Lod_Compare(2);
-                for (i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
-                    if (sLodNoise[i >> 3] & (1 << (i & 7))) {
-                        fb[i] = 0x003F;
+                if ((slot >= 0) && !(sDumped & (1 << slot))) {
+                    static u8 sMask[SCREEN_WIDTH * SCREEN_HEIGHT / 8];
+                    u16* fb = sLodCur;
+                    s32 i;
+
+                    sDumped |= 1 << slot;
+                    bzero(sMask, sizeof(sMask));
+                    for (i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
+                        u16 x = fb[i];
+                        u16 y = sLodRef[i];
+
+                        if ((ABS((s32)((x >> 11) & 31) - (s32)((y >> 11) & 31)) > LOD_THRESHOLD) ||
+                            (ABS((s32)((x >> 6) & 31) - (s32)((y >> 6) & 31)) > LOD_THRESHOLD) ||
+                            (ABS((s32)((x >> 1) & 31) - (s32)((y >> 1) & 31)) > LOD_THRESHOLD)) {
+                            sMask[i >> 3] |= 1 << (i & 7);
+                        }
                     }
+                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + slot * sizeof(sMask), sMask, sizeof(sMask),
+                                     OS_WRITE);
+                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + sizeof(sMask), sLodNoise, sizeof(sMask),
+                                     OS_WRITE);
                 }
-                Fishmod_DebugPrintf(3, "kind %d at %d: %d", sLodKind, mid * LOD_STEP, changed);
-                sLodTimer = 2;
-                break;
             }
 #endif
 
