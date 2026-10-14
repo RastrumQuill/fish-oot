@@ -35,6 +35,7 @@
 #include "src/fishmod_data/fishmod_props.inc.c"
 #include "src/fishmod_data/fishmod_props_kinds.h"
 #include "fishmod_lod.h"
+#include "fishmod_lod_zones.h"
 
 // Lake Hylia's bed shaded under the full lake (fishmod/tools/gen_bedshade.py, made at build time)
 typedef struct FishmodBedShade {
@@ -65,6 +66,7 @@ typedef struct FishmodPropKindInfo {
 } FishmodPropKindInfo;
 
 #define DIST_SMALL 800.0f
+#define ZONE_FLOOR 300.0f // a zone's distances no nearer than this
 #define DIST_MID 1200.0f
 #define DIST_FAR 1600.0f
 // Props drawn per frame at most. They are drawn nearest band first (whatever their kind), so the budget runs out on
@@ -99,6 +101,7 @@ typedef struct FishmodPropKindInfo {
 
 static FishmodPropKindInfo sKinds[FISHMOD_PROP_KIND_MAX];
 static f32 sDistFar[2]; // the furthest any kind is drawn: above water, under it (how far the chunks are looked at)
+static f32 sReach[FISHMOD_PROP_KIND_MAX][2]; // each kind's own reach [above, under water], before the measured cuts
 
 static void Scatter_InitKinds(void) {
 #define X(id, name)                                                       \
@@ -194,6 +197,8 @@ static void Scatter_InitKinds(void) {
         // the frame is the same and cheaper
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
             sKinds[i].drawDistUnder = MIN(sKinds[i].drawDist, DIST_UNDER_FOG);
+            sReach[i][0] = sKinds[i].drawDist;
+            sReach[i][1] = sKinds[i].drawDistUnder;
         }
 #define X(id, above, under)                                    \
     if ((above) > 0) {                                         \
@@ -206,8 +211,9 @@ static void Scatter_InitKinds(void) {
 #undef X
         sDistFar[0] = sDistFar[1] = 0.0f;
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
-            sDistFar[0] = MAX(sDistFar[0], sKinds[i].drawDist);
-            sDistFar[1] = MAX(sDistFar[1], sKinds[i].drawDistUnder);
+            // (a zone's distances can be longer than the global ones, never longer than the reach)
+            sDistFar[0] = MAX(sDistFar[0], (FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][0] : sKinds[i].drawDist);
+            sDistFar[1] = MAX(sDistFar[1], (FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][1] : sKinds[i].drawDistUnder);
         }
     }
 }
@@ -603,6 +609,19 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 budget = PROP_BUDGET;
     s32 xluLeft = XLU_MAX;
     ScatterSet* set;
+#if FISHMOD_LOD_ZONE_COUNT > 0
+    s32 zone = -1;
+
+    if (play->sceneId == SCENE_LAKE_HYLIA) {
+        s32 zx = (s32)((eye.x - FISHMOD_LOD_ZONE_X0) / FISHMOD_LOD_ZONE_CELL);
+        s32 zz = (s32)((eye.z - FISHMOD_LOD_ZONE_Z0) / FISHMOD_LOD_ZONE_CELL);
+
+        if ((eye.x >= FISHMOD_LOD_ZONE_X0) && (eye.z >= FISHMOD_LOD_ZONE_Z0) && (zx < FISHMOD_LOD_ZONE_W) &&
+            (zz < FISHMOD_LOD_ZONE_H)) {
+            zone = sLodZoneGrid[zz * FISHMOD_LOD_ZONE_W + zx];
+        }
+    }
+#endif
 
 #if FISHMOD_DEBUG
     if (gFishmodLodTest.active) {
@@ -670,6 +689,12 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         f32 maxSq;
         f32 reachSq;
 
+#if FISHMOD_LOD_ZONE_COUNT > 0
+        // what the sweep measured from the camera's zone, where it measured it
+        if ((zone >= 0) && (kind < FISHMOD_LOD_ZONE_KINDS) && (sLodZoneDist[zone][under][kind] != 0)) {
+            maxDist = MIN(sReach[kind][under], MAX(sLodZoneDist[zone][under][kind] * 100.0f, ZONE_FLOOR));
+        }
+#endif
 #if FISHMOD_DEBUG
         if (gFishmodLodTest.active) {
             // calibrating: everything out to DIST_CALIBRATE (the test's cut comes later, so it changes nothing else)
