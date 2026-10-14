@@ -905,6 +905,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
     gSaveContext.save.dayTime = sLodTime;
     play->skyboxCtx.rot.y = sLodSkyRot;
     play->state.frames = sLodStateFrames;
+    play->haltAllActors = gFishmodLodTest.active;
     if (sSweepState == SW_DONE) {
         Fishmod_DebugPrintf(2, "LOD sweep done: %d views", sSweep.done);
         return;
@@ -1157,6 +1158,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
     gSaveContext.save.dayTime = sLodTime;
     play->skyboxCtx.rot.y = sLodSkyRot; // the sky turns slowly (and shows through the water from below)
     play->state.frames = sLodStateFrames; // the lake's water scrolls by this count
+    play->haltAllActors = gFishmodLodTest.active; // Link, the NPCs, birds: still (drawn, not updated)
     if (sLodState == LOD_DONE) {
         Fishmod_DebugPrintf(2, "LOD calibration done: %d stops", sLod.stops);
         return;
