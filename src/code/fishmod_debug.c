@@ -57,6 +57,14 @@ typedef struct FishmodTourStop {
     const char* lines[3];
 } FishmodTourStop;
 
+// A viewpoint for the LOD sweep (fishmod/tools/gen_lod_views.py)
+typedef struct FishmodLodView {
+    Vec3s eye;
+    Vec3s at;
+    u8 zone;
+    u8 under;
+} FishmodLodView;
+
 #ifdef FISHMOD_SCRIPT
 #include FISHMOD_SCRIPT
 #else
@@ -555,6 +563,21 @@ static void Fishmod_TourUpdate(PlayState* play) {
 
     // glide (eased), arcing up over long hops so the camera doesn't cut through the land
     stop = &sTourStops[sTourStop];
+#ifdef FISHMOD_LOD_SWEEP
+    {
+        // the sweep's view, without gliding there
+        static FishmodTourStop sSweepStop;
+        extern Vec3f gFishmodLodSweepEye;
+        extern Vec3f gFishmodLodSweepAt;
+
+        sSweepStop.eye = gFishmodLodSweepEye;
+        sSweepStop.at = gFishmodLodSweepAt;
+        stop = &sSweepStop;
+        sTourFromEye = sTourEye = stop->eye;
+        sTourFromAt = sTourAt = stop->at;
+        sTourYaw = sTourRise = 0.0f;
+    }
+#endif
     t = CLAMP_MAX(sTourFrame / (f32)TOUR_GLIDE, 1.0f);
     s = t * t * (3.0f - 2.0f * t);
     sTourFrame++;
@@ -739,6 +762,350 @@ static void Lod_Save(void) {
     SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7A40, &sLod, sizeof(sLod), OS_WRITE);
 }
 
+#ifdef FISHMOD_LOD_SWEEP
+/*
+ * The LOD sweep: the calibration over many viewpoints (fishmod/tools/gen_lod_views.py: the shores, the surface, the
+ * bed, each looked from several ways), for draw distances per zone. Group testing keeps it quick: each view is first
+ * tested once with every kind cut to its zone's distances so far; only if that changes the frame are the kinds
+ * split in halves (each half cut alone) down to the ones that show, and only those searched for the distance they
+ * need here. Most views, once the tables have grown, pass on the first test. Results to SRAM 0x0000 (over the save
+ * slots: this build never saves) for fishmod/tools/lod_calibrate.py --sweep.
+ */
+#define SWEEP_ZONES 16
+#define SWEEP_SETTLE 30
+#define SWEEP_RETRIES 3
+
+Vec3f gFishmodLodSweepEye;
+Vec3f gFishmodLodSweepAt;
+
+typedef struct SweepResults {
+    /* 0x000 */ u32 magic; // 'FLSW'
+    /* 0x004 */ u16 views;
+    /* 0x006 */ u16 done;   // views measured so far (in this part)
+    /* 0x008 */ u16 noisy;  // views skipped: the frame changed by itself
+    /* 0x00A */ u16 empty;  // views with no props in sight
+    /* 0x00C */ u32 tests;
+    /* 0x010 */ u8 kinds;
+    /* 0x011 */ u8 zones;
+    /* 0x012 */ u8 part;
+    /* 0x013 */ u8 parts;
+    /* 0x014 */ u8 need[SWEEP_ZONES][2][FISHMOD_LOD_KINDS]; // in LOD_STEP units; 0: never in sight
+    /* 0x614 */ u16 passFirst; // views that passed on their first test
+    /* 0x616 */ u16 splits;    // views that needed the kinds split
+} SweepResults;
+
+typedef enum SweepState {
+    SW_ARRIVE,
+    SW_REF,
+    SW_NOISE,
+    SW_ALL,
+    SW_SPLIT_NEXT,
+    SW_SPLIT_CHECK,
+    SW_SEARCH,
+    SW_NEXT_VIEW,
+    SW_DONE
+} SweepState;
+
+static SweepResults sSweep;
+static s32 sSweepState = SW_ARRIVE;
+static s32 sSweepView = FISHMOD_LOD_PART;
+static s32 sSweepRetry;
+static s32 sSweepFirstTest;
+static u64 sSweepStack[64];
+static s32 sSweepTop;
+static u64 sSweepMask; // being tested in a split
+static u64 sSweepCulprits;
+static u64 sSweepWhole; // every kind cut, if that changed the frame
+static s32 sSweepSettle;
+
+static u8* Sweep_Need(s32 kind) {
+    FishmodLodView* view = &sLodViews[sSweepView];
+
+    return &sSweep.need[view->zone % SWEEP_ZONES][gFishmodLodTest.under][kind];
+}
+
+/** The cut to test: the kinds in `mask` at their zone's distances, the rest drawn in full. */
+static void Sweep_Test(u64 mask) {
+    s32 k;
+
+    bzero(sLodPending, sizeof(sLodPending));
+    for (k = 0; k < gFishmodLodTest.kindCount; k++) {
+        if (mask & (1ULL << k)) {
+            sLodPending[k] = MAX(*Sweep_Need(k), 1) * LOD_STEP;
+        }
+    }
+    sSweep.tests++;
+    Lod_TestPending();
+}
+
+static void Sweep_Save(void) {
+    sSweep.magic = 0x464C5357; // 'FLSW'
+    sSweep.views = ARRAY_COUNT(sLodViews);
+    sSweep.kinds = gFishmodLodTest.kindCount;
+    sSweep.zones = SWEEP_ZONES;
+    sSweep.part = FISHMOD_LOD_PART;
+    sSweep.parts = FISHMOD_LOD_PARTS;
+    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sSweep, sizeof(sSweep), OS_WRITE);
+}
+
+static void Sweep_Place(void) {
+    FishmodLodView* view = &sLodViews[sSweepView];
+
+    gFishmodLodSweepEye.x = view->eye.x;
+    gFishmodLodSweepEye.y = view->eye.y;
+    gFishmodLodSweepEye.z = view->eye.z;
+    gFishmodLodSweepAt.x = view->at.x;
+    gFishmodLodSweepAt.y = view->at.y;
+    gFishmodLodSweepAt.z = view->at.z;
+}
+
+static void Fishmod_LodUpdate(PlayState* play) {
+    if (sLodRef == NULL) {
+        sLodRef = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
+        sLodNoise = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT / 8, "../fishmod_debug.c", __LINE__);
+        sLodCur = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
+        sLodFrames = play->gameplayFrames;
+        sLodTime = gSaveContext.save.dayTime;
+        sLodSkyRot = play->skyboxCtx.rot.y;
+        sLodStateFrames = play->state.frames;
+        gFishmodLodTest.active = true;
+        sSweepSettle = SWEEP_SETTLE + 200; // the first: the scene's lights are still coming up
+        Sweep_Place();
+        if ((sLodRef == NULL) || (sLodNoise == NULL) || (sLodCur == NULL)) {
+            sSweepState = SW_DONE;
+        }
+    }
+    play->gameplayFrames = sLodFrames;
+    gSaveContext.save.dayTime = sLodTime;
+    play->skyboxCtx.rot.y = sLodSkyRot;
+    play->state.frames = sLodStateFrames;
+    if (sSweepState == SW_DONE) {
+        Fishmod_DebugPrintf(2, "LOD sweep done: %d views", sSweep.done);
+        return;
+    }
+    Fishmod_DebugPrintf(2, "LOD sweep view %d/%d", sSweepView, (s32)ARRAY_COUNT(sLodViews));
+    if (sSweepState == SW_ARRIVE) {
+        if (--sSweepSettle > 0) {
+            return;
+        }
+        Lod_Test(-1, 0);
+        sSweepState = SW_REF;
+        return;
+    }
+    if (--sLodTimer > 0) {
+        return;
+    }
+    if (sLodFresh) {
+        if (!Lod_Grab(sLodRef)) {
+            sLodTimer = 1;
+            return;
+        }
+        bcopy(sLodPending, gFishmodLodTest.dist, sizeof(sLodPending));
+        sLodFresh = false;
+        sLodTimer = LOD_HOLD;
+        return;
+    }
+    if (!Lod_Grab((sSweepState == SW_REF) ? sLodRef : sLodCur)) {
+        sLodTimer = 1; // the screen swapped while it was copied: again next frame
+        return;
+    }
+
+    switch (sSweepState) {
+        case SW_REF: {
+            s32 k;
+            s32 any = false;
+
+            bcopy(gFishmodLodTest.drawn, sLodDrawn, sizeof(sLodDrawn));
+            for (k = 0; k < gFishmodLodTest.kindCount; k++) {
+                any |= (sLodDrawn[k] != 0);
+            }
+            if (!any) {
+                sSweep.empty++;
+                sSweepState = SW_NEXT_VIEW;
+                sLodTimer = 1;
+                break;
+            }
+            bzero(sLodNoise, SCREEN_WIDTH * SCREEN_HEIGHT / 8);
+            Lod_Test(-1, 0);
+            sSweepState = SW_NOISE;
+            break;
+        }
+
+        case SW_NOISE:
+            if (Lod_Compare(false) > 0) {
+                sSweep.noisy++;
+                sSweepState = SW_NEXT_VIEW;
+                sLodTimer = 1;
+                break;
+            }
+            sSweepRetry = 0;
+            sSweepFirstTest = true;
+            // fall through
+        case SW_ALL: {
+            u64 mask = 0;
+            s32 k;
+
+            for (k = 0; k < gFishmodLodTest.kindCount; k++) {
+                if (sLodDrawn[k] != 0) {
+                    *Sweep_Need(k) = MAX(*Sweep_Need(k), 1); // seen in this zone (0: never seen, no measure)
+                    if (*Sweep_Need(k) < LOD_STEPS) {
+                        mask |= 1ULL << k;
+                    }
+                }
+            }
+            if (mask == 0) {
+                sSweepState = SW_NEXT_VIEW;
+                sLodTimer = 1;
+                break;
+            }
+            sSweepTop = 0;
+            sSweepStack[sSweepTop++] = mask;
+            sSweepCulprits = 0;
+            sSweepMask = mask;
+            Sweep_Test(mask);
+            sSweepState = SW_SPLIT_CHECK;
+            break;
+        }
+
+        case SW_SPLIT_CHECK: {
+            s32 changed = Lod_Compare(false);
+
+            sSweepTop--; // the mask just tested was on top
+            if (sSweepTop == 0) {
+                sSweepWhole = (changed > LOD_PIXELS) ? sSweepMask : 0;
+            }
+            if (changed > LOD_PIXELS) {
+                if (sSweepFirstTest) {
+                    sSweep.splits++;
+                }
+                if ((sSweepMask & (sSweepMask - 1)) == 0) {
+                    sSweepCulprits |= sSweepMask;
+                } else {
+                    // halves: alternate bits
+                    u64 a = 0;
+                    u64 b = 0;
+                    u64 m = sSweepMask;
+                    s32 odd = 0;
+
+                    while (m != 0) {
+                        u64 bit = m & (~m + 1);
+
+                        if (odd) {
+                            a |= bit;
+                        } else {
+                            b |= bit;
+                        }
+                        odd ^= 1;
+                        m &= m - 1;
+                    }
+                    sSweepStack[sSweepTop++] = a;
+                    sSweepStack[sSweepTop++] = b;
+                }
+            } else if (sSweepFirstTest) {
+                sSweep.passFirst++;
+            }
+            sSweepFirstTest = false;
+        }
+            // fall through
+        case SW_SPLIT_NEXT:
+            if (sSweepTop > 0) {
+                sSweepMask = sSweepStack[sSweepTop - 1];
+                Sweep_Test(sSweepMask);
+                sSweepState = SW_SPLIT_CHECK;
+                break;
+            }
+            if (sSweepCulprits == 0) {
+                if (sSweepWhole != 0) {
+                    // the kinds together change the frame, but none alone: each a step further, and again
+                    s32 k;
+
+                    for (k = 0; k < gFishmodLodTest.kindCount; k++) {
+                        if (sSweepWhole & (1ULL << k)) {
+                            *Sweep_Need(k) = MIN(MAX(*Sweep_Need(k), 1) + 1, LOD_STEPS);
+                        }
+                    }
+                    if (++sSweepRetry < SWEEP_RETRIES) {
+                        sSweepState = SW_ALL;
+                        sLodTimer = 1;
+                        break;
+                    }
+                }
+                sSweepState = SW_NEXT_VIEW;
+                sLodTimer = 1;
+                break;
+            }
+            sLodKind = -1;
+            // fall through
+        case SW_SEARCH:
+            if (sLodKind >= 0) {
+                s32 mid = (sLodLo + sLodHi) / 2;
+
+                if (Lod_Compare(false) <= LOD_PIXELS) {
+                    sLodHi = mid;
+                } else {
+                    sLodLo = mid + 1;
+                }
+                if (sLodLo < sLodHi) {
+                    Lod_Test(sLodKind, ((sLodLo + sLodHi) / 2) * LOD_STEP);
+                    sSweep.tests++;
+                    sSweepState = SW_SEARCH;
+                    break;
+                }
+                *Sweep_Need(sLodKind) = MAX(*Sweep_Need(sLodKind), sLodHi);
+                sSweepCulprits &= ~(1ULL << sLodKind);
+            }
+            if (sSweepCulprits != 0) {
+                s32 k = 0;
+
+                while (!(sSweepCulprits & (1ULL << k))) {
+                    k++;
+                }
+                sLodKind = k;
+                sLodLo = MAX(*Sweep_Need(k), 1) + 1;
+                sLodHi = LOD_STEPS;
+                if (sLodLo >= sLodHi) {
+                    *Sweep_Need(k) = LOD_STEPS;
+                    sSweepCulprits &= ~(1ULL << k);
+                    sLodKind = -1;
+                    sLodTimer = 1;
+                    sSweepState = SW_SEARCH;
+                    break;
+                }
+                Lod_Test(k, ((sLodLo + sLodHi) / 2) * LOD_STEP);
+                sSweep.tests++;
+                sSweepState = SW_SEARCH;
+                break;
+            }
+            // the culprits raised: the whole view again
+            if (++sSweepRetry < SWEEP_RETRIES) {
+                sSweepState = SW_ALL;
+                sLodTimer = 1;
+                break;
+            }
+            sSweepState = SW_NEXT_VIEW;
+            sLodTimer = 1;
+            break;
+
+        case SW_NEXT_VIEW:
+            sSweep.done++;
+            if ((sSweep.done & 3) == 0) {
+                Sweep_Save();
+            }
+            sSweepView += FISHMOD_LOD_PARTS;
+            if (sSweepView >= (s32)ARRAY_COUNT(sLodViews)) {
+                Sweep_Save();
+                sSweepState = SW_DONE;
+                gFishmodLodTest.active = false;
+                break;
+            }
+            Sweep_Place();
+            Lod_Test(-1, 0);
+            sSweepSettle = SWEEP_SETTLE;
+            sSweepState = SW_ARRIVE;
+            break;
+    }
+}
+#else
 static void Fishmod_LodUpdate(PlayState* play) {
     s32 under = gFishmodLodTest.under;
     s32 stop = sTourStop;
@@ -915,6 +1282,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
             break;
     }
 }
+#endif // FISHMOD_LOD_SWEEP
 #endif
 
 static void Fishmod_TourDraw(Gfx** gfxP) {
