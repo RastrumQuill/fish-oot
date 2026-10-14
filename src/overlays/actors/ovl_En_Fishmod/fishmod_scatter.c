@@ -183,16 +183,17 @@ static void Scatter_InitKinds(void) {
         s32 i;
 
         // under water no further than the haze lets anything be seen, then what the calibration measured
-        // (fishmod_lod.h, made by fishmod/tools/lod_calibrate.py from the game's own frames)
+        // (fishmod_lod.h, made by fishmod/tools/lod_calibrate.py from the game's own frames): only ever nearer, so
+        // the frame is the same and cheaper
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
             sKinds[i].drawDistUnder = MIN(sKinds[i].drawDist, DIST_UNDER_FOG);
         }
 #define X(id, above, under)                                    \
     if ((above) > 0) {                                         \
-        sKinds[FISHMOD_PROP_##id].drawDist = (above);          \
+        sKinds[FISHMOD_PROP_##id].drawDist = MIN(sKinds[FISHMOD_PROP_##id].drawDist, (above)); \
     }                                                          \
     if ((under) > 0) {                                         \
-        sKinds[FISHMOD_PROP_##id].drawDistUnder = (under);     \
+        sKinds[FISHMOD_PROP_##id].drawDistUnder = MIN(sKinds[FISHMOD_PROP_##id].drawDistUnder, (under)); \
     }
         FISHMOD_LOD_DISTANCES(X)
 #undef X
