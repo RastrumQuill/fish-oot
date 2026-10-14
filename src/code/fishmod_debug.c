@@ -688,10 +688,13 @@ static u16* Lod_Frame(void) {
 
 /** Copies what the screen shows to `dst`; false if the screen swapped to the other frame while it was copied. */
 static s32 Lod_Grab(u16* dst) {
-    u16* fb = Lod_Frame();
+    void* shown = osViGetCurrentFramebuffer();
+    u16* fb = (u16*)OS_PHYSICAL_TO_K0(OS_K0_TO_PHYSICAL(shown));
 
+    // through the cache (lines at a time: several times faster than one read each), the stale lines dropped first
+    osInvalDCache(fb, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
     bcopy(fb, dst, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
-    return Lod_Frame() == fb;
+    return osViGetCurrentFramebuffer() == shown;
 }
 
 /** Pixels differing from the reference by more than LOD_THRESHOLD; with `markNoise`, they're marked restless. */
@@ -772,7 +775,9 @@ static void Lod_Save(void) {
  * slots: this build never saves) for fishmod/tools/lod_calibrate.py --sweep.
  */
 #define SWEEP_ZONES 16
-#define SWEEP_SETTLE 30
+#define SWEEP_SETTLE 45
+#define SWEEP_HOLD 3       // frames a test is drawn before it's read
+#define SWEEP_GRAB_TRIES 30 // a view whose frame can't be copied whole this many times is skipped
 #define SWEEP_RETRIES 3
 
 Vec3f gFishmodLodSweepEye;
@@ -817,6 +822,7 @@ static u64 sSweepMask; // being tested in a split
 static u64 sSweepCulprits;
 static u64 sSweepWhole; // every kind cut, if that changed the frame
 static s32 sSweepSettle;
+static s32 sSweepGrabFails;
 
 static u8* Sweep_Need(s32 kind) {
     FishmodLodView* view = &sLodViews[sSweepView];
@@ -835,7 +841,16 @@ static void Sweep_Test(u64 mask) {
         }
     }
     sSweep.tests++;
-    Lod_TestPending();
+    // one reference per view (taken after it settles, checked for anything moving): no fresh one per test
+    bcopy(sLodPending, gFishmodLodTest.dist, sizeof(sLodPending));
+    sLodTimer = SWEEP_HOLD;
+}
+
+/** One kind cut at `dist`, the rest drawn in full. */
+static void Sweep_TestKind(s32 kind, s32 dist) {
+    bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
+    gFishmodLodTest.dist[kind] = dist;
+    sLodTimer = SWEEP_HOLD;
 }
 
 static void Sweep_Save(void) {
@@ -870,6 +885,17 @@ static void Fishmod_LodUpdate(PlayState* play) {
         sLodStateFrames = play->state.frames;
         gFishmodLodTest.active = true;
         sSweepSettle = SWEEP_SETTLE + 200; // the first: the scene's lights are still coming up
+        // carry on from an earlier run (the save file kept what it measured)
+        SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sSweep, sizeof(sSweep), OS_READ);
+        if ((sSweep.magic != 0x464C5357) || (sSweep.part != FISHMOD_LOD_PART) || (sSweep.parts != FISHMOD_LOD_PARTS)) {
+            bzero(&sSweep, sizeof(sSweep));
+        }
+        sSweepView = FISHMOD_LOD_PART + sSweep.done * FISHMOD_LOD_PARTS;
+        if (sSweepView >= (s32)ARRAY_COUNT(sLodViews)) {
+            sSweepState = SW_DONE;
+            gFishmodLodTest.active = false;
+            return;
+        }
         Sweep_Place();
         if ((sLodRef == NULL) || (sLodNoise == NULL) || (sLodCur == NULL)) {
             sSweepState = SW_DONE;
@@ -907,8 +933,13 @@ static void Fishmod_LodUpdate(PlayState* play) {
     }
     if (!Lod_Grab((sSweepState == SW_REF) ? sLodRef : sLodCur)) {
         sLodTimer = 1; // the screen swapped while it was copied: again next frame
-        return;
+        if (++sSweepGrabFails < SWEEP_GRAB_TRIES) {
+            return;
+        }
+        sSweep.noisy++;
+        sSweepState = SW_NEXT_VIEW;
     }
+    sSweepGrabFails = 0;
 
     switch (sSweepState) {
         case SW_REF: {
@@ -1046,7 +1077,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
                     sLodLo = mid + 1;
                 }
                 if (sLodLo < sLodHi) {
-                    Lod_Test(sLodKind, ((sLodLo + sLodHi) / 2) * LOD_STEP);
+                    Sweep_TestKind(sLodKind, ((sLodLo + sLodHi) / 2) * LOD_STEP);
                     sSweep.tests++;
                     sSweepState = SW_SEARCH;
                     break;
@@ -1071,7 +1102,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
                     sSweepState = SW_SEARCH;
                     break;
                 }
-                Lod_Test(k, ((sLodLo + sLodHi) / 2) * LOD_STEP);
+                Sweep_TestKind(k, ((sLodLo + sLodHi) / 2) * LOD_STEP);
                 sSweep.tests++;
                 sSweepState = SW_SEARCH;
                 break;
@@ -1088,9 +1119,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
 
         case SW_NEXT_VIEW:
             sSweep.done++;
-            if ((sSweep.done & 3) == 0) {
-                Sweep_Save();
-            }
+            Sweep_Save();
             sSweepView += FISHMOD_LOD_PARTS;
             if (sSweepView >= (s32)ARRAY_COUNT(sLodViews)) {
                 Sweep_Save();
