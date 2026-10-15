@@ -34,6 +34,11 @@
 #include "ultra64/convert.h"
 #include "speed_meter.h"
 #include "libu64/gfxprint.h"
+#include "ultra64/rcp.h"
+
+#if FISHMOD_TESTMODE
+static s32 sFpsDetail = 1; // D-pad Left: the RDP readout on or off
+#endif
 
 s32 Object_LoadPersistent(ObjectContext* objectCtx, s16 objectId);
 
@@ -226,6 +231,14 @@ void Fishmod_PlayUpdate(PlayState* play) {
         u16 press = play->state.input[0].press.button;
         s16 entrance = -1;
 
+        // D-pad Right: the props' textures in 4 bits or 8 (for comparing); D-pad Left: the RDP readout
+        if (CHECK_BTN_ALL(press, BTN_DRIGHT)) {
+            gFishmodTexCompress ^= 1;
+            Sfx_PlaySfxCentered(gFishmodTexCompress ? NA_SE_SY_CAMERA_ZOOM_UP : NA_SE_SY_CAMERA_ZOOM_DOWN);
+        }
+        if (CHECK_BTN_ALL(press, BTN_DLEFT)) {
+            sFpsDetail ^= 1;
+        }
         if (CHECK_BTN_ALL(press, BTN_DUP) && (play->sceneId != SCENE_KOKIRI_FOREST)) {
             entrance = ENTR_KOKIRI_FOREST_0;
         } else if (CHECK_BTN_ALL(press, BTN_DDOWN) && (play->sceneId != SCENE_LAKE_HYLIA)) {
@@ -726,13 +739,39 @@ void Fishmod_InitTestSave(void) {
 }
 #endif
 
+#if FISHMOD_TESTMODE || FISHMOD_DEBUG
+FishmodRdpCounters gFishmodRdp;
+
+/**
+ * The RDP's own counters since the last call (cycles at the RDP's clock, 62.5 MHz): all cycles, cycles its command
+ * buffer was busy (fetching commands from RDRAM, or held up), its pipeline was drawing, and TMEM was being loaded.
+ * Only the console has them; emulators read 0 or guesses. Once a frame.
+ */
+void Fishmod_SampleRdp(void) {
+    gFishmodRdp.clock = IO_READ(DPC_CLOCK_REG) & 0xFFFFFF;
+    gFishmodRdp.buf = IO_READ(DPC_BUFBUSY_REG) & 0xFFFFFF;
+    gFishmodRdp.pipe = IO_READ(DPC_PIPEBUSY_REG) & 0xFFFFFF;
+    gFishmodRdp.tmem = IO_READ(DPC_TMEM_REG) & 0xFFFFFF;
+    IO_WRITE(DPC_STATUS_REG, DPC_CLR_CLOCK_CTR | DPC_CLR_CMD_CTR | DPC_CLR_PIPE_CTR | DPC_CLR_TMEM_CTR);
+}
+#endif
+
 #if FISHMOD_TESTMODE
 void Fishmod_DrawFps(Gfx** gfxP) {
     // average of the last 20 frame periods (the time between graph updates), updated every 20 frames
     static u32 sSumUsec;
     static s32 sCount;
     static s32 sFpsTenths;
+    static u32 sRdpSum[4];
+    static s32 sRdpPct[3];
     GfxPrint printer;
+    s32 i;
+
+    Fishmod_SampleRdp();
+    sRdpSum[0] += gFishmodRdp.clock;
+    sRdpSum[1] += gFishmodRdp.buf;
+    sRdpSum[2] += gFishmodRdp.pipe;
+    sRdpSum[3] += gFishmodRdp.tmem;
 
     // nothing extra in the picture the pause menu takes of the screen (it comes out as garbage)
     if (R_PAUSE_BG_PRERENDER_STATE != PAUSE_BG_PRERENDER_OFF) {
@@ -743,12 +782,23 @@ void Fishmod_DrawFps(Gfx** gfxP) {
         sFpsTenths = (sSumUsec != 0) ? (s32)(20u * 10000000u / sSumUsec) : 0;
         sSumUsec = 0;
         sCount = 0;
+        for (i = 0; i < 3; i++) {
+            // (in 1/1024ths first: the sums run to tens of millions)
+            sRdpPct[i] = (sRdpSum[0] >> 10) ? (s32)((sRdpSum[1 + i] >> 10) * 100 / (sRdpSum[0] >> 10)) : 0;
+        }
+        bzero(sRdpSum, sizeof(sRdpSum));
     }
     GfxPrint_Init(&printer);
     GfxPrint_Open(&printer, *gfxP);
     GfxPrint_SetColor(&printer, 255, 255, 255, 200);
     GfxPrint_SetPos(&printer, 17, 27); // bottom middle: clear of the hearts, buttons, map and rupees
     GfxPrint_Printf(&printer, "%2d.%dfps", sFpsTenths / 10, sFpsTenths % 10);
+    if (sFpsDetail) {
+        // RDP busy fetching/held up (buf), drawing (pipe), loading textures (tmem), % of its cycles; 4-bit textures
+        GfxPrint_SetPos(&printer, 10, 26);
+        GfxPrint_Printf(&printer, "b%2d p%2d t%2d tex%s", sRdpPct[0], sRdpPct[1], sRdpPct[2],
+                        gFishmodTexCompress ? "4" : "8");
+    }
     *gfxP = GfxPrint_Close(&printer);
     GfxPrint_Destroy(&printer);
 }
@@ -980,6 +1030,7 @@ void Fishmod_AdvanceTime(PlayState* play) {
  */
 #define HAZE_FOG_NEAR 953 // the fog's start (of 1000, with vanilla's far plane; vanilla's water is about 990)
 f32 gFishmodHaze;
+s32 gFishmodTexCompress;
 
 static void Fishmod_UpdateHaze(PlayState* play) {
     Vec3f eye = play->view.eye;

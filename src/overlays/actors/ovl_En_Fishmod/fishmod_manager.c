@@ -525,13 +525,24 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
     }
 #if FISHMOD_OPT >= 5
     if (!gFishmodPhoto.active) {
-        FISHMOD_PROF(FISHMOD_PROF_D_SCATTER, EnFishmod_ScatterDraw(play));
+#if FISHMOD_DEBUG
+        gFishmodScatterDrawn = 0;
+        if (!(gFishmodBench & FISHMOD_BENCH_NOPROPS))
+#endif
+        {
+            FISHMOD_PROF(FISHMOD_PROF_D_SCATTER, EnFishmod_ScatterDraw(play));
+        }
 #if FISHMOD_DEBUG
         if (gFishmodLodTest.active) {
             return; // the LOD calibration compares frames: nothing moving but the props
         }
 #endif
         FISHMOD_PROF(FISHMOD_PROF_D_PARTICLES, EnFishmod_ParticlesDraw(play));
+    }
+#endif
+#if FISHMOD_DEBUG
+    if (gFishmodBench & FISHMOD_BENCH_NOFISH) {
+        return; // the hardware bench, timing the rest without the fish
     }
 #endif
 

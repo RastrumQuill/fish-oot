@@ -314,6 +314,12 @@ typedef enum FishmodProfSlot {
     FISHMOD_PROF_MAX
 } FishmodProfSlot;
 extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
+extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
+// the hardware bench (fishmod_debug.c, FISHMOD_HWBENCH) switches these off to time the rest without them
+#define FISHMOD_BENCH_NOPROPS (1 << 0)
+#define FISHMOD_BENCH_NOFISH (1 << 1)
+extern s32 gFishmodBench;
+extern s32 gFishmodScatterDrawn; // props drawn in the last frame
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 #define FISHMOD_PROF(slot, stmt)                        \
     {                                                   \
@@ -388,6 +394,17 @@ s32 Fishmod_Weather(struct PlayState* play);
 f32 Fishmod_Light(struct PlayState* play);
 // Underwater haze, 0 (camera above water) to 1 (under) (FISHMOD_OPT 5)
 extern f32 gFishmodHaze;
+// the props' textures in 4 bits instead of 8 (half the memory read per texture load): a switch for measuring
+extern s32 gFishmodTexCompress;
+// the RDP's hardware counters over the last frame (Fishmod_SampleRdp; RDP clock cycles, 24 bits)
+typedef struct FishmodRdpCounters {
+    u32 clock;
+    u32 buf;
+    u32 pipe;
+    u32 tmem;
+} FishmodRdpCounters;
+extern FishmodRdpCounters gFishmodRdp;
+void Fishmod_SampleRdp(void);
 // where the underwater fog is complete (of 1000; vanilla: 1000, the far plane)
 #define FISHMOD_HAZE_FOG_FAR 990
 
