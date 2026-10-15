@@ -128,6 +128,18 @@ evidence.
 | Console render | hardware | The finished asset rendered in ares (the real RDP and VI), scored by the judges above: is the differentiable renderer's approximation honest? | slow: final check |
 | You | people | Blind A/B pairs on a page; enough votes can train a small reward model (RLHF-style) for later species | your time |
 
+Chosen: BioCLIP. It can also join the training loss as a second semantic term (its species score), with
+SigLIP's held out, or the other way round.
+
+**The photo vs. game classifier: probably not trained.**
+- **The real side is easy.** iNaturalist has many openly licensed, species-labelled photos of these plants (cattail,
+  lotus, water lily, rushes, pondweed).
+- **The game side is the problem.** The only game images we can use are our own few assets. A classifier trained on
+  them learns those textures and colours, not "game-ness", and the optimizer then finds the cheapest way past it.
+- **Without training:** measure the distance between the renders' features and the iNaturalist photos' features
+  (KID, in BioCLIP's or DINOv2's feature space). It needs only the real photos, so there's nothing to overfit. At
+  most, a linear probe on frozen features with heavy augmentation, tested on species it never saw.
+
 Proposed held-out set: BioCLIP, the VLM question, normals and the console render. Optical flow and the orbit
 flicker are cheap enough to join the training loss if the multi-view term misses popping.
 
