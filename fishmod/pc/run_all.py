@@ -23,7 +23,20 @@ def main():
     ap.add_argument("--packs", default=os.path.join(HERE, "packs"))
     ap.add_argument("--out", default=os.path.join(HERE, "results"))
     args, passthrough = ap.parse_known_args()
+    args.rom = os.path.abspath(args.rom)
+    os.makedirs(args.out, exist_ok=True)
+    if not os.path.isfile(args.rom):
+        raise SystemExit(f"the ROM isn't at {args.rom}: give its full path, e.g. C:\\roms\\oot.z64")
 
+    # no ares yet (or a half-finished install): get it first
+    sys.path.insert(0, HERE)
+    import run_jobs
+    if "--ares" not in passthrough:
+        try:
+            run_jobs.find_ares(None)
+        except SystemExit:
+            print("ares isn't installed yet: getting it")
+            subprocess.run([sys.executable, os.path.join(HERE, "install_ares.py"), "--force"], check=False)
     packs = sorted(glob.glob(os.path.join(args.packs, "*.zip")))
     packs.sort(key=lambda p: 0 if "selftest" in os.path.basename(p) else 1)
     if not packs:
@@ -45,6 +58,8 @@ def main():
                 raise SystemExit("\nThe self-test's game didn't run (no frames counted), so the other packs wouldn't "
                                  "either. Check ares: the Expansion Pak setting, and the video driver (Settings → "
                                  "Video). See fishmod\\pc\\README.md.")
+    if not done:
+        raise SystemExit("\nNothing ran (see the errors above), so there are no results to send.")
     allzip = os.path.join(args.out, "results_all.zip")
     with zipfile.ZipFile(allzip, "w", zipfile.ZIP_DEFLATED) as z:
         for name in done:
