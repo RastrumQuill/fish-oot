@@ -45,12 +45,15 @@
     },
     {
       "id": 4,
-      "name": "Pond-house cove",
+      "name": "East shore lily shallows",
+      "note": "was a circle at the pond house (1650, 4350): too deep there for lilies (100-400 units); the lily-depth band is further south along the east shore",
       "shape": [
-        "circle",
-        1650,
-        4350,
-        650
+        "capsule",
+        2650,
+        5150,
+        2800,
+        5800,
+        420
       ],
       "bed": "silt",
       "props": "lily field with a few flowers, reed walls, a stump under the pads",
