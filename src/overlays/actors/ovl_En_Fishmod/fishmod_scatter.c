@@ -97,8 +97,8 @@ typedef struct FishmodPropKindInfo {
 // the RDP's full cost (closer than this times the plant's height, plus a little)
 #define NEAR_SKIP 0.6f
 // the cut-outs' edges smoothed by the VI alone, from the coverage the RDP writes (no read of the colour buffer):
-// see Scatter_Material
-#define PROP_EDGE_RA 0
+// see Scatter_Material. Compared at 11 tour stops in ares (whose RDP and VI match the console): no difference to see
+#define PROP_EDGE_RA 1
 #if FISHMOD_DEBUG
 // what the LOD calibration (fishmod_debug.c, FISHMOD_LOD_CALIBRATE) draws everything out to
 #define DIST_CALIBRATE 3000.0f
