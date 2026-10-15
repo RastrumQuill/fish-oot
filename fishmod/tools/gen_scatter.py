@@ -149,7 +149,11 @@ FLOAT_SPREAD = {"lily_pad": 45.0, "spatterdock": 32.0, "float_leaves": 32.0}
 FLOAT_OVERLAP = 0.95
 
 
-def place(scene, seed=1):
+# the layout: one of many the rules can make (chosen by eye from several: the fullest)
+SEED = 4
+
+
+def place(scene, seed=SEED):
     folder = SCENES[scene]
     d = os.path.join(gw.SCENES, folder)
     vtx = gw.parse_vtx(gw.one(d, "*_VtxList.inc.c"))
