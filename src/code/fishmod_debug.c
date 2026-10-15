@@ -1157,9 +1157,9 @@ static void Fishmod_LodUpdate(PlayState* play) {
 #else
 static void Fishmod_LodUpdate(PlayState* play) {
     s32 under = gFishmodLodTest.under;
+    s32 stop = sTourStop;
 
     sLodGfxCtx = play->state.gfxCtx;
-    s32 stop = sTourStop;
 
     if (sLodRef == NULL) {
         sLodRef = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
