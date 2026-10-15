@@ -97,8 +97,12 @@ typedef struct FishmodPropKindInfo {
 // the RDP's full cost (closer than this times the plant's height, plus a little)
 #define NEAR_SKIP 0.6f
 // the cut-outs' edges smoothed by the VI alone, from the coverage the RDP writes (no read of the colour buffer):
-// see Scatter_Material. Compared at 11 tour stops in ares (whose RDP and VI match the console): no difference to see
+// see Scatter_Material. Only for props nearer than PROP_EDGE_RA_DIST: far ones are a few pixels across, mostly edge,
+// and lose those partly covered pixels without the blend (small lotus flowers vanished in the exact A/B capture,
+// fishmod/tools/edge_ab_capture.py); the fill cost is in the near ones anyway
 #define PROP_EDGE_RA 1
+#define PROP_EDGE_RA_DIST 500.0f
+static s32 sEdgeNear; // the props being drawn are within PROP_EDGE_RA_DIST
 #if FISHMOD_DEBUG
 // what the LOD calibration (fishmod_debug.c, FISHMOD_LOD_CALIBRATE) draws everything out to
 #define DIST_CALIBRATE 3000.0f
@@ -263,7 +267,7 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 // The props' commands, two frames' worth (the RSP reads last frame's while this one is built), in buffers of their
 // own rather than the frame's display buffer, which the scene and the fish need.
 typedef struct ScatterFrame {
-    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 64]; // (and the dock)
+    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96]; // (and the dock, and the material again for the far edge mode)
     Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4];
     Mtx sway[SWAY_MAX];
 } ScatterFrame;
@@ -551,12 +555,12 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind) {
     {
         // The cut-out edge. Anti-aliased in the RDP (AA_ZB_TEX_EDGE) reads the colour buffer for every pixel;
         // without that read (as libultra's "RA" modes), the coverage is still written and the VI smooths the edges.
-        s32 ra = PROP_EDGE_RA;
+        s32 ra = PROP_EDGE_RA && sEdgeNear;
         u32 mode;
 
 #if FISHMOD_DEBUG
         if (gFishmodBench & FISHMOD_BENCH_ALTEDGE) {
-            ra = !ra;
+            ra = false; // the old way: every prop anti-aliased in the RDP
         }
 #endif
         mode = ra ? (AA_EN | Z_CMP | Z_UPD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE)
@@ -879,6 +883,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     s32 kind;
     s32 lastOpa = -1; // the material each list has now (the two are interleaved: nearest first, whatever the kind)
     s32 lastXlu = -1;
+    s32 lastNear = -1; // the edge mode the opaque list has now
     s32 n;
     Gfx* opa;
     Gfx* xlu;
@@ -965,6 +970,16 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         }
 #endif
         disp = info->xlu ? &xlu : &opa;
+        if (!info->xlu) {
+            // (nearest first, in bands: this changes once, from near to far)
+            s32 near = (SQ(prop->x - eye.x) + SQ(prop->z - eye.z)) < SQ(PROP_EDGE_RA_DIST);
+
+            if (near != lastNear) {
+                lastNear = near;
+                sEdgeNear = near;
+                lastOpa = -2; // the material again, with the other edge mode (-2: no texture to turn off first)
+            }
+        }
         if (kind != (info->xlu ? lastXlu : lastOpa)) {
             if (info->xlu) {
                 lastXlu = kind;
