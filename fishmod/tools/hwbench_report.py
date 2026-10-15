@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Reads the hardware bench's results (fishmod/scripts/hwbench.inc.c, SRAM 0x0000 of the save file) and prints a
+report: per tour stop and mode, the frame rate, where the frame's time goes (CPU, RSP, RDP), the RDP's own counters
+(command buffer busy / pipeline busy / TMEM loads, as shares of its cycles), and what each mode changes against the
+build as shipped; then the memory tests (latency and bandwidth, with the RDP idle and busy).
+
+Usage: fishmod/tools/hwbench_report.py save.sav [--md out.md]
+"""
+import argparse
+import struct
+
+MODES = ["base", "tex4", "cold", "noprops", "nofish"]
+MODE_DOC = {
+    "base": "as shipped",
+    "tex4": "props' textures in 4 bits (half the memory per texture load)",
+    "cold": "caches filled with other data before each update (CPU work from RDRAM, not the cache)",
+    "noprops": "props not drawn (what the props cost)",
+    "nofish": "fish not drawn (what the fish cost to draw)",
+}
+METRICS = ["period", "cpu_update", "cpu_draw", "rsp_gfx", "rdp", "rsp_audio", "dp_clock", "dp_buf", "dp_pipe",
+           "dp_tmem", "scatter", "fish_upd", "fish_draw", "props"]
+TESTS = [("chase", "load latency, cached miss", "ns/load"), ("chase_uncached", "load latency, uncached", "ns/load"),
+         ("read", "read 64 KB cached", "MB/s"), ("read_uncached", "read 16 KB uncached", "MB/s"),
+         ("write", "write 64 KB + writeback", "MB/s"), ("copy", "bcopy 64 KB", "MB/s")]
+COUNT_HZ = 46_875_000  # the CPU's count register
+STOP_NAMES = [
+    "Across the west flat (under)", "Straight down (under)", "North beach", "Beach shallows (under)", "Pillar ruins",
+    "Pillar ruins (under)", "Lab shore and dock", "Gerudo river inflow", "Rock garden (under)", "West weed flat",
+    "West weed flat (under)", "The drop-off (under)", "Deep basin (under)", "Water Temple gate", "South bridge",
+    "Island shallows (under)", "Island shallows", "East weed flats", "East weed flats (under)", "South reed bank",
+    "Under the lilies", "East shore"]
+
+
+def read(path):
+    d = open(path, "rb").read()
+    magic, version, stops, modes, metrics, tests, hw = struct.unpack(">IBBBBBB", d[:10])
+    if magic != 0x4642454E:
+        raise SystemExit(f"no bench results in {path}")
+    laps, visits = struct.unpack(">II", d[12:20])
+    o = 20
+    cells = []
+    for s in range(stops):
+        row = []
+        for m in range(modes):
+            frames = struct.unpack(">I", d[o:o + 4])[0]
+            sums = struct.unpack(f">{metrics}I", d[o + 4:o + 4 + 4 * metrics])
+            maxs = struct.unpack(f">{metrics}I", d[o + 4 + 4 * metrics:o + 4 + 8 * metrics])
+            row.append((frames, sums, maxs))
+            o += 4 + 8 * metrics
+        cells.append(row)
+    micro = []
+    for t in range(tests):
+        ctx = []
+        for b in range(2):
+            ctx.append(struct.unpack(">III", d[o:o + 12]))
+            o += 12
+        micro.append(ctx)
+    return dict(version=version, hw=hw, laps=laps, visits=visits, cells=cells, micro=micro)
+
+
+def avg(cell, name):
+    frames, sums, _ = cell
+    return sums[METRICS.index(name)] / frames if frames else 0.0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("save")
+    ap.add_argument("--md")
+    args = ap.parse_args()
+    r = read(args.save)
+    out = []
+    p = out.append
+    p(f"# Hardware bench ({'original-hardware build' if r['hw'] else 'emulator build'})\n")
+    p(f"{r['laps']} full laps, {r['visits']} stop visits.\n")
+    p("Modes: " + "; ".join(f"**{m}**: {MODE_DOC[m]}" for m in MODES) + ".\n")
+    p("RDP columns are shares of its cycles: **buf** = command buffer busy (fetching from RDRAM, or held up), "
+      "**pipe** = drawing, **tmem** = loading textures.\n")
+
+    totals = {m: [0.0, 0] for m in MODES}
+    p("| stop | mode | fps | CPU upd | CPU draw | RSP | RDP ms | buf | pipe | tmem | props | worst frame |")
+    p("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    for s, row in enumerate(r["cells"]):
+        for m, cell in enumerate(row):
+            if not cell[0]:
+                continue
+            period = avg(cell, "period")
+            clock = avg(cell, "dp_clock")
+            pct = lambda n: f"{100 * avg(cell, n) / clock:.0f}%" if clock else "-"
+            totals[MODES[m]][0] += period
+            totals[MODES[m]][1] += 1
+            worst = cell[2][METRICS.index("period")] / 1000
+            p(f"| {s + 1} {STOP_NAMES[s] if m == 0 else ''} | {MODES[m]} | {1e6 / period:.1f} | "
+              f"{avg(cell, 'cpu_update') / 1000:.1f} | {avg(cell, 'cpu_draw') / 1000:.1f} | "
+              f"{avg(cell, 'rsp_gfx') / 1000:.1f} | {avg(cell, 'rdp') / 1000:.1f} | {pct('dp_buf')} | "
+              f"{pct('dp_pipe')} | {pct('dp_tmem')} | {avg(cell, 'props'):.0f} | {worst:.0f} ms |")
+
+    p("\n## Each mode against the build as shipped (all stops)\n")
+    p("| mode | mean frame | change | ")
+    p("|---|---|---|")
+    base = totals["base"][0] / max(totals["base"][1], 1)
+    for m in MODES:
+        t, n = totals[m]
+        if n:
+            mean = t / n
+            p(f"| {m} | {mean / 1000:.1f} ms ({1e6 / mean:.1f} fps) | {100 * (mean - base) / base:+.1f}% |")
+
+    p("\n## Memory (CPU count cycles: 46.875 MHz)\n")
+    p("| test | RDP idle | RDP busy | samples (idle/busy) |")
+    p("|---|---|---|---|")
+    for (key, doc, unit), ctx in zip(TESTS, r["micro"]):
+        vals = []
+        for count, total, mn in ctx:
+            if not count:
+                vals.append("-")
+                continue
+            mean = total / count
+            if unit == "ns/load":
+                vals.append(f"{mean * 1e9 / COUNT_HZ:.0f} ns (best {mn * 1e9 / COUNT_HZ:.0f})")
+            else:
+                # cycles per KB -> MB/s
+                vals.append(f"{1024 * COUNT_HZ / mean / 1e6:.0f} MB/s (best {1024 * COUNT_HZ / mn / 1e6:.0f})")
+        p(f"| {doc} | {vals[0]} | {vals[1]} | {ctx[0][0]}/{ctx[1][0]} |")
+    text = "\n".join(out) + "\n"
+    print(text)
+    if args.md:
+        open(args.md, "w").write(text)
+
+
+if __name__ == "__main__":
+    main()

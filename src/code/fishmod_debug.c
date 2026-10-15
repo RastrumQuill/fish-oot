@@ -490,6 +490,9 @@ static s32 sTourDebugText;
 #ifdef FISHMOD_LOD_CALIBRATE
 static void Fishmod_LodUpdate(PlayState* play);
 #endif
+#ifdef FISHMOD_HWBENCH
+static void Fishmod_BenchUpdate(PlayState* play);
+#endif
 
 static void Fishmod_TourGo(s32 stop) {
     s32 n = ARRAY_COUNT(sTourStops);
@@ -617,6 +620,9 @@ static void Fishmod_TourUpdate(PlayState* play) {
     }
 #ifdef FISHMOD_LOD_CALIBRATE
     Fishmod_LodUpdate(play);
+#endif
+#ifdef FISHMOD_HWBENCH
+    Fishmod_BenchUpdate(play);
 #endif
 }
 
@@ -1337,14 +1343,360 @@ static void Fishmod_LodUpdate(PlayState* play) {
 #endif // FISHMOD_LOD_SWEEP
 #endif
 
+
+#ifdef FISHMOD_HWBENCH
+static u32 sLastCpu[FISHMOD_CPU_MAX];
+#endif
+#ifdef FISHMOD_HWBENCH
+/*
+ * The hardware bench (fishmod/scripts/hwbench.inc.c): for the console, all night. The tour's stops in turn; at each,
+ * blocks of frames in each mode, timed, and the RDP's own counters (only the console has them: how much of its time
+ * goes on fetching commands and waiting on memory, drawing, loading textures). Then a few memory tests, with the RDP
+ * busy and with it idle. Lap after lap, the sums go to SRAM after each stop (the SummerCart writes them to the .sav):
+ * fishmod/tools/hwbench_report.py reads it.
+ *
+ * Modes: as shipped; the props' textures in 4 bits (gFishmodTexCompress); both caches filled with other data before
+ * each frame's update (what the work costs coming from RDRAM rather than the cache); no props drawn; no fish drawn.
+ */
+#define BENCH_STOPS 22
+#define BENCH_SETTLE 60 // frames after arriving
+#define BENCH_SKIP 10   // frames after changing mode, not counted (the frame being timed runs behind)
+#define BENCH_FRAMES 60 // frames counted per block
+#define BENCH_ROUNDS 2  // blocks per mode per visit (interleaved: A B C D E A B C D E)
+#define BENCH_MICRO_FRAMES 30
+
+typedef enum BenchMode {
+    BENCH_BASE,
+    BENCH_TEX4,
+    BENCH_COLD,
+    BENCH_NOPROPS,
+    BENCH_NOFISH,
+    BENCH_MODES,
+    BENCH_MICRO = BENCH_MODES
+} BenchMode;
+
+typedef enum BenchMetric {
+    BM_PERIOD,     // frame period, us (the time between graph updates)
+    BM_CPU_UPDATE, // Play_Update, us (less the cache filling in the cold mode)
+    BM_CPU_DRAW,   // Play_Draw (display lists), us
+    BM_RSP_GFX,    // RSP graphics task, us
+    BM_RDP,        // RDP (scheduler: from its task's start to its end), us
+    BM_RSP_AUDIO,  // RSP audio, us
+    BM_DP_CLOCK,   // RDP counters, in 64-cycle units: all cycles
+    BM_DP_BUF,     //   command buffer busy (fetching, or held up)
+    BM_DP_PIPE,    //   pipeline busy (drawing)
+    BM_DP_TMEM,    //   loading TMEM
+    BM_SCATTER,    // the props' display lists (CPU), us
+    BM_FISH_UPD,   // the fishes' updates (CPU), us
+    BM_FISH_DRAW,  // the fishes' draws (CPU), us
+    BM_PROPS,      // props drawn
+    BENCH_METRICS
+} BenchMetric;
+
+typedef enum BenchTest {
+    BT_CHASE,         // dependent loads, each to a line not in the cache: latency (per load)
+    BT_CHASE_UNCACHED,// the same through KSEG1 (no cache at all)
+    BT_READ,          // reading 64 KB through the cache, from RDRAM (per KB)
+    BT_READ_UNCACHED, // reading 16 KB uncached (per KB)
+    BT_WRITE,         // writing 64 KB through the cache and writing it back (per KB)
+    BT_COPY,          // bcopy 64 KB, from RDRAM to RDRAM through the cache (per KB)
+    BENCH_TESTS
+} BenchTest;
+
+typedef struct BenchCell {
+    u32 frames;
+    u32 sum[BENCH_METRICS];
+    u32 max[BENCH_METRICS];
+} BenchCell;
+
+typedef struct BenchMicro {
+    u32 count;
+    u32 sum; // CPU count cycles (46.875 MHz)
+    u32 min;
+} BenchMicro;
+
+typedef struct BenchResults {
+    u32 magic; // 'FBEN'
+    u8 version;
+    u8 stops;
+    u8 modes;
+    u8 metrics;
+    u8 tests;
+    u8 hw;    // the original-hardware build
+    u8 pad[2];
+    u32 laps; // tours completed
+    u32 visits;
+    BenchCell cell[BENCH_STOPS][BENCH_MODES];
+    BenchMicro micro[BENCH_TESTS][2]; // [test][RDP idle, busy]
+} BenchResults;
+
+static BenchResults sBench;
+static s32 sBenchState; // 0: arriving, 1: measuring, 2: micro
+static s32 sBenchFrame;
+static s32 sBenchBlock; // block in this visit
+static u32* sBenchBuf;  // 128 KB for the memory tests and the cache filling
+static u32 sBenchRand = 0x1234567;
+static u32 sBenchFillTime; // last frame's cache filling, us (taken off the update's time)
+
+#define BENCH_BUF_SIZE 0x20000
+
+static u32 Bench_Rand(void) {
+    sBenchRand ^= sBenchRand << 13;
+    sBenchRand ^= sBenchRand >> 17;
+    sBenchRand ^= sBenchRand << 5;
+    return sBenchRand;
+}
+
+/** Both caches full of other things: the data cache with 32 KB of random words (dirty: written back as they're
+ * pushed out, as in the game), the instruction cache emptied. */
+static void Bench_FillCaches(void) {
+    u32* p = &sBenchBuf[0x10000 / 4]; // (the second half: the first holds the chase's cycle)
+    s32 i;
+
+    for (i = 0; i < 0x8000 / 4; i++) {
+        p[i] = Bench_Rand();
+    }
+    osInvalICache((void*)0x80000000, 0x4000);
+}
+
+static s32 Bench_RdpBusy(void) {
+    return (IO_READ(DPC_STATUS_REG) & (DPC_STATUS_PIPE_BUSY | DPC_STATUS_CMD_BUSY)) != 0;
+}
+
+static void Bench_Micro(void) {
+    s32 test = (s32)(Bench_Rand() % BENCH_TESTS);
+    u32* buf = sBenchBuf;
+    s32 busy0 = Bench_RdpBusy();
+    u32 t0;
+    u32 t1;
+    u32 per = 1;
+    s32 i;
+    u32 sink = 0;
+
+    osWritebackDCacheAll();
+    osInvalDCache(buf, BENCH_BUF_SIZE);
+    switch (test) {
+        case BT_CHASE:
+        case BT_CHASE_UNCACHED: {
+            // a random cycle through 2048 lines of the first 64 KB (one word each, 32 bytes apart): each load needs
+            // the last
+            u32* base = (test == BT_CHASE) ? buf : (u32*)OS_PHYSICAL_TO_K1(OS_K0_TO_PHYSICAL(buf));
+            u32 idx = 0;
+
+            t0 = osGetCount();
+            for (i = 0; i < 2048; i++) {
+                idx = base[idx];
+            }
+            t1 = osGetCount();
+            sink = idx;
+            per = 2048;
+            break;
+        }
+        case BT_READ:
+            t0 = osGetCount();
+            for (i = 0; i < 0x10000 / 4; i += 4) {
+                sink += buf[i] + buf[i + 1] + buf[i + 2] + buf[i + 3];
+            }
+            t1 = osGetCount();
+            per = 64;
+            break;
+        case BT_READ_UNCACHED: {
+            u32* k1 = (u32*)OS_PHYSICAL_TO_K1(OS_K0_TO_PHYSICAL(buf));
+
+            t0 = osGetCount();
+            for (i = 0; i < 0x4000 / 4; i += 4) {
+                sink += k1[i] + k1[i + 1] + k1[i + 2] + k1[i + 3];
+            }
+            t1 = osGetCount();
+            per = 16;
+            break;
+        }
+        case BT_WRITE:
+            t0 = osGetCount();
+            for (i = 0x10000 / 4; i < 0x20000 / 4; i += 4) {
+                buf[i] = i;
+                buf[i + 1] = i;
+                buf[i + 2] = i;
+                buf[i + 3] = i;
+            }
+            osWritebackDCache(&buf[0x10000 / 4], 0x10000);
+            t1 = osGetCount();
+            per = 64;
+            break;
+        default: // BT_COPY
+            t0 = osGetCount();
+            bcopy(buf, &buf[0x10000 / 4], 0x10000);
+            osWritebackDCache(&buf[0x10000 / 4], 0x10000);
+            t1 = osGetCount();
+            per = 64;
+            break;
+    }
+    // (the writes and the copy only go to the second 64 KB: the chase's cycle in the first is left as it was)
+    if (sink == 0xDEADBEEF) {
+        sBench.pad[0]++; // (keeps the reads from being optimised away)
+    }
+    if (busy0 == Bench_RdpBusy()) {
+        BenchMicro* m = &sBench.micro[test][busy0];
+        u32 c = (t1 - t0) / per;
+
+        m->count++;
+        m->sum += c;
+        if ((m->min == 0) || (c < m->min)) {
+            m->min = c;
+        }
+    }
+}
+
+static void Bench_Record(s32 stop, s32 mode) {
+    BenchCell* cell = &sBench.cell[stop][mode];
+    u32 v[BENCH_METRICS];
+    s32 i;
+
+    v[BM_PERIOD] = (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
+    v[BM_CPU_UPDATE] = sLastCpu[FISHMOD_CPU_UPDATE];
+    if (mode == BENCH_COLD) {
+        v[BM_CPU_UPDATE] = (v[BM_CPU_UPDATE] > sBenchFillTime) ? v[BM_CPU_UPDATE] - sBenchFillTime : 0;
+    }
+    v[BM_CPU_DRAW] = sLastCpu[FISHMOD_CPU_DRAW];
+    v[BM_RSP_GFX] = (u32)OS_CYCLES_TO_USEC(gRSPGfxTimeTotal);
+    v[BM_RDP] = (u32)OS_CYCLES_TO_USEC(gRDPTimeTotal);
+    v[BM_RSP_AUDIO] = (u32)OS_CYCLES_TO_USEC(gRSPAudioTimeTotal);
+    v[BM_DP_CLOCK] = gFishmodRdp.clock >> 6;
+    v[BM_DP_BUF] = gFishmodRdp.buf >> 6;
+    v[BM_DP_PIPE] = gFishmodRdp.pipe >> 6;
+    v[BM_DP_TMEM] = gFishmodRdp.tmem >> 6;
+    v[BM_SCATTER] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_D_SCATTER]);
+    v[BM_FISH_UPD] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_U_ENGINE]);
+    v[BM_FISH_DRAW] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_D_ENGINE]);
+    v[BM_PROPS] = gFishmodScatterDrawn;
+    cell->frames++;
+    for (i = 0; i < BENCH_METRICS; i++) {
+        cell->sum[i] += v[i];
+        cell->max[i] = MAX(cell->max[i], v[i]);
+    }
+}
+
+static void Bench_SetMode(s32 mode) {
+    gFishmodTexCompress = (mode == BENCH_TEX4);
+    gFishmodBench = ((mode == BENCH_NOPROPS) ? FISHMOD_BENCH_NOPROPS : 0) |
+                    ((mode == BENCH_NOFISH) ? FISHMOD_BENCH_NOFISH : 0);
+}
+
+static void Bench_Save(void) {
+    sBench.magic = 0x4642454E; // 'FBEN'
+    sBench.version = 1;
+    sBench.stops = BENCH_STOPS;
+    sBench.modes = BENCH_MODES;
+    sBench.metrics = BENCH_METRICS;
+    sBench.tests = BENCH_TESTS;
+    sBench.hw = FISHMOD_HW;
+    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_WRITE);
+}
+
+static void Fishmod_BenchUpdate(PlayState* play) {
+    s32 stop = sTourStop;
+    s32 mode;
+
+    if (sBenchBuf == NULL) {
+        s32 i;
+
+        sBenchBuf = SYSTEM_ARENA_MALLOC(BENCH_BUF_SIZE, "../fishmod_debug.c", __LINE__);
+        if (sBenchBuf == NULL) {
+            return;
+        }
+        // the chase's cycle: each of the first 2048 lines (of 16 bytes) points to the next in a shuffled order
+        {
+            static u16 sOrder[2048];
+
+            for (i = 0; i < 2048; i++) {
+                sOrder[i] = i;
+            }
+            for (i = 2047; i > 0; i--) {
+                s32 j = (s32)(Bench_Rand() % (u32)(i + 1));
+                u16 t = sOrder[i];
+
+                sOrder[i] = sOrder[j];
+                sOrder[j] = t;
+            }
+            for (i = 0; i < 2048; i++) {
+                // spread over the first 64 KB: line k at 32 * k bytes (8 words apart; the cache's lines are 16)
+                sBenchBuf[sOrder[i] * 8] = sOrder[(i + 1) % 2048] * 8;
+            }
+        }
+        // carry on from an earlier night (the save file keeps the sums)
+        SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_READ);
+        if ((sBench.magic != 0x4642454E) || (sBench.version != 1) || (sBench.hw != FISHMOD_HW)) {
+            bzero(&sBench, sizeof(sBench));
+        }
+    }
+    Fishmod_SampleRdp();
+
+    mode = sBenchBlock % BENCH_MODES;
+    switch (sBenchState) {
+        case 0: // arriving
+            Bench_SetMode(BENCH_BASE);
+            if (sTourFrame >= TOUR_GLIDE + BENCH_SETTLE) {
+                sBenchState = 1;
+                sBenchBlock = 0;
+                sBenchFrame = 0;
+                Bench_SetMode(0);
+            }
+            break;
+
+        case 1: // measuring
+            if (sBenchFrame >= BENCH_SKIP) {
+                Bench_Record(stop, mode);
+            }
+            if (++sBenchFrame >= BENCH_SKIP + BENCH_FRAMES) {
+                sBenchFrame = 0;
+                if (++sBenchBlock >= BENCH_MODES * BENCH_ROUNDS) {
+                    sBenchState = 2;
+                    Bench_SetMode(BENCH_BASE);
+                    break;
+                }
+                mode = sBenchBlock % BENCH_MODES;
+                Bench_SetMode(mode);
+            }
+            if ((sBenchState == 1) && (mode == BENCH_COLD)) {
+                // the update that follows starts with nothing of its own in the caches
+                OSTime t = osGetTime();
+
+                Bench_FillCaches();
+                sBenchFillTime = (u32)OS_CYCLES_TO_USEC(osGetTime() - t);
+            }
+            break;
+
+        default: // the memory tests, then on to the next stop
+            Bench_Micro();
+            if (++sBenchFrame >= BENCH_MICRO_FRAMES) {
+                sBench.visits++;
+                if (stop + 1 >= BENCH_STOPS) {
+                    sBench.laps++;
+                }
+                Bench_Save();
+                Fishmod_TourGo(stop + 1);
+                sBenchState = 0;
+                sBenchFrame = 0;
+            }
+            break;
+    }
+    {
+        static const char* sModeNames[] = { "base", "tex4", "cold", "noprops", "nofish" };
+
+        Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
+                            (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);
+    }
+}
+#endif
+
 static void Fishmod_TourDraw(Gfx** gfxP) {
     FishmodTourStop* stop = &sTourStops[sTourStop];
     GfxPrint printer;
     Gfx* gfx = *gfxP;
     s32 i;
 
-#ifdef FISHMOD_LOD_CALIBRATE
-    return; // nothing over the frames being compared
+#if defined(FISHMOD_LOD_CALIBRATE) || defined(FISHMOD_HWBENCH)
+    return; // nothing over the frames being compared or timed
 #endif
 
     // a dark box at the bottom, like a textbox
@@ -1475,6 +1827,12 @@ s32 Fishmod_DebugNormalBoot(void) {
 }
 
 OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
+#ifndef FISHMOD_HWBENCH
+static u32 sLastCpu[FISHMOD_CPU_MAX];
+#endif
+OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // the profile timers over the last frame (before they're cleared)
+s32 gFishmodBench;                         // FISHMOD_BENCH_* flags (the hardware bench switches things off)
+s32 gFishmodScatterDrawn;                  // props drawn in the last frame
 OSTime gFishmodProf[FISHMOD_PROF_MAX];
 u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 
@@ -1485,7 +1843,6 @@ u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 #ifndef FISHMOD_STATS_SKIP
 #define FISHMOD_STATS_SKIP 600 // frames before the whole-run stats start (scene load, settling)
 #endif
-static u32 sLastCpu[FISHMOD_CPU_MAX];
 static s32 sStatsFrames;
 
 /**
@@ -1518,6 +1875,7 @@ static void Fishmod_DebugProfile(s32 record) {
             SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7E00, &sProf, sizeof(sProf), OS_WRITE);
         }
     }
+    bcopy(gFishmodProf, gFishmodLastProf, sizeof(gFishmodLastProf));
     for (i = 0; i < FISHMOD_PROF_MAX; i++) {
         gFishmodProf[i] = 0;
         gFishmodProfCount[i] = 0;

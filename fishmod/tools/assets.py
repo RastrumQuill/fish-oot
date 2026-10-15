@@ -14,6 +14,11 @@ The manifest:
     { "name": "gFishmodBottleLarva3Tex", "src": "fishmod/art/bottle_larva_3.png", "format": "rgba32",
       "out": "src/code/fishmod_bait_icons.inc.c" }
   ],
+  "materials": [
+    { "name": "gFishmodRockMaterial4", "texture": "gFishmodRockTex4", "out": "..." }
+                                           // a texture load alone (convert_material): another format of a model's
+                                           // texture, to draw it with instead
+  ],
   "models": [
     { "name": "gFishmodRockDL", "src": "fishmod/assets/rock.obj", "out": "src/.../rock.inc.c",
       "scale": 10.0,                       // OBJ units -> world units (default 1)
@@ -189,6 +194,29 @@ def load_obj(path):
     return pos, uv, nrm, col, tris
 
 
+def convert_material(entry, textures):
+    """A texture load on its own (a "material" entry): the same as a separateMaterial model's <name>Material, for
+    drawing a model with another texture of the same size (another format of it, say)."""
+    name = entry["name"]
+    tex = textures.get(entry["texture"])
+    if tex is None:
+        raise AssetError(f"{name}: texture {entry['texture']!r} is not in the manifest's textures")
+    tw, th = tex["size"]
+    bits, gfmt, gsiz = FORMATS[tex["format"]]
+    load = "gsDPLoadTextureBlock_4b" if bits == 4 else "gsDPLoadTextureBlock"
+    siz = "" if bits == 4 else f"{gsiz}, "
+    dl = [f"Gfx {name}[] = {{", "    gsDPPipeSync(),"]
+    if tex["format"].startswith("ci"):
+        dl.append("    gsDPSetTextureLUT(G_TT_RGBA16),")
+        dl.append(f"    gsDPLoadTLUT_pal{'256' if bits == 8 else '16'}({'' if bits == 8 else '0, '}{tex['name']}TLUT),")
+    dl.append(f"    {load}({tex['name']}, {gfmt}, {siz}{tw}, {th}, 0, G_TX_WRAP, G_TX_WRAP, "
+              f"{(tw - 1).bit_length()}, {(th - 1).bit_length()}, G_TX_NOLOD, G_TX_NOLOD),")
+    dl.append("    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),")
+    dl.append("    gsSPEndDisplayList(),")
+    dl.append("};")
+    return f"// material: {tex['name']} ({tex['format']}, {tw}x{th})\n" + "\n".join(dl)
+
+
 def convert_model(entry, textures):
     name = entry["name"]
     pos, uv, nrm, col, tris = load_obj(rel(entry["src"]))
@@ -315,6 +343,13 @@ def build(manifest, check):
             chunks.append(u64_array(entry["name"] + "TLUT", tlut, f"palette of {entry['name']}: "
                                     f"{len(tlut) // 2} colours, RGBA16"))
         chunks.append(u64_array(entry["name"], data, f"{entry['src']}: {w}x{h} {entry['format']}"))
+
+    for entry in manifest.get("materials", []):
+        try:
+            outputs.setdefault(entry["out"], []).append(convert_material(entry, textures))
+        except (AssetError, OSError) as e:
+            print(f"error: {e}")
+            problems += 1
 
     for entry in manifest.get("models", []):
         try:

@@ -53,6 +53,7 @@ typedef enum FishmodPropKind {
 
 typedef struct FishmodPropKindInfo {
     Gfx* material;
+    Gfx* material4; // the same texture in 4 bits (gFishmodTexCompress), or NULL
     Gfx* model;
     f32 drawDist;      // drawn no further than this (above water)
     f32 drawDistUnder; // and with the camera under water (fishmod_lod.h: measured, the haze hides the rest)
@@ -109,6 +110,9 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_##id].model = gFishmodProp_##name##DL;
     // the generated kinds (the vanilla ones are set below)
     FISHMOD_PROP_KINDS_GENERATED(X)
+#undef X
+#define X(id, tex) sKinds[FISHMOD_PROP_##id].material4 = gFishmodProp_##tex##Material4;
+    FISHMOD_PROP_KINDS_4BIT(X)
 #undef X
     sKinds[FISHMOD_PROP_POND_REED].material = gFishingReedMaterialDL;
     sKinds[FISHMOD_PROP_POND_REED].model = gFishingReedModelDL;
@@ -529,7 +533,7 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind) {
     gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_TEX_EDGE2);
     gSPClearGeometryMode(gfx++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
     gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
-    gSPDisplayList(gfx++, info->material);
+    gSPDisplayList(gfx++, ((gFishmodTexCompress != 0) && (info->material4 != NULL)) ? info->material4 : info->material);
     return gfx;
 }
 
@@ -882,6 +886,9 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     opa = frame->opa;
     xlu = frame->xlu;
     Scatter_Sway(play, frame);
+#if FISHMOD_DEBUG
+    gFishmodScatterDrawn = set->count;
+#endif
     for (n = 0; n < set->count; n++) {
         FishmodProp* prop = &sProps[set->prop[n]];
         FishmodPropKindInfo* info;
@@ -942,6 +949,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         }
         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
     }
+    gDPPipeSync(opa++);
+    gDPSetTextureLUT(opa++, G_TT_NONE); // (a 4-bit texture's palette mode off again for what's drawn next)
     gSPEndDisplayList(opa++);
     gSPEndDisplayList(xlu++);
 #if FISHMOD_DEBUG
