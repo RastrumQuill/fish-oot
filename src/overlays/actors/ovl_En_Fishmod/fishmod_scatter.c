@@ -64,6 +64,7 @@ typedef struct FishmodPropKindInfo {
     u8 swayRate; // how fast (a turn takes 0x10000 / (swayRate * 16) frames)
     u8 card;     // a big plant card: not drawn with the camera inside it (NEAR_SKIP)
     u16 height;  // how tall it is at scale 1 (gen_scatter.py HEIGHT), for the camera-inside test
+    u16 extent;  // how far it reaches from where it stands at scale 1 (up, or down for hanging ones): the view test
 } FishmodPropKindInfo;
 
 #define DIST_SMALL 800.0f
@@ -102,6 +103,7 @@ typedef struct FishmodPropKindInfo {
 
 static FishmodPropKindInfo sKinds[FISHMOD_PROP_KIND_MAX];
 static f32 sDistFar[2]; // the furthest any kind is drawn: above water, under it (how far the chunks are looked at)
+static f32 sExtentMax; // the furthest any prop reaches from where it stands (the chunks' view test)
 static f32 sReach[FISHMOD_PROP_KIND_MAX][2]; // each kind's own reach [above, under water], before the measured cuts
 
 static void Scatter_InitKinds(void) {
@@ -193,6 +195,20 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_SUNKEN_LOG].plant = false;
     sKinds[FISHMOD_PROP_BRANCH].plant = false;
     sKinds[FISHMOD_PROP_OLD_POSTS].plant = false;
+    {
+        // how far each reaches from where it stands (the view test's room for its size): the cards their height,
+        // the rest a generous default (reeds, the pond's tall reed, rocks, logs, hanging vines)
+        s32 i;
+
+        for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
+            sKinds[i].extent = (sKinds[i].height != 0) ? sKinds[i].height : 150;
+        }
+        sKinds[FISHMOD_PROP_POND_REED].extent = 240;
+        sKinds[FISHMOD_PROP_CATTAILS].extent = 120;
+        for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
+            sExtentMax = MAX(sExtentMax, sKinds[i].extent * 1.6f); // (the largest scale)
+        }
+    }
     {
         s32 i;
 
@@ -613,6 +629,8 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 budget = PROP_BUDGET;
     s32 xluLeft = XLU_MAX;
     ScatterSet* set;
+    f32 viewCos = VIEW_COS;  // the view cone
+    f32 viewRoom = 0.0f;     // extra room round each prop and chunk for it
 #if FISHMOD_LOD_ZONE_COUNT > 0
     s32 zone = -1;
 
@@ -628,7 +646,12 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
 #endif
 
 #if FISHMOD_DEBUG
-    if (gFishmodLodTest.active) {
+    // the rotation check (FISHMOD_LOD_ROTATE) draws a reference with a much wider cone and nothing cut by distance
+    if (gFishmodLodTest.active && gFishmodLodTest.wide) {
+        viewCos = 0.3f;
+        viewRoom = 400.0f;
+    }
+    if (gFishmodLodTest.active && !gFishmodLodTest.asGame) {
         distFar = DIST_CALIBRATE;
         gFishmodLodTest.under = under;
         gFishmodLodTest.kindCount = FISHMOD_PROP_KIND_MAX;
@@ -657,8 +680,8 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             // the whole chunk outside the view cone (the same test as each prop's, with the chunk's size and the
             // water's depth as room)
             my = ((sChunkSurface[c] != -0x8000) ? sChunkSurface[c] - 150.0f : eye.y) - eye.y;
-            front = mx * lookX + my * lookY + mz * lookZ + chunk * 0.71f + PROP_RADIUS + 150.0f;
-            if (((front < 0.0f) || (SQ(front) < SQ(VIEW_COS) * (d + SQ(my)))) && (d > SQ(chunk * 1.5f))) {
+            front = mx * lookX + my * lookY + mz * lookZ + chunk * 0.71f + PROP_RADIUS + sExtentMax + viewRoom;
+            if (((front < 0.0f) || (SQ(front) < SQ(viewCos) * (d + SQ(my)))) && (d > SQ(chunk * 1.5f))) {
                 continue;
             }
             if (visibleCount < ARRAY_COUNT(sVisible)) {
@@ -700,7 +723,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
 #endif
 #if FISHMOD_DEBUG
-        if (gFishmodLodTest.active) {
+        if (gFishmodLodTest.active && !gFishmodLodTest.asGame) {
             // calibrating: everything out to DIST_CALIBRATE (the test's cut comes later, so it changes nothing else)
             maxDist = DIST_CALIBRATE;
         }
@@ -740,12 +763,16 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                         continue;
                     }
                 }
-                // outside the view cone (with room for the prop's size), unless it's right by the camera; squared,
-                // no square roots: front + R < cos * dist  <=>  (front + R)^2 < cos^2 * dist^2 (when front + R >= 0)
-                front = dx * lookX + dy * lookY + dz * lookZ + PROP_RADIUS;
-                if (((front < 0.0f) || (SQ(front) < SQ(VIEW_COS) * (dSq + SQ(dy)))) &&
-                    (dSq > SQ(PROP_RADIUS * 2.0f))) {
-                    continue;
+                // outside the view cone (with room for the prop's size: all of its height, as a tall weed's top can be
+                // in view with its foot below the screen), unless it's right by the camera; squared, no square roots:
+                // front + R < cos * dist  <=>  (front + R)^2 < cos^2 * dist^2 (when front + R >= 0)
+                {
+                    f32 room = PROP_RADIUS + info->extent * prop->scale * (1.0f / 64.0f) + viewRoom;
+
+                    front = dx * lookX + dy * lookY + dz * lookZ + room;
+                    if (((front < 0.0f) || (SQ(front) < SQ(viewCos) * (dSq + SQ(dy)))) && (dSq > SQ(room * 2.0f))) {
+                        continue;
+                    }
                 }
                 if (candCount < VISIBLE_MAX) {
                     sCandBand[candCount] = CLAMP_MAX((s32)(sqrtf(dSq) * (1.0f / BAND_WIDTH)), BANDS - 1);

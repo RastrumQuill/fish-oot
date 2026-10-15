@@ -341,6 +341,8 @@ typedef struct FishmodLodTest {
     /* 0x02 */ u8 kindCount; // FISHMOD_PROP_KIND_MAX (set by the scatter)
     /* 0x04 */ s16 dist[FISHMOD_LOD_KINDS];
     /* 0x64 */ u16 drawn[FISHMOD_LOD_KINDS]; // per kind, props drawn in the last frame (set by the scatter)
+    /* 0xC4 */ u8 asGame; // the rotation check: the props as the game picks them (its distances, cone, caps)
+    /* 0xC5 */ u8 wide;   // the rotation check's reference: a much wider cone, nothing cut by distance
 } FishmodLodTest;
 extern FishmodLodTest gFishmodLodTest;
 extern s16 gFishmodDebugFocusYaw;
