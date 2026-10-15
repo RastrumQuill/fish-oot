@@ -133,7 +133,10 @@ def main():
             if os.name != "nt":
                 cmd += ["--setting", "Audio/Driver=None"]  # (a headless Linux box has no sound device)
             cmd += ["--setting", "Input/Defocus=Allow", rom]  # (keeps running when its window isn't in front)
-            proc = subprocess.Popen(cmd, cwd=jd)
+            # ares's own messages (its renderer's memory warnings and so on) go to a log in the job's folder,
+            # not over the runner's progress
+            log = open(os.path.join(jd, "ares.log"), "w")
+            proc = subprocess.Popen(cmd, cwd=jd, stdout=log, stderr=subprocess.STDOUT)
             running.append((job, jd, proc, time.time()))
             print(f"  started {job['name']} ({job['seconds']} s)")
         time.sleep(2)
