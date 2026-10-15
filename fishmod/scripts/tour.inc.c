@@ -55,6 +55,6 @@ static FishmodTourStop sTourStops[] = {
       "Reed walls and lily pads. The tall", "see-through reeds are the Fishing", "Pond's own; the clumps are new." },
     { { -1900, -1480, 8300 }, { -2000, -1330, 8750 }, "Under the lilies",
       "Looking up at the pads from below.", "Bass sit under them at dawn", "and dusk." },
-    { { 1700, -1150, 4450 }, { 2050, -1330, 4800 }, "East shore",
-      "Toward the Fishing Pond house: lily", "field and reeds. That's the tour.", "Press A to go round again!" },
+    { { 2150, -1160, 4750 }, { 2700, -1330, 5400 }, "East shore",
+      "South of the Fishing Pond house:", "lilies and reeds. That's the tour.", "Press A to go round again!" },
 };
