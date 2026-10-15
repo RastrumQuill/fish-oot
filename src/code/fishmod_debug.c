@@ -681,18 +681,15 @@ static u32 sLodStateFrames;
 
 static u16* sLodCur;   // the frame being tested, copied off the screen
 
-static u16* Lod_Frame(void) {
-    // what the screen shows (finished), read past the data cache
-    return (u16*)OS_PHYSICAL_TO_K1(OS_K0_TO_PHYSICAL(osViGetCurrentFramebuffer()));
-}
+static GraphicsContext* sLodGfxCtx;
 
 /**
- * Copies what the screen shows to `dst`. The screen may swap to the next frame while it's copied, and that's fine:
- * the frame being copied is only drawn over by the frame after next, whose drawing starts after this update.
+ * Copies a finished frame to `dst`: the buffer this frame is about to be drawn into, which still holds the frame
+ * from two updates ago, whole (its drawing ended before the last one began, and this one's starts after this
+ * update). Not the buffer on the screen: the next frame can already be being drawn into that one.
  */
 static s32 Lod_Grab(u16* dst) {
-    void* shown = osViGetCurrentFramebuffer();
-    u16* fb = (u16*)OS_PHYSICAL_TO_K0(OS_K0_TO_PHYSICAL(shown));
+    u16* fb = (u16*)OS_PHYSICAL_TO_K0(OS_K0_TO_PHYSICAL(sLodGfxCtx->curFrameBuffer));
 
     // through the cache (lines at a time: several times faster than one read each), the stale lines dropped first
     osInvalDCache(fb, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16));
@@ -878,6 +875,7 @@ static void Sweep_Place(void) {
 }
 
 static void Fishmod_LodUpdate(PlayState* play) {
+    sLodGfxCtx = play->state.gfxCtx;
     if (sLodRef == NULL) {
         sLodRef = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
         sLodNoise = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT / 8, "../fishmod_debug.c", __LINE__);
@@ -979,6 +977,11 @@ static void Fishmod_LodUpdate(PlayState* play) {
                     SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x1000, &v, 4, OS_WRITE);
                     SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x1010, sLodNoise,
                                      SCREEN_WIDTH * SCREEN_HEIGHT / 8, OS_WRITE);
+                    // and row 200 of the reference and of this frame
+                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x3800, &sLodRef[200 * SCREEN_WIDTH],
+                                     SCREEN_WIDTH * 2, OS_WRITE);
+                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x3800 + SCREEN_WIDTH * 2,
+                                     &sLodCur[200 * SCREEN_WIDTH], SCREEN_WIDTH * 2, OS_WRITE);
                 }
 #endif
                 sSweep.noisy++;
@@ -1154,6 +1157,8 @@ static void Fishmod_LodUpdate(PlayState* play) {
 #else
 static void Fishmod_LodUpdate(PlayState* play) {
     s32 under = gFishmodLodTest.under;
+
+    sLodGfxCtx = play->state.gfxCtx;
     s32 stop = sTourStop;
 
     if (sLodRef == NULL) {
