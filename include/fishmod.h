@@ -319,6 +319,14 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 // the hardware bench (fishmod_debug.c, FISHMOD_HWBENCH) switches these off to time the rest without them
 #define FISHMOD_BENCH_NOPROPS (1 << 0)
 #define FISHMOD_BENCH_NOFISH (1 << 1)
+#define FISHMOD_BENCH_ALTEDGE (1 << 2)    // the props' other edge mode (anti-aliased in the RDP, or by the VI only)
+#define FISHMOD_BENCH_NOZUPD (1 << 3)     // the props don't write the depth buffer
+#define FISHMOD_BENCH_1CYCLE (1 << 4)     // the props in 1-cycle mode (no fog, no tint): pipeline or memory bound?
+#define FISHMOD_BENCH_NONEAR (1 << 5)     // props within FISHMOD_BENCH_NEAR not drawn
+#define FISHMOD_BENCH_NOFAR (1 << 6)      // props past it not drawn
+#define FISHMOD_BENCH_NOSKY (1 << 7)      // no skybox
+#define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
+#define FISHMOD_BENCH_NEAR 500.0f
 extern s32 gFishmodBench;
 extern s32 gFishmodScatterDrawn; // props drawn in the last frame
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];

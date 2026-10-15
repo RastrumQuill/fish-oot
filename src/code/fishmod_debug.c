@@ -1237,6 +1237,17 @@ static void Fishmod_LodUpdate(PlayState* play) {
     if (--sLodTimer > 0) {
         return;
     }
+    {
+        // a direction that takes the camera out of the water or into it: wait for the under-water look to finish
+        // changing (it eases in and out), or the frames compared would differ by it
+        static s32 sHazeWait;
+
+        if ((gFishmodHaze > 0.001f) && (gFishmodHaze < 0.999f) && (sHazeWait < 600)) {
+            sHazeWait++;
+            return;
+        }
+        sHazeWait = 0;
+    }
     switch (sRotState) {
         case 1:
             Lod_Grab(sLodRef); // the game's frame
@@ -1479,10 +1490,14 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 
 typedef enum BenchMode {
     BENCH_BASE,
-    BENCH_TEX4,
-    BENCH_COLD,
+    BENCH_ALTEDGE,  // the props' other edge mode (FISHMOD_BENCH_ALTEDGE)
+    BENCH_NOZUPD,   // the props without depth writes
+    BENCH_1CYCLE,   // the props in 1-cycle mode
+    BENCH_NONEAR,   // the props past FISHMOD_BENCH_NEAR only
+    BENCH_NOFAR,    // the props within it only
     BENCH_NOPROPS,
-    BENCH_NOFISH,
+    BENCH_NOSKY,    // no props and no skybox
+    BENCH_NOXLU,    // no props and no room translucency (the water surface)
     BENCH_MODES,
     BENCH_MICRO = BENCH_MODES
 } BenchMode;
@@ -1546,9 +1561,8 @@ static BenchResults sBench;
 static s32 sBenchState; // 0: arriving, 1: measuring, 2: micro
 static s32 sBenchFrame;
 static s32 sBenchBlock; // block in this visit
-static u32* sBenchBuf;  // 128 KB for the memory tests and the cache filling
+static u32* sBenchBuf;  // 128 KB for the memory tests
 static u32 sBenchRand = 0x1234567;
-static u32 sBenchFillTime; // last frame's cache filling, us (taken off the update's time)
 
 #define BENCH_BUF_SIZE 0x20000
 
@@ -1557,18 +1571,6 @@ static u32 Bench_Rand(void) {
     sBenchRand ^= sBenchRand >> 17;
     sBenchRand ^= sBenchRand << 5;
     return sBenchRand;
-}
-
-/** Both caches full of other things: the data cache with 32 KB of random words (dirty: written back as they're
- * pushed out, as in the game), the instruction cache emptied. */
-static void Bench_FillCaches(void) {
-    u32* p = &sBenchBuf[0x10000 / 4]; // (the second half: the first holds the chase's cycle)
-    s32 i;
-
-    for (i = 0; i < 0x8000 / 4; i++) {
-        p[i] = Bench_Rand();
-    }
-    osInvalICache((void*)0x80000000, 0x4000);
 }
 
 static s32 Bench_RdpBusy(void) {
@@ -1666,9 +1668,6 @@ static void Bench_Record(s32 stop, s32 mode) {
 
     v[BM_PERIOD] = (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
     v[BM_CPU_UPDATE] = sLastCpu[FISHMOD_CPU_UPDATE];
-    if (mode == BENCH_COLD) {
-        v[BM_CPU_UPDATE] = (v[BM_CPU_UPDATE] > sBenchFillTime) ? v[BM_CPU_UPDATE] - sBenchFillTime : 0;
-    }
     v[BM_CPU_DRAW] = sLastCpu[FISHMOD_CPU_DRAW];
     v[BM_RSP_GFX] = (u32)OS_CYCLES_TO_USEC(gRSPGfxTimeTotal);
     v[BM_RDP] = (u32)OS_CYCLES_TO_USEC(gRDPTimeTotal);
@@ -1689,14 +1688,24 @@ static void Bench_Record(s32 stop, s32 mode) {
 }
 
 static void Bench_SetMode(s32 mode) {
-    gFishmodTexCompress = (mode == BENCH_TEX4);
-    gFishmodBench = ((mode == BENCH_NOPROPS) ? FISHMOD_BENCH_NOPROPS : 0) |
-                    ((mode == BENCH_NOFISH) ? FISHMOD_BENCH_NOFISH : 0);
+    static const s32 sFlags[BENCH_MODES] = {
+        0,
+        FISHMOD_BENCH_ALTEDGE,
+        FISHMOD_BENCH_NOZUPD,
+        FISHMOD_BENCH_1CYCLE,
+        FISHMOD_BENCH_NONEAR,
+        FISHMOD_BENCH_NOFAR,
+        FISHMOD_BENCH_NOPROPS,
+        FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOSKY,
+        FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOROOMXLU,
+    };
+
+    gFishmodBench = sFlags[mode];
 }
 
 static void Bench_Save(void) {
     sBench.magic = 0x4642454E; // 'FBEN'
-    sBench.version = 1;
+    sBench.version = 2;
     sBench.stops = BENCH_STOPS;
     sBench.modes = BENCH_MODES;
     sBench.metrics = BENCH_METRICS;
@@ -1737,7 +1746,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
         }
         // carry on from an earlier night (the save file keeps the sums)
         SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_READ);
-        if ((sBench.magic != 0x4642454E) || (sBench.version != 1) || (sBench.hw != FISHMOD_HW)) {
+        if ((sBench.magic != 0x4642454E) || (sBench.version != 2) || (sBench.hw != FISHMOD_HW)) {
             bzero(&sBench, sizeof(sBench));
         }
     }
@@ -1769,13 +1778,6 @@ static void Fishmod_BenchUpdate(PlayState* play) {
                 mode = sBenchBlock % BENCH_MODES;
                 Bench_SetMode(mode);
             }
-            if ((sBenchState == 1) && (mode == BENCH_COLD)) {
-                // the update that follows starts with nothing of its own in the caches
-                OSTime t = osGetTime();
-
-                Bench_FillCaches();
-                sBenchFillTime = (u32)OS_CYCLES_TO_USEC(osGetTime() - t);
-            }
             break;
 
         default: // the memory tests, then on to the next stop
@@ -1793,7 +1795,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
             break;
     }
     {
-        static const char* sModeNames[] = { "base", "tex4", "cold", "noprops", "nofish" };
+        static const char* sModeNames[] = { "base", "altedge", "nozupd", "1cycle", "nonear", "nofar", "noprops", "nosky", "noxlu" };
 
         Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
                             (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);
@@ -1911,6 +1913,9 @@ void Fishmod_DebugBoot(void) {
 
 #ifdef FISHMOD_SCRIPT_TEXCOMPRESS
     gFishmodTexCompress = 1; // the props' textures in 4 bits from the start
+#endif
+#ifdef FISHMOD_SCRIPT_ALTEDGE
+    gFishmodBench |= FISHMOD_BENCH_ALTEDGE; // the props' other edge mode from the start
 #endif
     sScriptStepIndex = 0;
     sScriptStepFrame = 0;

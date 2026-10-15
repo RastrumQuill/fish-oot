@@ -9,13 +9,23 @@ Usage: fishmod/tools/hwbench_report.py save.sav [--md out.md]
 import argparse
 import struct
 
-MODES = ["base", "tex4", "cold", "noprops", "nofish"]
+MODES_V = {
+    1: ["base", "tex4", "cold", "noprops", "nofish"],
+    2: ["base", "altedge", "nozupd", "1cycle", "nonear", "nofar", "noprops", "nosky", "noxlu"],
+}
 MODE_DOC = {
     "base": "as shipped",
     "tex4": "props' textures in 4 bits (half the memory per texture load)",
     "cold": "caches filled with other data before each update (CPU work from RDRAM, not the cache)",
     "noprops": "props not drawn (what the props cost)",
     "nofish": "fish not drawn (what the fish cost to draw)",
+    "altedge": "props with the other edge mode (anti-aliased in the RDP, reading the colour buffer, or by the VI only)",
+    "nozupd": "props without depth writes",
+    "1cycle": "props in 1-cycle mode, no fog or tint (is the RDP's pipeline or its memory the limit?)",
+    "nonear": "only the props past 500 units",
+    "nofar": "only the props within 500 units",
+    "nosky": "no props, no skybox",
+    "noxlu": "no props, no room translucency (the water surface)",
 }
 METRICS = ["period", "cpu_update", "cpu_draw", "rsp_gfx", "rdp", "rsp_audio", "dp_clock", "dp_buf", "dp_pipe",
            "dp_tmem", "scatter", "fish_upd", "fish_draw", "props"]
@@ -72,12 +82,13 @@ def main():
     out = []
     p = out.append
     p(f"# Hardware bench ({'original-hardware build' if r['hw'] else 'emulator build'})\n")
+    MODES = MODES_V[r["version"]]
     p(f"{r['laps']} full laps, {r['visits']} stop visits.\n")
     p("Modes: " + "; ".join(f"**{m}**: {MODE_DOC[m]}" for m in MODES) + ".\n")
     p("RDP columns are shares of its cycles: **buf** = command buffer busy (fetching from RDRAM, or held up), "
       "**pipe** = drawing, **tmem** = loading textures.\n")
 
-    totals = {m: [0.0, 0] for m in MODES}
+    totals = {m: [0.0, 0, 0.0] for m in MODES}
     p("| stop | mode | fps | CPU upd | CPU draw | RSP | RDP ms | buf | pipe | tmem | props | worst frame |")
     p("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for s, row in enumerate(r["cells"]):
@@ -89,6 +100,7 @@ def main():
             pct = lambda n: f"{100 * avg(cell, n) / clock:.0f}%" if clock else "-"
             totals[MODES[m]][0] += period
             totals[MODES[m]][1] += 1
+            totals[MODES[m]][2] += avg(cell, "rdp")
             worst = cell[2][METRICS.index("period")] / 1000
             p(f"| {s + 1} {STOP_NAMES[s] if m == 0 else ''} | {MODES[m]} | {1e6 / period:.1f} | "
               f"{avg(cell, 'cpu_update') / 1000:.1f} | {avg(cell, 'cpu_draw') / 1000:.1f} | "
@@ -96,14 +108,26 @@ def main():
               f"{pct('dp_pipe')} | {pct('dp_tmem')} | {avg(cell, 'props'):.0f} | {worst:.0f} ms |")
 
     p("\n## Each mode against the build as shipped (all stops)\n")
-    p("| mode | mean frame | change | ")
-    p("|---|---|---|")
+    p("Frame times stop at the 20 fps cap (50 ms), so the RDP's own time shows the modes' cost better.\n")
+    p("| mode | mean frame | change | mean RDP | change |")
+    p("|---|---|---|---|---|")
     base = totals["base"][0] / max(totals["base"][1], 1)
+    base_rdp = totals["base"][2] / max(totals["base"][1], 1)
+    rdp = {}
     for m in MODES:
-        t, n = totals[m]
+        t, n, tr = totals[m]
         if n:
             mean = t / n
-            p(f"| {m} | {mean / 1000:.1f} ms ({1e6 / mean:.1f} fps) | {100 * (mean - base) / base:+.1f}% |")
+            rdp[m] = tr / n
+            p(f"| {m} | {mean / 1000:.1f} ms ({1e6 / mean:.1f} fps) | {100 * (mean - base) / base:+.1f}% | "
+              f"{rdp[m] / 1000:.1f} ms | {100 * (rdp[m] - base_rdp) / base_rdp:+.1f}% |")
+    if "nosky" in rdp and "noprops" in rdp:
+        p("\n## Where the RDP's time goes (mean over the stops)\n")
+        p(f"- props: {(rdp['base'] - rdp['noprops']) / 1000:.1f} ms; those within 500 units "
+          f"{(rdp['base'] - rdp['nonear']) / 1000:.1f} ms, those past it {(rdp['base'] - rdp['nofar']) / 1000:.1f} ms")
+        p(f"- skybox: {(rdp['noprops'] - rdp['nosky']) / 1000:.1f} ms")
+        p(f"- room translucency (the water surface): {(rdp['noprops'] - rdp['noxlu']) / 1000:.1f} ms")
+        p(f"- the rest (terrain, actors, fish, the HUD): {rdp['nosky'] / 1000:.1f} ms less the water's share")
 
     p("\n## Memory (CPU count cycles: 46.875 MHz)\n")
     p("| test | RDP idle | RDP busy | samples (idle/busy) |")
