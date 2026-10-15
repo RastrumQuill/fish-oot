@@ -62,3 +62,20 @@ The drained lake is left as it was.
 - **Textures through the N64's filter**: palettes and texels chosen by simulating the 3-point filter, fog and
   dither at real viewing distances.
 - **Fish tuned against simulated anglers** (fishing-feel phase).
+
+## ares patch: raw frames (`ARES_AUTOSHOT`)
+`fishmod/tools/edge_ab_capture.py` needs ares to save its raw output frames, the VI's picture before any scaling or
+colour correction. Add this to `desktop-ui/program/platform.cpp` in `Program::video`, after the `requestScreenshot`
+block, and rebuild:
+
+```cpp
+  // fish-oot: ARES_AUTOSHOT=<dir> saves every ARES_AUTOSHOT_EVERY-th frame (default 15) raw, for A/B captures
+  if(auto dir = getenv("ARES_AUTOSHOT")) {
+    static u32 autoshotFrame = 0;
+    u32 every = getenv("ARES_AUTOSHOT_EVERY") ? atoi(getenv("ARES_AUTOSHOT_EVERY")) : 15;
+    if((autoshotFrame++ % every) == 0) {
+      string name{dir, "/frame_", pad(autoshotFrame, 7, '0'), ".png"};
+      Encode::PNG::RGB8(name, data, pitch, width, height);
+    }
+  }
+```
