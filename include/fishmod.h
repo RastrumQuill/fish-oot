@@ -327,6 +327,7 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOSKY (1 << 7)      // no skybox
 #define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
 #define FISHMOD_BENCH_NEAR 500.0f
+#define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;
 extern s32 gFishmodScatterDrawn; // props drawn in the last frame
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
@@ -359,6 +360,7 @@ extern s16 gFishmodDebugFocusYaw;
     {                            \
         stmt;                    \
     }
+#define FISHMOD_BENCH_SKIP(flag) 0
 #endif
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */

@@ -1318,7 +1318,7 @@ void Play_Draw(PlayState* this) {
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_DRAW_SKYBOX) {
             if (this->skyboxId && (this->skyboxId != SKYBOX_UNSET_1D) && !this->envCtx.skyboxDisabled &&
-                !(gFishmodBench & FISHMOD_BENCH_NOSKY)) {
+                !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSKY)) {
                 if ((this->skyboxId == SKYBOX_NORMAL_SKY) || (this->skyboxId == SKYBOX_CUTSCENE_MAP)) {
                     Environment_UpdateSkybox(this->skyboxId, &this->envCtx, &this->skyboxCtx);
                     Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, this->envCtx.skyboxBlend, this->view.eye.x,
@@ -1362,7 +1362,7 @@ void Play_Draw(PlayState* this) {
                 } else {
                     roomDrawFlags = R_PLAY_DRAW_ROOM_FLAGS;
                 }
-                if (gFishmodBench & FISHMOD_BENCH_NOROOMXLU) {
+                if (FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOROOMXLU)) {
                     roomDrawFlags &= ~ROOM_DRAW_XLU;
                 }
                 Scene_Draw(this);
@@ -1373,7 +1373,7 @@ void Play_Draw(PlayState* this) {
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_DRAW_SKYBOX) {
             if ((this->skyboxCtx.drawType != SKYBOX_DRAW_128) &&
-                (GET_ACTIVE_CAM(this)->setting != CAM_SET_PREREND_FIXED) && !(gFishmodBench & FISHMOD_BENCH_NOSKY)) {
+                (GET_ACTIVE_CAM(this)->setting != CAM_SET_PREREND_FIXED) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSKY)) {
                 Vec3f quakeOffset;
 
                 quakeOffset = Camera_GetQuakeOffset(GET_ACTIVE_CAM(this));
