@@ -473,6 +473,9 @@ static void Fishmod_ViewUpdate(PlayState* play) {
  * The controller is kept from Link while the tour runs. FISHMOD_TOUR_AUTO: move on by itself (for screenshots).
  */
 #define TOUR_GLIDE 110
+#ifdef FISHMOD_EDGE_AB
+static s32 sEdgeAbPhase = -1; // -1 not ready, 0 the default edge mode on screen, 1 the other
+#endif
 static s16 sTourCamId = SUB_CAM_ID_DONE;
 static s32 sTourStop;
 static s32 sTourFrame;
@@ -565,6 +568,38 @@ static void Fishmod_TourUpdate(PlayState* play) {
 #ifdef FISHMOD_TOUR_AUTO
     if (sTourFrame >= FISHMOD_TOUR_AUTO) {
         Fishmod_TourGo(sTourStop + 1);
+    }
+#endif
+#ifdef FISHMOD_EDGE_AB
+    {
+        // An exact A/B of the props' two edge modes (fishmod/tools/edge_ab_capture.py): once the camera has
+        // settled, everything that moves is frozen (sway, water, sky, actors) and the modes take turns
+        static s32 sFrozenFrames;
+        static s32 sFrozenTime;
+        static s16 sFrozenSky;
+        static s32 sFrozenState;
+        s32 since = sTourFrame - (TOUR_GLIDE + 40);
+
+        if (since == 0) {
+            sFrozenFrames = play->gameplayFrames;
+            sFrozenTime = gSaveContext.save.dayTime;
+            sFrozenSky = play->skyboxCtx.rot.y;
+            sFrozenState = play->state.frames;
+        }
+        if (since >= 0) {
+            play->gameplayFrames = sFrozenFrames;
+            gSaveContext.save.dayTime = sFrozenTime;
+            play->skyboxCtx.rot.y = sFrozenSky;
+            play->state.frames = sFrozenState;
+            play->haltAllActors = true;
+            gFishmodBench = ((since / 60) & 1) ? FISHMOD_BENCH_ALTEDGE : 0;
+            // the marker shows the mode once the new one has been on screen for a while
+            sEdgeAbPhase = ((since % 60) >= 30) ? ((since / 60) & 1) : -1;
+        } else {
+            play->haltAllActors = false;
+            gFishmodBench = 0;
+            sEdgeAbPhase = -1;
+        }
     }
 #endif
     sTourYaw += sTourStickX * 0.0006f;
@@ -1811,6 +1846,18 @@ static void Fishmod_TourDraw(Gfx** gfxP) {
 
 #if defined(FISHMOD_LOD_CALIBRATE) || defined(FISHMOD_HWBENCH)
     return; // nothing over the frames being compared or timed
+#endif
+
+#ifdef FISHMOD_EDGE_AB
+    // for fishmod/tools/edge_ab_capture.py: red = 8 * stop number, green 0 (default edge mode) or 248 (the other),
+    // blue 248 while ready; nothing else drawn over the picture
+    gfx = Gfx_SetupDL_57(gfx);
+    gDPSetPrimColor(gfx++, 0, 0, (sTourStop + 1) * 8, (sEdgeAbPhase == 1) ? 248 : 0, (sEdgeAbPhase >= 0) ? 248 : 0,
+                    255);
+    gDPFillRectangle(gfx++, 0, 0, 16, 16);
+    gDPPipeSync(gfx++);
+    *gfxP = gfx;
+    return;
 #endif
 
     // a dark box at the bottom, like a textbox
