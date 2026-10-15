@@ -1,0 +1,22 @@
+# The fish-oot test helper environment, for running jobs (emulator runs, searches) on your own PC.
+# Windows 10/11, 64-bit. Create it once:
+#   conda env create -f fishmod/pc/environment.yml
+#   conda activate fishoot
+# then see fishmod/pc/README.md.
+name: fishoot
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pillow
+  - scipy
+  - numba          # fast loops for the PC-side searches (card outlines, overdraw)
+  - psutil         # watching and stopping emulator processes
+  - pywin32        # closing ares windows gracefully (so they write their save files)
+  - tqdm
+  - pytorch        # GPU work later (the 3060): plant fitting, image scoring
+  - pytorch-cuda=12.1
+  - pip
