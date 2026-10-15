@@ -73,3 +73,27 @@ Related compression work, from the same discussion:
 - **ACL-style animation compression**: per-track range and bit-width quantization.
 - **Prop vertices as offsets** from the chunk origin, expanded on the RSP.
 - **LZ4 / aPLib / Shrinkler** instead of Yaz0 for load times.
+
+## Engine-wide ideas (the whole game, not just the props)
+None of these is started. Each is invisible by construction or checked with the pixel test, and measured on the
+console before it stays.
+
+1. **The same edge trick for opaque surfaces everywhere.** Vanilla draws terrain and most actors with
+   `AA_ZB_OPA_SURF`, which reads the colour buffer for every pixel. Libultra's "reduced aliasing" modes (`RA_ZB_OPA_SURF`)
+   write coverage and let the VI smooth the silhouettes. This is the props' change applied to `Gfx_SetupDL` and the
+   room meshes' render modes. The risk is internal edges (one surface ending in front of another), so it needs the
+   same side-by-side check at many places, not just the lake. It's likely the biggest RDP win across the whole game.
+2. **Frame and depth buffers in different RDRAM banks** (the N64 manual's advice). It helps every pixel drawn
+   anywhere. Check where each sits in each memory layout (with and without the Expansion Pak).
+3. **A build-time display-list pass over the vanilla scenes:** drop redundant pipe syncs and repeated state and
+   texture loads, and merge identical materials. Same picture, fewer RDP stalls and commands.
+4. **Finer room culling.** Vanilla culls room meshes by coarse bounding spheres. Per-part frustum culling, and
+   precomputed visibility where rooms are big (Hyrule Field, Lake Hylia), would draw less.
+5. **The whole game built with GCC** (`-O2`, or `-Os` for the instruction cache) instead of IDO. The Makefile
+   already has a GCC path, and HackerOoT ships GCC builds. It frees CPU time for the fish AI and the rest. It needs a
+   pass for undefined behaviour IDO tolerated.
+6. **F3DEX3 by default** (`--f3dex3` exists): faster vertex work on the RSP, for every scene.
+7. **CPU hot spots:** collision queries (BgCheck), the software matrix stack, actor update overhead. Profile first.
+
+What the hardware bench showed decides the order: the RDP is the limit in the lake, so 1–4 come first. 5–7 matter
+where the CPU is the limit (busy scenes, lots of actors, the fish AI).
