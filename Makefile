@@ -456,7 +456,10 @@ else
 endif
 
 ifeq ($(COMPILER),gcc)
-  OPTFLAGS := -Os -ffast-math -fno-unsafe-math-optimizations
+  # fish-oot: GCC_OPT picks the level (fishmod/build.sh --gcc O2|Os)
+  GCC_OPT ?= Os
+  # (no strict aliasing: the game and the mod reinterpret memory in places, e.g. FISHMOD_SAVE past sceneFlags)
+  OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations
 endif
 
 GBI_DEFINES := -DF3DEX_GBI_2

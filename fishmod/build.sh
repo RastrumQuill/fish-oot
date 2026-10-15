@@ -10,6 +10,7 @@
 #   --testmode     new files skip the intro and start with testing items; outputs get a -test suffix
 #   --fasttrig     polynomial sin/cos instead of the sine table; outputs get a -trig suffix
 #   --hw           the original-hardware version (fewer, cheaper pixels for the RDP); outputs get a -hw suffix
+#   --gcc LEVEL    compile with GCC (mips-linux-gnu-gcc) at -O2 or -Os instead of IDO; outputs get a -gccO2/-gccOs suffix
 # Needs `flips` on PATH (or FLIPS=/path/to/flips) for the release patch.
 set -euo pipefail
 
@@ -29,6 +30,7 @@ OPT=0
 TESTMODE=0
 FASTTRIG=0
 HW=0
+GCC=""
 MAKE_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -39,6 +41,7 @@ while [ $# -gt 0 ]; do
         --testmode) TESTMODE=1 ;;
         --fasttrig) FASTTRIG=1 ;;
         --hw) HW=1 ;;
+        --gcc) GCC="$2"; shift ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
     shift
@@ -66,7 +69,7 @@ mkdir -p "$OUT_DIR"
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT testmode=$TESTMODE fasttrig=$FASTTRIG hw=$HW"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT testmode=$TESTMODE fasttrig=$FASTTRIG hw=$HW gcc=$GCC"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -97,7 +100,11 @@ python3 fishmod/tools/gen_collision.py
 # the water floor maps, baked from the extracted scenes and the props' collision (generated, not committed)
 python3 fishmod/tools/gen_watermap.py
 
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG FISHMOD_HW=$HW \
+GCC_ARGS=()
+if [ -n "$GCC" ]; then
+    GCC_ARGS=(COMPILER=gcc GCC_OPT="$GCC")
+fi
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG FISHMOD_HW=$HW \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -118,6 +125,9 @@ if [ "$TESTMODE" = 1 ]; then
 fi
 if [ "$HW" = 1 ]; then
     SUFFIX="$SUFFIX-hw"
+fi
+if [ -n "$GCC" ]; then
+    SUFFIX="$SUFFIX-gcc$GCC"
 fi
 
 if [ "$DEBUG" = 1 ]; then
