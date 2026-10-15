@@ -171,3 +171,14 @@ bed and the dock. 6 (looks) and 7 (behaviour) follow.
 
 1 (collision) and 2 (tuning, once your notes are in) first, since they change the lake everything else is tested in.
 Then 5 (feel) and 7 (behaviour) together, since bites depend on mood and senses. Then 3, 4, 6. 8 last, if there's room.
+
+## Test 5 feedback (console, not acted on yet: waiting on the bench results)
+
+1. **Stopping the hook from sinking after the cast** needs a more intuitive control.
+2. **"Keep it in a bottle?"**: the "Yes" and "No" choices are misaligned.
+3. **Rock collision is too chunky**: Link visibly floats over most rocks, and from some angles (from below) he
+   phases into them.
+4. **A sound keeps going while fishing**: probably the reel sound while the hook sinks after the bobber lands.
+5. **Plants and the dock ignore night**: they stay lit as by day.
+6. **Equipment on C buttons**: boots, tunics and swords should be assignable to C, for convenience.
+7. **Still a lot of pop-in** (above water: the original 800-1600 draw distances; see the rotation check).
