@@ -35,3 +35,8 @@ graphs/
 src/fishmod_data/
 fishmod/art/habitat_rom/
 fishmod/assets/habitat_hw/
+
+# fishmod/pc: job packs (made from the ROM) and their results stay local
+fishmod/pc/packs/*.zip
+fishmod/pc/results/
+fishmod/pc/ares/

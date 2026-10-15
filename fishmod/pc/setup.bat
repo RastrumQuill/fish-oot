@@ -5,4 +5,4 @@ call conda env create -f "%~dp0environment.yml"
 call conda activate fishoot
 python "%~dp0install_ares.py"
 echo.
-echo Done. Next time: conda activate fishoot, then python pc\run_jobs.py PACK.zip --rom YOUR_ROM.z64
+echo Done. Put the packs in fishmod\pc\packs\ and run: fishmod\pc\run_all.bat YOUR_ROM.z64
