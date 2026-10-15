@@ -24,18 +24,27 @@ Three runs go in parallel, with 2, 3 and 4 cards. The converged losses pick the 
 fewer cards become its LOD steps for middle distances. The game's LOD switch distances then come from the existing
 pixel calibration (`lod_calibrate.py`), so a step change is only made where it can't be seen.
 
+## The idea: a conceptual ground truth
+There is no ground truth: no detailed model of each plant to match. Instead, the cards have to convince several
+independent models, each from a different domain:
+- **meaning:** SigLIP sees the species, not a game asset;
+- **geometry:** the depth model perceives a volume, not flat planes;
+- **structure:** DINOv2's features stay steady as the camera moves.
+
+Each model can be fooled on its own. Fooling all three at once, from many views, comes close to being the real
+thing. Their agreement stands in for the ground truth.
+
 ## The loss
 
 ```
-L = w_sem * L_semantic + w_depth * L_depth + w_view * L_multiview + w_ref * L_reference + w_cost * C_hardware
+L = w_sem * L_semantic + w_depth * L_depth + w_view * L_multiview + w_cost * C_hardware
 ```
 
 | Term | Model | What it measures |
 |---|---|---|
 | `L_semantic` | SigLIP (pairwise sigmoid loss) | Positive and negative prompts (below). Rewards similarity to the species, and penalizes similarity to "video game" looks. A card seen edge-on, thinned to a line, loses the positive. |
-| `L_depth` | Monocular depth (Depth Anything V2) | A penalty for perceived depth that differs from the plant's real depth. Not a reward for depth variance (below). |
+| `L_depth` | Monocular depth (Depth Anything V2) | A penalty when the perceived depth is just flat planes. Not a reward for depth variance (below). |
 | `L_multiview` | DINOv2 dense features | The feature distance between adjacent camera angles. A spike means an arrangement that looks right from one angle and breaks when the camera moves. |
-| `L_reference` | DINOv2 / LPIPS (proposed addition) | The distance to renders of the detailed reference plant (OBJ+PNG or glTF), from the same views. Keeps the result looking like this species, not like plants in general. |
 | `C_hardware` | Fitted cost model (below) | The plant's expected RDP time on the console, over the distances and angles the game actually shows it. |
 
 The weights get set when it's built: each term is scaled to unit range on random arrangements, then tuned on two or
@@ -54,16 +63,17 @@ prompt is scored on its own, so positives and negatives don't compete in a softm
   are computed once at the start, so extra phrasings cost no GPU time per step, only a little memory.
 
 ### The depth term: real depth, not flat planes
-The goal is that the depth model perceives the plant's real shape, not a few flat planes. Maximizing depth variance
-would reward spreading cards apart, which is not the goal.
-- **The ground truth** is the depth of the detailed reference plant, rendered from the same view. Its depth buffer is
-  exact, and the monocular model's estimate of the same render is kept as a check.
-- **The penalty** is the difference between the depth the model perceives in the card plant's render and that
-  ground truth, inside the plant's alpha mask. Monocular depth is only known up to scale and offset, so the loss is
-  scale- and shift-invariant: least-squares align first, then measure (as in MiDaS).
-- **A plane check (optional, extra).** Fit up to N planes to the perceived depth inside the mask. If a few planes
-  explain it almost perfectly, the plant reads as flat cards: penalize that. No reward beyond the reference's own
-  level, so it can't push towards noise.
+The goal is that the depth model perceives a volume, not a few flat planes. It isn't asked to maximize depth
+variance, which would reward spreading cards apart. There's no reference depth, so the term penalizes flatness:
+- **Plane check.** Fit up to N planes to the perceived depth inside the plant's alpha mask, N being the card count.
+  If they explain it almost perfectly, the model sees what is really there, flat cards, and that is penalized: the
+  penalty falls as the fit's leftover error grows.
+- **Capped.** Once the leftover error reaches the level of a real plant photo or a detailed render, the term gives
+  nothing more. That level is measured once, on a handful of such images. So the term can't push towards noise or
+  scattered cards.
+- **Steady between views.** The perceived depth of adjacent views should agree once the camera's move is undone.
+  Flat cards seen from two angles give two different flat layouts, a solid shape gives one. This is optional, and
+  costs a reprojection per view pair.
 
 ### Views
 - **Angles:** off-axis cameras at several heights and distances, not one level orbit. Straight-down views are left
@@ -85,8 +95,22 @@ A plant judged only on clean, high-resolution renders can come out tuned for det
 ### Guards against degenerate solutions
 Any of the terms could be gamed by spreading cards far apart or scaling them up. To prevent that:
 - **Size:** cards are confined to the plant's bounding volume, and their scale is bounded.
-- **Coverage:** a term matches the plant's silhouette area to the reference's.
+- **Coverage:** the plant's silhouette area stays near what the species is given in the scatter (its height and
+  spread).
 - **Cost:** the hardware cost term already penalizes extra pixels.
+
+### Guards against fooling the models
+The optimizer can read the models' gradients, so it could find arrangements that fool them without looking any
+better to a person (adversarial examples). The design is already hard to fool this way, because:
+- **Few parameters.** About 8 per card plus a few texture offsets: no free pixels to fill with noise patterns.
+- **Many views,** each jittered at random every step (angle, distance, fog, small shifts), so an arrangement has to
+  hold up across all of them, not exploit one image.
+
+Two checks on top of that:
+- **A held-out judge.** A model that isn't used in training (CLIP next to SigLIP, a second depth model such as
+  Marigold or ZoeDepth) scores the result at the end. If the trained models are happy and the held-out one isn't,
+  they were fooled.
+- **Ensembles** (two SigLIP sizes, for example) if a single model turns out to be easy to fool.
 
 ## The hardware cost analog
 "How much it costs to run on real hardware" should be a number the optimizer can use, fitted to the console's own
@@ -144,8 +168,9 @@ fits the transforms for each choice. The reward is the final loss.
   `card_outline.py` and the pixel LOD calibration run as now.
 
 ## Decided
-- **Depth:** a penalty against the reference plant's real depth, plus an optional plane check. Not variance
-  maximized.
+- **No ground truth.** Fooling several independent models (meaning, geometry, structure) stands in for one.
+- **Depth:** a penalty for flat planes, capped at the level of real plants. Not variance maximized, and no
+  reference depth.
 - **SigLIP:** positive prompts (the species, including the lotus flower) and negative prompts ("video game" and
   flat looks).
 - **Targets:** one per species for now; more phrasings later, since they cost nothing per step.
