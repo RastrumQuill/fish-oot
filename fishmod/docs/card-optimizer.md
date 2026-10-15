@@ -112,6 +112,26 @@ Two checks on top of that:
   they were fooled.
 - **Ensembles** (two SigLIP sizes, for example) if a single model turns out to be easy to fool.
 
+### More judges (candidates, held out or used in training)
+Each comes from a different domain or training set from the three trained models, so fooling it too is independent
+evidence.
+
+| Judge | Domain | What it asks | Cost |
+|---|---|---|---|
+| BioCLIP | species, trained on iNaturalist-style biology images | Does it name the right species (e.g. *Typha*, *Nelumbo*)? | cheap |
+| A VLM (Qwen2-VL, Florence-2, PaliGemma), yes/no | language | "Is this a real 3D plant or flat cutouts?"; read the probability of yes | slow: judge only |
+| Surface normals (DSINE, Marigold-normals, Omnidata) | geometry, another family | Flat cards give one uniform normal per card; a volume gives varied normals | medium |
+| Multi-view reconstruction (DUSt3R / MASt3R, VGGT) | 3D | Reconstructed from the views together: a volume, or a few planes? | slow: judge only |
+| Optical flow (RAFT) over small camera moves | motion | Flat cards move as a few homographies; a volume shows varied parallax. In-game the camera always moves | medium |
+| Orbit flicker | time | LPIPS between frames of a smooth orbit; spikes where a card goes edge-on or pops | cheap |
+| Photo vs. game discriminator | style | A small classifier trained on real plant photos against game renders (the "plant / not plant" idea); or KID against a photo set of the species | cheap once trained |
+| Console render | hardware | The finished asset rendered in ares (the real RDP and VI), scored by the judges above: is the differentiable renderer's approximation honest? | slow: final check |
+| You | people | Blind A/B pairs on a page; enough votes can train a small reward model (RLHF-style) for later species | your time |
+
+Proposed held-out set: BioCLIP, the VLM question, normals and the console render. Optical flow and the orbit
+flicker are cheap enough to join the training loss if the multi-view term misses popping.
+
+
 ## The hardware cost analog
 "How much it costs to run on real hardware" should be a number the optimizer can use, fitted to the console's own
 measurements rather than guessed.
