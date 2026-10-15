@@ -341,6 +341,9 @@ void Play_Init(GameState* thisx) {
     u8 baseSceneLayer;
     STACK_PADS(s32, 2);
 
+#if FISHMOD_TESTMODE
+    Fishmod_TestPlayInit();
+#endif
     if (gSaveContext.save.entranceIndex == ENTR_LOAD_OPENING) {
         gSaveContext.save.entranceIndex = 0;
         this->state.running = false;
