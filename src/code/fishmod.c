@@ -50,6 +50,20 @@ Vec3f gFishmodHivePos; // where the scene's added beehive went (debug display)
 static u8 sRodOnB = false;
 static u8 sSavedBItem = ITEM_NONE;
 
+#if FISHMOD_TESTMODE
+static void Fishmod_TestSetAge(s32 adult);
+static s8 sTestPendingAge = -1; // the age the next scene loads with (set by the test warps)
+
+/** Test mode, at the start of Play_Init: the warp's age, before the scene and Link load (not during the fade: the
+ * Link leaving would be drawn holding the other age's gear). */
+void Fishmod_TestPlayInit(void) {
+    if (sTestPendingAge >= 0) {
+        Fishmod_TestSetAge(sTestPendingAge == LINK_AGE_ADULT);
+        sTestPendingAge = -1;
+    }
+}
+#endif
+
 /** What B holds normally: the equipped sword, or nothing. */
 static u8 Fishmod_SwordBItem(void) {
     switch (CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD)) {
@@ -225,7 +239,8 @@ void Fishmod_PlayUpdate(PlayState* play) {
     }
 
 #if FISHMOD_TESTMODE
-    // test mode: D-pad Up warps to Kokiri Forest (small water), D-pad Down to Lake Hylia (big water)
+    // test mode: D-pad Up warps to Kokiri Forest (small water) as child Link, D-pad Down to Lake Hylia (big water)
+    // as adult Link with the lake full, in the Iron Boots
     if ((play->pauseCtx.state == 0) && (Message_GetState(&play->msgCtx) == TEXT_STATE_NONE) &&
         !Play_InCsMode(play) && (play->transitionTrigger == TRANS_TRIGGER_OFF)) {
         u16 press = play->state.input[0].press.button;
@@ -245,6 +260,7 @@ void Fishmod_PlayUpdate(PlayState* play) {
             entrance = ENTR_LAKE_HYLIA_0;
         }
         if (entrance >= 0) {
+            sTestPendingAge = (entrance == ENTR_LAKE_HYLIA_0) ? LINK_AGE_ADULT : LINK_AGE_CHILD;
             play->nextEntranceIndex = entrance;
             play->transitionTrigger = TRANS_TRIGGER_START;
             play->transitionType = TRANS_TYPE_FADE_BLACK;
@@ -695,6 +711,36 @@ void Fishmod_ExtendMessage(u16 textId, u8* buf, u16* length, s32 size) {
 #if FISHMOD_TESTMODE
 #define OWN_EQUIP(type, inv) ((1 << (inv)) << ((type) * 4))
 
+/**
+ * Test mode: Link's age for where he's going (the next scene loads the right Link). Adult: Master Sword, Hylian
+ * Shield, Zora Tunic (no drowning while testing under water) and the Iron Boots on (take them off in the
+ * equipment screen to swim); child: the Kokiri Sword, Deku Shield and his own tunic and boots.
+ */
+static void Fishmod_TestSetAge(s32 adult) {
+    u8 sword;
+
+    gSaveContext.save.linkAge = adult ? LINK_AGE_ADULT : LINK_AGE_CHILD;
+    if (adult) {
+        Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_MASTER);
+        Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HYLIAN);
+        Inventory_ChangeEquipment(EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_ZORA);
+        Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_IRON);
+        sword = ITEM_SWORD_MASTER;
+    } else {
+        Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI);
+        Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_DEKU);
+        Inventory_ChangeEquipment(EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_KOKIRI);
+        Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_KOKIRI);
+        sword = ITEM_SWORD_KOKIRI;
+    }
+    // (with the rod on B, the sword waits where the rod keeps it)
+    if (sRodOnB) {
+        sSavedBItem = sword;
+    } else {
+        gSaveContext.save.info.equips.buttonItems[0] = sword;
+    }
+}
+
 void Fishmod_InitTestSave(void) {
     Inventory* inv = &gSaveContext.save.info.inventory;
     s32 i;
@@ -731,6 +777,11 @@ void Fishmod_InitTestSave(void) {
     // Kokiri Sword and Deku Shield, equipped
     inv->equipment |= OWN_EQUIP(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_KOKIRI) |
                       OWN_EQUIP(EQUIP_TYPE_SHIELD, EQUIP_INV_SHIELD_DEKU);
+    // for Lake Hylia as adult (test mode warps there grown up): the lake full, and his gear
+    inv->equipment |= OWN_EQUIP(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_MASTER) |
+                      OWN_EQUIP(EQUIP_TYPE_SHIELD, EQUIP_INV_SHIELD_HYLIAN) |
+                      OWN_EQUIP(EQUIP_TYPE_TUNIC, EQUIP_INV_TUNIC_ZORA) | OWN_EQUIP(EQUIP_TYPE_BOOTS, EQUIP_INV_BOOTS_IRON);
+    SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
     gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_KOKIRI;
     Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI);
     Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_DEKU);
