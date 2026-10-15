@@ -143,7 +143,8 @@ def main():
             fr = res["frames"]
             print(f"  done {job['name']}: {how}; save {'found' if save else 'NOT FOUND'}"
                   + (f"; {fr} game frames ran ({fr / max(res['seconds'], 1):.1f}/s)" if fr else
-                     ("; the game doesn't seem to have run (no frame count)" if save else "")))
+                     ("; no frame count: either the game didn't run, or it ran under 600 frames (too slow or too short a job)"
+                      if save else "")))
     json.dump(summary, open(os.path.join(out, "summary.json"), "w"), indent=1)
     zpath = os.path.join(args.out, f"results_{name}.zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
