@@ -27,8 +27,9 @@ from PIL import Image
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CACHE = os.path.join(ROOT, "src", "fishmod_data", "card_outlines.json")
-VERT_COST = 0.012   # a vertex is worth this much of the card's area
-MAX_VERTS = 10
+VERT_COST = 0.006   # a vertex (a triangle more: its setup and its 176 bytes of RDP commands) is worth this much of the
+                    # card's area: the hardware bench showed the RDP's filling is what costs, so pixels count for more
+MAX_VERTS = 14
 SUB = 4             # samples per texel side when checking that the polygon holds a texel
 DEFAULT_ITERS = 6000
 DEFAULT_RESTARTS = 2

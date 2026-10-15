@@ -96,6 +96,9 @@ typedef struct FishmodPropKindInfo {
 // A plant the camera is inside or right against isn't drawn: one card there is a blur across the whole screen, at
 // the RDP's full cost (closer than this times the plant's height, plus a little)
 #define NEAR_SKIP 0.6f
+// the cut-outs' edges smoothed by the VI alone, from the coverage the RDP writes (no read of the colour buffer):
+// see Scatter_Material
+#define PROP_EDGE_RA 0
 #if FISHMOD_DEBUG
 // what the LOD calibration (fishmod_debug.c, FISHMOD_LOD_CALIBRATE) draws everything out to
 #define DIST_CALIBRATE 3000.0f
@@ -545,8 +548,37 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind) {
     }
     gDPPipeSync(gfx++);
     gDPSetTextureLUT(gfx++, G_TT_NONE);
-    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0, COMBINED);
-    gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_TEX_EDGE2);
+    {
+        // The cut-out edge. Anti-aliased in the RDP (AA_ZB_TEX_EDGE) reads the colour buffer for every pixel;
+        // without that read (as libultra's "RA" modes), the coverage is still written and the VI smooths the edges.
+        s32 ra = PROP_EDGE_RA;
+        u32 mode;
+
+#if FISHMOD_DEBUG
+        if (gFishmodBench & FISHMOD_BENCH_ALTEDGE) {
+            ra = !ra;
+        }
+#endif
+        mode = ra ? (AA_EN | Z_CMP | Z_UPD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE)
+                  : (AA_EN | Z_CMP | Z_UPD | IM_RD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE);
+#if FISHMOD_DEBUG
+        if (gFishmodBench & FISHMOD_BENCH_NOZUPD) {
+            mode &= ~Z_UPD;
+        }
+        if (gFishmodBench & FISHMOD_BENCH_1CYCLE) {
+            // (the bench's question only: no fog and no tint, so not the same picture)
+            gDPSetCycleType(gfx++, G_CYC_1CYCLE);
+            gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0);
+            gDPSetRenderMode(gfx++, mode | GBL_c1(G_BL_CLR_IN, G_BL_A_IN, G_BL_CLR_MEM, G_BL_A_MEM),
+                             mode | GBL_c2(G_BL_CLR_IN, G_BL_A_IN, G_BL_CLR_MEM, G_BL_A_MEM));
+        } else
+#endif
+        {
+            gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0,
+                              COMBINED);
+            gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, mode | GBL_c2(G_BL_CLR_IN, G_BL_A_IN, G_BL_CLR_MEM, G_BL_A_MEM));
+        }
+    }
     gSPClearGeometryMode(gfx++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
     gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
     gSPDisplayList(gfx++, ((gFishmodTexCompress != 0) && (info->material4 != NULL)) ? info->material4 : info->material);
@@ -923,6 +955,15 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 
         kind = prop->kind;
         info = &sKinds[kind];
+#if FISHMOD_DEBUG
+        if (gFishmodBench & (FISHMOD_BENCH_NONEAR | FISHMOD_BENCH_NOFAR)) {
+            s32 near = (SQ(prop->x - eye.x) + SQ(prop->z - eye.z)) < SQ(FISHMOD_BENCH_NEAR);
+
+            if (near ? (gFishmodBench & FISHMOD_BENCH_NONEAR) : (gFishmodBench & FISHMOD_BENCH_NOFAR)) {
+                continue;
+            }
+        }
+#endif
         disp = info->xlu ? &xlu : &opa;
         if (kind != (info->xlu ? lastXlu : lastOpa)) {
             if (info->xlu) {
