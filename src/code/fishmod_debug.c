@@ -1797,6 +1797,9 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.showTitleCard = false;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
 
+#ifdef FISHMOD_SCRIPT_TEXCOMPRESS
+    gFishmodTexCompress = 1; // the props' textures in 4 bits from the start
+#endif
     sScriptStepIndex = 0;
     sScriptStepFrame = 0;
     sScriptActive = false;
