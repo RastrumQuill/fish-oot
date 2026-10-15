@@ -72,7 +72,7 @@ def health(ram):
     """The debug builds keep running totals at SRAM 0x7F00 ('FMST'): how many frames ran (the game was running)."""
     if len(ram) < 0x7F10 or ram[0x7F00:0x7F04] != b"FMST":
         return None
-    return struct.unpack(">I", ram[0x7F04:0x7F08])[0]
+    return struct.unpack(">I", ram[0x7F04:0x7F08])[0] + 600  # (it starts counting after the first 600 frames)
 
 
 def find_save(job_dir, name, saves_dir, since):
