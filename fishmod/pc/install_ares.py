@@ -28,27 +28,40 @@ def main():
         return
     req = urllib.request.Request(API, headers={"User-Agent": "fishoot-installer"})
     release = json.load(urllib.request.urlopen(req))
-    assets = [a for a in release["assets"] if a["name"].lower().endswith(".zip") and "windows" in a["name"].lower()]
-    # the 64-bit x86 build, not ARM
-    assets = [a for a in assets if "arm" not in a["name"].lower()] or assets
-    if not assets:
-        raise SystemExit("no Windows build in the latest ares release: get it from https://ares-emu.net/download")
-    asset = assets[0]
-    print(f"downloading ares {release['tag_name']}: {asset['name']} ({asset['size'] // (1 << 20)} MB)")
-    data = urllib.request.urlopen(urllib.request.Request(asset["browser_download_url"],
-                                                         headers={"User-Agent": "fishoot-installer"})).read()
-    z = zipfile.ZipFile(io.BytesIO(data))
+    zips = [a for a in release["assets"] if a["name"].lower().endswith(".zip")]
+    # the Windows x64 build first; never debug symbols (a "pdb" or "symbols" zip has no ares.exe in it)
+    def rank(a):
+        n = a["name"].lower()
+        if "windows" not in n and "win" not in n:
+            return None
+        if any(w in n for w in ("pdb", "symbol", "debug", "arm")):
+            return None
+        return 0 if ("x64" in n or "amd64" in n or "x86_64" in n) else 1
+    cands = sorted((a for a in zips if rank(a) is not None), key=rank)
+    if not cands:
+        names = ", ".join(a["name"] for a in release["assets"])
+        raise SystemExit(f"no Windows build among the latest ares release's files ({names}): get it from "
+                         "https://ares-emu.net/download and unzip it into " + args.dest)
     tmp = args.dest + "_tmp"
-    shutil.rmtree(tmp, ignore_errors=True)
-    z.extractall(tmp)
-    # the zip may keep everything in a folder of its own: use the folder that has ares.exe
-    found = None
-    for root, _, files in os.walk(tmp):
-        if "ares.exe" in files:
-            found = root
+    for asset in cands:
+        print(f"downloading ares {release['tag_name']}: {asset['name']} ({asset['size'] // (1 << 20)} MB)")
+        data = urllib.request.urlopen(urllib.request.Request(asset["browser_download_url"],
+                                                             headers={"User-Agent": "fishoot-installer"})).read()
+        shutil.rmtree(tmp, ignore_errors=True)
+        zipfile.ZipFile(io.BytesIO(data)).extractall(tmp)
+        # the zip may keep everything in a folder of its own: use the folder that has ares.exe
+        found = None
+        for root, _, files in os.walk(tmp):
+            if any(f.lower() == "ares.exe" for f in files):
+                found = root
+                break
+        if found is not None:
             break
-    if found is None:
-        raise SystemExit("ares.exe wasn't in the download: get it from https://ares-emu.net/download")
+        print(f"  no ares.exe in {asset['name']}, trying the next file")
+    else:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise SystemExit("ares.exe wasn't in any of the downloads: get it from https://ares-emu.net/download and "
+                         "unzip it into " + args.dest)
     shutil.rmtree(args.dest, ignore_errors=True)
     shutil.move(found, args.dest)
     shutil.rmtree(tmp, ignore_errors=True)

@@ -34,10 +34,19 @@ def find_ares(given):
     for p in ([given] if given else []) + [os.environ.get("ARES", "")] + ARES_GUESSES:
         if p and os.path.isfile(p):
             return p
+    # unpacked a folder deeper than expected (or left half-installed): look inside pc\ares and pc\ares_tmp
+    here = os.path.dirname(os.path.abspath(__file__))
+    for top in ("ares", "ares_tmp"):
+        for root, _, files in os.walk(os.path.join(here, top)):
+            for f in files:
+                if f.lower() == "ares.exe":
+                    return os.path.join(root, f)
     found = shutil.which("ares")
     if found:
         return found
-    raise SystemExit("ares not found: pass --ares C:\\path\\to\\ares.exe")
+    raise SystemExit("ares not found. Run  python fishmod\\pc\\install_ares.py --force  (or get ares from "
+                     "https://ares-emu.net/download and unzip it into fishmod\\pc\\ares), or pass --ares "
+                     "C:\\path\\to\\ares.exe")
 
 
 def close_gracefully(proc, wait=30):
@@ -96,6 +105,8 @@ def main():
     args = ap.parse_args()
 
     ares = find_ares(args.ares)
+    if not os.path.isfile(args.rom):
+        raise SystemExit(f"the ROM isn't at {os.path.abspath(args.rom)}: give its full path")
     base = bps.to_z64(open(args.rom, "rb").read())
     pack = zipfile.ZipFile(args.pack)
     spec = json.loads(pack.read("jobs.json"))
