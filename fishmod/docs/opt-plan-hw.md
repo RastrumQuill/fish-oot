@@ -94,6 +94,9 @@ console before it stays.
    pass for undefined behaviour IDO tolerated.
 6. **F3DEX3 by default** (`--f3dex3` exists): faster vertex work on the RSP, for every scene.
 7. **CPU hot spots:** collision queries (BgCheck), the software matrix stack, actor update overhead. Profile first.
+   The few functions that run the most can then be hand-written in MIPS assembly, sized to fit the instruction cache
+   and skipping the compiler entirely (as done in SM64 optimisation work). This only makes sense once a profile names
+   them, and each one needs a C version kept beside it to check the assembly against.
 
 What the hardware bench showed decides the order: the RDP is the limit in the lake, so 1–4 come first. 5–7 matter
 where the CPU is the limit (busy scenes, lots of actors, the fish AI).
