@@ -20,6 +20,21 @@ A/B on hardware, each with a pixel diff in the emulator:
 - no Z update for the props;
 - a per-frame budget for covered pixels on near props.
 
+## More fill ideas: the invisible ones go first
+1. A custom render mode: TEX_EDGE without `IM_RD`. The VI still anti-aliases the edges from the coverage bits, and
+   the RDP no longer reads the colour buffer.
+2. No Z writes for props: compare only, with props drawn back to front among themselves.
+3. Tighter card outlines. Re-run the annealer with more vertices and a cost weighted for fill, now that the RDP
+   is the limit. Pixels with zero alpha still cost Z and memory traffic.
+4. Fewer RDP pipe syncs and state changes per prop.
+5. 1-cycle mode for props.
+6. The no-prop baseline (18-38 ms of RDP): skip the skybox when it's off screen, check the water layers and
+   the fill of the lake floor.
+7. Bank layout. Colour buffers are at the top of the Expansion Pak and Z is in base RAM, probably already in
+   different banks. Check it once.
+8. Visibility (item 4) and simpler far props (item 5).
+Only if these aren't enough: a budget for near-prop pixels and density tuning, chosen by the pixel test.
+
 ## Reordered by these results
 Fill comes first. Items 4 (visibility) and 5 help by drawing less. Items 1 and 7 (CPU and cache) and 6 and 8
 (texture loads) save little, so they move down. The perceptual CI4 encoder is shelved.
