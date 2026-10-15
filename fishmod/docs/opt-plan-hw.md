@@ -107,3 +107,14 @@ off), but the ROM hangs at boot. ares reports that the CPU never sent the PIF it
 happens in libultra's `osInitialize`, so the hang is in the boot code or libultra, before the game starts. Next step,
 if pursued: GCC only for `src/code` and the overlays (where the CPU time goes), with the boot code, libultra, libc
 and audio staying on IDO; or port HackerOoT's GCC fixes.
+
+### The edge trick, tested exactly (edge_ab_capture.py)
+Raw VI frames from ares, scene frozen, the two edge modes alternating at all 22 tour stops:
+- **Every prop in the new mode:** not invisible. Far props are a few pixels across and mostly edge; without the
+  blend their partly covered pixels drop out. Small lotus flowers vanished (stops 10, 22) and far dock posts thinned
+  (stop 3).
+- **The new mode within 500 units only** (now the default): the far differences are gone. Near plants differ in
+  scattered single edge pixels (up to about 1% of the screen by more than the VI's own noise), which can't be told
+  apart side by side at 6x.
+- **Implication for the engine-wide version:** small or distant geometry is where it shows, so it would need the same
+  near/far split, and the same capture at many places, before going in.
