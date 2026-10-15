@@ -9,9 +9,15 @@ Status: design only. It waits until the fill-rate work and the second hardware b
 needs that bench's numbers.
 
 ## What is optimized
-- **Per card (at most 4):** translation (3), rotation (3, or yaw, pitch and roll), scale (2: width and height),
-  and which texture it carries, chosen from the plant's own set.
-- **Fixed:** the textures themselves and the game's render settings.
+- **Per card (at most 4):** translation (3), rotation (3, or yaw, pitch and roll) and scale (2: width and height).
+- **Texture offsets in certain regions, for some plants:** a region of a card can shift its texture coordinates, so
+  that part shows a different stretch of the plant's texture. That breaks the repetition between cards that carry
+  the same texture.
+  - Each region is a separate polygon with its own UVs, so it costs triangles, which the cost term counts.
+  - The offsets are bounded so the region stays inside the texture, unless that texture is set to wrap.
+  - Which plants and which regions get offsets is set per species.
+- **Not in scope:** which texture a card carries (each card keeps its own), the textures themselves, and the game's
+  render settings.
 - **Afterwards:** each card's outline is cut by `card_outline.py`, as now.
 
 Three runs go in parallel, with 2, 3 and 4 cards. The converged losses pick the base asset, and the variants with
@@ -26,11 +32,38 @@ L = w_sem * L_semantic + w_depth * L_depth + w_view * L_multiview + w_ref * L_re
 
 | Term | Model | What it measures |
 |---|---|---|
-| `L_semantic` | SigLIP (pairwise sigmoid loss) | 1 minus the similarity between each rendered view and a target text, such as "a volumetric aquatic plant". A card seen edge-on that thins to a line loses similarity, so that arrangement is penalized. |
-| `L_depth` | Monocular depth (Depth Anything V2) | The negative variance of the predicted depth inside the plant's alpha mask. Rewards intersecting cards and overlapping depth layers; penalizes flat, coplanar stacks. |
+| `L_semantic` | SigLIP (pairwise sigmoid loss) | Positive and negative prompts (below). Rewards similarity to the species, and penalizes similarity to "video game" looks. A card seen edge-on, thinned to a line, loses the positive. |
+| `L_depth` | Monocular depth (Depth Anything V2) | A penalty for perceived depth that differs from the plant's real depth. Not a reward for depth variance (below). |
 | `L_multiview` | DINOv2 dense features | The feature distance between adjacent camera angles. A spike means an arrangement that looks right from one angle and breaks when the camera moves. |
 | `L_reference` | DINOv2 / LPIPS (proposed addition) | The distance to renders of the detailed reference plant (OBJ+PNG or glTF), from the same views. Keeps the result looking like this species, not like plants in general. |
 | `C_hardware` | Fitted cost model (below) | The plant's expected RDP time on the console, over the distances and angles the game actually shows it. |
+
+The weights get set when it's built: each term is scaled to unit range on random arrangements, then tuned on two or
+three species.
+
+### The semantic term: positive and negative prompts
+`L_semantic = mean over views of [ -sim(view, positive) + sim(view, negative) ]`, using SigLIP's sigmoid scores (each
+prompt is scored on its own, so positives and negatives don't compete in a softmax).
+- **Positive: the species.** "a cattail", "a water lily", "a lotus flower", "a clump of rushes", and so on. Every
+  plant in the mod has one, the lotus flower included.
+- **Negative: video-game and flat looks.** For example "a video game plant", "a low-poly game asset", "a flat
+  cardboard cutout", "a 2D sprite", "a billboard texture". The renders are low-resolution and fogged, so the
+  negatives have to name flatness and game-ness specifically, not just "bad".
+- **One target per species for now.** Later it can use several phrasings per species ("a cattail", "bulrushes by a
+  lake", "reeds in shallow water"), with one chosen at random each step, or the scores averaged. The text embeddings
+  are computed once at the start, so extra phrasings cost no GPU time per step, only a little memory.
+
+### The depth term: real depth, not flat planes
+The goal is that the depth model perceives the plant's real shape, not a few flat planes. Maximizing depth variance
+would reward spreading cards apart, which is not the goal.
+- **The ground truth** is the depth of the detailed reference plant, rendered from the same view. Its depth buffer is
+  exact, and the monocular model's estimate of the same render is kept as a check.
+- **The penalty** is the difference between the depth the model perceives in the card plant's render and that
+  ground truth, inside the plant's alpha mask. Monocular depth is only known up to scale and offset, so the loss is
+  scale- and shift-invariant: least-squares align first, then measure (as in MiDaS).
+- **A plane check (optional, extra).** Fit up to N planes to the perceived depth inside the mask. If a few planes
+  explain it almost perfectly, the plant reads as flat cards: penalize that. No reward beyond the reference's own
+  level, so it can't push towards noise.
 
 ### Views
 - **Angles:** off-axis cameras at several heights and distances, not one level orbit. Straight-down views are left
@@ -50,12 +83,10 @@ The discriminators should judge what the player sees, so the differentiable rend
 A plant judged only on clean, high-resolution renders can come out tuned for detail the console never shows.
 
 ### Guards against degenerate solutions
-The depth-variance term on its own can be maximized by spreading cards far apart or scaling them up. To prevent that:
+Any of the terms could be gamed by spreading cards far apart or scaling them up. To prevent that:
 - **Size:** cards are confined to the plant's bounding volume, and their scale is bounded.
 - **Coverage:** a term matches the plant's silhouette area to the reference's.
 - **Cost:** the hardware cost term already penalizes extra pixels.
-
-Clip the depth term, or use it as a hinge (no reward beyond a target spread), so it can't dominate.
 
 ## The hardware cost analog
 "How much it costs to run on real hardware" should be a number the optimizer can use, fitted to the console's own
@@ -93,8 +124,9 @@ overnight bench run checks the real cost at the tour stops. That closes the loop
 The card transforms are continuous, and with a differentiable renderer the whole loss can be differentiated with
 respect to them. Plain gradient descent (Adam, several random starts) is the fastest and steadiest way to fit those.
 Use RL or an evolution strategy (PPO, or CMA-ES, which is simpler) where gradients don't exist:
-- which texture each card carries;
 - the card count, if not fixed per run;
+- which regions of a card get texture offsets (the offsets themselves are continuous, so they go to the gradient
+  loop);
 - the outline vertex budget;
 - the real hardware measurement, which can't be differentiated.
 
@@ -111,10 +143,15 @@ fits the transforms for each choice. The reward is the final loss.
 - **Output:** per species and card count, the card transforms as JSON. `gen_habitat.py` turns them into the mesh, and
   `card_outline.py` and the pixel LOD calibration run as now.
 
+## Decided
+- **Depth:** a penalty against the reference plant's real depth, plus an optional plane check. Not variance
+  maximized.
+- **SigLIP:** positive prompts (the species, including the lotus flower) and negative prompts ("video game" and
+  flat looks).
+- **Targets:** one per species for now; more phrasings later, since they cost nothing per step.
+- **Weights:** set when it's built.
+- **Textures:** which texture a card carries is out of scope. Texture offsets in regions of some plants are in scope.
+
 ## Open questions
-- **Target texts:** one per species ("a cattail", "a water lily") or one shared ("a volumetric aquatic plant"), or
-  both.
-- **Weights:** start with each term scaled to unit range on random arrangements, then hand-tune on two or three
-  species.
-- **Do texture choices per card stay in scope,** or only transforms (as specified)?
-- **Under-water plants:** they're seen through haze. Their views may need the haze or a separate SigLIP prompt.
+- **Under-water plants:** they're seen through haze. Their views may need the haze in the render, or separate
+  prompts.
