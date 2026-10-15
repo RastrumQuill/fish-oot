@@ -40,3 +40,4 @@ fishmod/assets/habitat_hw/
 fishmod/pc/packs/*.zip
 fishmod/pc/results/
 fishmod/pc/ares/
+/fishmod/pc/ares_tmp
