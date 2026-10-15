@@ -39,13 +39,16 @@ class Noise:
 
     def __init__(self, seed, scale):
         self.rnd = random.Random(seed)
+        self.seed = seed
         self.scale = scale
         self.cache = {}
 
     def lattice(self, i, j):
         k = (i, j)
         if k not in self.cache:
-            self.cache[k] = random.Random(hash((i, j, id(self))) & 0xFFFFFFFF).random()
+            # from the seed and the cell only (not the object's address or Python's hashing), so every build places
+            # the same props
+            self.cache[k] = random.Random((self.seed * 73856093) ^ (i * 19349663) ^ (j * 83492791)).random()
         return self.cache[k]
 
     def __call__(self, x, z):
