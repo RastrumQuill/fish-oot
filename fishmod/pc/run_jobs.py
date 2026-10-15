@@ -26,7 +26,8 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bps  # noqa: E402
 
-ARES_GUESSES = [r"C:\ares\ares.exe", r"C:\Program Files\ares\ares.exe", os.path.expandvars(r"%LOCALAPPDATA%\ares\ares.exe")]
+ARES_GUESSES = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "ares", "ares.exe"),  # (install_ares.py)
+                r"C:\ares\ares.exe", r"C:\Program Files\ares\ares.exe", os.path.expandvars(r"%LOCALAPPDATA%\ares\ares.exe")]
 
 
 def find_ares(given):
