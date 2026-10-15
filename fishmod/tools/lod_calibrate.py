@@ -17,6 +17,8 @@ KINDS_MAX = 48  # FISHMOD_LOD_KINDS
 OFF = 0x7A40
 # never drawn nearer than this (a kind that changed nothing at a stop still shows from closer than any stop looked)
 FLOOR = 300
+# the one-per-kind distances: no nearer than this (what the sampled views didn't see from some other angle)
+FLOOR_GLOBAL = 500
 
 
 def kinds():
@@ -76,6 +78,53 @@ def sweep(paths):
     return merged
 
 
+def rotate(path):
+    d = open(path, "rb").read()[0x7640:0x7640 + 0x600]
+    magic, stops, yaws = struct.unpack(">IHH", d[:8])
+    if magic != 0x46524F54:
+        raise SystemExit("no rotation check results in " + path)
+    cone = struct.unpack(f">{22 * yaws}H", d[8:8 + 44 * yaws])
+    allc = struct.unpack(f">{22 * yaws}H", d[8 + 44 * yaws:8 + 88 * yaws])
+    print(f"{stops} stops, {yaws} directions each: pixels the game's frame lacks against a wider view cone (cone), and"
+          f" against that with nothing cut by distance (all)")
+    for st in range(stops):
+        c = cone[st * yaws:(st + 1) * yaws]
+        a = allc[st * yaws:(st + 1) * yaws]
+        print(f"  stop {st + 1:2d}: cone max {max(c):5d} (dir {c.index(max(c)):2d}), all max {max(a):5d} "
+              f"(dir {a.index(max(a)):2d})   cone " + " ".join(f"{v}" for v in c))
+
+
+def write_global(merged):
+    """The sweep's furthest need per kind (over every zone) into include/fishmod_lod.h, keeping the larger of that
+    and what it has (the tour stops'); the zone tables emptied. Distances that change with where the camera is make
+    props pop as the camera moves or turns; one per kind can't."""
+    path = os.path.join(ROOT, "include/fishmod_lod.h")
+    text = open(path).read()
+    names = kinds()
+    have = {m.group(1): [int(m.group(2)), int(m.group(3))]
+            for m in re.finditer(r"X\((\w+), (-?\d+), (-?\d+)\)", text)}
+    lines = []
+    for k, n in enumerate(names):
+        need = [max(merged[z][u][k] for z in range(SWEEP_ZONES)) * 100 for u in range(2)]
+        old = have.get(n, [-1, -1])
+        row = []
+        for u in range(2):
+            vals = [v for v in (need[u], old[u]) if v > 0]
+            row.append(max(max(vals), FLOOR_GLOBAL) if vals else -1)
+        if row != [-1, -1]:
+            lines.append(f"    X({n}, {row[0]}, {row[1]}) \\")
+            print(f"  {n:14s} above {row[0]:>5}  under {row[1]:>5}")
+    head = text[:text.index("#define FISHMOD_LOD_DISTANCES(X)")]
+    with open(path, "w") as f:
+        f.write(head + "#define FISHMOD_LOD_DISTANCES(X) \\\n" + "\n".join(lines) + "\n\n#endif\n")
+    with open(os.path.join(ROOT, "include/fishmod_lod_zones.h"), "w") as f:
+        f.write("#ifndef FISHMOD_LOD_ZONES_H\n#define FISHMOD_LOD_ZONES_H\n\n/*\n * Draw distances per zone: none. "
+                "They changed with where the camera was, so props popped as it moved or turned; fishmod_lod.h has one\n"
+                " * distance per kind instead (the furthest any view needed). fishmod/tools/lod_calibrate.py --sweep "
+                "--write would make them again.\n */\n#define FISHMOD_LOD_ZONE_COUNT 0\n\n#endif\n")
+    print("wrote include/fishmod_lod.h (and emptied include/fishmod_lod_zones.h)")
+
+
 ZONE_CELL = 200
 
 
@@ -123,13 +172,22 @@ def write_zones(merged):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sweep", nargs="+")
+    ap.add_argument("--rotate", help="the rotation check's save file (fishmod/scripts/lod_rotate.inc.c)")
     ap.add_argument("save", nargs="?")
     ap.add_argument("--write", action="store_true")
+    ap.add_argument("--write-global", action="store_true",
+                    help="with --sweep: one distance per kind (the furthest any view needed, with what fishmod_lod.h "
+                         "has), and no zones")
     ap.add_argument("--log", action="store_true", help="the first tests: kind, distance, pixels changed")
     args = ap.parse_args()
+    if args.rotate:
+        rotate(args.rotate)
+        return
     if args.sweep:
         merged = sweep(args.sweep)
-        if args.write:
+        if args.write_global:
+            write_global(merged)
+        elif args.write:
             write_zones(merged)
         return
     nk, stops, thr, pix, above, under, noise, verify, uflag, log = read(args.save)

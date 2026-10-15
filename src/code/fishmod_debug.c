@@ -524,7 +524,13 @@ static void Fishmod_TourUpdate(PlayState* play) {
         Play_ChangeCameraStatus(play, sTourCamId, CAM_STAT_ACTIVE);
         sTourEye = sTourStops[0].eye;
         sTourAt = sTourStops[0].at;
+#ifdef FISHMOD_TOUR_START
+        Fishmod_TourGo(FISHMOD_TOUR_START); // (straight to one stop, for looking at it)
+        sTourEye = sTourStops[FISHMOD_TOUR_START].eye;
+        sTourAt = sTourStops[FISHMOD_TOUR_START].at;
+#else
         Fishmod_TourGo(0);
+#endif
     }
     // something else in the scene can hand the view back to the main camera (or clear ours): take it back
     if (play->cameraPtrs[sTourCamId] == NULL) {
@@ -1157,6 +1163,112 @@ static void Fishmod_LodUpdate(PlayState* play) {
             Lod_Test(-1, 0);
             sSweepSettle = SWEEP_SETTLE;
             sSweepState = SW_ARRIVE;
+            break;
+    }
+}
+#elif defined(FISHMOD_LOD_ROTATE)
+/*
+ * The rotation check: at each tour stop the camera turns all the way round (16 directions, about the point it looks
+ * at, as the stick turns it), and at each the game's frame is compared with two references: the same props with a
+ * much wider view cone (what the cone wrongly leaves out), and everything out to DIST_CALIBRATE with that cone (what
+ * any cut leaves out: the cone and the distances). Pixels differing, per stop and direction, to SRAM 0x7A40 for
+ * fishmod/tools/lod_calibrate.py --rotate.
+ */
+#define ROT_YAWS 16
+#define ROT_STOPS 22
+
+typedef struct RotResults {
+    u32 magic; // 'FROT'
+    u16 stops;
+    u16 yaws;
+    u16 cone[ROT_STOPS][ROT_YAWS];
+    u16 all[ROT_STOPS][ROT_YAWS];
+} RotResults;
+
+static RotResults sRot;
+static s32 sRotState; // 0 arriving; then per direction: 1 the game's frame, 2 the wide cone, 3 everything
+static s32 sRotYaw;
+
+static void Rot_Config(s32 state) {
+    gFishmodLodTest.asGame = (state != 3);
+    gFishmodLodTest.wide = (state >= 2);
+    bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
+    sLodTimer = LOD_HOLD;
+}
+
+static void Fishmod_LodUpdate(PlayState* play) {
+    s32 stop = sTourStop;
+
+    sLodGfxCtx = play->state.gfxCtx;
+    if (sLodRef == NULL) {
+        sLodRef = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
+        sLodNoise = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT / 8, "../fishmod_debug.c", __LINE__);
+        sLodCur = SYSTEM_ARENA_MALLOC(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16), "../fishmod_debug.c", __LINE__);
+        if ((sLodRef == NULL) || (sLodNoise == NULL) || (sLodCur == NULL)) {
+            return;
+        }
+        bzero(sLodNoise, SCREEN_WIDTH * SCREEN_HEIGHT / 8);
+        sLodFrames = play->gameplayFrames;
+        sLodTime = gSaveContext.save.dayTime;
+        sLodSkyRot = play->skyboxCtx.rot.y;
+        sLodStateFrames = play->state.frames;
+        gFishmodLodTest.active = true;
+        Rot_Config(1);
+    }
+    play->gameplayFrames = sLodFrames;
+    gSaveContext.save.dayTime = sLodTime;
+    play->skyboxCtx.rot.y = sLodSkyRot;
+    play->state.frames = sLodStateFrames;
+    play->haltAllActors = gFishmodLodTest.active;
+    if (!gFishmodLodTest.active) {
+        Fishmod_DebugPrintf(2, "rotation check done");
+        return;
+    }
+    Fishmod_DebugPrintf(2, "rotation stop %d dir %d", stop + 1, sRotYaw);
+    sTourYaw = sRotYaw * (2.0f * M_PI / ROT_YAWS);
+    if (sRotState == 0) {
+        if (sTourFrame >= TOUR_GLIDE + LOD_SETTLE + ((stop == 0) ? 200 : 0)) {
+            sRotState = 1;
+            sRotYaw = 0;
+            Rot_Config(1);
+        }
+        return;
+    }
+    if (--sLodTimer > 0) {
+        return;
+    }
+    switch (sRotState) {
+        case 1:
+            Lod_Grab(sLodRef); // the game's frame
+            Rot_Config(2);
+            sRotState = 2;
+            break;
+        case 2:
+            Lod_Grab(sLodCur);
+            sRot.cone[stop][sRotYaw] = MIN(Lod_Compare(false), 0xFFFF);
+            Rot_Config(3);
+            sRotState = 3;
+            break;
+        default:
+            Lod_Grab(sLodCur);
+            sRot.all[stop][sRotYaw] = MIN(Lod_Compare(false), 0xFFFF);
+            if (++sRotYaw >= ROT_YAWS) {
+                sRot.magic = 0x46524F54; // 'FROT'
+                sRot.stops = stop + 1;
+                sRot.yaws = ROT_YAWS;
+                SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7A40 - 0x400, &sRot, sizeof(sRot), OS_WRITE);
+                sRotYaw = 0;
+                if (stop + 1 >= ROT_STOPS) {
+                    gFishmodLodTest.active = false;
+                    gFishmodLodTest.asGame = gFishmodLodTest.wide = false;
+                    break;
+                }
+                Fishmod_TourGo(stop + 1);
+                sRotState = 0;
+                break;
+            }
+            Rot_Config(1);
+            sRotState = 1;
             break;
     }
 }
