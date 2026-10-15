@@ -97,3 +97,10 @@ console before it stays.
 
 What the hardware bench showed decides the order: the RDP is the limit in the lake, so 1–4 come first. 5–7 matter
 where the CPU is the limit (busy scenes, lots of actors, the fish AI).
+
+### GCC status
+`fishmod/build.sh --gcc O2` (or `Os`) compiles and links the whole game with mips-linux-gnu-gcc 12 (strict aliasing
+off), but the ROM hangs at boot. ares reports that the CPU never sent the PIF its boot-termination command. That
+happens in libultra's `osInitialize`, so the hang is in the boot code or libultra, before the game starts. Next step,
+if pursued: GCC only for `src/code` and the overlays (where the CPU time goes), with the boot code, libultra, libc
+and audio staying on IDO; or port HackerOoT's GCC fixes.
