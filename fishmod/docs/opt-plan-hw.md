@@ -132,3 +132,24 @@ meshes, the way vanilla's Kokiri grass bushes are made, in place of cut-out card
 
 Candidates are the plants that fill the most at the worst stops: weed clumps, broadleaf and bushes. Kept for later,
 if the bench-driven fixes leave the worst stops short.
+
+## Second results (hwbench-2.md, SummerCart, 1 lap + 3 stops)
+- **Far props cost twice what near ones do.** Of the props' 54.7 ms of RDP time, 34.5 ms is props past 500 units and
+  17 ms is props nearer. At the worst stops it's more lopsided: stop 10, far about 136 ms against near 45 ms;
+  stop 11, 110 against 58; stop 1, 87 against 42. Far props are small on screen, so the cost is per triangle and
+  per short span (each scanline's run starts with a memory fetch), not per pixel.
+- **Edge mode for near props:** the old mode everywhere costs 10% more RDP time (91.2 against 82.8 ms). Kept.
+- **1-cycle:** 1% faster. The RDP is limited by memory, not by its pipeline. Not worth building.
+- **No depth writes:** 4% slower (fewer hidden pixels rejected). Dropped.
+- **Skybox:** 5.4 ms on average. **Water surface:** 0.1 ms.
+- **The first bench's prop counts were off** at the under-water stops (stop 2: 191 against 348). The same v1 ROM
+  in ares draws 348, like v2 on the console, so per-stop comparisons with hwbench-1 aren't reliable there.
+
+### What follows
+1. **Far props, cheaper and the same to look at:** a far LOD per kind (one card, or fewer, with a short outline of
+   4-6 vertices), switched at a distance the pixel test picks so the switch can't be seen. The card optimizer's
+   2/3/4-card tiers are this. The tighter outlines (more vertices) add triangles to every far prop, so they should be
+   for near props only.
+2. **Skybox when it can't be seen** (5.4 ms): skip it when the terrain and water cover the screen. Needs a reliable
+   test for "covered".
+3. 1-cycle and no depth writes are dropped.

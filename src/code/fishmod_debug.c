@@ -1722,7 +1722,7 @@ static void Bench_Record(s32 stop, s32 mode) {
     }
 }
 
-/** Where the bench is, written to SRAM 0x7E00 as each mode starts: if the console crashes, the save says where. */
+/** Where the bench is, written to SRAM 0x7000 as each mode starts (0x7E00 is the profile): if the console crashes, the save says where. */
 static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
     static struct {
         u32 magic; // 'FBCR'
@@ -1740,7 +1740,7 @@ static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
     sCrumb.mode = mode;
     sCrumb.block = block;
     sCrumb.count++;
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7E00, &sCrumb, sizeof(sCrumb), OS_WRITE);
+    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7000, &sCrumb, sizeof(sCrumb), OS_WRITE);
 }
 
 static void Bench_SetMode(s32 mode) {
