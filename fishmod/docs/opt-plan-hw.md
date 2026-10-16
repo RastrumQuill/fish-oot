@@ -118,3 +118,17 @@ Raw VI frames from ares, scene frozen, the two edge modes alternating at all 22 
   apart side by side at 6x.
 - **Implication for the engine-wide version:** small or distant geometry is where it shows, so it would need the same
   near/far split, and the same capture at many places, before going in.
+
+### Fallback if the invisible fixes aren't enough: plants as solid geometry
+Not a budget and not thinning, which are both ruled out. Instead, rebuild the costly near plants as low-poly opaque
+meshes, the way vanilla's Kokiri grass bushes are made, in place of cut-out cards:
+- **No see-through pixels:** a card still fills the empty parts of its texture inside the outline; a mesh fills only
+  its silhouette.
+- **Back faces culled:** a closed mesh can use back-face culling, so its far side costs nothing; cards can't, being
+  seen from both sides.
+- **Cheaper per pixel:** an opaque surface needs no alpha-derived coverage, and could go to 1-cycle mode where fog
+  allows.
+- **The cost is triangles,** which the RSP has room for while it waits on the RDP.
+
+Candidates are the plants that fill the most at the worst stops: weed clumps, broadleaf and bushes. Kept for later,
+if the bench-driven fixes leave the worst stops short.
