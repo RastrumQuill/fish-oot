@@ -10,7 +10,8 @@
 #   --testmode     new files skip the intro and start with testing items; outputs get a -test suffix
 #   --fasttrig     polynomial sin/cos instead of the sine table; outputs get a -trig suffix
 #   --hw           the original-hardware version (fewer, cheaper pixels for the RDP); outputs get a -hw suffix
-#   --gcc LEVEL    compile with GCC (mips-linux-gnu-gcc) at -O2 or -Os instead of IDO; outputs get a -gccO2/-gccOs suffix
+#   --gcc LEVEL    compile the game's code (src/code, overlays, the mod) with GCC at -O2 or -Os; boot, libultra, libc and
+#                  audio stay on IDO. Outputs get a -gccO2/-gccOs suffix
 # Needs `flips` on PATH (or FLIPS=/path/to/flips) for the release patch.
 set -euo pipefail
 
@@ -102,7 +103,7 @@ python3 fishmod/tools/gen_watermap.py
 
 GCC_ARGS=()
 if [ -n "$GCC" ]; then
-    GCC_ARGS=(COMPILER=gcc GCC_OPT="$GCC")
+    GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC")
 fi
 make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG FISHMOD_HW=$HW \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}

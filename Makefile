@@ -880,6 +880,27 @@ $(BUILD_DIR)/src/libultra/libc/ll.o: OPTFLAGS := -Ofast
 $(BUILD_DIR)/src/overlays/%.o: CFLAGS += -mno-explicit-relocs -mno-split-addresses
 endif
 
+# fish-oot: GCC_CODE=1 compiles the game's own code (src/code and the overlays, the mod included) with GCC, while the
+# boot code, libultra, libc and audio stay on IDO (an all-GCC build hangs before osInitialize finishes). GCC_OPT picks
+# the level. Both follow the o32 ABI, so the objects link together.
+ifeq ($(GCC_CODE),1)
+GCC_CODE_CFLAGS := $(CPP_DEFINES) -DCOMPILER_GCC $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 \
+  -mabi=32 -mno-abicalls -mdivide-breaks -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
+  -fno-builtin-sinf -fno-builtin-cosf -fexec-charset=euc-jp -w
+GCC_OPT ?= O2
+$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CC := tools/fishmod_gcc_cc.sh
+$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CC_CHECK := @:
+$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: PREPROCESS :=
+$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CFLAGS := $(GCC_CODE_CFLAGS)
+$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: MIPS_VERSION := -mips3
+$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations
+$(BUILD_DIR)/src/overlays/%.o: CFLAGS += -mno-explicit-relocs -mno-split-addresses
+# GCC's objects are marked MIPS III, IDO's MIPS II: the VR4300 runs both, so the linker isn't to refuse the mix
+SEG_LDFLAGS += --no-warn-mismatch
+# (files whose own rule names IDO 5.3)
+$(BUILD_DIR)/src/code/jpegutils.o $(BUILD_DIR)/src/code/jpegdecoder.o: CC := tools/fishmod_gcc_cc.sh
+endif
+
 #### Main Targets ###
 
 all: rom compress
@@ -965,6 +986,9 @@ $(ROMC): $(ROM) $(ELF) $(BUILD_DIR)/compress_ranges.txt
 	$(PYTHON) -m ipl3checksum sum --cic $(CIC) --update $@
 
 LDFLAGS := -T $(LDSCRIPT) -T $(BUILD_DIR)/linker_scripts/makerom.ld -T $(BUILD_DIR)/undefined_syms.txt --emit-relocs -Map $(MAP)
+ifeq ($(GCC_CODE),1)
+  LDFLAGS += --no-warn-mismatch
+endif
 
 $(ELF): $(TEXTURE_FILES_OUT) $(ASSET_FILES_OUT) $(SEGMENT_FILES) $(OVL_RELOC_FILES) $(LDSCRIPT) $(MAKEROM_O_FILES) \
         $(BUILD_DIR)/linker_scripts/makerom.ld $(BUILD_DIR)/undefined_syms.txt \

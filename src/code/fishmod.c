@@ -1229,3 +1229,62 @@ f32 Fishmod_Light(PlayState* play) {
     }
     return light;
 }
+
+#ifdef COMPILER_GCC
+/*
+ * GCC_CODE=1 (the game's code compiled with GCC, the rest with IDO): GCC calls libgcc's helpers for 64-bit division
+ * and conversions, which IDO's libultra provides under its own names. o32 passes 64-bit values the same way in both.
+ */
+unsigned long long __ull_div(unsigned long long left, unsigned long long right);
+unsigned long long __ull_rem(unsigned long long left, unsigned long long right);
+long long __ll_div(long long left, long long right);
+long long __ll_mul(long long left, long long right);
+long long __d_to_ll(double d);
+long long __f_to_ll(float f);
+unsigned long long __d_to_ull(double d);
+unsigned long long __f_to_ull(float f);
+double __ll_to_d(long long l);
+float __ll_to_f(long long l);
+double __ull_to_d(unsigned long long l);
+float __ull_to_f(unsigned long long l);
+
+unsigned long long __udivdi3(unsigned long long a, unsigned long long b) {
+    return __ull_div(a, b);
+}
+unsigned long long __umoddi3(unsigned long long a, unsigned long long b) {
+    return __ull_rem(a, b);
+}
+long long __divdi3(long long a, long long b) {
+    return __ll_div(a, b);
+}
+long long __moddi3(long long a, long long b) {
+    return a - __ll_mul(__ll_div(a, b), b); // (C's %: the sign follows the dividend; __ll_rem divides unsigned)
+}
+long long __muldi3(long long a, long long b) {
+    return __ll_mul(a, b);
+}
+long long __fixdfdi(double d) {
+    return __d_to_ll(d);
+}
+long long __fixsfdi(float f) {
+    return __f_to_ll(f);
+}
+unsigned long long __fixunsdfdi(double d) {
+    return __d_to_ull(d);
+}
+unsigned long long __fixunssfdi(float f) {
+    return __f_to_ull(f);
+}
+double __floatdidf(long long l) {
+    return __ll_to_d(l);
+}
+float __floatdisf(long long l) {
+    return __ll_to_f(l);
+}
+double __floatundidf(unsigned long long l) {
+    return __ull_to_d(l);
+}
+float __floatundisf(unsigned long long l) {
+    return __ull_to_f(l);
+}
+#endif
