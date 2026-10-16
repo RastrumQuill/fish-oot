@@ -1722,6 +1722,27 @@ static void Bench_Record(s32 stop, s32 mode) {
     }
 }
 
+/** Where the bench is, written to SRAM 0x7E00 as each mode starts: if the console crashes, the save says where. */
+static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
+    static struct {
+        u32 magic; // 'FBCR'
+        u32 laps;
+        u8 stop;
+        u8 mode;
+        u8 block;
+        u8 pad;
+        u32 count; // breadcrumbs written so far
+    } sCrumb;
+
+    sCrumb.magic = 0x46424352;
+    sCrumb.laps = sBench.laps;
+    sCrumb.stop = stop;
+    sCrumb.mode = mode;
+    sCrumb.block = block;
+    sCrumb.count++;
+    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7E00, &sCrumb, sizeof(sCrumb), OS_WRITE);
+}
+
 static void Bench_SetMode(s32 mode) {
     static const s32 sFlags[BENCH_MODES] = {
         0,
@@ -1795,6 +1816,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
                 sBenchState = 1;
                 sBenchBlock = 0;
                 sBenchFrame = 0;
+                Bench_Breadcrumb(stop, 0, 0);
                 Bench_SetMode(0);
             }
             break;
@@ -1811,6 +1833,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
                     break;
                 }
                 mode = sBenchBlock % BENCH_MODES;
+                Bench_Breadcrumb(stop, mode, sBenchBlock);
                 Bench_SetMode(mode);
             }
             break;
