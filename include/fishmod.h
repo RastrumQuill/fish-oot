@@ -322,6 +322,8 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_ALTEDGE (1 << 2)    // the props' old edge mode (anti-aliased in the RDP, reading the colour buffer)
 #define FISHMOD_BENCH_NOZUPD (1 << 3)     // the props don't write the depth buffer
 #define FISHMOD_BENCH_TRIMFAR (1 << 9)    // far props drawn cut to their outlines too (the old way)
+#define FISHMOD_BENCH_NOTRI (1 << 10)     // the small plants' cut outlines instead of one triangle per card
+#define FISHMOD_BENCH_NOSTRICT (1 << 11)  // the nearest props by band and kind, not strictly nearest first
 #define FISHMOD_BENCH_1CYCLE (1 << 4)     // the props in 1-cycle mode (no fog, no tint): pipeline or memory bound?
 #define FISHMOD_BENCH_NONEAR (1 << 5)     // props within FISHMOD_BENCH_NEAR not drawn
 #define FISHMOD_BENCH_NOFAR (1 << 6)      // props past it not drawn

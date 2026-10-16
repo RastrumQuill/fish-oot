@@ -56,6 +56,7 @@ typedef struct FishmodPropKindInfo {
     Gfx* material4; // the same texture in 4 bits (gFishmodTexCompress), or NULL
     Gfx* model;
     Gfx* modelFar; // past PROP_FAR_DIST: the cards uncut (the same picture in fewer triangles), or the same model
+    Gfx* modelAlt; // the one-triangle kinds' cut outline (the bench's comparison), else the model
     f32 drawDist;      // drawn no further than this (above water)
     f32 drawDistUnder; // and with the camera under water (fishmod_lod.h: measured, the haze hides the rest)
     u8 floating; // on the surface: not drawn while the water there is lower than it was placed for
@@ -85,6 +86,9 @@ typedef struct FishmodPropKindInfo {
 // Material changes per frame at most (opaque, see-through): the command buffers are sized for them
 #define MAT_MAX 160
 #define MAT_MAX_XLU 24
+// the nearest props, drawn strictly nearest first (see Scatter_Build): at most this many, within this distance
+#define STRICT_MAX 128
+#define STRICT_DIST 500.0f
 // The view's half-angle: the screen's corner is about 44 degrees off the look direction (60 degree field of view,
 // 4:3); a little wider, plus the props' size as room. Props outside it (behind, too far left or right, above or
 // below) aren't drawn, so the budget goes on what's on screen.
@@ -138,6 +142,16 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_POND_REED].modelFar = gFishingReedModelDL;
     sKinds[FISHMOD_PROP_LILY_PAD].modelFar = gFishingLilyPadModelDL;
     sKinds[FISHMOD_PROP_ROCK].modelFar = gFishingRockModelDL;
+    {
+        s32 i;
+
+        for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
+            sKinds[i].modelAlt = sKinds[i].model;
+        }
+    }
+#define X(id, name) sKinds[FISHMOD_PROP_##id].modelAlt = gFishmodProp_##name##DLAlt;
+    FISHMOD_PROP_KINDS_TRI(X)
+#undef X
     {
         s32 i;
 
@@ -276,7 +290,7 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 // The props' commands, two frames' worth (the RSP reads last frame's while this one is built), in buffers of their
 // own rather than the frame's display buffer, which the scene and the fish need.
 typedef struct ScatterFrame {
-    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96]; // (and the dock, and the material again for the far edge mode)
+    Gfx opa[PROP_BUDGET * 4 + (MAT_MAX + STRICT_MAX) * 16 + 96]; // (and the dock, and the far edge mode's material)
     Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4];
     Mtx sway[SWAY_MAX];
 } ScatterFrame;
@@ -672,6 +686,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 band;
     s32 v;
     s32 budget = PROP_BUDGET;
+    s32 strictCount;
     s32 xluLeft = XLU_MAX;
     ScatterSet* set;
     f32 viewCos = VIEW_COS;  // the view cone
@@ -838,6 +853,36 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     for (n = 0; n < candCount; n++) {
         sOrdered[bandStart[sCandBand[n]]++] = sCand[n];
     }
+    // The nearest props strictly nearest first, whatever their kind: a plant hidden behind a nearer one then costs
+    // only a depth read per pixel (it fails the depth test, so nothing is written). Their materials change more
+    // often for it, which doesn't count against MAT_MAX (STRICT_MAX bounds it).
+    strictCount = 0;
+#if FISHMOD_DEBUG
+    if (!(gFishmodBench & FISHMOD_BENCH_NOSTRICT))
+#endif
+    {
+        static f32 sStrictD[STRICT_MAX];
+
+        while ((strictCount < candCount) && (strictCount < STRICT_MAX)) {
+            FishmodProp* p = &sProps[sOrdered[strictCount]];
+            f32 d = SQ(p->x - eye.x) + SQ(p->z - eye.z);
+            s32 j = strictCount;
+            u16 id = sOrdered[strictCount];
+
+            if (d >= SQ(STRICT_DIST)) {
+                break;
+            }
+            // (insertion sort: few, and nearly in order already, by band)
+            while ((j > 0) && (sStrictD[j - 1] > d)) {
+                sStrictD[j] = sStrictD[j - 1];
+                sOrdered[j] = sOrdered[j - 1];
+                j--;
+            }
+            sStrictD[j] = d;
+            sOrdered[j] = id;
+            strictCount++;
+        }
+    }
 
     // into the other set, as far as the budget (and the room for material changes) goes
     sSet ^= 1;
@@ -857,6 +902,8 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 matsXlu++;
                 lastXlu = k;
             }
+        } else if (n < strictCount) {
+            lastOpa = k; // (the strict nearest ones: their own allowance of material changes)
         } else {
             if ((k != lastOpa) && (mats >= MAT_MAX)) {
                 continue;
@@ -896,6 +943,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     s32 n;
     Gfx* opa;
     Gfx* xlu;
+    u32 light[3];
     ScatterFrame* frame;
     ScatterSet* set;
 #if FISHMOD_DEBUG
@@ -913,6 +961,20 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     if (!(eye.x == eye.x) || !(eye.y == eye.y) || !(eye.z == eye.z) || (fabsf(eye.x) > 30000.0f) ||
         (fabsf(eye.z) > 30000.0f) || !(at.x == at.x) || !(at.y == at.y) || !(at.z == at.z)) {
         return;
+    }
+    // The scene's light on the props, which are unlit (their colours are baked for daylight): the ambient light and
+    // half of each directional light, as a vertical card facing any way gets on average. Lake Hylia's midday comes to
+    // about 255 (so the day looks as it did), its night to a dim blue, dusk to orange.
+    {
+        EnvironmentContext* env = &play->envCtx;
+        s32 i;
+
+        for (i = 0; i < 3; i++) {
+            s32 l = play->lightCtx.ambientColor[i] + (env->dirLight1.params.dir.color[i] >> 1) +
+                    (env->dirLight2.params.dir.color[i] >> 1);
+
+            light[i] = CLAMP_MAX(l, 255);
+        }
     }
     lookX = at.x - eye.x;
     lookY = at.y - eye.y;
@@ -1003,9 +1065,9 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             *disp = Scatter_Material(*disp, info, kind);
         }
         if (!info->xlu) {
-            u8 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
+            u32 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
 
-            gDPSetPrimColor(opa++, 0, 0, t, t, t, 255);
+            gDPSetPrimColor(opa++, 0, 0, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, 255);
         }
         gSPMatrix((*disp)++, &set->mtx[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         if (info->sway != 0) {
@@ -1021,6 +1083,9 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             if (gFishmodBench & FISHMOD_BENCH_TRIMFAR) {
                 far = false;
             }
+            if (gFishmodBench & FISHMOD_BENCH_NOTRI) {
+                gSPDisplayList((*disp)++, info->modelAlt);
+            } else
 #endif
             gSPDisplayList((*disp)++, far ? info->modelFar : info->model);
         }
@@ -1046,7 +1111,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         }
         for (k = FISHMOD_PROP_DOCK_DECK; k <= FISHMOD_PROP_DOCK_POSTS; k++) {
             opa = Scatter_Material(opa, &sKinds[k], k);
-            gDPSetPrimColor(opa++, 0, 0, 255, 255, 255, 255);
+            gDPSetPrimColor(opa++, 0, 0, light[0], light[1], light[2], 255);
             gSPMatrix(opa++, &sDockMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
             gSPDisplayList(opa++, sKinds[k].model);
         }

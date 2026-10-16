@@ -209,7 +209,8 @@ def convert_material(entry, textures):
     if tex["format"].startswith("ci"):
         dl.append("    gsDPSetTextureLUT(G_TT_RGBA16),")
         dl.append(f"    gsDPLoadTLUT_pal{'256' if bits == 8 else '16'}({'' if bits == 8 else '0, '}{tex['name']}TLUT),")
-    dl.append(f"    {load}({tex['name']}, {gfmt}, {siz}{tw}, {th}, 0, G_TX_WRAP, G_TX_WRAP, "
+    mode = "G_TX_CLAMP" if entry.get("clamp") else "G_TX_WRAP"
+    dl.append(f"    {load}({tex['name']}, {gfmt}, {siz}{tw}, {th}, 0, {mode}, {mode}, "
               f"{(tw - 1).bit_length()}, {(th - 1).bit_length()}, G_TX_NOLOD, G_TX_NOLOD),")
     dl.append("    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),")
     dl.append("    gsSPEndDisplayList(),")
@@ -296,7 +297,9 @@ def convert_model(entry, textures):
             dl.append(f"    gsDPSetTextureLUT(G_TT_RGBA16),")
             dl.append(f"    gsDPLoadTLUT_pal{'256' if bits == 8 else '16'}"
                       f"({'' if bits == 8 else '0, '}{tex['name']}TLUT),")
-        dl.append(f"    {load}({tex['name']}, {gfmt}, {siz}{tw}, {th}, 0, G_TX_WRAP, G_TX_WRAP, "
+        # (clamped: a card drawn as one triangle reaches past the texture, where the edge's texels must not repeat)
+        mode = "G_TX_CLAMP" if entry.get("clamp") else "G_TX_WRAP"
+        dl.append(f"    {load}({tex['name']}, {gfmt}, {siz}{tw}, {th}, 0, {mode}, {mode}, "
                   f"{(tw - 1).bit_length()}, {(th - 1).bit_length()}, G_TX_NOLOD, G_TX_NOLOD),")
         dl.append("    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),")
     if separate:
