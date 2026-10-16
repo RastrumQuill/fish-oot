@@ -55,6 +55,7 @@ typedef struct FishmodPropKindInfo {
     Gfx* material;
     Gfx* material4; // the same texture in 4 bits (gFishmodTexCompress), or NULL
     Gfx* model;
+    Gfx* modelFar; // past PROP_FAR_DIST: the cards uncut (the same picture in fewer triangles), or the same model
     f32 drawDist;      // drawn no further than this (above water)
     f32 drawDistUnder; // and with the camera under water (fishmod_lod.h: measured, the haze hides the rest)
     u8 floating; // on the surface: not drawn while the water there is lower than it was placed for
@@ -102,6 +103,10 @@ typedef struct FishmodPropKindInfo {
 // fishmod/tools/edge_ab_capture.py); the fill cost is in the near ones anyway
 #define PROP_EDGE_RA 1
 #define PROP_EDGE_RA_DIST 500.0f
+// Past this, props draw their cards whole instead of cut to the texture's outline: the cut saves pixels, which near
+// props are made of, but triples the triangles, which far props are made of (hwbench-2: far props were two thirds of
+// the props' RDP time, and few pixels each)
+#define PROP_FAR_DIST 500.0f
 static s32 sEdgeNear; // the props being drawn are within PROP_EDGE_RA_DIST
 #if FISHMOD_DEBUG
 // what the LOD calibration (fishmod_debug.c, FISHMOD_LOD_CALIBRATE) draws everything out to
@@ -116,7 +121,8 @@ static f32 sReach[FISHMOD_PROP_KIND_MAX][2]; // each kind's own reach [above, un
 static void Scatter_InitKinds(void) {
 #define X(id, name)                                                       \
     sKinds[FISHMOD_PROP_##id].material = gFishmodProp_##name##DLMaterial; \
-    sKinds[FISHMOD_PROP_##id].model = gFishmodProp_##name##DL;
+    sKinds[FISHMOD_PROP_##id].model = gFishmodProp_##name##DL;            \
+    sKinds[FISHMOD_PROP_##id].modelFar = gFishmodProp_##name##DLFar;
     // the generated kinds (the vanilla ones are set below)
     FISHMOD_PROP_KINDS_GENERATED(X)
 #undef X
@@ -129,6 +135,9 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_LILY_PAD].model = gFishingLilyPadModelDL;
     sKinds[FISHMOD_PROP_ROCK].material = gFishingRockMaterialDL;
     sKinds[FISHMOD_PROP_ROCK].model = gFishingRockModelDL;
+    sKinds[FISHMOD_PROP_POND_REED].modelFar = gFishingReedModelDL;
+    sKinds[FISHMOD_PROP_LILY_PAD].modelFar = gFishingLilyPadModelDL;
+    sKinds[FISHMOD_PROP_ROCK].modelFar = gFishingRockModelDL;
     {
         s32 i;
 
@@ -957,12 +966,14 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         FishmodProp* prop = &sProps[set->prop[n]];
         FishmodPropKindInfo* info;
         Gfx** disp;
+        f32 dSq;
 
         kind = prop->kind;
         info = &sKinds[kind];
+        dSq = SQ(prop->x - eye.x) + SQ(prop->z - eye.z);
 #if FISHMOD_DEBUG
         if (gFishmodBench & (FISHMOD_BENCH_NONEAR | FISHMOD_BENCH_NOFAR)) {
-            s32 near = (SQ(prop->x - eye.x) + SQ(prop->z - eye.z)) < SQ(FISHMOD_BENCH_NEAR);
+            s32 near = dSq < SQ(FISHMOD_BENCH_NEAR);
 
             if (near ? (gFishmodBench & FISHMOD_BENCH_NONEAR) : (gFishmodBench & FISHMOD_BENCH_NOFAR)) {
                 continue;
@@ -972,7 +983,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         disp = info->xlu ? &xlu : &opa;
         if (!info->xlu) {
             // (nearest first, in bands: this changes once, from near to far)
-            s32 near = (SQ(prop->x - eye.x) + SQ(prop->z - eye.z)) < SQ(PROP_EDGE_RA_DIST);
+            s32 near = dSq < SQ(PROP_EDGE_RA_DIST);
 
             if (near != lastNear) {
                 lastNear = near;
@@ -1003,7 +1014,16 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 
             gSPMatrix((*disp)++, &frame->sway[kind * SWAY_PHASES + ph], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
         }
-        gSPDisplayList((*disp)++, info->model);
+        {
+            s32 far = dSq >= SQ(PROP_FAR_DIST);
+
+#if FISHMOD_DEBUG
+            if (gFishmodBench & FISHMOD_BENCH_TRIMFAR) {
+                far = false;
+            }
+#endif
+            gSPDisplayList((*disp)++, far ? info->modelFar : info->model);
+        }
     }
     if (lastOpa >= 0) {
         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);

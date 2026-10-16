@@ -827,6 +827,10 @@ def write_props_manifest():
             mesh = os.path.join(MESH, kind + ".obj")
         models.append({"name": "gFishmodProp_" + kind + "DL", "src": os.path.relpath(mesh, ROOT),
                        "texture": "gFishmodProp_" + tex + "Tex", "out": out, "separateMaterial": True})
+        # far away: the whole cards, uncut. The same picture (the cut only drops texels that never show) in a third
+        # of the triangles, and far props are few pixels each, so their cost is per triangle (hwbench-2)
+        models.append({"name": "gFishmodProp_" + kind + "DLFar", "src": os.path.relpath(os.path.join(MESH, kind + ".obj"), ROOT),
+                       "texture": "gFishmodProp_" + tex + "Tex", "out": out, "separateMaterial": True})
     with open(os.path.join(DATA, "props_manifest.json"), "w") as f:
         json.dump({"textures": textures, "materials": materials, "models": models}, f, indent=1)
     kinds = [k for k, _, _ in PROP_KINDS] + VANILLA_KINDS
