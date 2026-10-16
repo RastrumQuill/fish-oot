@@ -44,6 +44,13 @@ STOP_NAMES = [
 def read(path):
     d = open(path, "rb").read()
     magic, version, stops, modes, metrics, tests, hw = struct.unpack(">IBBBBBB", d[:10])
+    if len(d) >= 0x7E10 and d[0x7E00:0x7E04] == b"FBCR":
+        laps, = struct.unpack(">I", d[0x7E04:0x7E08])
+        cstop, cmode, cblock = d[0x7E08], d[0x7E09], d[0x7E0A]
+        count, = struct.unpack(">I", d[0x7E0C:0x7E10])
+        names = MODES_V.get(version, MODES_V[max(MODES_V)])
+        print(f"(last breadcrumb: lap {laps + 1}, stop {cstop + 1}, mode {names[cmode] if cmode < len(names) else cmode}, "
+              f"block {cblock}; {count} written)")
     if magic != 0x4642454E:
         raise SystemExit(f"no bench results in {path}")
     laps, visits = struct.unpack(">II", d[12:20])
