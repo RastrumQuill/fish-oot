@@ -782,6 +782,7 @@ void Fishmod_InitTestSave(void) {
                       OWN_EQUIP(EQUIP_TYPE_SHIELD, EQUIP_INV_SHIELD_HYLIAN) |
                       OWN_EQUIP(EQUIP_TYPE_TUNIC, EQUIP_INV_TUNIC_ZORA) | OWN_EQUIP(EQUIP_TYPE_BOOTS, EQUIP_INV_BOOTS_IRON);
     SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
+    SET_EVENTCHKINF(EVENTCHKINF_B1); // Lake Hylia's intro cutscene seen (it took the camera on the first warp there)
     gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_KOKIRI;
     Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI);
     Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_DEKU);

@@ -1525,9 +1525,8 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 
 typedef enum BenchMode {
     BENCH_BASE,
-    BENCH_ALTEDGE,  // the props' other edge mode (FISHMOD_BENCH_ALTEDGE)
-    BENCH_NOZUPD,   // the props without depth writes
-    BENCH_1CYCLE,   // the props in 1-cycle mode
+    BENCH_ALTEDGE,  // the props' old edge mode (FISHMOD_BENCH_ALTEDGE)
+    BENCH_TRIMFAR,  // far props cut to their outlines too, as before (FISHMOD_BENCH_TRIMFAR)
     BENCH_NONEAR,   // the props past FISHMOD_BENCH_NEAR only
     BENCH_NOFAR,    // the props within it only
     BENCH_NOPROPS,
@@ -1747,8 +1746,7 @@ static void Bench_SetMode(s32 mode) {
     static const s32 sFlags[BENCH_MODES] = {
         0,
         FISHMOD_BENCH_ALTEDGE,
-        FISHMOD_BENCH_NOZUPD,
-        FISHMOD_BENCH_1CYCLE,
+        FISHMOD_BENCH_TRIMFAR,
         FISHMOD_BENCH_NONEAR,
         FISHMOD_BENCH_NOFAR,
         FISHMOD_BENCH_NOPROPS,
@@ -1761,7 +1759,7 @@ static void Bench_SetMode(s32 mode) {
 
 static void Bench_Save(void) {
     sBench.magic = 0x4642454E; // 'FBEN'
-    sBench.version = 2;
+    sBench.version = 3;
     sBench.stops = BENCH_STOPS;
     sBench.modes = BENCH_MODES;
     sBench.metrics = BENCH_METRICS;
@@ -1802,7 +1800,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
         }
         // carry on from an earlier night (the save file keeps the sums)
         SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_READ);
-        if ((sBench.magic != 0x4642454E) || (sBench.version != 2) || (sBench.hw != FISHMOD_HW)) {
+        if ((sBench.magic != 0x4642454E) || (sBench.version != 3) || (sBench.hw != FISHMOD_HW)) {
             bzero(&sBench, sizeof(sBench));
         }
     }
@@ -1853,7 +1851,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
             break;
     }
     {
-        static const char* sModeNames[] = { "base", "altedge", "nozupd", "1cycle", "nonear", "nofar", "noprops", "nosky", "noxlu" };
+        static const char* sModeNames[] = { "base", "altedge", "trimfar", "nonear", "nofar", "noprops", "nosky", "noxlu" };
 
         Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
                             (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);
@@ -1910,8 +1908,24 @@ static void Fishmod_TourDraw(Gfx** gfxP) {
         }
     }
     GfxPrint_SetColor(&printer, 255, 255, 120, 255);
-    GfxPrint_SetPos(&printer, 21, 27);
+    GfxPrint_SetPos(&printer, 18, 27); // (ends at column 36: inside the box, which ends at x 302)
     GfxPrint_Printf(&printer, "A>  B<  stick:look");
+    {
+        // the frame rate, averaged over 20 frames (the time between graph updates)
+        static u32 sSumUsec;
+        static s32 sCount;
+        static s32 sFpsTenths;
+
+        sSumUsec += (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
+        if (++sCount >= 20) {
+            sFpsTenths = (sSumUsec != 0) ? (s32)(20u * 10000000u / sSumUsec) : 0;
+            sSumUsec = 0;
+            sCount = 0;
+        }
+        GfxPrint_SetColor(&printer, 255, 255, 255, 220);
+        GfxPrint_SetPos(&printer, 31, 2);
+        GfxPrint_Printf(&printer, "%2d.%dfps", sFpsTenths / 10, sFpsTenths % 10);
+    }
     *gfxP = GfxPrint_Close(&printer);
     GfxPrint_Destroy(&printer);
 }
@@ -1928,6 +1942,7 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.save.linkAge = LINK_AGE_CHILD;
     gSaveContext.fileNum = 0xFF;
     Sram_InitDebugSave();
+    SET_EVENTCHKINF(EVENTCHKINF_B1); // Lake Hylia's intro cutscene seen: it would take the camera from the tour
 
     gSaveContext.save.dayTime = CLOCK_TIME(10, 0);
 #ifdef FISHMOD_SCRIPT_TIME

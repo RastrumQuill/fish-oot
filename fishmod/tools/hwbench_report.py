@@ -12,6 +12,7 @@ import struct
 MODES_V = {
     1: ["base", "tex4", "cold", "noprops", "nofish"],
     2: ["base", "altedge", "nozupd", "1cycle", "nonear", "nofar", "noprops", "nosky", "noxlu"],
+    3: ["base", "altedge", "trimfar", "nonear", "nofar", "noprops", "nosky", "noxlu"],
 }
 MODE_DOC = {
     "base": "as shipped",
@@ -19,6 +20,7 @@ MODE_DOC = {
     "cold": "caches filled with other data before each update (CPU work from RDRAM, not the cache)",
     "noprops": "props not drawn (what the props cost)",
     "nofish": "fish not drawn (what the fish cost to draw)",
+    "trimfar": "far props cut to their outlines too, as before (what the uncut far models save)",
     "altedge": "props with the other edge mode (anti-aliased in the RDP, reading the colour buffer, or by the VI only)",
     "nozupd": "props without depth writes",
     "1cycle": "props in 1-cycle mode, no fog or tint (is the RDP's pipeline or its memory the limit?)",
