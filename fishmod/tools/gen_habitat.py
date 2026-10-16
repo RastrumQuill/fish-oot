@@ -33,6 +33,13 @@ os.makedirs(MESH, exist_ok=True)
 # the meshes the game uses: the same, with each card cut down to its texture's outline (fishmod/tools/card_outline.py,
 # made from the ROM's textures, so not committed)
 MESH_TRIM = os.path.join(ROOT, "src", "fishmod_data", "habitat_trim")
+# small plants whose cards are drawn as one triangle each (round everything that can show): a triangle's setup costs
+# the RDP more than the few pixels a tight outline of several triangles saves on a plant this small
+MESH_TRI = os.path.join(ROOT, "src", "fishmod_data", "habitat_tri")
+# the meshes of kinds whose texture gets a see-through margin (so the triangle has room past the leaves' edges),
+# their UVs moved onto the bigger texture
+MESH_PAD = os.path.join(ROOT, "src", "fishmod_data", "habitat_pad")
+TRI_KINDS = {"grass_tuft", "float_leaves", "leaf_litter", "spatterdock", "lily_flower", "lily_centre"}
 
 
 def hexc(h):
@@ -353,6 +360,10 @@ class Mesh:
 
     def write(self):
         self._write(MESH, self.v, self.vt, self.f)
+        if self.name in TRI_KINDS:
+            tri = self.trimmed(triangle=True)
+            if tri is not None:
+                self._write(MESH_TRI, *tri[:3])
         trimmed = self.trimmed()
         self.trim_stats = None
         if trimmed is not None:
@@ -362,7 +373,7 @@ class Mesh:
             os.remove(os.path.join(MESH_TRIM, self.name + ".obj"))
         return self
 
-    def trimmed(self):
+    def trimmed(self, triangle=False):
         """The mesh with each card (a quad with the whole texture across it, once or repeated up) cut down to its
         texture's outline. The outline holds every texel that can show, and positions, UVs and colours inside the
         quad are where they were, so the picture is the same. None if nothing here can be cut."""
@@ -379,7 +390,12 @@ class Mesh:
             if us != [0.0, 1.0] or len(vs) != 2 or vs[0] != 0.0 or abs(vs[1] - round(vs[1])) > 1e-4:
                 continue
             rep = int(round(vs[1]))
-            poly = card_outline.outline(path, rep)
+            if triangle:
+                if rep != 1:
+                    continue
+                poly = tri_poly(self.texture)
+            else:
+                poly = card_outline.outline(path, rep)
             if poly is None:
                 continue
             # bilinear over the quad, in its own UV (exact for the flat parallelograms the cards are)
@@ -430,6 +446,52 @@ class Mesh:
                 out.append(remap[i])
             faces.append(tuple(out))
         return v, vt, faces, (len(cut), area_after / area_before)
+
+
+def tex_padding(name):
+    """For a one-triangle kind's texture: (path of the texture to use, (pad x, pad y, w, h, W, H)) where the texture
+    gets a see-through margin if no triangle fits it clamped as it is; pad is None when it needs none."""
+    import card_outline
+    path = texture_path(name)
+    if card_outline.triangle(path) is not None:
+        return path, None
+    img = Image.open(path).convert("RGBA")
+    w, h = img.size
+    W, H = w * 2, h * 2
+    big = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    big.paste(img, ((W - w) // 2, (H - h) // 2))
+    out = os.path.join(ART_ROM, name + "_pad.png")
+    big.save(out)
+    return out, ((W - w) // 2, (H - h) // 2, w, h, W, H)
+
+
+def tri_poly(name):
+    """The card's one triangle, in the original texture's UV (it may reach past 0..1)."""
+    import card_outline
+    path, pad = tex_padding(name)
+    r = card_outline.triangle(path)
+    if r is None:
+        return None
+    tri = r[0]
+    if pad is None:
+        return tri
+    px, py, w, h, W, H = pad
+    return [((u * W - px) / w, (v * H - py) / h) for u, v in tri]
+
+
+def remap_obj(src, dst, pad):
+    """An OBJ with its UVs moved onto the padded texture."""
+    px, py, w, h, W, H = pad
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    with open(src) as f, open(dst, "w") as o:
+        for line in f:
+            if line.startswith("vt "):
+                u, v = map(float, line.split()[1:3])
+                v = 1.0 - v  # (OBJ's v is up)
+                u, v = (u * w + px) / W, (v * h + py) / H
+                line = "vt %.4f %.4f\n" % (u, 1.0 - v)
+            o.write(line)
+    return dst
 
 
 def texture_path(name):
@@ -805,12 +867,18 @@ def write_props_manifest():
     os.makedirs(DATA, exist_ok=True)
     out = "src/fishmod_data/fishmod_props.inc.c"
     textures, models, materials, seen = [], [], [], set()
+    tri_kinds_built = []
     for kind, tex, fmt in PROP_KINDS:
+        pad = None
+        if kind in TRI_KINDS:
+            _, pad = tex_padding(tex)
         if tex not in seen:
             seen.add(tex)
             src = os.path.join(ART_ROM, tex + ".png")
             if not os.path.exists(src):
                 src = os.path.join(ART, tex + ".png")
+            if pad is not None:
+                src = os.path.join(ART_ROM, tex + "_pad.png")
             textures.append({"name": "gFishmodProp_" + tex + "Tex", "src": os.path.relpath(src, ROOT),
                              "format": fmt, "out": out})
             if fmt in COMPRESS_4BIT:
@@ -821,16 +889,35 @@ def write_props_manifest():
                 textures.append({"name": "gFishmodProp_" + tex + "Tex4", "src": os.path.relpath(src4, ROOT),
                                  "format": "ci4", "out": out})
                 materials.append({"name": "gFishmodProp_" + tex + "Material4", "texture": "gFishmodProp_" + tex + "Tex4",
-                                  "out": out})
+                                  "out": out, "clamp": kind in TRI_KINDS})
         mesh = os.path.join(MESH_TRIM, kind + ".obj")
         if not os.path.exists(mesh):
             mesh = os.path.join(MESH, kind + ".obj")
+        far = os.path.join(MESH, kind + ".obj")
+        tri = os.path.join(MESH_TRI, kind + ".obj")
+        is_tri = kind in TRI_KINDS and os.path.exists(tri)
+        if pad is not None:
+            mesh = remap_obj(mesh, os.path.join(MESH_PAD, kind + ".obj"), pad)
+            far = remap_obj(far, os.path.join(MESH_PAD, kind + "_far.obj"), pad)
+            if is_tri:
+                tri = remap_obj(tri, os.path.join(MESH_PAD, kind + "_tri.obj"), pad)
+        texname = "gFishmodProp_" + tex + "Tex"
+        if is_tri:
+            # one triangle per card, near and far (clamped texture); the cut outline kept for the bench's comparison
+            models.append({"name": "gFishmodProp_" + kind + "DL", "src": os.path.relpath(tri, ROOT),
+                           "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
+            models.append({"name": "gFishmodProp_" + kind + "DLFar", "src": os.path.relpath(tri, ROOT),
+                           "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
+            models.append({"name": "gFishmodProp_" + kind + "DLAlt", "src": os.path.relpath(mesh, ROOT),
+                           "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
+            tri_kinds_built.append(kind)
+            continue
         models.append({"name": "gFishmodProp_" + kind + "DL", "src": os.path.relpath(mesh, ROOT),
-                       "texture": "gFishmodProp_" + tex + "Tex", "out": out, "separateMaterial": True})
+                       "texture": texname, "out": out, "separateMaterial": True})
         # far away: the whole cards, uncut. The same picture (the cut only drops texels that never show) in a third
         # of the triangles, and far props are few pixels each, so their cost is per triangle (hwbench-2)
-        models.append({"name": "gFishmodProp_" + kind + "DLFar", "src": os.path.relpath(os.path.join(MESH, kind + ".obj"), ROOT),
-                       "texture": "gFishmodProp_" + tex + "Tex", "out": out, "separateMaterial": True})
+        models.append({"name": "gFishmodProp_" + kind + "DLFar", "src": os.path.relpath(far, ROOT),
+                       "texture": texname, "out": out, "separateMaterial": True})
     with open(os.path.join(DATA, "props_manifest.json"), "w") as f:
         json.dump({"textures": textures, "materials": materials, "models": models}, f, indent=1)
     kinds = [k for k, _, _ in PROP_KINDS] + VANILLA_KINDS
@@ -845,6 +932,10 @@ def write_props_manifest():
         f.write(f"#define FISHMOD_DOCK_X {DOCK['x']}\n#define FISHMOD_DOCK_Y {DOCK['y']}\n#define FISHMOD_DOCK_Z {DOCK['z']}\n")
         f.write("\n#define FISHMOD_PROP_KINDS_GENERATED(X) \\\n")
         for k, _, _ in PROP_KINDS:
+            f.write(f"    X({k.upper()}, {k}) \\\n")
+        f.write("\n// the kinds drawn one triangle per card (with the cut outline kept as ...DLAlt for the bench)\n")
+        f.write("#define FISHMOD_PROP_KINDS_TRI(X) \\\n")
+        for k in tri_kinds_built:
             f.write(f"    X({k.upper()}, {k}) \\\n")
         f.write("\n// the kinds whose texture also comes in 4 bits: kind, texture\n")
         f.write("#define FISHMOD_PROP_KINDS_4BIT(X) \\\n")

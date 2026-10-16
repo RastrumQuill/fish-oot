@@ -13,6 +13,7 @@ MODES_V = {
     1: ["base", "tex4", "cold", "noprops", "nofish"],
     2: ["base", "altedge", "nozupd", "1cycle", "nonear", "nofar", "noprops", "nosky", "noxlu"],
     3: ["base", "altedge", "trimfar", "nonear", "nofar", "noprops", "nosky", "noxlu"],
+    4: ["base", "altedge", "trimfar", "notri", "nostrict", "nonear", "nofar", "noprops", "nosky"],
 }
 MODE_DOC = {
     "base": "as shipped",
@@ -20,6 +21,8 @@ MODE_DOC = {
     "cold": "caches filled with other data before each update (CPU work from RDRAM, not the cache)",
     "noprops": "props not drawn (what the props cost)",
     "nofish": "fish not drawn (what the fish cost to draw)",
+    "notri": "the small plants' cut outlines instead of one triangle per card",
+    "nostrict": "the nearest props by band and kind, not strictly nearest first",
     "trimfar": "far props cut to their outlines too, as before (what the uncut far models save)",
     "altedge": "props with the other edge mode (anti-aliased in the RDP, reading the colour buffer, or by the VI only)",
     "nozupd": "props without depth writes",
@@ -130,7 +133,7 @@ def main():
             rdp[m] = tr / n
             p(f"| {m} | {mean / 1000:.1f} ms ({1e6 / mean:.1f} fps) | {100 * (mean - base) / base:+.1f}% | "
               f"{rdp[m] / 1000:.1f} ms | {100 * (rdp[m] - base_rdp) / base_rdp:+.1f}% |")
-    if "nosky" in rdp and "noprops" in rdp:
+    if "nosky" in rdp and "noprops" in rdp and "noxlu" in rdp:
         p("\n## Where the RDP's time goes (mean over the stops)\n")
         p(f"- props: {(rdp['base'] - rdp['noprops']) / 1000:.1f} ms; those within 500 units "
           f"{(rdp['base'] - rdp['nonear']) / 1000:.1f} ms, those past it {(rdp['base'] - rdp['nofar']) / 1000:.1f} ms")

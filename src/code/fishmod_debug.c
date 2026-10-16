@@ -474,6 +474,9 @@ static void Fishmod_ViewUpdate(PlayState* play) {
  */
 #define TOUR_GLIDE 110
 #ifdef FISHMOD_EDGE_AB
+#ifndef FISHMOD_EDGE_AB_FLAGS
+#define FISHMOD_EDGE_AB_FLAGS FISHMOD_BENCH_ALTEDGE // what the A/B switches (bench flags)
+#endif
 static s32 sEdgeAbPhase = -1; // -1 not ready, 0 the default edge mode on screen, 1 the other
 #endif
 static s16 sTourCamId = SUB_CAM_ID_DONE;
@@ -592,7 +595,7 @@ static void Fishmod_TourUpdate(PlayState* play) {
             play->skyboxCtx.rot.y = sFrozenSky;
             play->state.frames = sFrozenState;
             play->haltAllActors = true;
-            gFishmodBench = ((since / 60) & 1) ? FISHMOD_BENCH_ALTEDGE : 0;
+            gFishmodBench = ((since / 60) & 1) ? FISHMOD_EDGE_AB_FLAGS : 0;
             // the marker shows the mode once the new one has been on screen for a while
             sEdgeAbPhase = ((since % 60) >= 30) ? ((since / 60) & 1) : -1;
         } else {
@@ -1527,11 +1530,12 @@ typedef enum BenchMode {
     BENCH_BASE,
     BENCH_ALTEDGE,  // the props' old edge mode (FISHMOD_BENCH_ALTEDGE)
     BENCH_TRIMFAR,  // far props cut to their outlines too, as before (FISHMOD_BENCH_TRIMFAR)
+    BENCH_NOTRI,    // the small plants' cut outlines instead of one triangle per card
+    BENCH_NOSTRICT, // the nearest props by band and kind, not strictly nearest first
     BENCH_NONEAR,   // the props past FISHMOD_BENCH_NEAR only
     BENCH_NOFAR,    // the props within it only
     BENCH_NOPROPS,
     BENCH_NOSKY,    // no props and no skybox
-    BENCH_NOXLU,    // no props and no room translucency (the water surface)
     BENCH_MODES,
     BENCH_MICRO = BENCH_MODES
 } BenchMode;
@@ -1747,11 +1751,12 @@ static void Bench_SetMode(s32 mode) {
         0,
         FISHMOD_BENCH_ALTEDGE,
         FISHMOD_BENCH_TRIMFAR,
+        FISHMOD_BENCH_NOTRI,
+        FISHMOD_BENCH_NOSTRICT,
         FISHMOD_BENCH_NONEAR,
         FISHMOD_BENCH_NOFAR,
         FISHMOD_BENCH_NOPROPS,
         FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOSKY,
-        FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOROOMXLU,
     };
 
     gFishmodBench = sFlags[mode];
@@ -1759,7 +1764,7 @@ static void Bench_SetMode(s32 mode) {
 
 static void Bench_Save(void) {
     sBench.magic = 0x4642454E; // 'FBEN'
-    sBench.version = 3;
+    sBench.version = 4;
     sBench.stops = BENCH_STOPS;
     sBench.modes = BENCH_MODES;
     sBench.metrics = BENCH_METRICS;
@@ -1800,7 +1805,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
         }
         // carry on from an earlier night (the save file keeps the sums)
         SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_READ);
-        if ((sBench.magic != 0x4642454E) || (sBench.version != 3) || (sBench.hw != FISHMOD_HW)) {
+        if ((sBench.magic != 0x4642454E) || (sBench.version != 4) || (sBench.hw != FISHMOD_HW)) {
             bzero(&sBench, sizeof(sBench));
         }
     }
@@ -1851,7 +1856,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
             break;
     }
     {
-        static const char* sModeNames[] = { "base", "altedge", "trimfar", "nonear", "nofar", "noprops", "nosky", "noxlu" };
+        static const char* sModeNames[] = { "base", "altedge", "trimfar", "notri", "nostrict", "nonear", "nofar", "noprops", "nosky" };
 
         Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
                             (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);

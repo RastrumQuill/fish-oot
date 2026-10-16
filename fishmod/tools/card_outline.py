@@ -235,3 +235,96 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# ---- one triangle per card -------------------------------------------------------------------------------------
+# For small plants a single triangle round everything that can show is cheaper than the cut outline (several
+# triangles): each triangle costs the RDP a setup, and a small plant has few pixels to save. The triangle may reach
+# past the texture's edges; the texture is then clamped there, so what's beyond an edge is that edge's texels, and
+# those must not show (not in the required mask) wherever the triangle reaches past them.
+
+def _hull(pts):
+    pts = sorted(set(pts))
+
+    def cr(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lo, up = [], []
+    for p in pts:
+        while len(lo) >= 2 and cr(lo[-2], lo[-1], p) <= 0:
+            lo.pop()
+        lo.append(p)
+    for p in reversed(pts):
+        while len(up) >= 2 and cr(up[-2], up[-1], p) <= 0:
+            up.pop()
+        up.append(p)
+    return np.array(lo[:-1] + up[:-1], float)
+
+
+def _tri_clamp_ok(P, mask):
+    """Every point of the triangle outside the texture samples (clamped) a texel that never shows."""
+    h, w = mask.shape
+    x0, y0 = np.floor(P.min(0)).astype(int) - 1
+    x1, y1 = np.ceil(P.max(0)).astype(int) + 1
+    xs, ys = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+    xs, ys = xs.ravel(), ys.ravel()
+    outside = (xs < 0) | (xs > w) | (ys < 0) | (ys > h)
+    xs, ys = xs[outside], ys[outside]
+    if len(xs) == 0:
+        return True
+    a, b, c = P
+
+    def side(p, q, x, y):
+        return (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0])
+    s1, s2, s3 = side(a, b, xs, ys), side(b, c, xs, ys), side(c, a, xs, ys)
+    inside = ((s1 >= 0) & (s2 >= 0) & (s3 >= 0)) | ((s1 <= 0) & (s2 <= 0) & (s3 <= 0))
+    tx = np.clip(np.floor(xs[inside]).astype(int), 0, w - 1)
+    ty = np.clip(np.floor(ys[inside]).astype(int), 0, h - 1)
+    return not mask[ty, tx].any()
+
+
+def triangle(path, step=3):
+    """The smallest triangle (texel units, image rows down) holding every texel that can show, valid with the texture
+    clamped; cached. None if there's nothing to cut."""
+    img = Image.open(path)
+    if np.array(img.convert("RGBA"))[:, :, 3].min() >= 128:
+        return None
+    cache = load_cache()
+    key = "tri:" + _key(path, 1)
+    if key not in cache:
+        mask = required_mask(img)
+        ys, xs = np.nonzero(mask)
+        H = _hull([(x + dx, y + dy) for x, y in zip(xs, ys) for dx in (0, 1) for dy in (0, 1)])
+        angs = np.radians(np.arange(0, 360, step))
+        N = np.stack([np.cos(angs), np.sin(angs)], 1)
+        C = (H @ N.T).max(0)
+        cands = []
+        n = len(angs)
+        for i in range(n):
+            for j in range(i + 1, n):
+                for k in range(j + 1, n):
+                    g = (angs[j] - angs[i], angs[k] - angs[j], 2 * math.pi - angs[k] + angs[i])
+                    if max(g) >= math.pi:
+                        continue
+                    P = []
+                    for p, q in ((i, j), (j, k), (k, i)):
+                        P.append(np.linalg.solve(np.array([N[p], N[q]]), [C[p], C[q]]))
+                    P = np.array(P)
+                    e1, e2 = P[1] - P[0], P[2] - P[0]
+                    cands.append((abs(e1[0] * e2[1] - e1[1] * e2[0]) / 2, P))
+        cands.sort(key=lambda t: t[0])
+        best = None
+        h, w = mask.shape
+        for area_, P in cands:
+            if (np.abs(P[:, 0] - w / 2).max() > 2 * w) or (np.abs(P[:, 1] - h / 2).max() > 2 * h):
+                continue  # (a sliver reaching far out: never the best that's valid)
+            if _tri_clamp_ok(P, mask):
+                best = (area_, P)
+                break
+        h, w = mask.shape
+        cache[key] = {"tri": [[round(float(x), 3), round(float(y), 3)] for x, y in best[1]],
+                      "area": best[0] / (w * h)} if best else {"tri": None, "area": None}
+        save_cache(cache)
+    if cache[key]["tri"] is None:
+        return None
+    w, h = img.size
+    return [(x / w, y / h) for x, y in cache[key]["tri"]], cache[key]["area"]
