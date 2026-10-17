@@ -7,7 +7,8 @@ distances per zone.
 
 Made from the scene's collision (the extracted assets), so written to src/fishmod_data/ (not committed).
 
-Usage: fishmod/tools/gen_lod_views.py [--spacing 450] [--yaws 4]
+Usage: fishmod/tools/gen_lod_views.py [--spacing 450] [--yaws 4] [--pitches]
+  --pitches: each view also looking further down and further up (the LOD tuning, lod_tune.inc.c: more angles)
 """
 import argparse
 import importlib.util
@@ -30,6 +31,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--spacing", type=int, default=450)
     ap.add_argument("--yaws", type=int, default=4)
+    ap.add_argument("--pitches", action="store_true")
     args = ap.parse_args()
     gs = load_tool("gen_scatter")
     gw = gs.gw
@@ -69,6 +71,10 @@ def main():
                 if surf - top > 150:
                     eyes.append((top + 70, 0.08, 1))  # walking the bed
             yaw0 = rnd.uniform(0, 2 * math.pi)
+            if args.pitches:
+                # also looking well down (at the bed through the water, or at the bed from a swim) and up
+                eyes = [(ey, p, u) for ey, p0, u in eyes for p in ((p0 - 0.35, p0, p0 + 0.3) if u else
+                                                                  (p0 - 0.3, p0, p0 + 0.2))]
             for ey, pitch, under in eyes:
                 for k in range(args.yaws):
                     yaw = yaw0 + 2 * math.pi * k / args.yaws

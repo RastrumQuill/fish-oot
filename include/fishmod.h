@@ -363,6 +363,12 @@ typedef struct FishmodLodTest {
     /* 0x64 */ u16 drawn[FISHMOD_LOD_KINDS]; // per kind, props drawn in the last frame (set by the scatter)
     /* 0xC4 */ u8 asGame; // the rotation check: the props as the game picks them (its distances, cone, caps)
     /* 0xC5 */ u8 wide;   // the rotation check's reference: a much wider cone, nothing cut by distance
+    // the LOD tuning (FISHMOD_LOD_TUNE): from how far (at scale 1) each kind's far single card and half-size texture
+    // are used (0: not at all; the reference uses neither, and nothing dissolves past the cutoff while testing)
+    /* 0xC6 */ s16 imp[FISHMOD_LOD_KINDS];
+    /* 0x126 */ s16 half[FISHMOD_LOD_KINDS];
+    /* 0x188 */ u64 hasImp;  // the kinds that have a single card (set by the scatter)
+    /* 0x190 */ u64 hasHalf; // and a half-size texture
 } FishmodLodTest;
 extern FishmodLodTest gFishmodLodTest;
 extern s16 gFishmodDebugFocusYaw;
