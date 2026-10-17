@@ -120,6 +120,22 @@ FOOTPRINT = {"grass_tuft": 40, "ribbon_weed": 32, "bush_weed": 50, "tall_weed": 
              "big_pondweed": 30, "kelp_frond": 15, "vine_strand": 12, "fan_weed": 22, "bank_roots": 35}
 # props that lie along the bed, tilted to its slope: half their length (along the model's x) and half their width
 TILTED = {"sunken_log": (150, 15), "branch": (70, 6)}
+# Rocks (all one vanilla model) get variety for free: stretched along each axis by a hash of where they stand (the
+# game computes the same, fishmod_scatter.c Scatter_RockStretch: no per-prop data) and tilted a little at random
+ROCK_KINDS = ("rock", "boulder")
+ROCK_TILT = math.radians(12)
+ROCK_RADIUS = 66  # the vanilla rock's reach from its middle at scale 1
+
+
+def rock_stretch(x, z):
+    """(x, y, z) stretch of the rock standing at integer (x, z), as Scatter_RockStretch."""
+    m = 0xFFFFFFFF
+    h = ((x & m) * 0x9E3779B1 & m) ^ ((z & m) * 0x85EBCA77 & m)
+    h ^= h >> 15
+    h = (h * 0x2C1B3C6D) & m
+    h ^= h >> 12
+    return (0.75 + (h & 0xFF) * (0.6 / 255.0), 0.7 + ((h >> 8) & 0xFF) * (0.45 / 255.0),
+            0.75 + ((h >> 16) & 0xFF) * (0.6 / 255.0))
 
 
 def lie_on_bed(floor_at, x, z, surface, here, yaw, half_len, half_wid):
@@ -268,6 +284,14 @@ def place(scene, seed=SEED):
                     sc = rnd.uniform(*scale)
                     yaw = rnd.uniform(0, 2 * math.pi)
                     tilt = (0.0, 0.0)
+                    lift = 0.0  # how far a tilted rock's raised edge comes up, per unit of scale
+                    if kind in ROCK_KINDS:
+                        st = rock_stretch(int(px), int(pz))
+                        # (its own random numbers, by where it stands: the scatter's sequence, and so every other prop,
+                        # stays as it was)
+                        trnd = random.Random(int(px) * 100003 + int(pz))
+                        tilt = (trnd.uniform(-ROCK_TILT, ROCK_TILT), trnd.uniform(-ROCK_TILT, ROCK_TILT))
+                        lift = ROCK_RADIUS * max(st[0], st[2]) * math.sin(max(abs(tilt[0]), abs(tilt[1])))
                     if kind in HEIGHT:
                         # stay a little under the surface (rocks and logs may show in the shallows), all over the
                         # prop's footprint: on a slope a patch's shallow side is what pokes out
@@ -281,6 +305,12 @@ def place(scene, seed=SEED):
                         sc = min(sc, room / HEIGHT[kind])
                         if sc < 0.35:
                             continue
+                        if kind in ROCK_KINDS:
+                            # stretched taller or tilted: smaller, to stay as far under the surface (never dropped, so
+                            # which props are placed doesn't change)
+                            sc = min(sc, room / (HEIGHT[kind] * st[1] + lift))
+                    if kind in ROCK_KINDS:
+                        y = pf - lift * sc * 0.6  # sunk so the raised edge doesn't float off the bed
                     if kind in TILTED:
                         # lying along the bed: tilted to its slope along the length and across it
                         y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, TILTED[kind][0] * sc, TILTED[kind][1] * sc)

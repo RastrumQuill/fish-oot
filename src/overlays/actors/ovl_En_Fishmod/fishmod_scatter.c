@@ -439,6 +439,21 @@ void EnFishmod_ScatterUnload(void) {
  * A prop's matrix: turned about Y, scaled, placed. Written straight into the fixed-point Mtx (guMtxF2L converts all
  * sixteen entries from floats; here only the three that aren't 0, 1 or a whole-number position need it).
  */
+/**
+ * A rock's stretch along its own x, y and z, from where it stands: every rock is the same vanilla model, and this
+ * varies their shapes with no per-prop data. gen_scatter.py rock_stretch must match it (placement and collision).
+ */
+static void Scatter_RockStretch(FishmodProp* prop, f32* out) {
+    u32 h = ((u32)(s32)prop->x * 0x9E3779B1u) ^ ((u32)(s32)prop->z * 0x85EBCA77u);
+
+    h ^= h >> 15;
+    h *= 0x2C1B3C6Du;
+    h ^= h >> 12;
+    out[0] = 0.75f + (h & 0xFF) * (0.6f / 255.0f);
+    out[1] = 0.7f + ((h >> 8) & 0xFF) * (0.45f / 255.0f);
+    out[2] = 0.75f + ((h >> 16) & 0xFF) * (0.6f / 255.0f);
+}
+
 static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
     Mtx* mtx = &sBufs->set[sSet].mtx[sMtxUsed++];
     s16 yaw = prop->yaw << 8;
@@ -446,8 +461,9 @@ static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
     s32 c = (s32)(Math_CosS(yaw) * s);
     s32 sn = (s32)(Math_SinS(yaw) * s);
 
-    if ((prop->tiltX != 0) || (prop->tiltZ != 0)) {
-        // lying on the bed (logs): tilted about its length and width before it is turned, M = Rz * Rx * Ry * scale
+    if ((prop->tiltX != 0) || (prop->tiltZ != 0) || (prop->kind == FISHMOD_PROP_ROCK)) {
+        // lying on the bed (logs, rocks): tilted about its length and width before it is turned,
+        // M = stretch * Rz * Rx * Ry * scale (only rocks are stretched)
         f32 k = prop->scale * (1.0f / 64.0f);
         f32 ct = Math_CosS(prop->tiltZ << 8);
         f32 st = Math_SinS(prop->tiltZ << 8);
@@ -457,6 +473,7 @@ static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
         f32 sy = Math_SinS(yaw);
         // Rz * Rx (rows: where the model's axes go before the turn)
         f32 r[3][3];
+        f32 stretch[3] = { 1.0f, 1.0f, 1.0f };
         s32 i;
 
         r[0][0] = ct;
@@ -468,6 +485,14 @@ static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
         r[2][0] = 0.0f;
         r[2][1] = -sp;
         r[2][2] = cp;
+        if (prop->kind == FISHMOD_PROP_ROCK) {
+            Scatter_RockStretch(prop, stretch);
+        }
+        for (i = 0; i < 3; i++) {
+            r[i][0] *= stretch[i];
+            r[i][1] *= stretch[i];
+            r[i][2] *= stretch[i];
+        }
         for (i = 0; i < 3; i++) {
             // then turned about y: (x, y, z) -> (x cy + z sy, y, -x sy + z cy)
             MTX_SET(mtx, i, 0, (s32)((r[i][0] * cy + r[i][2] * sy) * k * 65536.0f));
