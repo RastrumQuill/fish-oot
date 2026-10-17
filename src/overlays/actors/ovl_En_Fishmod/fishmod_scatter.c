@@ -57,6 +57,13 @@ typedef struct FishmodPropKindInfo {
     Gfx* model;
     Gfx* modelFar; // past PROP_FAR_DIST: the cards uncut (the same picture in fewer triangles), or the same model
     Gfx* modelAlt; // the one-triangle kinds' cut outline (the bench's comparison), else the model
+    Gfx* modelHalf;     // far, on the texture at half size (...DLFarH), or NULL
+    Gfx* materialHalf;  // its texture
+    Gfx* material4Half; // and in 4 bits, or NULL
+    f32 halfDist;       // from how far (at scale 1) a texel of the full texture is under half a pixel
+    Gfx* modelImp;      // the far single card (fishmod/tools/impostor.py), turned to face the camera, or NULL
+    Gfx* materialImp;
+    f32 impDist;        // from how far (at scale 1)
     f32 drawDist;      // drawn no further than this (above water)
     f32 drawDistUnder; // and with the camera under water (fishmod_lod.h: measured, the haze hides the rest)
     u8 floating; // on the surface: not drawn while the water there is lower than it was placed for
@@ -84,7 +91,7 @@ typedef struct FishmodPropKindInfo {
 // Props in view at most (before the budget)
 #define VISIBLE_MAX 2400
 // Material changes per frame at most (opaque, see-through): the command buffers are sized for them
-#define MAT_MAX 160
+#define MAT_MAX 256 // (a kind can change material at each tier: near, far, half, single card)
 #define MAT_MAX_XLU 24
 // The view's half-angle: the screen's corner is about 44 degrees off the look direction (60 degree field of view,
 // 4:3); a little wider, plus the props' size as room. Props outside it (behind, too far left or right, above or
@@ -108,6 +115,27 @@ typedef struct FishmodPropKindInfo {
 // props are made of, but triples the triangles, which far props are made of (hwbench-2: far props were two thirds of
 // the props' RDP time, and few pixels each)
 #define PROP_FAR_DIST 500.0f
+// How each prop is drawn (Scatter_Tier): within PROP_FAR_DIST its cut cards; past it its whole cards; from where the
+// full texture's texels are under half a pixel, the same on a texture of half the size; from where it's at most
+// IMP_PX (gen_habitat.py) tall on screen, one card with a picture of the whole plant, turned to face the camera. In the
+// last FADE_BAND of its distance, that card dissolves (a dithered alpha test, in the opaque pass) instead of popping.
+typedef enum {
+    TIER_NEAR,
+    TIER_FAR,
+    TIER_HALF,
+    TIER_IMP,
+    TIER_MAX
+} ScatterTier;
+#define FADE_BAND 0.15f
+// The single card turns only about its own up, so it holds only for plants seen from near the side: seen from above
+// (the bed through the water from a shore, looking down) it would be a sliver. Single cards only within this slope
+// of the view to the plant (tan 20 degrees, squared)
+#define IMP_SLOPE_SQ 0.132f
+static f32 sKindMax[FISHMOD_PROP_KIND_MAX]; // how far each kind is drawn, as last built (above or under water)
+static s16 sBillboardYaw;                    // the single cards' turn: facing the camera (as last built)
+#if FISHMOD_DEBUG
+static u32 sSetBench; // the bench flags the set was last made with
+#endif
 static s32 sEdgeNear; // the props being drawn are within PROP_EDGE_RA_DIST
 #if FISHMOD_DEBUG
 // what the LOD calibration (fishmod_debug.c, FISHMOD_LOD_CALIBRATE) draws everything out to
@@ -148,6 +176,22 @@ static void Scatter_InitKinds(void) {
     }
 #define X(id, name) sKinds[FISHMOD_PROP_##id].modelAlt = gFishmodProp_##name##DLAlt;
     FISHMOD_PROP_KINDS_TRI(X)
+#undef X
+#define X(id, name, tex, dist)                                               \
+    sKinds[FISHMOD_PROP_##id].modelHalf = gFishmodProp_##name##DLFarH;          \
+    sKinds[FISHMOD_PROP_##id].materialHalf = gFishmodProp_##name##DLFarHMaterial; \
+    sKinds[FISHMOD_PROP_##id].halfDist = (dist);
+    FISHMOD_PROP_KINDS_HALF(X)
+#undef X
+#define X(id, tex) sKinds[FISHMOD_PROP_##id].material4Half = gFishmodProp_##tex##Material4Half;
+    FISHMOD_PROP_KINDS_4BIT_HALF(X)
+#undef X
+#define X(id, name, dist)                                                    \
+    sKinds[FISHMOD_PROP_##id].modelImp = gFishmodProp_##name##DLImp;          \
+    sKinds[FISHMOD_PROP_##id].materialImp = gFishmodProp_##name##DLImpMaterial; \
+    sKinds[FISHMOD_PROP_##id].impDist = (dist);
+    FISHMOD_PROP_KINDS_IMP(X)
+#undef X
 #undef X
     {
         s32 i;
@@ -297,6 +341,7 @@ typedef struct ScatterFrame {
 typedef struct ScatterSet {
     Mtx mtx[PROP_BUDGET];
     u16 prop[PROP_BUDGET]; // in drawing order: nearest band first, kind by kind within a band
+    u8 tier[PROP_BUDGET];  // ScatterTier, as its matrix was made
     s32 count;
 } ScatterSet;
 typedef struct ScatterBuffers {
@@ -454,9 +499,8 @@ static void Scatter_RockStretch(FishmodProp* prop, f32* out) {
     out[2] = 0.75f + ((h >> 16) & 0xFF) * (0.6f / 255.0f);
 }
 
-static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale) {
+static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale, s16 yaw) {
     Mtx* mtx = &sBufs->set[sSet].mtx[sMtxUsed++];
-    s16 yaw = prop->yaw << 8;
     f32 s = prop->scale * (65536.0f / 64.0f);
     s32 c = (s32)(Math_CosS(yaw) * s);
     s32 sn = (s32)(Math_SinS(yaw) * s);
@@ -588,7 +632,7 @@ static void Scatter_UpdateDry(PlayState* play) {
 }
 
 /** A kind's material, at the start of its props in a band. */
-static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind) {
+static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 tier) {
     gfx = Gfx_SetupDL(gfx, SETUPDL_25);
     if (info->xlu || (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK)) {
         // vanilla's own materials (lit by the scene's lights, like the Fishing Pond's props)
@@ -623,14 +667,31 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind) {
         } else
 #endif
         {
-            gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0,
-                              COMBINED);
+            if (tier == TIER_IMP) {
+                // the single card: its alpha times the primitive's (how far it has faded), against noise
+                gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0, COMBINED, 0, PRIMITIVE, 0, 0,
+                                  0, 0, COMBINED);
+            } else {
+                gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0,
+                                  COMBINED);
+            }
             gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, mode | GBL_c2(G_BL_CLR_IN, G_BL_A_IN, G_BL_CLR_MEM, G_BL_A_MEM));
+            if (tier == TIER_IMP) {
+                gDPSetAlphaCompare(gfx++, G_AC_DITHER);
+            }
         }
     }
     gSPClearGeometryMode(gfx++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
     gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
-    gSPDisplayList(gfx++, ((gFishmodTexCompress != 0) && (info->material4 != NULL)) ? info->material4 : info->material);
+    if (tier == TIER_IMP) {
+        gSPDisplayList(gfx++, info->materialImp);
+    } else if (tier == TIER_HALF) {
+        gSPDisplayList(gfx++, ((gFishmodTexCompress != 0) && (info->material4Half != NULL)) ? info->material4Half
+                                                                                         : info->materialHalf);
+    } else {
+        gSPDisplayList(gfx++,
+                       ((gFishmodTexCompress != 0) && (info->material4 != NULL)) ? info->material4 : info->material);
+    }
     return gfx;
 }
 
@@ -679,6 +740,29 @@ static void Scatter_Sway(PlayState* play, ScatterFrame* frame) {
  * the camera, keeping those in view (a cone around the look direction, any pitch, per chunk then per prop) and
  * within their kind's distance.
  */
+/** How a prop at this (squared, flat) distance is drawn: see ScatterTier. */
+static s32 Scatter_Tier(FishmodProp* prop, FishmodPropKindInfo* info, s32 kind, f32 dSq, f32 eyeY) {
+    f32 s = prop->scale * (1.0f / 64.0f);
+    f32 dy = eyeY - prop->y;
+
+    if (info->xlu) {
+        return TIER_NEAR;
+    }
+    // (the dissolve at the cutoff comes first: under water the cutoffs can be nearer than PROP_FAR_DIST)
+    if ((info->modelImp != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOIMP) && (SQ(dy) <= IMP_SLOPE_SQ * dSq) &&
+        (((dSq >= SQ(info->impDist * s)) && (dSq >= SQ(PROP_FAR_DIST))) ||
+         (dSq >= SQ(sKindMax[kind] * (1.0f - FADE_BAND))))) {
+        return TIER_IMP;
+    }
+    if (dSq < SQ(PROP_FAR_DIST)) {
+        return TIER_NEAR;
+    }
+    if ((info->modelHalf != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOFARTEX) && (dSq >= SQ(info->halfDist * s))) {
+        return TIER_HALF;
+    }
+    return TIER_FAR;
+}
+
 static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f32 lookZ) {
     static u16 sVisible[256];                       // chunks near the camera
     static f32 sChunkDistSq[ARRAY_COUNT(sVisible)]; // their centres' distance from the eye, squared
@@ -809,6 +893,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             maxDist = DIST_CALIBRATE;
         }
 #endif
+        sKindMax[kind] = maxDist;
         maxSq = SQ(maxDist);
         reachSq = SQ(maxDist + chunk * 0.71f);
 
@@ -879,9 +964,13 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     sMtxUsed = 0;
     set = &sBufs->set[sSet];
     set->count = 0;
+    // the single cards face the camera: they turn about their own up, by the look's direction across the ground
+    sBillboardYaw = Math_Atan2S(-lookZ, -lookX);
     for (n = 0; (n < candCount) && (budget > 0); n++) {
         FishmodProp* prop = &sProps[sOrdered[n]];
         s32 k = prop->kind;
+        s32 tier = Scatter_Tier(prop, &sKinds[k], k, SQ(prop->x - eye.x) + SQ(prop->z - eye.z), eye.y);
+        s32 key = k + tier * FISHMOD_PROP_KIND_MAX; // (a material per kind and tier)
 
         if (sKinds[k].xlu) {
             if ((xluLeft <= 0) || ((k != lastXlu) && (matsXlu >= MAT_MAX_XLU))) {
@@ -893,12 +982,12 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 lastXlu = k;
             }
         } else {
-            if ((k != lastOpa) && (mats >= MAT_MAX)) {
+            if ((key != lastOpa) && (mats >= MAT_MAX)) {
                 continue;
             }
-            if (k != lastOpa) {
+            if (key != lastOpa) {
                 mats++;
-                lastOpa = k;
+                lastOpa = key;
             }
         }
         budget--;
@@ -912,7 +1001,8 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             gFishmodLodTest.drawn[k]++;
         }
 #endif
-        Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD);
+        Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD, (tier == TIER_IMP) ? sBillboardYaw : (s16)(prop->yaw << 8));
+        set->tier[set->count] = tier;
         set->prop[set->count++] = sOrdered[n];
     }
 }
@@ -977,13 +1067,18 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 
     // remake what's drawn only when the camera has moved or turned (or now and then anyway)
     sSetAge++;
+
     if ((sSetAge >= REUSE_FRAMES) ||
 #if FISHMOD_DEBUG
         gFishmodLodTest.active || // calibrating: what's drawn changes with the test, not the camera
+        ((u32)gFishmodBench != sSetBench) || // the bench switched a mode: the tiers are chosen here
 #endif
         ((SQ(eye.x - sSetEye.x) + SQ(eye.y - sSetEye.y) + SQ(eye.z - sSetEye.z)) > SQ(REUSE_MOVE)) ||
         ((lookX * sSetLook.x + lookY * sSetLook.y + lookZ * sSetLook.z) < REUSE_TURN_COS)) {
         Scatter_Build(play, &eye, lookX, lookY, lookZ);
+#if FISHMOD_DEBUG
+        sSetBench = gFishmodBench;
+#endif
         sSetAge = 0;
         sSetEye = eye;
         sSetLook.x = lookX;
@@ -1017,6 +1112,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         FishmodPropKindInfo* info;
         Gfx** disp;
         f32 dSq;
+        s32 tier;
+        s32 key;
 
         kind = prop->kind;
         info = &sKinds[kind];
@@ -1031,9 +1128,11 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         }
 #endif
         disp = info->xlu ? &xlu : &opa;
+        tier = set->tier[n];
+        key = kind + tier * FISHMOD_PROP_KIND_MAX;
         if (!info->xlu) {
             // (nearest first, in bands: this changes once, from near to far)
-            s32 near = dSq < SQ(PROP_EDGE_RA_DIST);
+            s32 near = (tier == TIER_NEAR);
 
             if (near != lastNear) {
                 lastNear = near;
@@ -1041,21 +1140,32 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 lastOpa = -2; // the material again, with the other edge mode (-2: no texture to turn off first)
             }
         }
-        if (kind != (info->xlu ? lastXlu : lastOpa)) {
+        if ((info->xlu ? kind : key) != (info->xlu ? lastXlu : lastOpa)) {
             if (info->xlu) {
                 lastXlu = kind;
             } else {
                 if (lastOpa >= 0) {
                     gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
                 }
-                lastOpa = kind;
+                lastOpa = key;
             }
-            *disp = Scatter_Material(*disp, info, kind);
+            *disp = Scatter_Material(*disp, info, kind, tier);
         }
         if (!info->xlu) {
             u32 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
+            s32 a = 255;
 
-            gDPSetPrimColor(opa++, 0, 0, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, 255);
+            if ((tier == TIER_IMP) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)) {
+                // the last stretch of its distance: dissolving away (a dithered alpha test, no blending)
+                f32 cut = sKindMax[kind];
+                f32 from = cut * (1.0f - FADE_BAND);
+
+                if (dSq > SQ(from)) {
+                    a = (s32)((cut - sqrtf(dSq)) * (255.0f / (cut * FADE_BAND)));
+                    a = CLAMP(a, 0, 255);
+                }
+            }
+            gDPSetPrimColor(opa++, 0, 0, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
         }
         gSPMatrix((*disp)++, &set->mtx[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         if (info->sway != 0) {
@@ -1064,19 +1174,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 
             gSPMatrix((*disp)++, &frame->sway[kind * SWAY_PHASES + ph], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
         }
-        {
-            s32 far = dSq >= SQ(PROP_FAR_DIST);
-
-#if FISHMOD_DEBUG
-            if (gFishmodBench & FISHMOD_BENCH_TRIMFAR) {
-                far = false;
-            }
-            if (gFishmodBench & FISHMOD_BENCH_NOTRI) {
-                gSPDisplayList((*disp)++, info->modelAlt);
-            } else
-#endif
-            gSPDisplayList((*disp)++, far ? info->modelFar : info->model);
-        }
+        gSPDisplayList((*disp)++, (tier == TIER_IMP)    ? info->modelImp
+                                  : (tier == TIER_HALF) ? info->modelHalf
+                                  : (tier == TIER_FAR)  ? info->modelFar
+                                                        : info->model);
     }
     if (lastOpa >= 0) {
         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
@@ -1098,7 +1199,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             sDockMtxMade = true;
         }
         for (k = FISHMOD_PROP_DOCK_DECK; k <= FISHMOD_PROP_DOCK_POSTS; k++) {
-            opa = Scatter_Material(opa, &sKinds[k], k);
+            opa = Scatter_Material(opa, &sKinds[k], k, TIER_NEAR);
             gDPSetPrimColor(opa++, 0, 0, light[0], light[1], light[2], 255);
             gSPMatrix(opa++, &sDockMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
             gSPDisplayList(opa++, sKinds[k].model);
