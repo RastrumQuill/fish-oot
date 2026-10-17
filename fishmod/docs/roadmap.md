@@ -188,6 +188,17 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
   better) and in larger waters than Kokiri Forest. If it still needs a change, scale the tension by the fish's
   weight.
 
+### Water current (not a moonshot: small)
+Flowing water, where it actually flows (the Gerudo river's inflow into the lake, the rivers, Zora's River), pushes
+on what's in it; still water next to it doesn't, even where both are one body of water to the game.
+- **A current map:** where the water flows and which way, as a field over the water map (flow strength and
+  direction per cell), baked at build time from the rivers' courses and their mouths, fading out into the lake's
+  still water.
+- **Fish:** hold station facing upstream in it (drifting back when they rest), shelter behind rocks and in eddies,
+  and current-loving species favour it. The hook and float drift with it.
+- **Plants:** in flowing cells the sway leans downstream and moves faster (a steady lean plus the wave); still
+  cells keep today's sway. Per sway phase, so it costs nothing extra to draw.
+
 ## Feature complete (after normal bait fishing is sorted out)
 
 Not moonshots: these are needed for fishmod to count as feature complete, but they wait until plain bait

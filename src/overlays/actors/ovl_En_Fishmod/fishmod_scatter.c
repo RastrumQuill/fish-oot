@@ -93,10 +93,11 @@ typedef struct FishmodPropKindInfo {
 // Material changes per frame at most (opaque, see-through): the command buffers are sized for them
 #define MAT_MAX 256 // (a kind can change material at each tier: near, far, half, single card)
 #define MAT_MAX_XLU 24
-// The view's half-angle: the screen's corner is about 44 degrees off the look direction (60 degree field of view,
-// 4:3); a little wider, plus the props' size as room. Props outside it (behind, too far left or right, above or
-// below) aren't drawn, so the budget goes on what's on screen.
-#define VIEW_COS 0.68f
+// The view cone: props outside it (behind, too far left or right, above or below) aren't drawn, so the budget goes on
+// what's on screen. It's made from the camera's own field of view each time the set is made (Scatter_ViewCos): the
+// screen's corner, plus VIEW_MARGIN for the frames the set is kept while the camera turns, plus the props' size as
+// room. (A fixed cone for 60 degrees cut off the corners whenever the camera's view was wider: pop-in at the edges.)
+#define VIEW_MARGIN_TAN 0.0875f // tan 5 degrees
 #define PROP_RADIUS 90.0f
 // See-through props (the pond reeds) drawn per frame at most
 #define XLU_MAX 200
@@ -134,6 +135,10 @@ typedef enum {
 #define IMP_SLOPE_SQ 0.132f
 static f32 sKindMax[FISHMOD_PROP_KIND_MAX]; // how far each kind is drawn, as last built (above or under water)
 static s16 sBillboardYaw;                    // the single cards' turn: facing the camera (as last built)
+// Under water the haze hides detail much sooner, and the kinds' distances are shorter (500-900): the tiers' distances
+// are this much nearer there, so the far tiers still do their work
+#define UNDER_LOD_SCALE 0.5f
+static f32 sLodScale = 1.0f; // (as last built: UNDER_LOD_SCALE under water)
 #if FISHMOD_DEBUG
 static u32 sSetBench; // the bench flags the set was last made with
 #endif
@@ -746,25 +751,58 @@ static void Scatter_Sway(PlayState* play, ScatterFrame* frame) {
  */
 /** How a prop at this (squared, flat) distance is drawn: see ScatterTier. */
 static s32 Scatter_Tier(FishmodProp* prop, FishmodPropKindInfo* info, s32 kind, f32 dSq, f32 eyeY) {
-    f32 s = prop->scale * (1.0f / 64.0f);
+    f32 s = prop->scale * (1.0f / 64.0f) * sLodScale;
+    f32 farDist = PROP_FAR_DIST * sLodScale;
     f32 dy = eyeY - prop->y;
 
     if (info->xlu) {
         return TIER_NEAR;
     }
+#if FISHMOD_DEBUG
+    if (gFishmodLodTest.active && !gFishmodLodTest.asGame) {
+        // the LOD tuning: the distances under test (0: not used), at the prop's scale, no dissolve
+        f32 s1 = prop->scale * (1.0f / 64.0f);
+
+        if ((info->modelImp != NULL) && (gFishmodLodTest.imp[kind] > 0) && (SQ(dy) <= IMP_SLOPE_SQ * dSq) &&
+            (dSq >= SQ(gFishmodLodTest.imp[kind] * s1)) && (dSq >= SQ(farDist))) {
+            return TIER_IMP;
+        }
+        if (dSq < SQ(farDist)) {
+            return TIER_NEAR;
+        }
+        if ((info->modelHalf != NULL) && (gFishmodLodTest.half[kind] > 0) &&
+            (dSq >= SQ(gFishmodLodTest.half[kind] * s1))) {
+            return TIER_HALF;
+        }
+        return TIER_FAR;
+    }
+#endif
     // (the dissolve past the cutoff comes first: under water the cutoffs can be nearer than PROP_FAR_DIST)
     if ((info->modelImp != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOIMP) && (SQ(dy) <= IMP_SLOPE_SQ * dSq) &&
-        (((dSq >= SQ(info->impDist * s)) && (dSq >= SQ(PROP_FAR_DIST))) ||
+        (((dSq >= SQ(info->impDist * s)) && (dSq >= SQ(farDist))) ||
          (dSq >= SQ(sKindMax[kind])))) {
         return TIER_IMP;
     }
-    if (dSq < SQ(PROP_FAR_DIST)) {
+    if (dSq < SQ(farDist)) {
         return TIER_NEAR;
     }
     if ((info->modelHalf != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOFARTEX) && (dSq >= SQ(info->halfDist * s))) {
         return TIER_HALF;
     }
     return TIER_FAR;
+}
+
+/** The cosine of the angle from the look direction to the screen's corner, with VIEW_MARGIN: from the view's field of
+ * view (vertical) and the 4:3 screen. */
+static f32 Scatter_ViewCos(PlayState* play) {
+    f32 half = DEG_TO_RAD(play->view.fovy * 0.5f);
+    f32 t = (sinf(half) / cosf(half)) * (5.0f / 3.0f); // (the corner: the half-height and half-width, 3:4:5)
+
+    t = (t + VIEW_MARGIN_TAN) / (1.0f - t * VIEW_MARGIN_TAN);
+    if (t <= 0.0f) {
+        return 0.0f; // (wider than a right angle: everything in front)
+    }
+    return 1.0f / sqrtf(1.0f + SQ(t));
 }
 
 static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f32 lookZ) {
@@ -798,7 +836,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 budget = PROP_BUDGET;
     s32 xluLeft = XLU_MAX;
     ScatterSet* set;
-    f32 viewCos = VIEW_COS;  // the view cone
+    f32 viewCos = Scatter_ViewCos(play); // the view cone
     f32 viewRoom = 0.0f;     // extra room round each prop and chunk for it
 #if FISHMOD_LOD_ZONE_COUNT > 0
     s32 zone = -1;
@@ -824,6 +862,15 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         distFar = DIST_CALIBRATE;
         gFishmodLodTest.under = under;
         gFishmodLodTest.kindCount = FISHMOD_PROP_KIND_MAX;
+        {
+            s32 k;
+
+            gFishmodLodTest.hasImp = gFishmodLodTest.hasHalf = 0;
+            for (k = 0; k < FISHMOD_PROP_KIND_MAX; k++) {
+                gFishmodLodTest.hasImp |= (u64)(sKinds[k].modelImp != NULL) << k;
+                gFishmodLodTest.hasHalf |= (u64)(sKinds[k].modelHalf != NULL) << k;
+            }
+        }
         bzero(gFishmodLodTest.drawn, sizeof(gFishmodLodTest.drawn));
     }
 #endif
@@ -898,7 +945,11 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
 #endif
         sKindMax[kind] = maxDist;
-        if ((info->modelImp != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOIMP | FISHMOD_BENCH_NODISSOLVE)) {
+        if ((info->modelImp != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOIMP | FISHMOD_BENCH_NODISSOLVE)
+#if FISHMOD_DEBUG
+            && !gFishmodLodTest.active
+#endif
+        ) {
             maxDist *= 1.0f + FADE_BAND; // the dissolve, past the kind's distance
         }
         maxSq = SQ(maxDist);
@@ -973,6 +1024,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     set->count = 0;
     // the single cards face the camera: they turn about their own up, by the look's direction across the ground
     sBillboardYaw = Math_Atan2S(-lookZ, -lookX);
+    sLodScale = under ? UNDER_LOD_SCALE : 1.0f;
     for (n = 0; (n < candCount) && (budget > 0); n++) {
         FishmodProp* prop = &sProps[sOrdered[n]];
         s32 k = prop->kind;
@@ -1162,7 +1214,11 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             u32 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
             s32 a = 255;
 
-            if ((tier == TIER_IMP) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)) {
+            if ((tier == TIER_IMP) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)
+#if FISHMOD_DEBUG
+                && !gFishmodLodTest.active
+#endif
+            ) {
                 // past its distance: dissolving away (a dithered alpha test, no blending)
                 f32 from = sKindMax[kind];
 

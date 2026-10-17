@@ -792,6 +792,8 @@ static s32 sLodFresh;                      // a fresh reference is being drawn
  */
 static void Lod_TestPending(void) {
     bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
+    bzero(gFishmodLodTest.imp, sizeof(gFishmodLodTest.imp));
+    bzero(gFishmodLodTest.half, sizeof(gFishmodLodTest.half));
     sLodFresh = true;
     sLodTimer = LOD_HOLD;
 }
@@ -800,6 +802,8 @@ static void Lod_Test(s32 kind, s32 dist) {
     bzero(sLodPending, sizeof(sLodPending));
     if (kind < 0) {
         bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
+        bzero(gFishmodLodTest.imp, sizeof(gFishmodLodTest.imp));
+        bzero(gFishmodLodTest.half, sizeof(gFishmodLodTest.half));
         sLodTimer = LOD_HOLD;
         return;
     }
@@ -825,6 +829,33 @@ static void Lod_Save(void) {
  * slots: this build never saves) for fishmod/tools/lod_calibrate.py --sweep.
  */
 #define SWEEP_ZONES 16
+#ifdef FISHMOD_LOD_TUNE
+/*
+ * The LOD tuning (lod_tune.inc.c): the sweep, but over every view at each of TUNE_TIMES times of day, and for three
+ * settings per kind, each against the same full-detail reference: how far it's drawn (the cut), from how far its
+ * single card is used, from how far its half-size texture is. Each the shortest distance that changes no view (as
+ * the sweep counts it), per time of day and above or under water, in TUNE_STEP units. The views are shared out
+ * between parts run side by side; the part comes from SRAM 0x7C00 ('FMPT', part, parts: fishmod/pc/run_jobs.py
+ * writes it into each job's save), so one ROM serves every part.
+ */
+#define TUNE_TIMES 4
+#define TUNE_KNOBS 3 // the cut, the single card, the half-size texture
+#define SW_STEP 50
+#define SW_STEPS 60 // out to 3000 (DIST_CALIBRATE)
+static const u16 sTuneTimes[TUNE_TIMES] = { CLOCK_TIME(6, 30), CLOCK_TIME(12, 0), CLOCK_TIME(18, 30), CLOCK_TIME(0, 0) };
+static s32 sTuneKnob;
+#define SWEEP_SLOTS ((s32)ARRAY_COUNT(sLodViews) * TUNE_TIMES)
+#define SWEEP_SLOT_VIEW(slot) ((slot) / TUNE_TIMES)
+#define SW_KNOB_DONE SW_NEXT_KNOB
+#else
+#define SW_STEP LOD_STEP
+#define SW_STEPS LOD_STEPS
+#define SWEEP_SLOTS ((s32)ARRAY_COUNT(sLodViews))
+#define SWEEP_SLOT_VIEW(slot) (slot)
+#define SW_KNOB_DONE SW_NEXT_VIEW
+#endif
+static s32 sSweepPart = FISHMOD_LOD_PART;
+static s32 sSweepParts = FISHMOD_LOD_PARTS;
 #define SWEEP_SETTLE 45
 #define SWEEP_HOLD 3       // frames a test is drawn before it's read
 #define SWEEP_GRAB_TRIES 30 // a view whose frame can't be copied whole this many times is skipped
@@ -844,9 +875,13 @@ typedef struct SweepResults {
     /* 0x011 */ u8 zones;
     /* 0x012 */ u8 part;
     /* 0x013 */ u8 parts;
+#ifdef FISHMOD_LOD_TUNE
+    /* 0x014 */ u8 need[TUNE_TIMES][2][TUNE_KNOBS][FISHMOD_LOD_KINDS]; // in SW_STEP units; 0: never in sight
+#else
     /* 0x014 */ u8 need[SWEEP_ZONES][2][FISHMOD_LOD_KINDS]; // in LOD_STEP units; 0: never in sight
-    /* 0x614 */ u16 passFirst; // views that passed on their first test
-    /* 0x616 */ u16 splits;    // views that needed the kinds split
+#endif
+    u16 passFirst; // views that passed on their first test
+    u16 splits;    // views that needed the kinds split
 } SweepResults;
 
 typedef enum SweepState {
@@ -858,12 +893,13 @@ typedef enum SweepState {
     SW_SPLIT_CHECK,
     SW_SEARCH,
     SW_NEXT_VIEW,
+    SW_NEXT_KNOB,
     SW_DONE
 } SweepState;
 
 static SweepResults sSweep;
 static s32 sSweepState = SW_ARRIVE;
-static s32 sSweepView = FISHMOD_LOD_PART;
+static s32 sSweepView = FISHMOD_LOD_PART; // (the slot: the view, and with the tuning the time of day)
 static s32 sSweepRetry;
 static s32 sSweepFirstTest;
 static u64 sSweepStack[64];
@@ -875,46 +911,65 @@ static s32 sSweepSettle;
 static s32 sSweepGrabFails;
 
 static u8* Sweep_Need(s32 kind) {
+#ifdef FISHMOD_LOD_TUNE
+    return &sSweep.need[sSweepView % TUNE_TIMES][gFishmodLodTest.under][sTuneKnob][kind];
+#else
     FishmodLodView* view = &sLodViews[sSweepView];
 
     return &sSweep.need[view->zone % SWEEP_ZONES][gFishmodLodTest.under][kind];
+#endif
+}
+
+/** The test's distances for the setting being measured (the cut, or with the tuning one of its others). */
+static s16* Sweep_Knob(void) {
+    bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
+    bzero(gFishmodLodTest.imp, sizeof(gFishmodLodTest.imp));
+    bzero(gFishmodLodTest.half, sizeof(gFishmodLodTest.half));
+#ifdef FISHMOD_LOD_TUNE
+    if (sTuneKnob == 1) {
+        return gFishmodLodTest.imp;
+    }
+    if (sTuneKnob == 2) {
+        return gFishmodLodTest.half;
+    }
+#endif
+    return gFishmodLodTest.dist;
 }
 
 /** The cut to test: the kinds in `mask` at their zone's distances, the rest drawn in full. */
 static void Sweep_Test(u64 mask) {
     s32 k;
 
-    bzero(sLodPending, sizeof(sLodPending));
+    s16* knob = Sweep_Knob();
+
     for (k = 0; k < gFishmodLodTest.kindCount; k++) {
         if (mask & (1ULL << k)) {
-            sLodPending[k] = MAX(*Sweep_Need(k), 1) * LOD_STEP;
+            knob[k] = MAX(*Sweep_Need(k), 1) * SW_STEP;
         }
     }
     sSweep.tests++;
     // one reference per view (taken after it settles, checked for anything moving): no fresh one per test
-    bcopy(sLodPending, gFishmodLodTest.dist, sizeof(sLodPending));
     sLodTimer = SWEEP_HOLD;
 }
 
 /** One kind cut at `dist`, the rest drawn in full. */
 static void Sweep_TestKind(s32 kind, s32 dist) {
-    bzero(gFishmodLodTest.dist, sizeof(gFishmodLodTest.dist));
-    gFishmodLodTest.dist[kind] = dist;
+    Sweep_Knob()[kind] = dist;
     sLodTimer = SWEEP_HOLD;
 }
 
 static void Sweep_Save(void) {
     sSweep.magic = 0x464C5357; // 'FLSW'
-    sSweep.views = ARRAY_COUNT(sLodViews);
+    sSweep.views = SWEEP_SLOTS;
     sSweep.kinds = gFishmodLodTest.kindCount;
     sSweep.zones = SWEEP_ZONES;
-    sSweep.part = FISHMOD_LOD_PART;
-    sSweep.parts = FISHMOD_LOD_PARTS;
+    sSweep.part = sSweepPart;
+    sSweep.parts = sSweepParts;
     SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sSweep, sizeof(sSweep), OS_WRITE);
 }
 
 static void Sweep_Place(void) {
-    FishmodLodView* view = &sLodViews[sSweepView];
+    FishmodLodView* view = &sLodViews[SWEEP_SLOT_VIEW(sSweepView)];
 
     gFishmodLodSweepEye.x = view->eye.x;
     gFishmodLodSweepEye.y = view->eye.y;
@@ -922,6 +977,9 @@ static void Sweep_Place(void) {
     gFishmodLodSweepAt.x = view->at.x;
     gFishmodLodSweepAt.y = view->at.y;
     gFishmodLodSweepAt.z = view->at.z;
+#ifdef FISHMOD_LOD_TUNE
+    sLodTime = sTuneTimes[sSweepView % TUNE_TIMES];
+#endif
 }
 
 static void Fishmod_LodUpdate(PlayState* play) {
@@ -936,13 +994,23 @@ static void Fishmod_LodUpdate(PlayState* play) {
         sLodStateFrames = play->state.frames;
         gFishmodLodTest.active = true;
         sSweepSettle = SWEEP_SETTLE + 200; // the first: the scene's lights are still coming up
+        // which part this is, if the runner said (fishmod/pc/run_jobs.py writes it into the save)
+        {
+            u32 pt[3];
+
+            SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7C00, pt, sizeof(pt), OS_READ);
+            if ((pt[0] == 0x464D5054) && (pt[2] > 0) && (pt[1] < pt[2])) { // 'FMPT'
+                sSweepPart = pt[1];
+                sSweepParts = pt[2];
+            }
+        }
         // carry on from an earlier run (the save file kept what it measured)
         SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sSweep, sizeof(sSweep), OS_READ);
-        if ((sSweep.magic != 0x464C5357) || (sSweep.part != FISHMOD_LOD_PART) || (sSweep.parts != FISHMOD_LOD_PARTS)) {
+        if ((sSweep.magic != 0x464C5357) || (sSweep.part != sSweepPart) || (sSweep.parts != sSweepParts)) {
             bzero(&sSweep, sizeof(sSweep));
         }
-        sSweepView = FISHMOD_LOD_PART + sSweep.done * FISHMOD_LOD_PARTS;
-        if (sSweepView >= (s32)ARRAY_COUNT(sLodViews)) {
+        sSweepView = sSweepPart + sSweep.done * sSweepParts;
+        if (sSweepView >= SWEEP_SLOTS) {
             sSweepState = SW_DONE;
             gFishmodLodTest.active = false;
             return;
@@ -961,7 +1029,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
         Fishmod_DebugPrintf(2, "LOD sweep done: %d views", sSweep.done);
         return;
     }
-    Fishmod_DebugPrintf(2, "LOD sweep view %d/%d", sSweepView, (s32)ARRAY_COUNT(sLodViews));
+    Fishmod_DebugPrintf(2, "LOD sweep view %d/%d", sSweepView, SWEEP_SLOTS);
     if (sSweepState == SW_ARRIVE) {
         if (--sSweepSettle > 0) {
             return;
@@ -1047,15 +1115,22 @@ static void Fishmod_LodUpdate(PlayState* play) {
             s32 k;
 
             for (k = 0; k < gFishmodLodTest.kindCount; k++) {
+#ifdef FISHMOD_LOD_TUNE
+                // (only the kinds that have the setting being measured)
+                if (((sTuneKnob == 1) && !(gFishmodLodTest.hasImp & (1ULL << k))) ||
+                    ((sTuneKnob == 2) && !(gFishmodLodTest.hasHalf & (1ULL << k)))) {
+                    continue;
+                }
+#endif
                 if (sLodDrawn[k] != 0) {
                     *Sweep_Need(k) = MAX(*Sweep_Need(k), 1); // seen in this zone (0: never seen, no measure)
-                    if (*Sweep_Need(k) < LOD_STEPS) {
+                    if (*Sweep_Need(k) < SW_STEPS) {
                         mask |= 1ULL << k;
                     }
                 }
             }
             if (mask == 0) {
-                sSweepState = SW_NEXT_VIEW;
+                sSweepState = SW_KNOB_DONE;
                 sLodTimer = 1;
                 break;
             }
@@ -1122,7 +1197,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
 
                     for (k = 0; k < gFishmodLodTest.kindCount; k++) {
                         if (sSweepWhole & (1ULL << k)) {
-                            *Sweep_Need(k) = MIN(MAX(*Sweep_Need(k), 1) + 1, LOD_STEPS);
+                            *Sweep_Need(k) = MIN(MAX(*Sweep_Need(k), 1) + 1, SW_STEPS);
                         }
                     }
                     if (++sSweepRetry < SWEEP_RETRIES) {
@@ -1131,7 +1206,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
                         break;
                     }
                 }
-                sSweepState = SW_NEXT_VIEW;
+                sSweepState = SW_KNOB_DONE;
                 sLodTimer = 1;
                 break;
             }
@@ -1147,7 +1222,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
                     sLodLo = mid + 1;
                 }
                 if (sLodLo < sLodHi) {
-                    Sweep_TestKind(sLodKind, ((sLodLo + sLodHi) / 2) * LOD_STEP);
+                    Sweep_TestKind(sLodKind, ((sLodLo + sLodHi) / 2) * SW_STEP);
                     sSweep.tests++;
                     sSweepState = SW_SEARCH;
                     break;
@@ -1163,16 +1238,16 @@ static void Fishmod_LodUpdate(PlayState* play) {
                 }
                 sLodKind = k;
                 sLodLo = MAX(*Sweep_Need(k), 1) + 1;
-                sLodHi = LOD_STEPS;
+                sLodHi = SW_STEPS;
                 if (sLodLo >= sLodHi) {
-                    *Sweep_Need(k) = LOD_STEPS;
+                    *Sweep_Need(k) = SW_STEPS;
                     sSweepCulprits &= ~(1ULL << k);
                     sLodKind = -1;
                     sLodTimer = 1;
                     sSweepState = SW_SEARCH;
                     break;
                 }
-                Sweep_TestKind(k, ((sLodLo + sLodHi) / 2) * LOD_STEP);
+                Sweep_TestKind(k, ((sLodLo + sLodHi) / 2) * SW_STEP);
                 sSweep.tests++;
                 sSweepState = SW_SEARCH;
                 break;
@@ -1183,15 +1258,30 @@ static void Fishmod_LodUpdate(PlayState* play) {
                 sLodTimer = 1;
                 break;
             }
-            sSweepState = SW_NEXT_VIEW;
+            sSweepState = SW_KNOB_DONE;
             sLodTimer = 1;
             break;
 
+        case SW_NEXT_KNOB:
+#ifdef FISHMOD_LOD_TUNE
+            // the next setting, against the same reference
+            if (++sTuneKnob < TUNE_KNOBS) {
+                sSweepRetry = 0;
+                sSweepFirstTest = true;
+                sSweepState = SW_ALL;
+                sLodTimer = 1;
+                break;
+            }
+#endif
+            // fall through
         case SW_NEXT_VIEW:
+#ifdef FISHMOD_LOD_TUNE
+            sTuneKnob = 0;
+#endif
             sSweep.done++;
             Sweep_Save();
-            sSweepView += FISHMOD_LOD_PARTS;
-            if (sSweepView >= (s32)ARRAY_COUNT(sLodViews)) {
+            sSweepView += sSweepParts;
+            if (sSweepView >= SWEEP_SLOTS) {
                 Sweep_Save();
                 sSweepState = SW_DONE;
                 gFishmodLodTest.active = false;

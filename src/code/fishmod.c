@@ -1265,6 +1265,33 @@ long long __moddi3(long long a, long long b) {
 long long __muldi3(long long a, long long b) {
     return __ll_mul(a, b);
 }
+// 64-bit shifts, on the two 32-bit halves (libultra has no equivalent)
+long long __ashldi3(long long a, int b) {
+    unsigned int lo = (unsigned int)a;
+    unsigned int hi = (unsigned int)((unsigned long long)a >> 32);
+
+    if (b >= 32) {
+        hi = lo << (b - 32);
+        lo = 0;
+    } else if (b > 0) {
+        hi = (hi << b) | (lo >> (32 - b));
+        lo <<= b;
+    }
+    return (long long)(((unsigned long long)hi << 32) | lo);
+}
+unsigned long long __lshrdi3(unsigned long long a, int b) {
+    unsigned int lo = (unsigned int)a;
+    unsigned int hi = (unsigned int)(a >> 32);
+
+    if (b >= 32) {
+        lo = hi >> (b - 32);
+        hi = 0;
+    } else if (b > 0) {
+        lo = (lo >> b) | (hi << (32 - b));
+        hi >>= b;
+    }
+    return ((unsigned long long)hi << 32) | lo;
+}
 long long __fixdfdi(double d) {
     return __d_to_ll(d);
 }

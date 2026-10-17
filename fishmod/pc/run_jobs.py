@@ -8,7 +8,10 @@ where the test ROMs put their results) goes into the results.
 
 Usage (in the fishoot conda env, see README.md):
   python fishmod/pc/run_jobs.py PACK.zip --rom "C:\\roms\\oot-ntsc-1.2.z64" [--ares "C:\\ares\\ares.exe"]
-         [--parallel 6] [--out results] [--saves-dir DIR]
+         [--parallel N] [--out results] [--saves-dir DIR] [--keep-cores 2]
+--parallel defaults to the logical cores less --keep-cores (2: the first two are left to the OS), and each ares is
+pinned to a core of its own. A pack can ask for ares to run uncapped ("uncapped" in jobs.json: no waiting on the
+display or the sound), and give a job bytes to start its save with ("sram": the part a job is, say).
 Results: results\\<pack>\\ (a folder per job) and results_<pack>.zip next to it: send the zip.
 Running the same pack again carries on from the saves already there (the long jobs resume).
 """
@@ -99,7 +102,8 @@ def main():
     ap.add_argument("pack")
     ap.add_argument("--rom", required=True, help="your Ocarina of Time NTSC 1.2 (US) ROM (any byte order)")
     ap.add_argument("--ares")
-    ap.add_argument("--parallel", type=int, default=6)
+    ap.add_argument("--parallel", type=int, default=0, help="ares at once (default: the logical cores less --keep-cores)")
+    ap.add_argument("--keep-cores", type=int, default=2, help="the first cores, left to the OS (no ares on them)")
     ap.add_argument("--out", default="results")
     ap.add_argument("--saves-dir", help="ares's saves folder, if it doesn't put saves next to the ROM")
     args = ap.parse_args()
@@ -111,6 +115,11 @@ def main():
     pack = zipfile.ZipFile(args.pack)
     spec = json.loads(pack.read("jobs.json"))
     name = spec["pack"]
+    ncpu = os.cpu_count() or 4
+    cores = list(range(min(args.keep_cores, ncpu - 1), ncpu))  # the cores ares may use
+    if args.parallel <= 0:
+        args.parallel = max(1, len(cores))
+    free_cores = list(cores)
     out = os.path.join(args.out, name)
     os.makedirs(out, exist_ok=True)
     print(f"pack {name}: {len(spec['jobs'])} jobs, {args.parallel} at a time, ares {ares}")
@@ -129,23 +138,43 @@ def main():
             prev = os.path.join(jd, "result.sav")
             if job.get("resume") and os.path.exists(prev):
                 shutil.copy(prev, os.path.join(jd, job["name"] + ".ram"))
+            elif job.get("sram"):
+                # a save to start from: zeros, with the job's bytes (its part, say) at their offsets
+                ram = bytearray(0x8000)
+                for off, hexbytes in job["sram"].items():
+                    b = bytes.fromhex(hexbytes)
+                    ram[int(off, 16):int(off, 16) + len(b)] = b
+                open(os.path.join(jd, job["name"] + ".ram"), "wb").write(ram)
             cmd = [ares, "--system", "Nintendo 64", "--no-file-prompt"]
             if os.name != "nt":
                 cmd += ["--setting", "Audio/Driver=None"]  # (a headless Linux box has no sound device)
+            if spec.get("uncapped"):
+                # as fast as it goes: no sound, and neither the display nor the sound holds it to real time
+                cmd += ["--setting", "Audio/Driver=None", "--setting", "Audio/Blocking=false",
+                        "--setting", "Video/Blocking=false"]
             cmd += ["--setting", "Input/Defocus=Allow", rom]  # (keeps running when its window isn't in front)
             # ares's own messages (its renderer's memory warnings and so on) go to a log in the job's folder,
             # not over the runner's progress
             log = open(os.path.join(jd, "ares.log"), "w")
             proc = subprocess.Popen(cmd, cwd=jd, stdout=log, stderr=subprocess.STDOUT)
-            running.append((job, jd, proc, time.time()))
+            core = free_cores.pop(0) if free_cores else None
+            if core is not None:
+                try:
+                    import psutil
+                    psutil.Process(proc.pid).cpu_affinity([core])
+                except Exception as e:  # (no psutil, or not allowed: it just isn't pinned)
+                    print(f"  (couldn't pin {job['name']} to core {core}: {e})")
+            running.append((job, jd, proc, time.time(), core))
             print(f"  started {job['name']} ({job['seconds']} s)")
         time.sleep(2)
         for item in list(running):
-            job, jd, proc, t0 = item
+            job, jd, proc, t0, core = item
             if proc.poll() is None and time.time() - t0 < job["seconds"]:
                 continue
             how = "exited by itself" if proc.poll() is not None else close_gracefully(proc)
             running.remove(item)
+            if core is not None:
+                free_cores.append(core)
             save = find_save(jd, job["name"], args.saves_dir, t0)
             res = {"seconds": round(time.time() - t0), "ares": how, "save": None, "frames": None}
             if save:
