@@ -242,6 +242,11 @@ in the spirit of vanilla (ammo top left, arrows and tools right, bottles along t
   Kokiri tutorial gives it (shoot down the hive for the rod, learn that larvae make bait). The Fishing Pond uses
   your rod.
 - **Bug net:** catch bugs (and fireflies) for the compendium and for bait.
+  - Swings with the Megaton Hammer's animations (`gPlayerAnim_link_hammer_*`). These are in the shared Link
+    animation bank, not the adult's object, and store joint rotations, so they play on the child skeleton too (same
+    limb layout; the Deku Stick already swings with the sword's animations as a child). The net model attaches to the
+    hand like the hammer does. To check in the game: the shorter child arms (the overhead swing clipping the head),
+    the net's reach for the catch collider, and the hammer's adult-only flag in the item's age table.
 - **Pictograph box:** in the style of MM's: first-person photos, logging every NPC, enemy type and the passive
   wildlife that's in the shot (actors on screen and close enough when the shutter fires), plus a selfie
   camera with a caught fish. Only a few photos are stored (each is about 9 KB at MM's 160 × 112, 4-bit); entries
