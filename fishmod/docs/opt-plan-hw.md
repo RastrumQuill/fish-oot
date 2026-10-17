@@ -153,3 +153,22 @@ if the bench-driven fixes leave the worst stops short.
 2. **Skybox when it can't be seen** (5.4 ms): skip it when the terrain and water cover the screen. Needs a reliable
    test for "covered".
 3. 1-cycle and no depth writes are dropped.
+
+## Reading hwbench-4 (decided before the results)
+Two saves: `fish-oot-hwbench4` (IDO) and `fish-oot-hwbench4-gcc`. Read each with `hwbench_report.py save.sav`, and
+the pair with `hwbench_report.py ido.sav --vs gcc.sav`. The bench's run-to-run noise was about 1-2% of mean RDP time,
+so a change smaller than 2% counts as none. Each mode is the old way of doing one thing, so its change against base is
+what the new way saves (a positive change means the new way wins):
+- **notri** (one triangle per small-plant card): keep if notri's RDP time is 2% or more above base. If it is, the lily
+  pads and the lotus flowers' cards get one triangle too. Within 2%: keep it anyway (fewer vertices for the RSP and the
+  CPU, no visible change). Clearly below base: put the cut outlines back for near props.
+- **nostrict** (nearest props strictly nearest first): the same rule. Within 2% it goes, since the sort costs CPU.
+- **trimfar** (cut outlines for far props instead of uncut cards): keep the uncut far cards unless trimfar is 2% or
+  more below base.
+- **altedge**: expected about +10% as in hwbench-2. A different answer means the new cards changed the edge cost.
+- **nonear / nofar / noprops / nosky**: no decision; they say where the remaining props' time is, which picks the next
+  optimization (far props still dominant: a far LOD per kind; near props: the solid-geometry fallback).
+- **GCC against IDO**: GCC stays the default if the CPU's update and draw times drop and the GCC save shows as many
+  laps without a crash. Its RDP time should be unchanged (within 2%); if it isn't, look at why before keeping it.
+- **A crash** in either save (the breadcrumb shows where): that build's result is read up to the crash, and the crash
+  is fixed before anything else.
