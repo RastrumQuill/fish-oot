@@ -435,6 +435,7 @@ void Fishmod_AutoplayInput(struct GameState* gameState, Input* inputs);
 void Fishmod_DebugPlayUpdate(struct PlayState* play);
 void Fishmod_DebugDrawText(struct GameState* gameState, Gfx** gfxP);
 void Fishmod_DebugPrintf(s32 line, const char* fmt, ...);
+void Fishmod_DebugColNodes(s32 sceneId, s32 used, s32 max);
 #endif
 
 #endif

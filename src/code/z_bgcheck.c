@@ -1680,6 +1680,9 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
     SSNodeList_Alloc(play, &colCtx->polyNodes, tblMax, colCtx->colHeader->numPolygons);
 
     lookupTblMemSize = BgCheck_InitializeStaticLookup(colCtx, play, colCtx->lookupTbl);
+#if FISHMOD_DEBUG
+    Fishmod_DebugColNodes(play->sceneId, colCtx->polyNodes.count, colCtx->polyNodes.max);
+#endif
     PRINTF_COLOR_GREEN();
     PRINTF(T("/*---結局 BG使用サイズ %dbyte---*/\n", "/*---BG size used in the end %dbyte---*/\n"),
            memSize + lookupTblMemSize);
