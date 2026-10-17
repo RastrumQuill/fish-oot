@@ -86,9 +86,6 @@ typedef struct FishmodPropKindInfo {
 // Material changes per frame at most (opaque, see-through): the command buffers are sized for them
 #define MAT_MAX 160
 #define MAT_MAX_XLU 24
-// the nearest props, drawn strictly nearest first (see Scatter_Build): at most this many, within this distance
-#define STRICT_MAX 128
-#define STRICT_DIST 500.0f
 // The view's half-angle: the screen's corner is about 44 degrees off the look direction (60 degree field of view,
 // 4:3); a little wider, plus the props' size as room. Props outside it (behind, too far left or right, above or
 // below) aren't drawn, so the budget goes on what's on screen.
@@ -290,7 +287,7 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 // The props' commands, two frames' worth (the RSP reads last frame's while this one is built), in buffers of their
 // own rather than the frame's display buffer, which the scene and the fish need.
 typedef struct ScatterFrame {
-    Gfx opa[PROP_BUDGET * 4 + (MAT_MAX + STRICT_MAX) * 16 + 96]; // (and the dock, and the far edge mode's material)
+    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96]; // (and the dock, and the far edge mode's material)
     Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4];
     Mtx sway[SWAY_MAX];
 } ScatterFrame;
@@ -686,7 +683,6 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 band;
     s32 v;
     s32 budget = PROP_BUDGET;
-    s32 strictCount;
     s32 xluLeft = XLU_MAX;
     ScatterSet* set;
     f32 viewCos = VIEW_COS;  // the view cone
@@ -853,37 +849,6 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     for (n = 0; n < candCount; n++) {
         sOrdered[bandStart[sCandBand[n]]++] = sCand[n];
     }
-    // The nearest props strictly nearest first, whatever their kind: a plant hidden behind a nearer one then costs
-    // only a depth read per pixel (it fails the depth test, so nothing is written). Their materials change more
-    // often for it, which doesn't count against MAT_MAX (STRICT_MAX bounds it).
-    strictCount = 0;
-#if FISHMOD_DEBUG
-    if (!(gFishmodBench & FISHMOD_BENCH_NOSTRICT))
-#endif
-    {
-        static f32 sStrictD[STRICT_MAX];
-
-        while ((strictCount < candCount) && (strictCount < STRICT_MAX)) {
-            FishmodProp* p = &sProps[sOrdered[strictCount]];
-            f32 d = SQ(p->x - eye.x) + SQ(p->z - eye.z);
-            s32 j = strictCount;
-            u16 id = sOrdered[strictCount];
-
-            if (d >= SQ(STRICT_DIST)) {
-                break;
-            }
-            // (insertion sort: few, and nearly in order already, by band)
-            while ((j > 0) && (sStrictD[j - 1] > d)) {
-                sStrictD[j] = sStrictD[j - 1];
-                sOrdered[j] = sOrdered[j - 1];
-                j--;
-            }
-            sStrictD[j] = d;
-            sOrdered[j] = id;
-            strictCount++;
-        }
-    }
-
     // into the other set, as far as the budget (and the room for material changes) goes
     sSet ^= 1;
     sMtxUsed = 0;
@@ -902,8 +867,6 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 matsXlu++;
                 lastXlu = k;
             }
-        } else if (n < strictCount) {
-            lastOpa = k; // (the strict nearest ones: their own allowance of material changes)
         } else {
             if ((k != lastOpa) && (mats >= MAT_MAX)) {
                 continue;
