@@ -7,6 +7,7 @@ Usage: fishmod/pc/make_pack.py NAME OUT.zip JOB [JOB ...] [--parts N] [--uncappe
   --parts N: each JOB becomes N jobs on the one patch, each told its part ('FMPT', part, parts) in its ROM's header
              (0x20, the name field) and its starting save (SRAM 0x7C00); the LOD sweep and tuning read it; resumable
   --uncapped: ares runs as fast as it can (no sound, nothing holding it to real time)
+  --parallel N: at most N ares at once for this pack (run_jobs.py --parallel still overrides it)
 e.g. fishmod/pc/make_pack.py selftest out/selftest.zip tour=fishmod/out/fish-oot-debug-tour-opt5.z64:120
 Needs flips (as the build does) and fishmod/out/original.z64 (made by any release build).
 """
@@ -28,11 +29,14 @@ def main():
     ap.add_argument("jobs", nargs="+")
     ap.add_argument("--parts", type=int, default=0)
     ap.add_argument("--uncapped", action="store_true")
+    ap.add_argument("--parallel", type=int, default=0, help="at most this many at once (unless the runner is told)")
     args = ap.parse_args()
     original = os.path.join(ROOT, "fishmod", "out", "original.z64")
     spec = {"pack": args.name, "jobs": []}
     if args.uncapped:
         spec["uncapped"] = True
+    if args.parallel > 0:
+        spec["parallel"] = args.parallel
     with tempfile.TemporaryDirectory() as tmp, zipfile.ZipFile(args.out, "w", zipfile.ZIP_DEFLATED) as z:
         for j in args.jobs:
             jname, rest = j.split("=", 1)
