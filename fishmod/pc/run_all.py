@@ -3,7 +3,9 @@
 the repo), the self-test first: if the game doesn't run in it, it stops there and says why. Then one zip of all the
 results to send back.
 
-Usage (in the repo, in the fishoot env):  python fishmod\\pc\\run_all.py --rom C:\\roms\\oot.z64 [--parallel 6]
+Usage (in the repo, in the fishoot env):  python fishmod\\pc\\run_all.py [--rom C:\\roms\\oot.z64] [--parallel 6]
+The ROM's path is remembered (fishmod\\pc\\rom_path.txt) after the first time; without one it also looks for a .z64,
+.n64 or .v64 in fishmod\\pc\\ and the decompilation's baseroms\\ntsc-1.2\\.
 Options are passed on to run_jobs.py (--ares, --parallel, --saves-dir).
 """
 import argparse
@@ -19,14 +21,28 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--rom", required=True)
+    ap.add_argument("--rom", default="")
     ap.add_argument("--packs", default=os.path.join(HERE, "packs"))
     ap.add_argument("--out", default=os.path.join(HERE, "results"))
     args, passthrough = ap.parse_known_args()
+    remembered = os.path.join(HERE, "rom_path.txt")
+    if not args.rom and os.path.exists(remembered):
+        args.rom = open(remembered).read().strip()
+    if not args.rom:
+        repo = os.path.normpath(os.path.join(HERE, "..", ".."))
+        found = [p for d in (HERE, os.path.join(repo, "baseroms", "ntsc-1.2"))
+                 for ext in ("z64", "n64", "v64") for p in glob.glob(os.path.join(d, "*." + ext))]
+        if found:
+            args.rom = found[0]
+    if not args.rom:
+        raise SystemExit("which ROM? Give its full path once:  run_all.bat C:\\path\\to\\oot.z64\n"
+                         "(it's remembered after that; or put the ROM in fishmod\\pc\\)")
     args.rom = os.path.abspath(args.rom)
     os.makedirs(args.out, exist_ok=True)
     if not os.path.isfile(args.rom):
-        raise SystemExit(f"the ROM isn't at {args.rom}: give its full path, e.g. C:\\roms\\oot.z64")
+        raise SystemExit(f"the ROM isn't at {args.rom}: give its full path, e.g. run_all.bat C:\\roms\\oot.z64")
+    open(remembered, "w").write(args.rom)
+    print(f"ROM: {args.rom}")
 
     # no ares yet (or a half-finished install): get it first
     sys.path.insert(0, HERE)
