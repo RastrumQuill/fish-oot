@@ -43,18 +43,28 @@ def props(base):
                        .split("#define FISHMOD_PROP_KINDS_GENERATED")[0])
     src = open(os.path.join(DATA, f"fishmod_sc_{base}.c")).read()
     out = []
-    for m in re.findall(r"\{ (-?\d+), (-?\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+), -?\d+, -?\d+ \}", src):
-        x, y, z, k, yaw, sc, tint = map(int, m)
-        out.append({"x": x, "y": y, "z": z, "kind": kinds[k], "yaw": yaw, "scale": sc / 64.0})
+    for m in re.findall(r"\{ (-?\d+), (-?\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+), (-?\d+), (-?\d+) \}", src):
+        x, y, z, k, yaw, sc, tint, tx, tz = map(int, m)
+        out.append({"x": x, "y": y, "z": z, "kind": kinds[k], "yaw": yaw, "scale": sc / 64.0, "tiltX": tx, "tiltZ": tz})
     return out
 
 
 def place(p, pts):
-    """The rock's points in the world, as the game draws it (fishmod_scatter.c, Scatter_Matrix)."""
+    """The rock's points in the world, as the game draws it (fishmod_scatter.c, Scatter_Matrix: stretched, tilted,
+    turned, scaled)."""
+    gs = load_tool("gen_scatter")
+    st = gs.rock_stretch(p["x"], p["z"])
     ang = ((p["yaw"] << 8) & 0xFFFF) * 2 * math.pi / 65536.0
-    c, s = math.cos(ang), math.sin(ang)
+    cy, sy = math.cos(ang), math.sin(ang)
+    tz = (p["tiltZ"] * 256) * 2 * math.pi / 65536.0
+    tx = (p["tiltX"] * 256) * 2 * math.pi / 65536.0
+    ct, s_t, cp, sp = math.cos(tz), math.sin(tz), math.cos(tx), math.sin(tx)
+    r = [[ct, s_t * cp, s_t * sp], [-s_t, ct * cp, ct * sp], [0.0, -sp, cp]]
+    rows = [[v * st[i] for v in r[i]] for i in range(3)]
+    rows = [(a * cy + c * sy, b, -a * sy + c * cy) for a, b, c in rows]
     k = p["scale"]
-    return [(p["x"] + (x * c + z * s) * k, p["y"] + y * k, p["z"] + (-x * s + z * c) * k) for x, y, z in pts]
+    return [tuple(p[("x", "y", "z")[j]] + k * (x * rows[0][j] + y * rows[1][j] + z * rows[2][j]) for j in range(3))
+            for x, y, z in pts]
 
 
 def sub(a, b):

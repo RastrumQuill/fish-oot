@@ -185,3 +185,15 @@ Then 5 (feel) and 7 (behaviour) together, since bites depend on mood and senses.
 5. **Plants and the dock ignore night**: they stay lit as by day.
 6. **Equipment on C buttons**: boots, tunics and swords should be assignable to C, for convenience.
 7. **Still a lot of pop-in** (above water: the original 800-1600 draw distances; see the rotation check).
+
+## Rocks (after test 5)
+- **Done:** each rock stretched along its own axes by a hash of where it stands (x and z 0.75-1.35, height
+  0.7-1.15; no per-prop data, the game and gen_scatter.py compute the same) and tilted up to 12 degrees, sunk so the
+  raised edge stays in the bed. Collision follows (3,333 triangles; lookup 14,894 of 19,362 nodes). Plants unmoved.
+- **Not done, measured:** a lower-triangle version for small rocks. Rocks are 6% of the props, they're drawn with
+  back faces culled on the RSP (so only the ~8 facing triangles reach the RDP), and half are under 0.47 scale; a
+  smaller version saves a few triangles each on a few dozen rocks in view: well under 1% of the props' RDP time.
+- **Not done, measured:** deleting triangles buried inside another rock (9% of rock triangles) or under the bed
+  (under 1%). All rocks share one display list, so this needs a mesh per rock (memory, and read bandwidth per
+  frame) to save under 1% of the props' triangles.
+- **Held:** vertex colours per rock for variety; the caustics on rocks.
