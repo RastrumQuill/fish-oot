@@ -6,6 +6,7 @@
  *  - Draws debug text lines that any code can set with Fishmod_DebugPrintf
  */
 
+#include "dma.h"
 #include "fishmod.h"
 
 #if FISHMOD_DEBUG
@@ -910,6 +911,15 @@ static u64 sSweepWhole; // every kind cut, if that changed the frame
 static s32 sSweepSettle;
 static s32 sSweepGrabFails;
 
+// each part takes its own run of the views (one stretch of the lake each, its times of day together)
+static s32 Sweep_PartStart(void) {
+    return (s32)((s64)SWEEP_SLOTS * sSweepPart / sSweepParts);
+}
+
+static s32 Sweep_PartEnd(void) {
+    return (s32)((s64)SWEEP_SLOTS * (sSweepPart + 1) / sSweepParts);
+}
+
 static u8* Sweep_Need(s32 kind) {
 #ifdef FISHMOD_LOD_TUNE
     return &sSweep.need[sSweepView % TUNE_TIMES][gFishmodLodTest.under][sTuneKnob][kind];
@@ -994,12 +1004,16 @@ static void Fishmod_LodUpdate(PlayState* play) {
         sLodStateFrames = play->state.frames;
         gFishmodLodTest.active = true;
         sSweepSettle = SWEEP_SETTLE + 200; // the first: the scene's lights are still coming up
-        // which part this is, if the runner said (fishmod/pc/run_jobs.py writes it into the save)
+        // which part this is, if the runner said: in the ROM's header (the name field, which nothing checks), else
+        // in the save (fishmod/pc/run_jobs.py writes both)
         {
-            u32 pt[3];
+            static u32 pt[4] ALIGNED(16);
 
-            SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7C00, pt, sizeof(pt), OS_READ);
-            if ((pt[0] == 0x464D5054) && (pt[2] > 0) && (pt[1] < pt[2])) { // 'FMPT'
+            DmaMgr_RequestSync(pt, 0x20, sizeof(pt));
+            if (!((pt[0] == 0x464D5054) && (pt[2] > 0) && (pt[1] < pt[2]))) { // 'FMPT'
+                SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7C00, pt, 12, OS_READ);
+            }
+            if ((pt[0] == 0x464D5054) && (pt[2] > 0) && (pt[1] < pt[2])) {
                 sSweepPart = pt[1];
                 sSweepParts = pt[2];
             }
@@ -1009,8 +1023,8 @@ static void Fishmod_LodUpdate(PlayState* play) {
         if ((sSweep.magic != 0x464C5357) || (sSweep.part != sSweepPart) || (sSweep.parts != sSweepParts)) {
             bzero(&sSweep, sizeof(sSweep));
         }
-        sSweepView = sSweepPart + sSweep.done * sSweepParts;
-        if (sSweepView >= SWEEP_SLOTS) {
+        sSweepView = Sweep_PartStart() + sSweep.done;
+        if (sSweepView >= Sweep_PartEnd()) {
             sSweepState = SW_DONE;
             gFishmodLodTest.active = false;
             return;
@@ -1029,7 +1043,8 @@ static void Fishmod_LodUpdate(PlayState* play) {
         Fishmod_DebugPrintf(2, "LOD sweep done: %d views", sSweep.done);
         return;
     }
-    Fishmod_DebugPrintf(2, "LOD sweep view %d/%d", sSweepView, SWEEP_SLOTS);
+    Fishmod_DebugPrintf(2, "LOD part %d/%d: %d of %d", sSweepPart + 1, sSweepParts, sSweepView - Sweep_PartStart() + 1,
+                        Sweep_PartEnd() - Sweep_PartStart());
     if (sSweepState == SW_ARRIVE) {
         if (--sSweepSettle > 0) {
             return;
@@ -1280,8 +1295,8 @@ static void Fishmod_LodUpdate(PlayState* play) {
 #endif
             sSweep.done++;
             Sweep_Save();
-            sSweepView += sSweepParts;
-            if (sSweepView >= SWEEP_SLOTS) {
+            sSweepView++;
+            if (sSweepView >= Sweep_PartEnd()) {
                 Sweep_Save();
                 sSweepState = SW_DONE;
                 gFishmodLodTest.active = false;

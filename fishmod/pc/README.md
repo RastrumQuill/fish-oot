@@ -45,7 +45,7 @@ runs the game. The runner prints `NNNN game frames ran (NN/s)`; about 20 per sec
 **If no frames ran:** the game didn't start. That means the black screen from before: most likely ares's Expansion
 Pak setting, or its video driver (try another under *Settings → Video*).
 
-## The LOD tuning pack: `lodtune`
+## The LOD tuning pack: `lodtune2`
 
 It runs 14 ares at once, each pinned to its own core, with the first two cores left to Windows. Each instance runs
 as fast as it can: no sound, no frame limit. It looks at Lake Hylia from 3,396 views (above and under water, looking
@@ -53,7 +53,7 @@ down, level and up), each at dawn, noon, dusk and midnight. For every plant kind
 of three things can start at without the picture changing: where the kind stops being drawn, where it becomes a
 single card, and where it switches to the half-size texture.
 
-- **Run it:** put `lodtune.zip` in `fishmod\pc\packs\` and run `run_all.bat` as usual. Each instance runs up to
+- **Run it:** put `lodtune2.zip` in `fishmod\pc\packs\` and run `run_all.bat` as usual. Each instance runs up to
   4 hours. Running it again carries on where it stopped, so if it isn't finished, run it again.
 - **How many at once:** `--parallel N` sets it (default: your logical cores less two). `--keep-cores` sets how many
   of the first cores are left alone.

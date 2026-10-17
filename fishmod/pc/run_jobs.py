@@ -133,7 +133,12 @@ def main():
             jd = os.path.abspath(os.path.join(out, job["name"]))  # (ares runs in it: paths must be absolute)
             os.makedirs(jd, exist_ok=True)
             rom = os.path.join(jd, job["name"] + ".z64")
-            open(rom, "wb").write(bps.apply(base, pack.read(job["patch"])))
+            image = bytearray(bps.apply(base, pack.read(job["patch"])))
+            for off, hexbytes in job.get("rom_poke", {}).items():
+                # (the job's own bytes in the ROM's header, its part say: one patch serves every part)
+                b = bytes.fromhex(hexbytes)
+                image[int(off, 16):int(off, 16) + len(b)] = b
+            open(rom, "wb").write(image)
             # carry on from an earlier run's save, for the long resumable jobs
             prev = os.path.join(jd, "result.sav")
             if job.get("resume") and os.path.exists(prev):
