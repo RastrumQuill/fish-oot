@@ -118,7 +118,8 @@ def main():
     ncpu = os.cpu_count() or 4
     cores = list(range(min(args.keep_cores, ncpu - 1), ncpu))  # the cores ares may use
     if args.parallel <= 0:
-        args.parallel = max(1, len(cores))
+        # (a pack can cap it: "parallel" in jobs.json)
+        args.parallel = max(1, min(len(cores), spec.get("parallel", len(cores))))
     free_cores = list(cores)
     out = os.path.join(args.out, name)
     os.makedirs(out, exist_ok=True)
