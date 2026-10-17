@@ -4,9 +4,12 @@ report: per tour stop and mode, the frame rate, where the frame's time goes (CPU
 (command buffer busy / pipeline busy / TMEM loads, as shares of its cycles), and what each mode changes against the
 build as shipped; then the memory tests (latency and bandwidth, with the RDP idle and busy).
 
-Usage: fishmod/tools/hwbench_report.py save.sav [--md out.md]
+Usage: fishmod/tools/hwbench_report.py save.sav [--vs other.sav] [--md out.md]
+  --vs: compare with a second save of the same bench (e.g. the IDO build against the GCC one): per mode and per stop,
+        the CPU's update and draw time, the RDP's time and the frame rate, side by side.
 """
 import argparse
+import os
 import struct
 
 MODES_V = {
@@ -85,14 +88,66 @@ def avg(cell, name):
     return sums[METRICS.index(name)] / frames if frames else 0.0
 
 
+def compare(a, b, name_a, name_b, p):
+    """Two saves of the same bench side by side (b against a), over the stops both measured."""
+    if a["version"] != b["version"]:
+        raise SystemExit(f"different bench versions ({a['version']} and {b['version']}): not comparable")
+    MODES = MODES_V[a["version"]]
+    cols = [("cpu_update", "CPU upd"), ("cpu_draw", "CPU draw"), ("rsp_gfx", "RSP"), ("rdp", "RDP"),
+            ("period", "frame")]
+    p(f"# Bench comparison: {name_b} against {name_a}\n")
+    p(f"{name_a}: {a['laps']} laps; {name_b}: {b['laps']} laps. Times are ms per frame, averaged over the stops both "
+      "saves measured in that mode; the change is the second save's against the first's.\n")
+    p("## Per mode\n")
+    p("| mode | stops | " + " | ".join(f"{c} A | {c} B | change" for _, c in cols) + " |")
+    p("|---|---|" + "---|---|---|" * len(cols))
+    for m, mode in enumerate(MODES):
+        sa = {k: 0.0 for k, _ in cols}
+        sb = {k: 0.0 for k, _ in cols}
+        n = 0
+        for ra, rb in zip(a["cells"], b["cells"]):
+            if not ra[m][0] or not rb[m][0]:
+                continue
+            n += 1
+            for k, _ in cols:
+                sa[k] += avg(ra[m], k)
+                sb[k] += avg(rb[m], k)
+        if not n:
+            continue
+        cells = []
+        for k, _ in cols:
+            va, vb = sa[k] / n / 1000, sb[k] / n / 1000
+            cells.append(f"{va:.1f} | {vb:.1f} | {100 * (vb - va) / va:+.0f}%" if va else f"{va:.1f} | {vb:.1f} | -")
+        p(f"| {mode} | {n} | " + " | ".join(cells) + " |")
+    p("\n## Per stop (base mode)\n")
+    p("| stop | props A/B | CPU upd A | B | CPU draw A | B | RDP A | B | fps A | B |")
+    p("|---|---|---|---|---|---|---|---|---|---|")
+    for s, (ra, rb) in enumerate(zip(a["cells"], b["cells"])):
+        ca, cb = ra[0], rb[0]
+        if not ca[0] or not cb[0]:
+            continue
+        f = lambda c, k: avg(c, k) / 1000
+        p(f"| {s + 1} {STOP_NAMES[s]} | {avg(ca, 'props'):.0f}/{avg(cb, 'props'):.0f} | "
+          f"{f(ca, 'cpu_update'):.1f} | {f(cb, 'cpu_update'):.1f} | {f(ca, 'cpu_draw'):.1f} | {f(cb, 'cpu_draw'):.1f} | "
+          f"{f(ca, 'rdp'):.1f} | {f(cb, 'rdp'):.1f} | {1e6 / avg(ca, 'period'):.1f} | {1e6 / avg(cb, 'period'):.1f} |")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("save")
+    ap.add_argument("--vs")
     ap.add_argument("--md")
     args = ap.parse_args()
     r = read(args.save)
     out = []
     p = out.append
+    if args.vs:
+        compare(r, read(args.vs), os.path.basename(args.save), os.path.basename(args.vs), p)
+        text = "\n".join(out) + "\n"
+        print(text)
+        if args.md:
+            open(args.md, "w").write(text)
+        return
     p(f"# Hardware bench ({'original-hardware build' if r['hw'] else 'emulator build'})\n")
     MODES = MODES_V[r["version"]]
     p(f"{r['laps']} full laps, {r['visits']} stop visits.\n")
@@ -133,13 +188,15 @@ def main():
             rdp[m] = tr / n
             p(f"| {m} | {mean / 1000:.1f} ms ({1e6 / mean:.1f} fps) | {100 * (mean - base) / base:+.1f}% | "
               f"{rdp[m] / 1000:.1f} ms | {100 * (rdp[m] - base_rdp) / base_rdp:+.1f}% |")
-    if "nosky" in rdp and "noprops" in rdp and "noxlu" in rdp:
+    if "nosky" in rdp and "noprops" in rdp:
         p("\n## Where the RDP's time goes (mean over the stops)\n")
         p(f"- props: {(rdp['base'] - rdp['noprops']) / 1000:.1f} ms; those within 500 units "
           f"{(rdp['base'] - rdp['nonear']) / 1000:.1f} ms, those past it {(rdp['base'] - rdp['nofar']) / 1000:.1f} ms")
         p(f"- skybox: {(rdp['noprops'] - rdp['nosky']) / 1000:.1f} ms")
-        p(f"- room translucency (the water surface): {(rdp['noprops'] - rdp['noxlu']) / 1000:.1f} ms")
-        p(f"- the rest (terrain, actors, fish, the HUD): {rdp['nosky'] / 1000:.1f} ms less the water's share")
+        if "noxlu" in rdp:
+            p(f"- room translucency (the water surface): {(rdp['noprops'] - rdp['noxlu']) / 1000:.1f} ms")
+        p(f"- the rest (terrain, actors, fish, the HUD): {rdp['nosky'] / 1000:.1f} ms"
+          + (" less the water's share" if "noxlu" in rdp else ""))
 
     p("\n## Memory (CPU count cycles: 46.875 MHz)\n")
     p("| test | RDP idle | RDP busy | samples (idle/busy) |")
