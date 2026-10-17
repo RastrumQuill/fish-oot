@@ -178,6 +178,9 @@ Then 5 (feel) and 7 (behaviour) together, since bites depend on mood and senses.
 2. **"Keep it in a bottle?"**: the "Yes" and "No" choices are misaligned.
 3. **Rock collision is too chunky**: Link visibly floats over most rocks, and from some angles (from below) he
    phases into them.
+   **Done:** each rock's collision is now its own drawn mesh (16 triangles, 3,409 in all, against 977 for the
+   hulls). Lake Hylia's collision lookup uses 14,947 of its 19,343 nodes (the debug builds write this to SRAM
+   0x7D00 as a scene loads). CPU update in the ares tour: 16.4 → 17.7 ms, hidden behind the RDP.
 4. **A sound keeps going while fishing**: probably the reel sound while the hook sinks after the bobber lands.
 5. **Plants and the dock ignore night**: they stay lit as by day.
 6. **Equipment on C buttons**: boots, tunics and swords should be assignable to C, for convenience.
