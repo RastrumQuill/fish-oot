@@ -41,3 +41,4 @@ fishmod/pc/packs/*.zip
 fishmod/pc/results/
 fishmod/pc/ares/
 /fishmod/pc/ares_tmp
+fishmod/pc/rom_path.txt
