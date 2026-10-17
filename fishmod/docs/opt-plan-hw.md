@@ -172,3 +172,34 @@ what the new way saves (a positive change means the new way wins):
   laps without a crash. Its RDP time should be unchanged (within 2%); if it isn't, look at why before keeping it.
 - **A crash** in either save (the breadcrumb shows where): that build's result is read up to the crash, and the crash
   is fixed before anything else.
+
+## Fourth results (hwbench-4.md, SummerCart: IDO 12 laps, GCC 15 laps, no crash in either)
+Mean RDP time over the 22 stops (GCC save; the IDO save agrees within 1 point everywhere):
+
+| | RDP | against base |
+|---|---|---|
+| base (as shipped in 5e) | 63.1 ms | |
+| far props cut to outlines (`trimfar`) | 80.0 ms | +27% |
+| `notri` | 81.8 ms | +30% |
+| old edge mode (`altedge`) | 71.3 ms | +13% |
+| no strict nearest-first order (`nostrict`) | 63.1 ms | 0.0% |
+
+- **A flaw in the `notri` mode:** it also gave the other kinds' far props their cut outlines, so it holds `trimfar`'s
+  cost too. The single triangle's own share is `notri − trimfar`: +1.8 ms (2.8%) in both saves, up to 4-5 ms at the
+  worst stops (1, 10, 11, 19).
+- **Since hwbench-2:** base RDP 82.8 → 63.1 ms (−24%), the props 54.7 → 36.2 ms. The uncut far cards are most of it.
+- **Where it goes now:** props 36 ms (near 17, far 16.5), skybox 5.3 ms, everything else 22 ms. Without the props
+  every stop holds 20 fps.
+- **The worst stops** are still props: 10 (129 ms, 106 of it props), 11 (133 / 103), 17 (109 / 82), 1 (103 / 72),
+  12 (102 / 78). There both near and far are 30-60 ms each.
+- **GCC:** CPU update −14%, CPU draw −16%, RDP −2% (feeding it sooner), frame −1% (the frame is the RDP's).
+
+### Decisions (by the rules set before the results)
+- Uncut far cards: kept. One triangle per small-plant card: kept (+2.8% when off).
+- Strict nearest-first order: dropped (no difference; the sort cost CPU). The code is gone.
+- Edge mode for near props: kept, as hwbench-2 found.
+- GCC: now the default (`build.sh`; `--ido` for the old compiler).
+- **Lily pads as one triangle: not done.** Vanilla's pad is a 3-triangle fan, and its normals light one corner (two
+  vertices face up, three have zero normals), so its shading is piecewise. One triangle would change that shading
+  by up to 35% of the sun's share somewhere on the pad: not invisible. (Its fan also cuts off a corner of the
+  texture, which a triangle could keep.) The lotus flowers and centres already have one triangle.
