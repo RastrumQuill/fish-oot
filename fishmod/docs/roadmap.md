@@ -219,7 +219,8 @@ players have landmarks to navigate and read the water by.
 ### 2. Lake Hylia boat
 
 A small boat you can ride, working like Epona does, to reach more of Lake Hylia for fishing. It's only available at
-Lake Hylia.
+Lake Hylia. MM's references: `ovl_Bg_Ingate` (the swamp tour boat, which Link stands on as it follows a path) and
+`ovl_Obj_Boat` (the pirates' boats).
 
 ### 3. Expanded Fishing Pond
 
@@ -228,7 +229,8 @@ A much larger version of the Fishing Pond (a new scene, likely built with Fast64
 ### 4. Lake Hylia lab aquarium
 
 Much later: turn the Lake Hylia laboratory into an aquarium where you can keep your favourite catches, like a
-living version of the fishing journal.
+living version of the fishing journal. MM's Marine Research Lab fish (`ovl_En_Fish2`: fish in a tank that you feed
+and that grow) is the closest existing thing.
 
 ### 5. New items: bug net, fishing rod, pictograph box, journal
 
@@ -251,7 +253,10 @@ in the spirit of vanilla (ammo top left, arrows and tools right, bottles along t
   wildlife that's in the shot (actors on screen and close enough when the shutter fires), plus a selfie
   camera with a caught fish. Only a few photos are stored (each is about 9 KB at MM's 160 × 112, 4-bit); entries
   are "logged" flags shown with the live model or a pre-made image.
-  - MM's code is fine to learn from (zeldaret/mm). MM's assets (the box model, its icon, the viewfinder
+  - MM's code is fine to learn from (zeldaret/mm). In RastrumQuill/mm: `src/code/z_snap.c` (`Snap_RecordPictographedActors` walks
+    every actor list and flags what was in the shot; `Snap_ValidatePictograph` checks distance, facing, the capture
+    region on screen and a line-of-sight ray, which is the logging check the box needs). MM saves to 128 KB of
+    Flash (`sys_flashrom.c`, `z_sram_NES.c`): the bigger save type the compendium needs. MM's assets (the box model, its icon, the viewfinder
     graphics, the shutter sound) aren't in the OoT ROM, so they'd be made new for the mod.
   - Pre-rendered rooms (shops, the Market and such) have a fixed camera, so first-person photos don't work there,
     and some NPCs only appear in them, so a complete log would need those rooms rebuilt in 3D. Not worth solving

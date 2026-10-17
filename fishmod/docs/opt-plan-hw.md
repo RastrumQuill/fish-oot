@@ -203,3 +203,16 @@ Mean RDP time over the 22 stops (GCC save; the IDO save agrees within 1 point ev
   vertices face up, three have zero normals), so its shading is piecewise. One triangle would change that shading
   by up to 35% of the sun's share somewhere on the pad: not invisible. (Its fan also cuts off a corner of the
   texture, which a triangle could keep.) The lotus flowers and centres already have one triangle.
+
+## What Majora's Mask does (zeldaret/mm, RastrumQuill/mm)
+MM's answer to a lush field is `ovl_Obj_Grass` (Termina Field's grass):
+- **Bushes are opaque solid meshes,** one shared display list, not cut-out cards: our solid-geometry fallback is
+  what MM shipped.
+- **Groups:** the bushes come in groups. Each group is tested once (distance under 1280 and a bounding check
+  against the view, `func_809A9110`) and binds the scene's lights once for all its bushes.
+- **Distance:** opaque within 1080 units, then a translucent fade to nothing by 1180 (a pop-free cutoff). Beyond
+  that there's no grass at all. MM keeps fields lush only near the camera; the distance is bare ground.
+- **What we already do better:** batched per-area props, far LOD cards, per-prop view test, material sorting.
+- **What to borrow, if needed:** (1) solid meshes for the near bushy plants (weed clumps, broadleaf), the fallback
+  above; (2) the fade instead of a pop at the far cutoff (costs a translucent pass, so only for a thin band).
+The meshes themselves are in MM's assets, which need an MM ROM to extract; the code is readable without one.
