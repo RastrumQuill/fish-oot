@@ -1528,10 +1528,10 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 
 typedef enum BenchMode {
     BENCH_BASE,
-    BENCH_ALTEDGE,  // the props' old edge mode (FISHMOD_BENCH_ALTEDGE)
-    BENCH_TRIMFAR,  // far props cut to their outlines too, as before (FISHMOD_BENCH_TRIMFAR)
-    BENCH_NOTRI,    // the small plants' cut outlines instead of one triangle per card
-    BENCH_NOSTRICT, // the nearest props by band and kind, not strictly nearest first
+    BENCH_NOIMP,      // no far single cards: whole cards out to the cutoff (FISHMOD_BENCH_NOIMP)
+    BENCH_NOFARTEX,   // far props on full-size textures (FISHMOD_BENCH_NOFARTEX)
+    BENCH_NODISSOLVE, // the single cards pop at the cutoff (FISHMOD_BENCH_NODISSOLVE)
+    BENCH_ZSAME,      // the depth buffer in the frame buffers' bank (FISHMOD_BENCH_ZSAME)
     BENCH_NONEAR,   // the props past FISHMOD_BENCH_NEAR only
     BENCH_NOFAR,    // the props within it only
     BENCH_NOPROPS,
@@ -1749,10 +1749,10 @@ static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
 static void Bench_SetMode(s32 mode) {
     static const s32 sFlags[BENCH_MODES] = {
         0,
-        FISHMOD_BENCH_ALTEDGE,
-        FISHMOD_BENCH_TRIMFAR,
-        FISHMOD_BENCH_NOTRI,
-        FISHMOD_BENCH_NOSTRICT,
+        FISHMOD_BENCH_NOIMP,
+        FISHMOD_BENCH_NOFARTEX,
+        FISHMOD_BENCH_NODISSOLVE,
+        FISHMOD_BENCH_ZSAME,
         FISHMOD_BENCH_NONEAR,
         FISHMOD_BENCH_NOFAR,
         FISHMOD_BENCH_NOPROPS,
@@ -1764,7 +1764,7 @@ static void Bench_SetMode(s32 mode) {
 
 static void Bench_Save(void) {
     sBench.magic = 0x4642454E; // 'FBEN'
-    sBench.version = 4;
+    sBench.version = 5;
     sBench.stops = BENCH_STOPS;
     sBench.modes = BENCH_MODES;
     sBench.metrics = BENCH_METRICS;
@@ -1856,7 +1856,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
             break;
     }
     {
-        static const char* sModeNames[] = { "base", "altedge", "trimfar", "notri", "nostrict", "nonear", "nofar", "noprops", "nosky" };
+        static const char* sModeNames[] = { "base", "noimp", "nofartex", "nodissolve", "zsame", "nonear", "nofar", "noprops", "nosky" };
 
         Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
                             (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);

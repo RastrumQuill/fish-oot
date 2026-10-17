@@ -324,6 +324,10 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_TRIMFAR (1 << 9)    // far props drawn cut to their outlines too (the old way)
 #define FISHMOD_BENCH_NOTRI (1 << 10)     // the small plants' cut outlines instead of one triangle per card
 #define FISHMOD_BENCH_NOSTRICT (1 << 11)  // (hwbench-4 only: strict nearest-first order, since dropped, made no difference)
+#define FISHMOD_BENCH_NOIMP (1 << 12)      // no far single cards: the whole cards out to the cutoff
+#define FISHMOD_BENCH_NOFARTEX (1 << 13)   // far props on their full-size textures
+#define FISHMOD_BENCH_NODISSOLVE (1 << 14) // the single cards pop at the cutoff instead of dissolving
+#define FISHMOD_BENCH_ZSAME (1 << 15)      // the depth buffer in the frame buffers' 1 MB bank (bank layout test)
 #define FISHMOD_BENCH_1CYCLE (1 << 4)     // the props in 1-cycle mode (no fog, no tint): pipeline or memory bound?
 #define FISHMOD_BENCH_NONEAR (1 << 5)     // props within FISHMOD_BENCH_NEAR not drawn
 #define FISHMOD_BENCH_NOFAR (1 << 6)      // props past it not drawn
@@ -331,6 +335,10 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
 #define FISHMOD_BENCH_NEAR 500.0f
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
+// the depth buffer to draw with: the bench's ZSAME mode puts it in the frame buffers' 1 MB bank (main.c reserves room
+// just below them), to measure how much the banks matter
+extern u16* gFishmodZSame;
+#define FISHMOD_ZBUFFER ((FISHMOD_BENCH_SKIP(FISHMOD_BENCH_ZSAME) && (gFishmodZSame != NULL)) ? gFishmodZSame : (u16*)gZBuffer)
 extern s32 gFishmodBench;
 extern s32 gFishmodScatterDrawn; // props drawn in the last frame
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
@@ -364,6 +372,7 @@ extern s16 gFishmodDebugFocusYaw;
         stmt;                    \
     }
 #define FISHMOD_BENCH_SKIP(flag) 0
+#define FISHMOD_ZBUFFER ((u16*)gZBuffer)
 #endif
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */

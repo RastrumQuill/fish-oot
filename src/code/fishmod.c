@@ -1083,6 +1083,7 @@ void Fishmod_AdvanceTime(PlayState* play) {
 #define HAZE_FOG_NEAR 953 // the fog's start (of 1000, with vanilla's far plane; vanilla's water is about 990)
 f32 gFishmodHaze;
 s32 gFishmodTexCompress;
+u16* gFishmodZSame; // (debug builds: main.c)
 
 static void Fishmod_UpdateHaze(PlayState* play) {
     Vec3f eye = play->view.eye;

@@ -17,6 +17,7 @@ MODES_V = {
     2: ["base", "altedge", "nozupd", "1cycle", "nonear", "nofar", "noprops", "nosky", "noxlu"],
     3: ["base", "altedge", "trimfar", "nonear", "nofar", "noprops", "nosky", "noxlu"],
     4: ["base", "altedge", "trimfar", "notri", "nostrict", "nonear", "nofar", "noprops", "nosky"],
+    5: ["base", "noimp", "nofartex", "nodissolve", "zsame", "nonear", "nofar", "noprops", "nosky"],
 }
 MODE_DOC = {
     "base": "as shipped",
@@ -30,6 +31,10 @@ MODE_DOC = {
     "altedge": "props with the other edge mode (anti-aliased in the RDP, reading the colour buffer, or by the VI only)",
     "nozupd": "props without depth writes",
     "1cycle": "props in 1-cycle mode, no fog or tint (is the RDP's pipeline or its memory the limit?)",
+    "noimp": "no far single cards: the whole cards out to the cutoff",
+    "nofartex": "far props on their full-size textures",
+    "nodissolve": "the far single cards pop at the cutoff instead of dissolving",
+    "zsame": "the depth buffer in the frame buffers' 1 MB bank (how much the banks matter)",
     "nonear": "only the props past 500 units",
     "nofar": "only the props within 500 units",
     "nosky": "no props, no skybox",

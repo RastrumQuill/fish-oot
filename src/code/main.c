@@ -1,3 +1,4 @@
+#include "fishmod.h"
 #include "sys_cfb.h"
 #include "ultra64.h"
 #include "versions.h"
@@ -115,6 +116,12 @@ void Main(void* arg) {
     systemHeapStart = (uintptr_t)_buffersSegmentEnd;
 #endif
     fb = (uintptr_t)SysCfb_GetFbPtr(0);
+#if FISHMOD_DEBUG
+    // room for the bench's other depth buffer, just below the frame buffers (their 1 MB bank)
+    fb -= SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16);
+    fb &= ~0x3F;
+    gFishmodZSame = (u16*)fb;
+#endif
     gSystemHeapSize = fb - systemHeapStart;
     PRINTF(T("システムヒープ初期化 %08x-%08x %08x\n", "System heap initialization %08x-%08x %08x\n"), systemHeapStart,
            fb, gSystemHeapSize);

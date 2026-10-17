@@ -1,3 +1,4 @@
+#include "fishmod.h"
 #include "gfx.h"
 #include "gfx_setupdl.h"
 
@@ -1522,9 +1523,9 @@ void Gfx_SetupFrame(GraphicsContext* gfxCtx, u8 r, u8 g, u8 b) {
     gDPSetColorImage(OVERLAY_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, gScreenWidth, gfxCtx->curFrameBuffer);
 
     // Set up the z-buffer
-    gDPSetDepthImage(POLY_OPA_DISP++, gZBuffer);
-    gDPSetDepthImage(POLY_XLU_DISP++, gZBuffer);
-    gDPSetDepthImage(OVERLAY_DISP++, gZBuffer);
+    gDPSetDepthImage(POLY_OPA_DISP++, FISHMOD_ZBUFFER);
+    gDPSetDepthImage(POLY_XLU_DISP++, FISHMOD_ZBUFFER);
+    gDPSetDepthImage(OVERLAY_DISP++, FISHMOD_ZBUFFER);
 
     if ((R_PAUSE_BG_PRERENDER_STATE <= PAUSE_BG_PRERENDER_SETUP) && (gTransitionTileState <= TRANS_TILE_SETUP)) {
         s32 letterboxSize = Letterbox_GetSize();
@@ -1576,7 +1577,7 @@ void Gfx_SetupFrame(GraphicsContext* gfxCtx, u8 r, u8 g, u8 b) {
 
         // Set the whole z buffer to maximum depth
         // Don't bother with pixels that are being covered by the letterbox
-        gDPSetColorImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, gScreenWidth, gZBuffer);
+        gDPSetColorImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, gScreenWidth, FISHMOD_ZBUFFER);
         gDPSetCycleType(POLY_OPA_DISP++, G_CYC_FILL);
         gDPSetRenderMode(POLY_OPA_DISP++, G_RM_NOOP, G_RM_NOOP2);
         gDPSetFillColor(POLY_OPA_DISP++, (GPACK_ZDZ(G_MAXFBZ, 0) << 16) | GPACK_ZDZ(G_MAXFBZ, 0));
@@ -1612,7 +1613,7 @@ void func_80095974(GraphicsContext* gfxCtx) {
 
     gSPDisplayList(POLY_OPA_DISP++, sFillSetupDL);
     gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, 0, 0, gScreenWidth, gScreenHeight);
-    gDPSetDepthImage(POLY_OPA_DISP++, gZBuffer);
+    gDPSetDepthImage(POLY_OPA_DISP++, FISHMOD_ZBUFFER);
     gDPSetColorImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, gScreenWidth, gfxCtx->curFrameBuffer);
 
     CLOSE_DISPS(gfxCtx, "../z_rcp.c", 2513);

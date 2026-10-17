@@ -19,6 +19,7 @@ import os
 import random
 import sys
 
+import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -39,7 +40,20 @@ MESH_TRI = os.path.join(ROOT, "src", "fishmod_data", "habitat_tri")
 # the meshes of kinds whose texture gets a see-through margin (so the triangle has room past the leaves' edges),
 # their UVs moved onto the bigger texture
 MESH_PAD = os.path.join(ROOT, "src", "fishmod_data", "habitat_pad")
+# the far single cards (fishmod/tools/impostor.py) and the half-size far textures, made from the ROM's textures
+MESH_IMP = os.path.join(ROOT, "src", "fishmod_data", "habitat_imp")
+# The far tiers' distances come from how big things are on screen: the game's 60 degree view over 240 lines puts
+# 207.8 pixels per unit of size at a distance of one unit.
+PX_PER_UNIT = 207.8
+# a plant becomes its single card once it's no taller on screen than this (at scale 1; the game scales it per prop).
+# Checked with the exact A/B capture (edge_ab_capture.py, bench flag NOIMP)
+IMP_PX = 16
 TRI_KINDS = {"grass_tuft", "float_leaves", "leaf_litter", "spatterdock", "lily_flower", "lily_centre"}
+# upright plants that get the far single card (fishmod/tools/impostor.py): turned to face the camera, so not the flat
+# ones (floating leaves, litter, lily flowers), nor wood and the dock
+IMPOSTOR_KINDS = {"grass_tuft", "ribbon_weed", "tall_weed", "broadleaf", "bush_weed", "reed_clump", "cattails",
+                  "old_posts", "rush_tuft", "iris", "big_pondweed", "kelp_frond", "vine_strand", "vine_curtain",
+                  "bank_roots", "marigold", "fan_weed"}
 
 
 def hexc(h):
@@ -860,6 +874,43 @@ VANILLA_KINDS = ["pond_reed", "lily_pad", "rock"]  # object_fish's own (the Fish
 DATA = os.path.join(ROOT, "src", "fishmod_data")
 
 
+def half_texture(src, out):
+    """The texture at half size: colour averaged over the texels that show, see-through where under half of them do.
+    None if it's already small (8 texels on a side)."""
+    img = Image.open(src).convert("RGBA")
+    w, h = img.size
+    if min(w, h) <= 8:
+        return None
+    a = np.asarray(img).astype(float).reshape(h // 2, 2, w // 2, 2, 4)
+    alpha = a[..., 3]
+    weight = (alpha >= 128).astype(float)
+    n = weight.sum((1, 3))
+    rgb = (a[..., :3] * weight[..., None]).sum((1, 3)) / np.maximum(n, 1)[..., None]
+    rgb_all = a[..., :3].mean((1, 3))
+    rgb = np.where(n[..., None] > 0, rgb, rgb_all)
+    o = np.zeros((h // 2, w // 2, 4), np.uint8)
+    o[..., :3] = np.clip(rgb, 0, 255)
+    o[..., 3] = np.where(n >= 2, 255, 0)
+    Image.fromarray(o).save(out)
+    return out
+
+
+def half_distance(mesh_path, tex_path):
+    """How far away (at scale 1) the half-size texture can't be told apart: a texel of the full texture is then
+    smaller than half a pixel on screen. From the mesh's UVs: the most texels per unit along any edge, either way
+    across the texture (upright cards and flat leaves alike)."""
+    import impostor
+    pos, uv, _, tris = impostor.load_obj(mesh_path)
+    tw, th = Image.open(tex_path).size
+    best = 0.0
+    for (a, ta), (b, tb), (c, tc) in tris:
+        for (i, ti), (j, tj) in (((a, ta), (b, tb)), ((b, tb), (c, tc)), ((c, tc), (a, ta))):
+            d = math.dist(pos[i], pos[j])
+            if d > 1e-3 and ti >= 0 and tj >= 0:
+                best = max(best, math.hypot((uv[ti][0] - uv[tj][0]) * tw, (uv[ti][1] - uv[tj][1]) * th) / d)
+    return PX_PER_UNIT * 2 / best if best > 0 else 0.0
+
+
 def write_props_manifest():
     """The textures and models as an assets.py manifest (into src/fishmod_data/, generated at build time)."""
     import json
@@ -868,6 +919,7 @@ def write_props_manifest():
     out = "src/fishmod_data/fishmod_props.inc.c"
     textures, models, materials, seen = [], [], [], set()
     tri_kinds_built = []
+    seen_half, have_half, half_kinds, imp_kinds = set(), set(), [], []
     for kind, tex, fmt in PROP_KINDS:
         pad = None
         if kind in TRI_KINDS:
@@ -902,12 +954,49 @@ def write_props_manifest():
             if is_tri:
                 tri = remap_obj(tri, os.path.join(MESH_PAD, kind + "_tri.obj"), pad)
         texname = "gFishmodProp_" + tex + "Tex"
+        # far away (past the near tier): the texture at half size, from where a texel is under half a pixel
+        tex_src = os.path.join(ART_ROM, tex + ".png")
+        if not os.path.exists(tex_src):
+            tex_src = os.path.join(ART, tex + ".png")
+        if pad is not None:
+            tex_src = os.path.join(ART_ROM, tex + "_pad.png")
+        halfname = None
+        half_png = os.path.join(MESH_IMP, tex + "_half.png")
+        os.makedirs(MESH_IMP, exist_ok=True)
+        if tex not in seen_half:
+            seen_half.add(tex)
+            if half_texture(tex_src, half_png):
+                textures.append({"name": "gFishmodProp_" + tex + "HalfTex", "src": os.path.relpath(half_png, ROOT),
+                                 "format": fmt, "out": out})
+                if fmt in COMPRESS_4BIT:
+                    textures.append({"name": "gFishmodProp_" + tex + "HalfTex4", "src": os.path.relpath(half_png, ROOT),
+                                     "format": "ci4", "out": out})
+                    materials.append({"name": "gFishmodProp_" + tex + "Material4Half",
+                                      "texture": "gFishmodProp_" + tex + "HalfTex4", "out": out,
+                                      "clamp": kind in TRI_KINDS})
+                have_half.add(tex)
+        if tex in have_half:
+            halfname = "gFishmodProp_" + tex + "HalfTex"
+            half_kinds.append((kind, tex, round(half_distance(tri if is_tri else far, tex_src))))
+        if kind in IMPOSTOR_KINDS:
+            import impostor
+            r = impostor.impostor(kind, os.path.join(MESH, kind + ".obj"), texture_path(tex), MESH_IMP)
+            if r is not None:
+                textures.append({"name": "gFishmodProp_" + kind + "ImpTex", "src": os.path.relpath(r["png"], ROOT),
+                                 "format": "ci4", "out": out})
+                models.append({"name": "gFishmodProp_" + kind + "DLImp", "src": os.path.relpath(r["obj"], ROOT),
+                               "texture": "gFishmodProp_" + kind + "ImpTex", "out": out, "separateMaterial": True,
+                               "clamp": True})
+                imp_kinds.append((kind, round(r["height"] * PX_PER_UNIT / IMP_PX)))
         if is_tri:
             # one triangle per card, near and far (clamped texture); the cut outline kept for the bench's comparison
             models.append({"name": "gFishmodProp_" + kind + "DL", "src": os.path.relpath(tri, ROOT),
                            "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
             models.append({"name": "gFishmodProp_" + kind + "DLFar", "src": os.path.relpath(tri, ROOT),
                            "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
+            if halfname:
+                models.append({"name": "gFishmodProp_" + kind + "DLFarH", "src": os.path.relpath(tri, ROOT),
+                               "texture": halfname, "out": out, "separateMaterial": True, "clamp": True})
             models.append({"name": "gFishmodProp_" + kind + "DLAlt", "src": os.path.relpath(mesh, ROOT),
                            "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
             tri_kinds_built.append(kind)
@@ -918,6 +1007,10 @@ def write_props_manifest():
         # of the triangles, and far props are few pixels each, so their cost is per triangle (hwbench-2)
         models.append({"name": "gFishmodProp_" + kind + "DLFar", "src": os.path.relpath(far, ROOT),
                        "texture": texname, "out": out, "separateMaterial": True})
+        if halfname:
+            # and from where a texel is under half a pixel, with the texture at half size (its own UVs)
+            models.append({"name": "gFishmodProp_" + kind + "DLFarH", "src": os.path.relpath(far, ROOT),
+                           "texture": halfname, "out": out, "separateMaterial": True})
     with open(os.path.join(DATA, "props_manifest.json"), "w") as f:
         json.dump({"textures": textures, "materials": materials, "models": models}, f, indent=1)
     kinds = [k for k, _, _ in PROP_KINDS] + VANILLA_KINDS
@@ -937,6 +1030,20 @@ def write_props_manifest():
         f.write("#define FISHMOD_PROP_KINDS_TRI(X) \\\n")
         for k in tri_kinds_built:
             f.write(f"    X({k.upper()}, {k}) \\\n")
+        f.write("\n// the kinds with a far model on the half-size texture (...DLFarH): kind, name, texture, from how far (scale 1)\n")
+        f.write("#define FISHMOD_PROP_KINDS_HALF(X) \\\n")
+        for k, tex, d in half_kinds:
+            f.write(f"    X({k.upper()}, {k}, {tex}, {d}) \\\n")
+        f.write("\n// the half-size textures that also come in 4 bits: kind, texture\n")
+        f.write("#define FISHMOD_PROP_KINDS_4BIT_HALF(X) \\\n")
+        fmts = {k: fm for k, _, fm in PROP_KINDS}
+        for k, tex, d in half_kinds:
+            if fmts[k] in COMPRESS_4BIT:
+                f.write(f"    X({k.upper()}, {tex}) \\\n")
+        f.write("\n// the kinds with a far single card (...DLImp, fishmod/tools/impostor.py): kind, from how far (scale 1)\n")
+        f.write("#define FISHMOD_PROP_KINDS_IMP(X) \\\n")
+        for k, d in imp_kinds:
+            f.write(f"    X({k.upper()}, {k}, {d}) \\\n")
         f.write("\n// the kinds whose texture also comes in 4 bits: kind, texture\n")
         f.write("#define FISHMOD_PROP_KINDS_4BIT(X) \\\n")
         for k, tex, fmt in PROP_KINDS:

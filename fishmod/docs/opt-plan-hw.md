@@ -216,3 +216,24 @@ MM's answer to a lush field is `ovl_Obj_Grass` (Termina Field's grass):
 - **What to borrow, if needed:** (1) solid meshes for the near bushy plants (weed clumps, broadleaf), the fallback
   above; (2) the fade instead of a pop at the far cutoff (costs a translucent pass, so only for a thin band).
 The meshes themselves are in MM's assets, which need an MM ROM to extract; the code is readable without one.
+
+## Far tiers (after hwbench-4)
+Every prop is drawn one of four ways, chosen per prop when the set is built (`Scatter_Tier`):
+
+| Tier | Where | What |
+|---|---|---|
+| near | within 500 | the cut cards (or one triangle per card), edges by the VI |
+| far | 500 on | the whole cards, edges anti-aliased in the RDP |
+| half | from where a texel of the full texture is under half a pixel (`half_distance`, per kind, times the prop's scale) | the same whole cards on the texture at half size (`...DLFarH`) |
+| single card | from where the plant is at most 16 pixels tall (`IMP_PX`), and only seen within 20 degrees of the side | one card with a picture of the whole plant (`fishmod/tools/impostor.py`: rendered from its mesh, texture and vertex colours, from the yaw showing most of it), one clamped triangle, turned about its up to face the camera |
+
+- **The dissolve:** in the last 15% of a kind's distance its props are single cards, faded by the primitive alpha
+  against the RDP's dithered alpha test: in the opaque pass, at opaque cost, no blending. It replaces the pop at the
+  cutoff.
+- **Seen from above:** a single card that turns only about its up is a sliver from above. The first A/B capture
+  showed it (stop 10: the grass on the bed, seen from the shore, thinned out), so single cards are only used where the
+  view to the plant is within 20 degrees of level.
+- **Bench v5** (`hwbench.inc.c`): base, noimp, nofartex, nodissolve, zsame, nonear, nofar, noprops, nosky. `zsame`
+  draws depth into a buffer in the frame buffers' 1 MB bank (debug builds reserve it below them): the depth buffer
+  normally shares the 2nd MB with the RDP's command buffer and the display lists, the frame buffers have the 8th to
+  themselves. It measures how much the bank layout matters at all.
