@@ -117,8 +117,9 @@ typedef struct FishmodPropKindInfo {
 #define PROP_FAR_DIST 500.0f
 // How each prop is drawn (Scatter_Tier): within PROP_FAR_DIST its cut cards; past it its whole cards; from where the
 // full texture's texels are under half a pixel, the same on a texture of half the size; from where it's at most
-// IMP_PX (gen_habitat.py) tall on screen, one card with a picture of the whole plant, turned to face the camera. In the
-// last FADE_BAND of its distance, that card dissolves (a dithered alpha test, in the opaque pass) instead of popping.
+// IMP_PX (gen_habitat.py) tall on screen, one card with a picture of the whole plant, turned to face the camera. Past
+// its distance, for FADE_BAND more of it, that card dissolves away (a dithered alpha test, in the opaque pass) instead
+// of the plant popping: everything within the distance is drawn as before, the fade is added beyond it.
 typedef enum {
     TIER_NEAR,
     TIER_FAR,
@@ -303,8 +304,11 @@ static void Scatter_InitKinds(void) {
         sDistFar[0] = sDistFar[1] = 0.0f;
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
             // (a zone's distances can be longer than the global ones, never longer than the reach)
-            sDistFar[0] = MAX(sDistFar[0], (FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][0] : sKinds[i].drawDist);
-            sDistFar[1] = MAX(sDistFar[1], (FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][1] : sKinds[i].drawDistUnder);
+            f32 fade = (sKinds[i].modelImp != NULL) ? (1.0f + FADE_BAND) : 1.0f; // (the dissolve, past the distance)
+
+            sDistFar[0] = MAX(sDistFar[0], fade * ((FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][0] : sKinds[i].drawDist));
+            sDistFar[1] =
+                MAX(sDistFar[1], fade * ((FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][1] : sKinds[i].drawDistUnder));
         }
     }
 }
@@ -748,10 +752,10 @@ static s32 Scatter_Tier(FishmodProp* prop, FishmodPropKindInfo* info, s32 kind, 
     if (info->xlu) {
         return TIER_NEAR;
     }
-    // (the dissolve at the cutoff comes first: under water the cutoffs can be nearer than PROP_FAR_DIST)
+    // (the dissolve past the cutoff comes first: under water the cutoffs can be nearer than PROP_FAR_DIST)
     if ((info->modelImp != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOIMP) && (SQ(dy) <= IMP_SLOPE_SQ * dSq) &&
         (((dSq >= SQ(info->impDist * s)) && (dSq >= SQ(PROP_FAR_DIST))) ||
-         (dSq >= SQ(sKindMax[kind] * (1.0f - FADE_BAND))))) {
+         (dSq >= SQ(sKindMax[kind])))) {
         return TIER_IMP;
     }
     if (dSq < SQ(PROP_FAR_DIST)) {
@@ -894,6 +898,9 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
 #endif
         sKindMax[kind] = maxDist;
+        if ((info->modelImp != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOIMP | FISHMOD_BENCH_NODISSOLVE)) {
+            maxDist *= 1.0f + FADE_BAND; // the dissolve, past the kind's distance
+        }
         maxSq = SQ(maxDist);
         reachSq = SQ(maxDist + chunk * 0.71f);
 
@@ -1156,12 +1163,11 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             s32 a = 255;
 
             if ((tier == TIER_IMP) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)) {
-                // the last stretch of its distance: dissolving away (a dithered alpha test, no blending)
-                f32 cut = sKindMax[kind];
-                f32 from = cut * (1.0f - FADE_BAND);
+                // past its distance: dissolving away (a dithered alpha test, no blending)
+                f32 from = sKindMax[kind];
 
                 if (dSq > SQ(from)) {
-                    a = (s32)((cut - sqrtf(dSq)) * (255.0f / (cut * FADE_BAND)));
+                    a = (s32)((from * (1.0f + FADE_BAND) - sqrtf(dSq)) * (255.0f / (from * FADE_BAND)));
                     a = CLAMP(a, 0, 255);
                 }
             }

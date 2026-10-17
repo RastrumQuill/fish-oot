@@ -227,7 +227,7 @@ Every prop is drawn one of four ways, chosen per prop when the set is built (`Sc
 | half | from where a texel of the full texture is under half a pixel (`half_distance`, per kind, times the prop's scale) | the same whole cards on the texture at half size (`...DLFarH`) |
 | single card | from where the plant is at most 16 pixels tall (`IMP_PX`), and only seen within 20 degrees of the side | one card with a picture of the whole plant (`fishmod/tools/impostor.py`: rendered from its mesh, texture and vertex colours, from the yaw showing most of it), one clamped triangle, turned about its up to face the camera |
 
-- **The dissolve:** in the last 15% of a kind's distance its props are single cards, faded by the primitive alpha
+- **The dissolve:** for 15% past a kind's distance its props are single cards, faded by the primitive alpha
   against the RDP's dithered alpha test: in the opaque pass, at opaque cost, no blending. It replaces the pop at the
   cutoff.
 - **Seen from above:** a single card that turns only about its up is a sliver from above. The first A/B capture
