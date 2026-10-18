@@ -28,8 +28,8 @@ BASE_UNDER = 30.0          # no-prop RDP time under water (hwbench-4: most stops
 F = 207.8                  # focal length in pixels: 240 lines, 60 degrees
 SURFACE = -1313
 # per kind: (cards drawn, overall width at scale 1); height is gen_scatter's HEIGHT (rdp_estimate.HEIGHT)
-CARDS = {"grass_tuft": (8, 80), "ribbon_weed": (3, 60), "bush_weed": (6, 100), "tall_weed": (2, 86),
-         "broadleaf": (3, 40), "big_pondweed": (4, 44), "kelp_frond": (1, 30), "vine_strand": (2, 30),
+CARDS = {"grass_tuft": (4, 80), "ribbon_weed": (3, 60), "bush_weed": (4, 100), "tall_weed": (2, 86),
+         "broadleaf": (2, 40), "big_pondweed": (2, 44), "kelp_frond": (1, 30), "vine_strand": (2, 30),
          "fan_weed": (2, 44), "rock": (1, 120), "boulder": (1, 120), "moss_patch": (1, 100), "lily_pad": (1, 110),
          "pond_reed": (1, 30), "reed_clump": (3, 40), "cattails": (3, 44), "spatterdock": (1, 60),
          "float_leaves": (1, 60)}
