@@ -5,7 +5,8 @@ direction is over, the plant costing that view the most is turned into a moss ma
 stays covered and green; where a moss mat is still the costliest, it goes. Repeats until every spot holds. Writes the list of turned plants (by position) to
 fishmod/data/lake_hylia_thin.json; gen_scatter.py applies it after placing, so nothing else moves.
 
-Usage: thin_beds.py [--limit 48] [--views 60] [--seed 7]   (then gen_scatter.py --c)
+Usage: thin_beds.py [--limit 48] [--views 150] [--seeds 7,19,23]   (then gen_scatter.py --c; check with
+       section_budget.py --seed 11, spots it never saw)
 """
 import argparse
 import json
@@ -49,7 +50,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=float, default=48.0)
     ap.add_argument("--views", type=int, default=60)
-    ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--seeds", default="7,19,23", help="sets of spots (section_budget.py --seed 11 is kept for checking)")
     ap.add_argument("--passes", type=int, default=60)
     a = ap.parse_args()
     if os.path.exists(OUT):
@@ -58,9 +59,10 @@ def main():
     finder, boxes, zones, gs = B.setting()
     sc = S.Scene()
     bases = B.stop_bases()
-    rng = np.random.default_rng(a.seed)
     dirs = []
-    for z in zones:
+    for seed in (int(x) for x in a.seeds.split(",")):
+      rng = np.random.default_rng(seed)
+      for z in zones:
         for kind, eye, at, under in B.views(z, finder, boxes, gs, rng, a.views):
             for e, t, u in turned({"kind": kind, "eye": eye, "at": at, "under": under}):
                 dirs.append((e, t, u, B.base_for(bases, e, u), z["id"]))
@@ -106,7 +108,7 @@ def main():
         by[o["kind"]] = by.get(o["kind"], 0) + 1
     print(f"{int((turned_to_moss & ~dropped).sum())} plants to moss of {int(thin.sum())}, "
           f"{int(dropped.sum())} dropped (moss mats, or plants turned to moss and then still too much):", by)
-    json.dump({"limit": a.limit, "views": a.views, "seed": a.seed, "moss": out}, open(OUT, "w"), indent=0)
+    json.dump({"limit": a.limit, "views": a.views, "seeds": a.seeds, "moss": out}, open(OUT, "w"), indent=0)
 
 
 if __name__ == "__main__":
