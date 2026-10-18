@@ -6,7 +6,8 @@ cameras like the game's own, not picked ones:
   swim:  Link swimming at the surface in the section, the follow camera 220 behind and 80 up, looking at him
   dive:  Link under water in the section (diving, or iron boots on the bed), the camera 200 behind and 40 up
 Each view's RDP time is shot_search.py's model: its no-prop time (the nearest hwbench-4 stop on the same side of the
-surface) plus the props' card-scanlines. A frame over 50 ms drops below 20 fps.
+surface) plus the props' card-scanlines. A frame over 50 ms drops below 20 fps. Each spot is looked at in eight directions (the camera swung round Link, or
+the bobber cast all round him), and it counts by its worst one: a spot holds 20 fps only if you can look around.
 
 Usage: section_budget.py [--views 150] [--save out.json] [--png sections.png]
 """
@@ -138,18 +139,31 @@ def main():
     bases = stop_bases()
     rng = np.random.default_rng(a.seed)
     rows = []
-    print(f"{'section':38s} {'views':>5s} {'median':>7s} {'p90':>6s} {'worst':>6s} {'over 50':>8s}  worst kind")
+    print("Each spot by its worst direction of eight (looking all the way round):")
+    print(f"{'section':38s} {'spots':>5s} {'median':>7s} {'p90':>6s} {'worst':>6s} {'over 50':>8s}  worst kind")
     for z in zones:
         vs = views(z, finder, boxes, gs, rng, a.views)
         res = []
         for kind, eye, at, under in vs:
-            ms, cover, nprops = scene.cost(eye, at, under, base_for(bases, eye, under))
+            # looking all the way round from the same spot: the camera swung about Link (swim, dive) or about Link
+            # standing on the shore (fish: the bobber cast in eight directions); the spot holds only if every one does
+            pivot = np.array(at, float) if kind != "fish" else np.array(eye, float)
+            turns = []
+            for deg in range(0, 360, 45):
+                a_ = math.radians(deg)
+                c_, s_ = math.cos(a_), math.sin(a_)
+                def rot(p):
+                    d = np.array(p, float) - pivot
+                    return pivot + np.array([d[0] * c_ - d[2] * s_, d[1], d[0] * s_ + d[2] * c_])
+                e2, a2 = rot(eye), rot(at)
+                turns.append(scene.cost(e2, a2, under, base_for(bases, e2, under))[0])
             res.append({"kind": kind, "eye": [round(v) for v in eye], "at": [round(v) for v in at], "under": under,
-                        "ms": round(ms, 1)})
+                        "ms": round(turns[0], 1), "worst": round(max(turns), 1),
+                        "turns": [round(t, 1) for t in turns]})
         if not res:
             print(f"{z['id']:2d} {z['name'][:35]:35s}  (no views)")
             continue
-        ms = np.array([r["ms"] for r in res])
+        ms = np.array([r["worst"] for r in res])  # (each spot by its worst direction)
         over = (ms > LIMIT).mean()
         worst = max(res, key=lambda r: r["ms"])
         print(f"{z['id']:2d} {z['name'][:35]:35s} {len(res):5d} {np.median(ms):7.1f} {np.percentile(ms, 90):6.1f} "

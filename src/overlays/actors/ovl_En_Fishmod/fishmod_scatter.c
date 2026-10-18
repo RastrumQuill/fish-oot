@@ -73,7 +73,7 @@ typedef struct FishmodPropKindInfo {
     u8 sway;     // how far its top sways (per mille of its height per unit of height); 0: still
     u8 swayRate; // how fast (a turn takes 0x10000 / (swayRate * 16) frames)
     u8 card;     // a big plant card: not drawn with the camera inside it (NEAR_SKIP)
-    u8 faceCam;  // one card turned about its up to face the camera (kelp), like the far single cards
+    u8 faceCam;  // one card turned about its up, at most enough to stay within 45 degrees of facing the camera
     u16 height;  // how tall it is at scale 1 (gen_scatter.py HEIGHT), for the camera-inside test
     u16 extent;  // how far it reaches from where it stands at scale 1 (up, or down for hanging ones): the view test
 } FishmodPropKindInfo;
@@ -184,7 +184,7 @@ static void Scatter_TunedDistances(s32 under) {
             *out[i] = MIN(MAX(sLodTuned[k][a][1][i], sLodTuned[k][b][1][i]), UNDER_CUT_MAX);
         }
         if ((k == FISHMOD_PROP_KELP_FROND) || (k == FISHMOD_PROP_TALL_WEED) || (k == FISHMOD_PROP_RIBBON_WEED) ||
-            (k == FISHMOD_PROP_BIG_PONDWEED)) {
+            (k == FISHMOD_PROP_BIG_PONDWEED) || (k == FISHMOD_PROP_VINE_STRAND)) {
             sTunedCut[k] = (sTunedCut[k] > 0.0f) ? MIN(sTunedCut[k], UNDER_CUT_TALL) : 0.0f;
         }
     }
@@ -1129,8 +1129,28 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             gFishmodLodTest.drawn[k]++;
         }
 #endif
-        Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD,
-                       ((tier == TIER_IMP) || sKinds[k].faceCam) ? sBillboardYaw : (s16)(prop->yaw << 8));
+        {
+            s16 yaw = (tier == TIER_IMP) ? sBillboardYaw : (s16)(prop->yaw << 8);
+
+            if (sKinds[k].faceCam && (tier != TIER_IMP)) {
+                // one card that only turns as far as it must: kept within 45 degrees of facing the camera (by where
+                // the camera is, not where it looks), so it never shows edge-on and doesn't spin as the view pans
+                s16 own = yaw;
+                s16 delta = (s16)(Math_Atan2S(-(prop->z - eye.z), -(prop->x - eye.x)) - own);
+
+                if (delta > 0x4000) { // (the card is the same from either side)
+                    delta -= 0x8000;
+                } else if (delta < -0x4000) {
+                    delta += 0x8000;
+                }
+                if (delta > 0x2000) {
+                    yaw = own + (delta - 0x2000);
+                } else if (delta < -0x2000) {
+                    yaw = own + (delta + 0x2000);
+                }
+            }
+            Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD, yaw);
+        }
         set->tier[set->count] = tier;
         set->prop[set->count++] = sOrdered[n];
     }
