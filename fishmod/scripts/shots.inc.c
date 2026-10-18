@@ -1,5 +1,5 @@
-// One view per lake section, picked at random from section_budget.py's game-like cameras (the rod camera from the
-// shore, swimming, diving), not by cost: for look_shots (captures), tour_shots (fly between them) and hwbench_shots
+// One view per lake section, a random diving view (camera 200 behind and 40 above Link) from
+// section_budget.py's game-like cameras, not picked by cost: for look_shots (captures), tour_shots (fly between them) and hwbench_shots
 // (the console bench at the same cameras).
 #define FISHMOD_SCRIPT_ENTRANCE ENTR_LAKE_HYLIA_0
 #define FISHMOD_SCRIPT_DAY 1        // a clear day
@@ -13,20 +13,20 @@ static FishmodAutoplayStep sScriptSteps[] = {
 
 // The water's surface is at y -1313 (the full lake).
 static FishmodTourStop sTourStops[] = {
-    { { -3491, -1165, 3074 }, { -3335, -1313, 3740 }, "1. Gerudo river inflow", "fish view, estimated 42.0 ms", "", "" },
-    { { -2069, -1004, 3282 }, { -2597, -1313, 4179 }, "2. Lab shore and dock", "fish view, estimated 39.2 ms", "", "" },
-    { { 896, -1331, 3540 }, { 744, -1351, 3410 }, "3. North beach shallows", "dive view, estimated 57.8 ms", "", "" },
-    { { 2231, -1371, 5527 }, { 2369, -1391, 5382 }, "4. East shore lily shallows", "dive view, estimated 41.7 ms", "", "" },
-    { { -3946, -1177, 4068 }, { -3118, -1313, 4789 }, "5. West bridge and grave is", "fish view, estimated 44.0 ms", "", "" },
-    { { -3564, -1233, 5683 }, { -3784, -1283, 5683 }, "6. West weed flat", "swim view, estimated 74.9 ms", "", "" },
-    { { -533, -1417, 8047 }, { -347, -1437, 7974 }, "7. Drop-off (weed edge)", "dive view, estimated 41.6 ms", "", "" },
-    { { -1440, -1233, 4961 }, { -1249, -1283, 5070 }, "8. Deep basin", "swim view, estimated 26.6 ms", "", "" },
-    { { -606, -1183, 7212 }, { -1221, -1313, 6221 }, "9. Water Temple gate (deepe", "fish view, estimated 36.1 ms", "", "" },
-    { { -2106, -1233, 6775 }, { -1940, -1283, 6918 }, "10. South bridge pilings", "swim view, estimated 37.6 ms", "", "" },
-    { { -933, -1183, 7177 }, { -906, -1313, 6643 }, "11. Island shallows", "fish view, estimated 34.8 ms", "", "" },
-    { { 787, -1238, 7335 }, { 828, -1313, 6442 }, "12. East weed flats", "fish view, estimated 27.1 ms", "", "" },
-    { { 406, -1233, 8708 }, { 301, -1283, 8514 }, "13. South reed bank and lily", "swim view, estimated 29.4 ms", "", "" },
-    { { -978, -1380, 3724 }, { -1049, -1400, 3912 }, "14. Pillar ruins (by the Zor", "dive view, estimated 42.5 ms", "", "" },
-    { { -459, -1339, 3686 }, { -365, -1359, 3509 }, "15. Dry dock (north beach)", "dive view, estimated 54.7 ms", "", "" },
-    { { -384, -1413, 6805 }, { -233, -1433, 6937 }, "16. Under the island's dead ", "dive view, estimated 44.0 ms", "", "" },
+    { { -3562, -1328, 4006 }, { -3438, -1343, 3849 }, "1. Gerudo river inflow", "dive view, estimated 41.0 ms", "", "" },
+    { { -2267, -1333, 4244 }, { -2459, -1353, 4300 }, "2. Lab shore and dock", "dive view, estimated 44.1 ms", "", "" },
+    { { 1172, -1400, 3391 }, { 1071, -1420, 3218 }, "3. North beach shallows", "dive view, estimated 59.7 ms", "", "" },
+    { { 2521, -1333, 5425 }, { 2613, -1353, 5602 }, "4. East shore lily shallows", "dive view, estimated 53.5 ms", "", "" },
+    { { -3043, -1421, 4532 }, { -2849, -1441, 4485 }, "5. West bridge and grave is", "dive view, estimated 44.7 ms", "", "" },
+    { { -3566, -1395, 5298 }, { -3437, -1415, 5450 }, "6. West weed flat", "dive view, estimated 47.4 ms", "", "" },
+    { { -1904, -1442, 7038 }, { -1705, -1462, 7051 }, "7. Drop-off (weed edge)", "dive view, estimated 45.3 ms", "", "" },
+    { { -1395, -2071, 5914 }, { -1197, -2091, 5883 }, "8. Deep basin", "dive view, estimated 24.0 ms", "", "" },
+    { { -1024, -1892, 6046 }, { -1146, -1912, 6204 }, "9. Water Temple gate (deepe", "dive view, estimated 24.6 ms", "", "" },
+    { { -2481, -1573, 6728 }, { -2292, -1593, 6793 }, "10. South bridge pilings", "dive view, estimated 30.7 ms", "", "" },
+    { { -820, -1346, 6614 }, { -1004, -1366, 6692 }, "11. Island shallows", "dive view, estimated 34.6 ms", "", "" },
+    { { 1333, -1396, 7115 }, { 1533, -1416, 7119 }, "12. East weed flats", "dive view, estimated 63.3 ms", "", "" },
+    { { -646, -1507, 8318 }, { -647, -1527, 8518 }, "13. South reed bank and lily", "dive view, estimated 31.1 ms", "", "" },
+    { { -1164, -1378, 3753 }, { -1040, -1398, 3911 }, "14. Pillar ruins (by the Zor", "dive view, estimated 37.3 ms", "", "" },
+    { { -513, -1340, 3703 }, { -391, -1360, 3545 }, "15. Dry dock (north beach)", "dive view, estimated 54.9 ms", "", "" },
+    { { -104, -1364, 7794 }, { -214, -1384, 7627 }, "16. Under the island's dead ", "dive view, estimated 33.4 ms", "", "" },
 };

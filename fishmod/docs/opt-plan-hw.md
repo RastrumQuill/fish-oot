@@ -286,6 +286,13 @@ Mostly diving among mid-height plants.
 -> 2 cards (10%), grass tuft patches 8 -> 4 cards (7%), bush 6 -> 4 (6%), broadleaf 3 -> 2 (5%), vine strands 2 -> 1
 (4%).
 
+**Submerged plants from above water** (not done; the next candidate): the game draws every plant under the surface
+even where the surface hides it (a swimming view over the West weed flat: 75 ms estimated, almost nothing visible).
+Cutting submerged plants at 600 from the camera while it's above water: fishing views over 50 ms 4% -> 0%,
+swimming 11% -> 4% (the model's estimate). Needs an A/B capture to check nothing visible goes.
+
+After 1-4 the diving views are what's left (21% over 50 ms), mostly among mid-height plants.
+
 **Step 5, a per-frame plant budget** (the game estimates its own plant cost each frame the same way and fades the
 furthest plants out when over): the only way to guarantee a solid 20 in every view. Held back until everything else
 is squeezed.
