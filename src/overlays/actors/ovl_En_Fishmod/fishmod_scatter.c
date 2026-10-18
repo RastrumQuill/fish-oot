@@ -73,6 +73,7 @@ typedef struct FishmodPropKindInfo {
     u8 sway;     // how far its top sways (per mille of its height per unit of height); 0: still
     u8 swayRate; // how fast (a turn takes 0x10000 / (swayRate * 16) frames)
     u8 card;     // a big plant card: not drawn with the camera inside it (NEAR_SKIP)
+    u8 faceCam;  // one card turned about its up to face the camera (kelp), like the far single cards
     u16 height;  // how tall it is at scale 1 (gen_scatter.py HEIGHT), for the camera-inside test
     u16 extent;  // how far it reaches from where it stands at scale 1 (up, or down for hanging ones): the view test
 } FishmodPropKindInfo;
@@ -147,6 +148,8 @@ static f32 sTunedCut[FISHMOD_PROP_KIND_MAX];
 // (the tuned cut no further than this: past it the shapes in the haze are faint, and the budget goes on nearer
 // plants; the dissolve past the cut hides the edge)
 #define UNDER_CUT_MAX 1400.0f
+// the tall kinds (the most scanlines per prop) no further than this under water, in the thicker haze
+#define UNDER_CUT_TALL 900.0f
 static f32 sTunedImp[FISHMOD_PROP_KIND_MAX];
 static f32 sTunedHalf[FISHMOD_PROP_KIND_MAX];
 
@@ -179,6 +182,10 @@ static void Scatter_TunedDistances(s32 under) {
 
         for (i = 0; i < 3; i++) {
             *out[i] = MIN(MAX(sLodTuned[k][a][1][i], sLodTuned[k][b][1][i]), UNDER_CUT_MAX);
+        }
+        if ((k == FISHMOD_PROP_KELP_FROND) || (k == FISHMOD_PROP_TALL_WEED) || (k == FISHMOD_PROP_RIBBON_WEED) ||
+            (k == FISHMOD_PROP_BIG_PONDWEED)) {
+            sTunedCut[k] = (sTunedCut[k] > 0.0f) ? MIN(sTunedCut[k], UNDER_CUT_TALL) : 0.0f;
         }
     }
 }
@@ -282,6 +289,7 @@ static void Scatter_InitKinds(void) {
     SWAY(RIBBON_WEED, 70, 44);
     SWAY(TALL_WEED, 32, 36);
     SWAY(KELP_FROND, 30, 32);
+    sKinds[FISHMOD_PROP_KELP_FROND].faceCam = true;
     SWAY(VINE_STRAND, 40, 40);
     SWAY(BIG_PONDWEED, 60, 40);
     SWAY(FAN_WEED, 70, 44);
@@ -300,8 +308,8 @@ static void Scatter_InitKinds(void) {
             u8 kind;
             u16 height;
         } sCards[] = {
-            { FISHMOD_PROP_GRASS_TUFT, 16 },  { FISHMOD_PROP_RIBBON_WEED, 80 },  { FISHMOD_PROP_TALL_WEED, 190 },
-            { FISHMOD_PROP_BROADLEAF, 40 },   { FISHMOD_PROP_BUSH_WEED, 42 },    { FISHMOD_PROP_KELP_FROND, 260 },
+            { FISHMOD_PROP_GRASS_TUFT, 16 },  { FISHMOD_PROP_RIBBON_WEED, 80 },  { FISHMOD_PROP_TALL_WEED, 140 },
+            { FISHMOD_PROP_BROADLEAF, 40 },   { FISHMOD_PROP_BUSH_WEED, 42 },    { FISHMOD_PROP_KELP_FROND, 180 },
             { FISHMOD_PROP_VINE_STRAND, 150 }, { FISHMOD_PROP_BIG_PONDWEED, 52 }, { FISHMOD_PROP_FAN_WEED, 44 },
         };
         s32 i;
@@ -1121,7 +1129,8 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             gFishmodLodTest.drawn[k]++;
         }
 #endif
-        Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD, (tier == TIER_IMP) ? sBillboardYaw : (s16)(prop->yaw << 8));
+        Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD,
+                       ((tier == TIER_IMP) || sKinds[k].faceCam) ? sBillboardYaw : (s16)(prop->yaw << 8));
         set->tier[set->count] = tier;
         set->prop[set->count++] = sOrdered[n];
     }
