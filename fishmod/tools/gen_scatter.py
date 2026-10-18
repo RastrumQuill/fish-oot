@@ -380,6 +380,47 @@ def moss_fit(floor_at, px, pz, ps, pf, yaw, sc):
     return y, tilt
 
 
+# An even cap on how thick a bed gets: per 120-unit cell, the plants' cards times their height (what the console pays
+# for, per scanline per card) no more than DENSITY_CAP, about the thickest of the beds that already hold 20 fps all
+# round (the East weed flats, the reed bank: 90th percentile ~600). Over it, plants turn to moss mats (by a hash, so
+# the same ones every time), cheapest look first: the ones with most cards and height go.
+DENSITY_CAP = 600.0
+DENSITY_CELL = 120
+CAP_CARDS = {"grass_tuft": 4, "broadleaf": 2, "bush_weed": 4, "big_pondweed": 2, "ribbon_weed": 3, "vine_strand": 2,
+             "tall_weed": 2, "kelp_frond": 1}
+
+
+def density_capped(instances):
+    cells = {}
+    for p in instances:
+        if p["kind"] in CAP_CARDS:
+            cells.setdefault((int(p["x"] // DENSITY_CELL), int(p["z"] // DENSITY_CELL)), []).append(p)
+    turn = set()
+    for key, ps in cells.items():
+        load = sum(CAP_CARDS[p["kind"]] * HEIGHT.get(p["kind"], 40) * p["scale"] for p in ps)
+        for p in sorted(ps, key=lambda p: spot_hash(p["x"], p["z"], 3)):
+            if load <= DENSITY_CAP:
+                break
+            load -= CAP_CARDS[p["kind"]] * HEIGHT.get(p["kind"], 40) * p["scale"]
+            turn.add(id(p))
+    if not turn or not BED:
+        return instances
+    surface_at, floor_at = BED
+    out = []
+    for p in instances:
+        if id(p) not in turn:
+            out.append(p)
+            continue
+        ps = surface_at(p["x"], p["z"])
+        pf = floor_at(p["x"], p["z"], ps) if ps is not None else None
+        sc = min(max(p["scale"], 0.7), 1.1)
+        fit = moss_fit(floor_at, p["x"], p["z"], ps, pf, p["yaw"], sc) if pf is not None else None
+        if fit is not None:
+            out.append(dict(p, kind="moss_patch", y=fit[0], tilt=fit[1], scale=sc))
+    print(f"density cap: {len(turn)} plants to moss (or gone where a mat can't lie)")
+    return out
+
+
 THIN = os.path.join(ROOT, "fishmod", "data", "lake_hylia_thin.json")
 
 
@@ -632,7 +673,7 @@ def main():
     ap.add_argument("--preview", default=None)
     ap.add_argument("--c", action="store_true", help="write the game's data (src/fishmod_data/)")
     args = ap.parse_args()
-    inst = thinned(accents(place(args.scene)))
+    inst = thinned(density_capped(accents(place(args.scene))))
     counts = {}
     for it in inst:
         counts[it["kind"]] = counts.get(it["kind"], 0) + 1
