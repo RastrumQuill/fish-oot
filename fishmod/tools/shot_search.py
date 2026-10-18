@@ -46,10 +46,11 @@ class Scene:
         self.NC = np.array([CARDS.get(k, (2, 0))[0] for k in self.kind])
         self.W = np.array([CARDS[k][1] if k in CARDS else R.HEIGHT.get(k, 40) for k in self.kind]) * self.P[:, 3]
         self.CUT = np.array([dist.get(k, (1600, 900))[1] for k in self.kind])
+        self.CUT_ABOVE = np.array([dist.get(k, (1600, 900))[0] for k in self.kind])
         self.PLANT = np.array([k not in NOT_PLANT for k in self.kind])
 
-    def cost(self, eye, at):
-        """(estimated RDP ms under water, plant screen cover, props drawn)."""
+    def cost(self, eye, at, under=True, base=BASE_UNDER):
+        """(estimated RDP ms, plant screen cover, props drawn); base: the view's no-prop RDP time."""
         eye = np.array(eye, float)
         fw = np.array(at, float) - eye
         fw /= np.linalg.norm(fw)
@@ -58,7 +59,7 @@ class Scene:
         up = np.cross(rt, fw)
         d = self.P[:, :3] - eye
         dsq = d[:, 0] ** 2 + d[:, 2] ** 2
-        ok = dsq < self.CUT ** 2
+        ok = dsq < (self.CUT if under else self.CUT_ABOVE) ** 2
         c = d.copy()
         c[:, 1] += self.H / 2
         z, x, y = c @ fw, c @ rt, c @ up
@@ -71,7 +72,7 @@ class Scene:
         ok &= (cx > 0) & (cy > 0)
         spans = np.where(ok, cy * self.NC, 0)
         near = dsq < 500 ** 2
-        ms = BASE_UNDER + KN * spans[near].sum() + KF * spans[~near].sum()
+        ms = base + KN * spans[near].sum() + KF * spans[~near].sum()
         cover = np.where(ok & self.PLANT, np.minimum(cx * cy, 4000), 0).sum()
         return float(ms), float(cover), int(ok.sum())
 
