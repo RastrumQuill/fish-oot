@@ -348,6 +348,7 @@ def place(scene, seed=SEED):
                 break  # one rule per candidate: keeps kinds from stacking on one spot
     out += place_moss(seed, rnd_state=None, surface_at=surface_at, floor_at=floor_at, zones=zones, excluded=excluded,
                       boxes=boxes)
+    BED[:] = [surface_at, floor_at]
     return out
 
 
@@ -356,6 +357,51 @@ def place(scene, seed=SEED):
 # bed's slope; not where the bed bends too much for a flat mat (it would float at one edge).
 MOSS = {"depth": (6, 260), "base": 0.1, "boosts": {4: 0.08, 12: 0.08, 13: 0.08, 6: 0.07, 11: 0.07, 1: 0.07, 3: 0.03},
         "cluster": (3, 6), "scale": (0.6, 1.2), "spread": 40.0, "radius": 46.0}
+
+
+BED = []  # (surface_at, floor_at) of the last place(), for the thinning pass
+
+
+def moss_fit(floor_at, px, pz, ps, pf, yaw, sc):
+    """(y, tilt) of a moss mat lying on the bed here, or None where it can't: too steep, or the bed bends more than
+    3 units under its rim (a mat can't bend, so not over bumps or hollows)."""
+    r = MOSS["radius"] * sc * 0.8
+    y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, r, r)
+    if max(abs(tilt[0]), abs(tilt[1])) > math.radians(25):
+        return None
+    c, s_ = math.cos(yaw), math.sin(yaw)
+    for ang in range(0, 360, 45):
+        a = math.radians(ang)
+        lx, lz = math.cos(a) * r, math.sin(a) * r
+        wx, wz = px + lx * c + lz * s_, pz - lx * s_ + lz * c
+        fy = floor_at(wx, wz, ps)
+        if fy is None or abs(fy - (y + lx * math.tan(tilt[1]) - lz * math.tan(tilt[0]))) > 3.0:
+            return None
+    return y, tilt
+
+
+THIN = os.path.join(ROOT, "fishmod", "data", "lake_hylia_thin.json")
+
+
+def thinned(instances):
+    """The plants thin_beds.py picked (where the console needs it) turned into moss mats, or dropped where a mat
+    can't lie."""
+    if not os.path.exists(THIN) or not BED:
+        return instances
+    picked = {(o["kind"], o["x"], o["z"]) for o in json.load(open(THIN))["moss"]}
+    surface_at, floor_at = BED
+    out = []
+    for p in instances:
+        if (p["kind"], int(p["x"]), int(p["z"])) not in picked:
+            out.append(p)
+            continue
+        ps = surface_at(p["x"], p["z"])
+        pf = floor_at(p["x"], p["z"], ps) if ps is not None else None
+        sc = min(max(p["scale"], 0.7), 1.1)
+        fit = moss_fit(floor_at, p["x"], p["z"], ps, pf, p["yaw"], sc) if pf is not None else None
+        if fit is not None:
+            out.append(dict(p, kind="moss_patch", y=fit[0], tilt=fit[1], scale=sc))
+    return out
 
 
 def place_moss(seed, rnd_state, surface_at, floor_at, zones, excluded, boxes):
@@ -390,27 +436,10 @@ def place_moss(seed, rnd_state, surface_at, floor_at, zones, excluded, boxes):
                 pf = floor_at(px, pz, ps)
                 if pf is None or not (MOSS["depth"][0] - 4 <= ps - pf <= MOSS["depth"][1] + 10):
                     continue
-                r = MOSS["radius"] * sc * 0.8
-                y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, r, r)
-                if max(abs(tilt[0]), abs(tilt[1])) > math.radians(25):
+                fit = moss_fit(floor_at, px, pz, ps, pf, yaw, sc)
+                if fit is None:
                     continue
-                # the bed under the rim, against the tilted plane: a mat can't bend, so not over bumps or hollows
-                c, s_ = math.cos(yaw), math.sin(yaw)
-                ok = True
-                for ang in range(0, 360, 45):
-                    a = math.radians(ang)
-                    lx, lz = math.cos(a) * r, math.sin(a) * r
-                    wx, wz = px + lx * c + lz * s_, pz - lx * s_ + lz * c
-                    fy = floor_at(wx, wz, ps)
-                    if fy is None:
-                        ok = False
-                        break
-                    plane = y + lx * math.tan(tilt[1]) - lz * math.tan(tilt[0])
-                    if abs(fy - plane) > 3.0:
-                        ok = False
-                        break
-                if not ok:
-                    continue
+                y, tilt = fit
                 out.append({"kind": "moss_patch", "x": px, "y": y, "z": pz, "yaw": yaw, "tilt": tilt, "scale": sc,
                             "tint": rnd.uniform(0.9, 1.08)})
     return out
@@ -453,6 +482,12 @@ def accents(instances):
         if k in ACCENT_KEEP:
             if h < ACCENT_KEEP[k]:
                 out.append(p)
+            continue
+        if k == "vine_curtain":
+            # capped: a spatterdock's pads float on top (its roots, from below), so from above it's leaves, not a
+            # cross of card tops
+            out.append(p)
+            out.append(dict(p, kind="spatterdock", scale=1.0, tilt=(0.0, 0.0)))
             continue
         if k == "ribbon_weed":
             edge = counts[id(p)] < median
@@ -593,7 +628,7 @@ def main():
     ap.add_argument("--preview", default=None)
     ap.add_argument("--c", action="store_true", help="write the game's data (src/fishmod_data/)")
     args = ap.parse_args()
-    inst = accents(place(args.scene))
+    inst = thinned(accents(place(args.scene)))
     counts = {}
     for it in inst:
         counts[it["kind"]] = counts.get(it["kind"], 0) + 1
