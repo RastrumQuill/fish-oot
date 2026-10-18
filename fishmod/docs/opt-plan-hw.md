@@ -237,3 +237,20 @@ Every prop is drawn one of four ways, chosen per prop when the set is built (`Sc
   draws depth into a buffer in the frame buffers' 1 MB bank (debug builds reserve it below them): the depth buffer
   normally shares the 2nd MB with the RDP's command buffer and the display lists, the frame buffers have the 8th to
   themselves. It measures how much the bank layout matters at all.
+
+## LOD tuning, first run (lodtune3: all 13,584 view-times, `lodtune-1.txt`)
+3,396 views of Lake Hylia (above and under water, looking down, level and up) at dawn, noon, dusk and midnight. For
+each kind: the shortest cut, single-card and half-texture distances that changed no view by more than 2 pixels (a
+pixel counted when a channel moves more than 2 of 31). The table keeps the most any view needed.
+
+- **Above water, almost nothing can go without some view seeing it.** Most kinds need their full 3000 for the cut,
+  and the single card needs 3000 for nearly every kind: the lake is open, plants on the far shore are visible, and
+  the single card changes a few pixels somewhere in some view however far away it starts. The shipped cutoffs
+  (800-1600) are far inside what this criterion asks: that is the pop-in.
+- **Under water the haze does hide things, but later than assumed:** cut distances 50-2000 (grass 950-1900, ribbon
+  weed 1050-2000, kelp 1800) against the shipped 500-900. The single card and half texture can start at 350-2000
+  depending on the kind; rushes, marigolds and bank roots can't be seen under water at all.
+- **Time of day matters:** dusk needs the least almost everywhere (e.g. grass above water: 2200 at dusk against 3000).
+- **The criterion is strict:** the most any of 13,584 views needed, at 2 pixels. One view where a far plant's few
+  pixels change sets the table. Only the maximum was stored, not how many views needed how much, so this run can't say
+  what a looser line (a few dozen pixels, say) would allow.
