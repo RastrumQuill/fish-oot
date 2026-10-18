@@ -4,7 +4,8 @@ cameras like the game's own, not picked ones:
   fish:  Link on the shore or a dock near the section, the rod's camera (75 behind, 28 aside, 60 up) on a bobber
          300-1100 out in the section (fishmod_rod.c Rod_CameraUpdate)
   swim:  Link swimming at the surface in the section, the follow camera 220 behind and 80 up, looking at him
-  dive:  Link under water in the section (diving, or iron boots on the bed), the camera 200 behind and 40 up
+  dive:  Link under water in the section (half on the bed in iron boots, half swimming), the camera 200 behind
+         and 40 up
 Each view's RDP time is shot_search.py's model: its no-prop time (the nearest hwbench-4 stop on the same side of the
 surface) plus the props' card-scanlines. A frame over 50 ms drops below 20 fps. Each spot is looked at in eight directions (the camera swung round Link, or
 the bobber cast all round him), and it counts by its worst one: a spot holds 20 fps only if you can look around.
@@ -116,7 +117,8 @@ def views(zone, finder, boxes, gs, rng, n):
         else:
             if SURF - fl < 70:
                 continue
-            ly = rng.uniform(fl + 10, SURF - 40)
+            # half with iron boots on the bed, half swimming in mid-water
+            ly = fl + 2 if rng.uniform(0, 1) < 0.5 else rng.uniform(fl + 30, SURF - 40)
             eye = (px - fx * 200, min(ly + 40, SURF - 15), pz - fz * 200)
             g = floor(finder, eye[0], eye[2], SURF)
             if g is None or g > eye[1] - 15:
@@ -132,7 +134,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--views", type=int, default=150, help="per kind of camera per section")
     ap.add_argument("--save")
-    ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--seed", type=int, default=7, help="11 or another: spots the thinning never saw")
     a = ap.parse_args()
     finder, boxes, zones, gs = setting()
     scene = S.Scene()
