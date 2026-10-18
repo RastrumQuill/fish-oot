@@ -2,7 +2,7 @@
 """Thin the plant beds only where the console needs it: every sampled spot (section_budget.py's game-like cameras,
 looked at in eight directions) must stay under the frame-time limit by shot_search.py's model. Wherever a
 direction is over, the plant costing that view the most is turned into a moss mat (nearly free to draw), so the bed
-stays covered and green. Repeats until every spot holds. Writes the list of turned plants (by position) to
+stays covered and green; where a moss mat is still the costliest, it goes. Repeats until every spot holds. Writes the list of turned plants (by position) to
 fishmod/data/lake_hylia_thin.json; gen_scatter.py applies it after placing, so nothing else moves.
 
 Usage: thin_beds.py [--limit 48] [--views 60] [--seed 7]   (then gen_scatter.py --c)
@@ -66,7 +66,9 @@ def main():
                 dirs.append((e, t, u, B.base_for(bases, e, u), z["id"]))
     print(f"{len(dirs)} view directions")
     thin = np.array([k in THINNABLE for k in sc.kind])
+    moss = np.array([k == "moss_patch" for k in sc.kind])
     turned_to_moss = np.zeros(len(sc.kind), bool)
+    dropped = np.zeros(len(sc.kind), bool)
     failing = list(range(len(dirs)))
     for p in range(a.passes):
         still = []
@@ -77,7 +79,8 @@ def main():
             if base + c.sum() <= a.limit:
                 continue
             still.append(i)
-            cand = np.where(thin & ~turned_to_moss, c, 0)
+            # the costliest plant becomes moss; a moss mat (placed, or made from a plant) costliest of all goes
+            cand = np.where((thin | moss | turned_to_moss) & ~dropped, c, 0)
             j = int(np.argmax(cand))
             if cand[j] > 0:
                 pick.add(j)
@@ -85,6 +88,10 @@ def main():
         if not still or not pick:
             break
         for j in pick:
+            if moss[j] or turned_to_moss[j]:
+                dropped[j] = True
+                sc.NC[j] = 0
+                continue
             turned_to_moss[j] = True
             sc.H[j] = MOSS_H * sc.P[j, 3]
             sc.W[j] = MOSS_W * sc.P[j, 3]
@@ -92,11 +99,13 @@ def main():
             sc.PLANT[j] = False
             sc.FLAT[j] = True
         failing = still
-    out = [{"kind": sc.kind[j], "x": int(sc.P[j, 0]), "z": int(sc.P[j, 2])} for j in np.nonzero(turned_to_moss)[0]]
+    out = [{"kind": sc.kind[j], "x": int(sc.P[j, 0]), "z": int(sc.P[j, 2]), "drop": bool(dropped[j])}
+           for j in np.nonzero(turned_to_moss | dropped)[0]]
     by = {}
     for o in out:
         by[o["kind"]] = by.get(o["kind"], 0) + 1
-    print(f"{len(out)} plants to moss of {int(thin.sum())} thinnable:", by)
+    print(f"{int((turned_to_moss & ~dropped).sum())} plants to moss of {int(thin.sum())}, "
+          f"{int(dropped.sum())} dropped (moss mats, or plants turned to moss and then still too much):", by)
     json.dump({"limit": a.limit, "views": a.views, "seed": a.seed, "moss": out}, open(OUT, "w"), indent=0)
 
 
