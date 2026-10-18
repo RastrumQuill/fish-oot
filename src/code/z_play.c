@@ -1222,7 +1222,11 @@ void Play_Draw(PlayState* this) {
     gSPSegment(POLY_XLU_DISP++, 0x02, this->sceneSegment);
     gSPSegment(OVERLAY_DISP++, 0x02, this->sceneSegment);
 
-    Gfx_SetupFrame(gfxCtx, 0, 0, 0);
+    if (FISHMOD_NO_SKY()) {
+        Gfx_SetupFrame(gfxCtx, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2]);
+    } else {
+        Gfx_SetupFrame(gfxCtx, 0, 0, 0);
+    }
 
     if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_RUN_DRAW) {
         POLY_OPA_DISP = Play_SetFog(this, POLY_OPA_DISP);
@@ -1318,7 +1322,7 @@ void Play_Draw(PlayState* this) {
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_DRAW_SKYBOX) {
             if (this->skyboxId && (this->skyboxId != SKYBOX_UNSET_1D) && !this->envCtx.skyboxDisabled &&
-                !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSKY)) {
+                !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSKY) && !FISHMOD_NO_SKY()) {
                 if ((this->skyboxId == SKYBOX_NORMAL_SKY) || (this->skyboxId == SKYBOX_CUTSCENE_MAP)) {
                     Environment_UpdateSkybox(this->skyboxId, &this->envCtx, &this->skyboxCtx);
                     Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, this->envCtx.skyboxBlend, this->view.eye.x,
@@ -1373,7 +1377,8 @@ void Play_Draw(PlayState* this) {
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_DRAW_SKYBOX) {
             if ((this->skyboxCtx.drawType != SKYBOX_DRAW_128) &&
-                (GET_ACTIVE_CAM(this)->setting != CAM_SET_PREREND_FIXED) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSKY)) {
+                (GET_ACTIVE_CAM(this)->setting != CAM_SET_PREREND_FIXED) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSKY) &&
+                !FISHMOD_NO_SKY()) {
                 Vec3f quakeOffset;
 
                 quakeOffset = Camera_GetQuakeOffset(GET_ACTIVE_CAM(this));

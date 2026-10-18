@@ -40,11 +40,13 @@ def setting():
 
 
 def stop_bases():
-    """(eye, under, no-prop ms) for each hwbench-4 stop."""
+    """(eye, under, no-prop ms) for each hwbench-4 stop. Under water the skybox isn't drawn (FISHMOD_NO_SKY: it can't
+    be seen there, the sky_ab capture changed no pixel), so those stops count their no-prop, no-sky time."""
     hw = R.hw4()
     out = []
     for i, (eye, at, title) in enumerate(R.sb.stops()):
-        out.append((eye, "(under)" in title or title in ("Under the lilies", "Water Temple gate"), hw[i + 1]["noprops"]))
+        under = "(under)" in title or title in ("Under the lilies", "Water Temple gate")
+        out.append((eye, under, hw[i + 1]["nosky"] if under else hw[i + 1]["noprops"]))
     return out
 
 
