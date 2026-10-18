@@ -85,10 +85,11 @@ RULES = {
     "cattails": ((-4, 22), 0.02, {13: 0.25, 4: 0.25, 11: 0.1}, (2, 5), (0.8, 1.2), False),
     "lily_pad": ((18, 130), 0.012, {4: 0.95, 13: 0.5, 11: 0.12, 6: 0.1}, (3, 8), (0.45, 0.85), False),
     "float_leaves": ((12, 70), 0.01, {4: 0.15, 13: 0.15, 12: 0.06}, (1, 2), (0.9, 1.3), False),
-    "grass_tuft": ((4, 260), 0.10, {3: 0.1, 12: 0.12, 6: 0.12, 11: 0.12}, (2, 5), (0.8, 1.6), False),
-    "ribbon_weed": ((25, 220), 0.05, {6: 0.3, 12: 0.3, 11: 0.2, 3: 0.08, 1: 0.2}, (3, 7), (0.8, 1.5), False),
-    "broadleaf": ((20, 160), 0.03, {4: 0.08, 12: 0.2, 13: 0.2}, (2, 4), (0.8, 1.4), False),
-    "bush_weed": ((60, 290), 0.03, {12: 0.1, 6: 0.1, 7: 0.15}, (2, 4), (0.8, 1.5), False),
+    # (the bed plants: fewer clumps, more and bigger plants in each, so beds read as beds with sand between them)
+    "grass_tuft": ((4, 260), 0.035, {3: 0.04, 12: 0.05, 6: 0.05, 11: 0.05}, (4, 8), (1.0, 1.8), False),
+    "ribbon_weed": ((25, 220), 0.02, {6: 0.13, 12: 0.13, 11: 0.09, 3: 0.035, 1: 0.09}, (5, 9), (1.0, 1.6), False),
+    "broadleaf": ((20, 160), 0.014, {4: 0.035, 12: 0.085, 13: 0.085}, (3, 6), (0.9, 1.5), False),
+    "bush_weed": ((60, 290), 0.014, {12: 0.042, 6: 0.042, 7: 0.07}, (3, 5), (1.0, 1.7), False),
     "tall_weed": ((110, 340), 0.0, {}, (3, 7), (0.8, 1.3), True),
     "rock": ((-10, 600), 0.006, {5: 0.35, 14: 0.12, 1: 0.25, 9: 0.1}, (1, 4), (0.15, 0.6), False),
     "pebble_patch": ((8, 60), 0.0, {1: 0.4, 3: 0.05, 15: 0.05}, (1, 3), (0.6, 1.2), False),
@@ -101,7 +102,7 @@ RULES = {
     "marigold": ((-6, 8), 0.01, {4: 0.12, 13: 0.12, 11: 0.08}, (1, 3), (0.8, 1.2), False),
     "big_pondweed": ((30, 180), 0.01, {12: 0.12, 6: 0.12, 4: 0.1}, (2, 4), (0.8, 1.3), False),
     "spatterdock": ((15, 80), 0.0, {4: 0.2, 13: 0.2, 6: 0.08}, (2, 5), (0.8, 1.3), False),
-    "kelp_frond": ((150, 420), 0.0, {7: 0.2, 9: 0.1}, (3, 6), (0.8, 1.3), True),
+    "kelp_frond": ((150, 420), 0.0, {7: 0.1, 9: 0.05}, (3, 6), (1.0, 1.4), True),
     "vine_strand": ((60, 260), 0.01, {12: 0.06, 6: 0.06, 10: 0.06}, (2, 4), (0.8, 1.3), False),
     "vine_curtain": ((20, 200), 0.0, {14: 0.08, 15: 0.06, 2: 0.06}, (1, 3), (0.8, 1.2), False),
     "bank_roots": ((0, 60), 0.0, {10: 0.05, 11: 0.05, 6: 0.05, 13: 0.04}, (1, 2), (0.8, 1.3), True),
@@ -115,6 +116,21 @@ RULES = {
 HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 190, "broadleaf": 40, "bush_weed": 42, "kelp_frond": 260,
           "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44,
           "old_posts": 60, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
+# How far apart a clump's plants are scattered (the rest: 14): tight, so a clump reads as one plant mass
+CLUSTER_SPREAD = {"grass_tuft": 11.0, "ribbon_weed": 12.0, "broadleaf": 12.0, "bush_weed": 15.0, "big_pondweed": 13.0}
+# The bed plants are lushest where the camera spends its time, the shallows by the shores, and thin out toward the
+# deep middle, which is mostly seen far off through the surface: their chance, by depth below the surface
+BED_KINDS = {"grass_tuft", "ribbon_weed", "broadleaf", "bush_weed", "big_pondweed", "vine_strand"}
+
+
+def depth_lushness(depth):
+    if depth <= 140:
+        return 1.25
+    if depth <= 320:
+        return 1.25 - 0.7 * (depth - 140) / 180
+    return 0.55
+
+
 # how far a prop spreads from its middle (patches spread wider): the bed is checked all round it
 FOOTPRINT = {"grass_tuft": 40, "ribbon_weed": 32, "bush_weed": 50, "tall_weed": 42, "broadleaf": 22,
              "big_pondweed": 30, "kelp_frond": 15, "vine_strand": 12, "fan_weed": 22, "bank_roots": 35}
@@ -249,12 +265,16 @@ def place(scene, seed=SEED):
                     chance *= max(0.0, min(1.0, (0.6 - slope) / 0.3))
                 if steep:
                     chance += 0.35 * max(0.0, min(1.0, (slope - 0.6) / 0.8))
-                # patchy: dense in some places, none in others
-                chance *= max(0.0, patch[kind](x, z) * 2.2 - 0.6)
+                if kind in BED_KINDS:
+                    chance *= depth_lushness(depth)
+                # patchy: dense in some places, none in others (high contrast: thick beds, open sand between)
+                chance *= max(0.0, patch[kind](x, z) * 2.8 - 0.95)
                 if rnd.random() >= chance:
                     continue
                 n = rnd.randint(*cluster)
-                spread = FLOAT_SPREAD.get(kind, 14.0)
+                spread = FLOAT_SPREAD.get(kind, CLUSTER_SPREAD.get(kind, 14.0))
+                # a clump's own colour (each plant varies a little round it): beds vary clump to clump, like real ones
+                clump_tint = rnd.uniform(0.76, 1.1)
                 if kind in FLOAT_SPACE:
                     n *= 6  # leaves that would overlap are skipped: more tries, so the bed still fills in
                 for k in range(n):
@@ -322,7 +342,7 @@ def place(scene, seed=SEED):
                             continue  # it would lie on top of another leaf
                         floats.setdefault((int(circle[0] // 64), int(circle[1] // 64)), []).append(circle)
                     out.append({"kind": kind, "x": px, "y": y, "z": pz, "yaw": yaw, "tilt": tilt,
-                                "scale": sc, "tint": rnd.uniform(0.82, 1.08)})
+                                "scale": sc, "tint": clump_tint * rnd.uniform(0.95, 1.04)})
                 break  # one rule per candidate: keeps kinds from stacking on one spot
     return out
 

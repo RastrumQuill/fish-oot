@@ -144,6 +144,9 @@ static f32 sLodScale = 1.0f; // (as last built: UNDER_LOD_SCALE under water)
 // shortest that changed no view, per time of day), at the prop's scale; 0: the defaults. Above water the defaults
 // (set by eye: the tuning's views there were harsher than the game's).
 static f32 sTunedCut[FISHMOD_PROP_KIND_MAX];
+// (the tuned cut no further than this: past it the shapes in the haze are faint, and the budget goes on nearer
+// plants; the dissolve past the cut hides the edge)
+#define UNDER_CUT_MAX 1400.0f
 static f32 sTunedImp[FISHMOD_PROP_KIND_MAX];
 static f32 sTunedHalf[FISHMOD_PROP_KIND_MAX];
 
@@ -175,7 +178,7 @@ static void Scatter_TunedDistances(s32 under) {
         f32* out[3] = { &sTunedCut[k], &sTunedImp[k], &sTunedHalf[k] };
 
         for (i = 0; i < 3; i++) {
-            *out[i] = MAX(sLodTuned[k][a][1][i], sLodTuned[k][b][1][i]);
+            *out[i] = MIN(MAX(sLodTuned[k][a][1][i], sLodTuned[k][b][1][i]), UNDER_CUT_MAX);
         }
     }
 }
@@ -208,11 +211,13 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_POND_REED].model = gFishingReedModelDL;
     sKinds[FISHMOD_PROP_LILY_PAD].material = gFishingLilyPadMaterialDL;
     sKinds[FISHMOD_PROP_LILY_PAD].model = gFishingLilyPadModelDL;
-    sKinds[FISHMOD_PROP_ROCK].material = gFishingRockMaterialDL;
-    sKinds[FISHMOD_PROP_ROCK].model = gFishingRockModelDL;
+    // the rocks: vanilla's rock with vertex colours (moss on top, darker at the base: gen_habitat.py rock_vc), drawn
+    // unlit like the plants
+    sKinds[FISHMOD_PROP_ROCK].material = gFishmodProp_rockvcDLMaterial;
+    sKinds[FISHMOD_PROP_ROCK].model = gFishmodProp_rockvcDL;
     sKinds[FISHMOD_PROP_POND_REED].modelFar = gFishingReedModelDL;
     sKinds[FISHMOD_PROP_LILY_PAD].modelFar = gFishingLilyPadModelDL;
-    sKinds[FISHMOD_PROP_ROCK].modelFar = gFishingRockModelDL;
+    sKinds[FISHMOD_PROP_ROCK].modelFar = gFishmodProp_rockvcDL;
     {
         s32 i;
 
@@ -359,7 +364,7 @@ static void Scatter_InitKinds(void) {
                 s32 t;
 
                 for (t = 0; t < FISHMOD_LOD_TUNE_TIMES; t++) {
-                    sDistFar[1] = MAX(sDistFar[1], fade * sLodTuned[i][t][1][0]);
+                    sDistFar[1] = MAX(sDistFar[1], fade * MIN(sLodTuned[i][t][1][0], UNDER_CUT_MAX));
                 }
             }
         }
@@ -691,7 +696,7 @@ static void Scatter_UpdateDry(PlayState* play) {
 /** A kind's material, at the start of its props in a band. */
 static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 tier) {
     gfx = Gfx_SetupDL(gfx, SETUPDL_25);
-    if (info->xlu || (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK)) {
+    if (info->xlu || (kind == FISHMOD_PROP_LILY_PAD)) {
         // vanilla's own materials (lit by the scene's lights, like the Fishing Pond's props)
         gSPDisplayList(gfx++, info->material);
         return gfx;
@@ -740,6 +745,9 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
     }
     gSPClearGeometryMode(gfx++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
     gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
+    if (kind == FISHMOD_PROP_ROCK) {
+        gSPSetGeometryMode(gfx++, G_CULL_BACK); // (solid: their far sides cost nothing)
+    }
     if (tier == TIER_IMP) {
         gSPDisplayList(gfx++, info->materialImp);
     } else if (tier == TIER_HALF) {
@@ -1278,7 +1286,16 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                     a = CLAMP(a, 0, 255);
                 }
             }
-            gDPSetPrimColor(opa++, 0, 0, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
+            if (kind == FISHMOD_PROP_ROCK) {
+                // each rock a slightly different stone: neutral, warmer or cooler grey (by where it stands)
+                static const u8 sStone[4][3] = { { 255, 255, 255 }, { 255, 240, 222 }, { 228, 240, 255 }, { 240, 248, 232 } };
+                const u8* c = sStone[((u32)(prop->x * 7 + prop->z * 13) >> 4) & 3];
+
+                gDPSetPrimColor(opa++, 0, 0, (t * light[0] * c[0]) >> 16, (t * light[1] * c[1]) >> 16,
+                                (t * light[2] * c[2]) >> 16, a);
+            } else {
+                gDPSetPrimColor(opa++, 0, 0, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
+            }
         }
         gSPMatrix((*disp)++, &set->mtx[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         if (info->sway != 0) {
