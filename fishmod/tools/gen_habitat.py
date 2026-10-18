@@ -746,7 +746,9 @@ def mesh_moss_patch():
     ring = []
     for k in range(sides):
         t = 2 * math.pi * (k + rnd.uniform(-0.35, 0.35)) / sides
-        r = radius * (rnd.uniform(0.45, 0.7) if k % 2 else rnd.uniform(0.8, 1.05))  # (in and out: a ragged edge)
+        # an uneven, lumpy edge: two slow waves round the rim and a little jitter (not alternating in and out,
+        # which made star shapes)
+        r = radius * (0.78 + 0.14 * math.sin(2 * t + 0.7) + 0.1 * math.sin(3 * t + 2.1) + rnd.uniform(-0.05, 0.05))
         x, z = math.cos(t) * r, math.sin(t) * r
         # the rim well under the sand: where the bed rises or dips a little, it still cuts the edge, never a gap
         ring.append(m.vert((x, -3.5, z), uv(x, z), (175, 185, 160)))  # (a little darker where it meets the sand)
