@@ -672,8 +672,11 @@ def main():
     ap.add_argument("--scene", default="SCENE_LAKE_HYLIA")
     ap.add_argument("--preview", default=None)
     ap.add_argument("--c", action="store_true", help="write the game's data (src/fishmod_data/)")
+    ap.add_argument("--unthinned", action="store_true", help="without the density cap and thin_beds.py's list (A/B)")
     args = ap.parse_args()
-    inst = thinned(density_capped(accents(place(args.scene))))
+    inst = accents(place(args.scene))
+    if not args.unthinned:
+        inst = thinned(density_capped(inst))
     counts = {}
     for it in inst:
         counts[it["kind"]] = counts.get(it["kind"], 0) + 1
