@@ -49,7 +49,8 @@ def distances():
         for name, body in rows:
             nums = list(map(int, re.findall(r"\d+", body)))  # [time][under][setting]
             tuned[name.upper()] = min(max(nums[t * 6 + 3] for t in range(4)), 1400)  # (UNDER_CUT_MAX)
-            if name.upper() in ("KELP_FROND", "TALL_WEED", "RIBBON_WEED", "BIG_PONDWEED") and tuned[name.upper()]:
+            if name.upper() in ("KELP_FROND", "TALL_WEED", "RIBBON_WEED", "BIG_PONDWEED", "VINE_STRAND") and \
+                    tuned[name.upper()]:
                 tuned[name.upper()] = min(tuned[name.upper()], 900)  # (UNDER_CUT_TALL)
     out = {}
     for k in kinds:

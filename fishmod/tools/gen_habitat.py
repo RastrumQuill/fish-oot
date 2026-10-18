@@ -733,22 +733,23 @@ def mesh_flat_scatter(name, texture, count, spread, size, y, col, seed):
 
 
 def mesh_moss_patch():
-    """A low, lumpy mat of moss rising out of the bed: a 10-sided fan with a ragged rim sunk under the sand, so the bed
+    """A low, lumpy mat of moss rising out of the bed: a 14-sided fan with a ragged rim sunk under the sand, so the bed
     cuts the edge (an irregular outline from the terrain, no see-through texels), only a few units high in the
     middle, so from the low under-water camera it covers few scanlines (cheap) and reads as a carpet, not a mound.
     The texture is laid on from above and repeats, so the patch's size doesn't stretch it."""
     rnd = random.Random(121)
     m = Mesh("moss_patch", "moss")
-    radius, height, sides, tile = 56.0, 2.8, 10, 26.0
+    radius, height, sides, tile = 56.0, 2.8, 14, 26.0
     def uv(x, z):
         return (x / tile, z / tile)
     c = m.vert((rnd.uniform(-6, 6), height, rnd.uniform(-6, 6)), uv(0, 0), (240, 245, 225))
     ring = []
     for k in range(sides):
-        t = 2 * math.pi * (k + rnd.uniform(-0.3, 0.3)) / sides
-        r = radius * rnd.uniform(0.55, 1.05)
+        t = 2 * math.pi * (k + rnd.uniform(-0.35, 0.35)) / sides
+        r = radius * (rnd.uniform(0.45, 0.7) if k % 2 else rnd.uniform(0.8, 1.05))  # (in and out: a ragged edge)
         x, z = math.cos(t) * r, math.sin(t) * r
-        ring.append(m.vert((x, -1.5, z), uv(x, z), (175, 185, 160)))  # (a little darker where it meets the sand)
+        # the rim well under the sand: where the bed rises or dips a little, it still cuts the edge, never a gap
+        ring.append(m.vert((x, -3.5, z), uv(x, z), (175, 185, 160)))  # (a little darker where it meets the sand)
     for k in range(sides):
         m.tri(c, ring[(k + 1) % sides], ring[k])
     return m

@@ -110,9 +110,6 @@ RULES = {
     "boulder": ((-20, 700), 0.0, {5: 0.06, 14: 0.08, 7: 0.03, 1: 0.03, 9: 0.05}, (1, 2), (0.9, 2.2), False),
     "old_posts": ((5, 200), 0.0, {2: 0.08}, (1, 2), (0.8, 1.2), False),  # old pilings by the lab's shore
     "leaf_litter": ((10, 120), 0.005, {11: 0.05, 13: 0.04, 4: 0.04}, (1, 1), (0.8, 1.3), False),
-    # low domes of moss on flat bed in the shallows (castle hedge texture): cover between the plant clumps that costs
-    # few pixels from the low under-water camera and no see-through texels
-    "moss_patch": ((6, 260), 0.16, {4: 0.12, 12: 0.12, 13: 0.12, 6: 0.1, 11: 0.1, 1: 0.1, 3: 0.05}, (3, 6), (0.6, 1.2), False),
 }
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
 # meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
@@ -120,7 +117,7 @@ HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 140, "broadleaf": 40
           "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44,
           "old_posts": 60, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
 # How far apart a clump's plants are scattered (the rest: 14): tight, so a clump reads as one plant mass
-CLUSTER_SPREAD = {"moss_patch": 40.0, "grass_tuft": 11.0, "ribbon_weed": 12.0, "broadleaf": 12.0, "bush_weed": 15.0, "big_pondweed": 13.0}
+CLUSTER_SPREAD = {"grass_tuft": 11.0, "ribbon_weed": 12.0, "broadleaf": 12.0, "bush_weed": 15.0, "big_pondweed": 13.0}
 # The bed plants are lushest where the camera spends its time, the shallows by the shores, and thin out toward the
 # deep middle, which is mostly seen far off through the surface: their chance, by depth below the surface
 BED_KINDS = {"grass_tuft", "ribbon_weed", "broadleaf", "bush_weed", "big_pondweed", "vine_strand"}
@@ -174,7 +171,7 @@ def lie_on_bed(floor_at, x, z, surface, here, yaw, half_len, half_wid):
             (max(-clamp, min(clamp, tx)), max(-clamp, min(clamp, tz))))
 
 
-FLAT_KINDS = {"pebble_patch", "leaf_litter", "moss_patch"}  # flat on the bed
+FLAT_KINDS = {"pebble_patch", "leaf_litter"}  # flat on the bed
 FLOATING = {"lily_pad", "float_leaves", "spatterdock", "vine_curtain"}  # sit on the surface, not the bed
 # Leaves floating on the surface lie side by side, not on top of each other: each one's round footprint (radius,
 # and its centre's offset in the model: vanilla's lily pad sits off its origin) at scale 1, and how far apart a
@@ -300,9 +297,8 @@ def place(scene, seed=SEED):
                         continue
                     # flat patches (pebbles, leaf litter) only on flat ground, not hanging over an edge
                     if kind in FLAT_KINDS:
-                        # (the moss mat's rim sinks into the sand, so it takes gentle slopes)
-                        r = (32 if kind == "moss_patch" else 50) * scale[1]
-                        tol = 12 if kind == "moss_patch" else 6
+                        r = 50 * scale[1]
+                        tol = 6
                         corners = [floor_at(px + dx, pz + dz, ps) for dx, dz in ((r, 0), (-r, 0), (0, r), (0, -r))]
                         if any(c is None or abs(c - pf) > tol for c in corners):
                             continue
@@ -350,6 +346,73 @@ def place(scene, seed=SEED):
                     out.append({"kind": kind, "x": px, "y": y, "z": pz, "yaw": yaw, "tilt": tilt,
                                 "scale": sc, "tint": clump_tint * rnd.uniform(0.95, 1.04)})
                 break  # one rule per candidate: keeps kinds from stacking on one spot
+    out += place_moss(seed, rnd_state=None, surface_at=surface_at, floor_at=floor_at, zones=zones, excluded=excluded,
+                      boxes=boxes)
+    return out
+
+
+# Moss mats (gen_habitat.py mesh_moss_patch: a low dome, its rim sunk in the sand): their own pass with their own
+# random numbers, so changing them never moves anything else. On the bed in the shallows, in clusters, tilted to the
+# bed's slope; not where the bed bends too much for a flat mat (it would float at one edge).
+MOSS = {"depth": (6, 260), "base": 0.1, "boosts": {4: 0.08, 12: 0.08, 13: 0.08, 6: 0.07, 11: 0.07, 1: 0.07, 3: 0.03},
+        "cluster": (3, 6), "scale": (0.6, 1.2), "spread": 40.0, "radius": 46.0}
+
+
+def place_moss(seed, rnd_state, surface_at, floor_at, zones, excluded, boxes):
+    rnd = random.Random(seed * 1000 + 77)
+    noise = Noise(seed * 31 + 999, 420.0)
+    out = []
+    xs = [b["xMin"] for b in boxes] + [b["xMin"] + b["xLen"] for b in boxes]
+    zs = [b["zMin"] for b in boxes] + [b["zMin"] + b["zLen"] for b in boxes]
+    for gz in range(min(zs), max(zs), STEP):
+        for gx in range(min(xs), max(xs), STEP):
+            x, z = gx + rnd.uniform(0, STEP), gz + rnd.uniform(0, STEP)
+            chance_roll = rnd.random()
+            surf = surface_at(x, z)
+            if surf is None:
+                continue
+            f = floor_at(x, z, surf)
+            if f is None or not (MOSS["depth"][0] <= surf - f <= MOSS["depth"][1]):
+                continue
+            chance = MOSS["base"] + sum(b * in_zone(zn, x, z) for zn in zones for zid, b in MOSS["boosts"].items()
+                                        if zn["id"] == zid)
+            chance *= max(0.0, noise(x, z) * 2.2 - 0.6)
+            if chance_roll >= chance:
+                continue
+            for k in range(rnd.randint(*MOSS["cluster"])):
+                px = x + (rnd.gauss(0, MOSS["spread"]) if k else 0)
+                pz = z + (rnd.gauss(0, MOSS["spread"]) if k else 0)
+                sc = rnd.uniform(*MOSS["scale"])
+                yaw = rnd.uniform(0, 2 * math.pi)
+                ps = surface_at(px, pz)
+                if ps is None or excluded(px, pz):
+                    continue
+                pf = floor_at(px, pz, ps)
+                if pf is None or not (MOSS["depth"][0] - 4 <= ps - pf <= MOSS["depth"][1] + 10):
+                    continue
+                r = MOSS["radius"] * sc * 0.8
+                y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, r, r)
+                if max(abs(tilt[0]), abs(tilt[1])) > math.radians(25):
+                    continue
+                # the bed under the rim, against the tilted plane: a mat can't bend, so not over bumps or hollows
+                c, s_ = math.cos(yaw), math.sin(yaw)
+                ok = True
+                for ang in range(0, 360, 45):
+                    a = math.radians(ang)
+                    lx, lz = math.cos(a) * r, math.sin(a) * r
+                    wx, wz = px + lx * c + lz * s_, pz - lx * s_ + lz * c
+                    fy = floor_at(wx, wz, ps)
+                    if fy is None:
+                        ok = False
+                        break
+                    plane = y + lx * math.tan(tilt[1]) - lz * math.tan(tilt[0])
+                    if abs(fy - plane) > 3.0:
+                        ok = False
+                        break
+                if not ok:
+                    continue
+                out.append({"kind": "moss_patch", "x": px, "y": y, "z": pz, "yaw": yaw, "tilt": tilt, "scale": sc,
+                            "tint": rnd.uniform(0.9, 1.08)})
     return out
 
 
@@ -357,7 +420,7 @@ def place(scene, seed=SEED):
 # per card, so the tall kinds are kept to a third, and the eelgrass keeps its beds' edges while the middles turn to
 # low plants (grass, broadleaf), with the moss between. Decided after placement, by a hash of where each prop stands,
 # so the rest of the layout stays exactly as placed.
-ACCENT_KEEP = {"kelp_frond": 1 / 3, "tall_weed": 1 / 3}
+ACCENT_KEEP = {"kelp_frond": 1 / 3, "tall_weed": 1 / 3, "vine_strand": 1 / 3}
 RIBBON_KEEP_EDGE, RIBBON_KEEP_INSIDE = 0.5, 0.17
 
 
