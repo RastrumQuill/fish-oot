@@ -381,10 +381,10 @@ def moss_fit(floor_at, px, pz, ps, pf, yaw, sc):
 
 
 # An even cap on how thick a bed gets: per 120-unit cell, the plants' cards times their height (what the console pays
-# for, per scanline per card) no more than DENSITY_CAP, about the thickest of the beds that already hold 20 fps all
-# round (the East weed flats, the reed bank: 90th percentile ~600). Over it, plants turn to moss mats (by a hash, so
+# for, per scanline per card) no more than DENSITY_CAP: trims only the thickest tenth of the West weed flat (its
+# 90th percentile ~916; 600 thinned beds that already held). Over it, plants turn to moss mats (by a hash, so
 # the same ones every time), cheapest look first: the ones with most cards and height go.
-DENSITY_CAP = 600.0
+DENSITY_CAP = 900.0
 DENSITY_CELL = 120
 CAP_CARDS = {"grass_tuft": 4, "broadleaf": 2, "bush_weed": 4, "big_pondweed": 2, "ribbon_weed": 3, "vine_strand": 2,
              "tall_weed": 2, "kelp_frond": 1}
