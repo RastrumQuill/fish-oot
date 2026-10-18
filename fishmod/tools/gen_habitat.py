@@ -839,8 +839,10 @@ MESHES = [
     lambda: crossed_cards("iris", "iris_card", 30, 85, 3, hexc("#2a4a1c"), hexc("#a0b060"), 112, lean=4),
     lambda: crossed_cards("big_pondweed", "bigleaf_card", 40, 52, 4, hexc("#1a3412"), hexc("#7a8a40"), 113),
     mesh_spatterdock,
-    lambda: crossed_cards("kelp_frond", "frond_card", 26, 260, 3, hexc("#0c200a"), hexc("#6a7a38"), 114,
-                          lean=30),
+    # one card, turned to face the camera in the game (fishmod_scatter.c faceCam): a thin frond, so the turn doesn't
+    # show, at a third of the three crossed cards' cost (the console pays per scanline per card)
+    lambda: crossed_cards("kelp_frond", "frond_card", 26, 180, 1, hexc("#0c200a"), hexc("#6a7a38"), 114,
+                          lean=22),
     lambda: crossed_cards_v("vine_strand", "vine_card", 28, 150, 2, hexc("#122a0e"), hexc("#7a8a48"), 115,
                             lean=10, v_repeat=2.0),
     mesh_curtain,
@@ -853,7 +855,7 @@ MESHES = [
     # one clump stretched up the whole height (the texture once, not twice: twice stacked a second clump on the
     # first's blade tips, pinched in the middle), leaning a little
     lambda: patch("tall_weed", PATCH["tall_weed"], 30, 205, lambda i: crossed_cards_v(
-        "tall_weed", "ribbon_card", 26, 190, 2, hexc("#0d260b"), hexc("#5a6a30"), 105 + i, lean=6, v_repeat=1.0)),
+        "tall_weed", "ribbon_card", 26, 140, 1, hexc("#0d260b"), hexc("#5a6a30"), 105 + i, lean=6, v_repeat=1.0)),
     lambda: crossed_cards("broadleaf", "broadleaf_card", 38, 40, 3, hexc("#1a3a12"), hexc("#7a8a40"), 106),
     lambda: crossed_cards("old_posts", "roots_card", 70, 60, 2, hexc("#2b2311"), hexc("#8a8a70"), 107),
     lambda: crossed_cards("cattails", "reed_card", 44, 110, 3, hexc("#3a4a18"), hexc("#b8b070"), 108, lean=3),
@@ -865,7 +867,7 @@ MESHES = [
 
     lambda: crossed_cards("reed_clump", "reed_card", 40, 95, 3, hexc("#184217"), hexc("#8f9342"), 101, lean=4),
     lambda: patch("ribbon_weed", PATCH["ribbon_weed"], 22, 202, lambda i: crossed_cards(
-        "ribbon_weed", "ribbon_card", 18, 80, 2, hexc("#133611"), hexc("#6c7a3b"), 102 + i, lean=10)),
+        "ribbon_weed", "ribbon_card", 22, 80, 1, hexc("#133611"), hexc("#6c7a3b"), 102 + i, lean=10)),
     lambda: patch("bush_weed", PATCH["bush_weed"], 30, 203, lambda i: crossed_cards(
         "bush_weed", "bush_card", 46, 42, 3, hexc("#082b07"), hexc("#525d28"), 103 + i)),
     mesh_log,

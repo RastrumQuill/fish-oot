@@ -258,3 +258,39 @@ pixel counted when a channel moves more than 2 of 31). The table keeps the most 
   table (`Scatter_TunedDistances`: of the two measured times either side of the clock, the further), at the prop's
   scale. Above water the hand-set distances stay: the tuning's views there (looking across the lake from anywhere,
   at any pitch) were harsher than anything the game's camera does, so those numbers are set by eye instead.
+
+## Frame-rate pass: a solid 20 fps from in-game views (steps 1-4 of 5)
+The goal is 20 fps, solid, from views like the game's own. `section_budget.py` estimates the console's frame time
+for 240 views per lake section (the rod camera from the shore, swimming at the surface, diving), with
+`shot_search.py`'s cost model: the scanlines each prop's cards cover, fitted to hwbench-4 (near 0.00326, far 0.00242
+ms per card-scanline, 3.2 ms rms per stop). The model is pessimistic: it leaves out the far single cards and half
+textures, and the skip for plants the camera is inside.
+
+What it showed: the props are the whole problem (the no-prop time is 19-37 ms everywhere), and three tall kinds made
+most of it: kelp (260 tall, 3 cards), tall weed (190, 4 cards) and ribbon weed (6 cards), from every camera, even
+above water through the surface.
+
+| Step | Views over 50 ms |
+|---|---|
+| Before | 51% |
+| 1. Fewer cards: kelp 1 (turned to face the camera, `faceCam`), tall weed 2, ribbon weed 3 | |
+| 2. Shorter: kelp 260 -> 180, tall weed 190 -> 140 | |
+| 3. Tall kinds as accents: kelp and tall weed a third as many; ribbon weed keeps its beds' edges (half), the middles (a sixth kept) turn to grass and broadleaf (`gen_scatter.py accents`, by a hash of position, so the rest of the layout doesn't move) | |
+| 4. Under water: tall kinds cut at 900 (`UNDER_CUT_TALL`), the haze a little nearer (`HAZE_FOG_NEAR` 953 -> 945) | |
+| After 1-4 | 12% (p95 57.9 ms) |
+
+Still heavy: West weed flat (60% of views), North beach shallows (39%), Dry dock (22%), East shore lilies (21%).
+Mostly diving among mid-height plants.
+
+**Not done (the next squeeze, each a small change of look; the model's estimate of views over 50 ms):** pondweed 4
+-> 2 cards (10%), grass tuft patches 8 -> 4 cards (7%), bush 6 -> 4 (6%), broadleaf 3 -> 2 (5%), vine strands 2 -> 1
+(4%).
+
+**Step 5, a per-frame plant budget** (the game estimates its own plant cost each frame the same way and fades the
+furthest plants out when over): the only way to guarantee a solid 20 in every view. Held back until everything else
+is squeezed.
+
+**Next LOD tuning run (the compute package):** the meshes changed (kelp, tall weed, ribbon weed), so the tuned
+under-water distances need re-running. This time no hard limit: store, per kind, view and candidate distance, the
+percentage of the picture that changed, so the cut-off can be chosen afterwards (and differently per kind) without
+running it again.

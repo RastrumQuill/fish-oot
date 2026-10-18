@@ -116,7 +116,7 @@ RULES = {
 }
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
 # meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
-HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 190, "broadleaf": 40, "bush_weed": 42, "kelp_frond": 260,
+HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 140, "broadleaf": 40, "bush_weed": 42, "kelp_frond": 180,
           "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44,
           "old_posts": 60, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
 # How far apart a clump's plants are scattered (the rest: 14): tight, so a clump reads as one plant mass
@@ -353,6 +353,59 @@ def place(scene, seed=SEED):
     return out
 
 
+# Tall plants as accents (step 3 of the frame-rate plan, fishmod/docs/opt-plan-hw.md): the console pays per scanline
+# per card, so the tall kinds are kept to a third, and the eelgrass keeps its beds' edges while the middles turn to
+# low plants (grass, broadleaf), with the moss between. Decided after placement, by a hash of where each prop stands,
+# so the rest of the layout stays exactly as placed.
+ACCENT_KEEP = {"kelp_frond": 1 / 3, "tall_weed": 1 / 3}
+RIBBON_KEEP_EDGE, RIBBON_KEEP_INSIDE = 0.5, 0.17
+
+
+def spot_hash(x, z, salt=0):
+    h = ((int(x) * 73856093) ^ (int(z) * 19349663) ^ (salt * 83492791)) & 0xFFFFFFFF
+    h ^= h >> 13
+    h = (h * 0x5BD1E995) & 0xFFFFFFFF
+    h ^= h >> 15
+    return (h & 0xFFFF) / 65536.0
+
+
+def accents(instances):
+    grid = {}
+    for p in instances:
+        if p["kind"] in BED_KINDS:
+            grid.setdefault((int(p["x"] // 100), int(p["z"] // 100)), []).append(p)
+
+    def neighbours(p):
+        gx, gz = int(p["x"] // 100), int(p["z"] // 100)
+        return sum(1 for ix in (gx - 1, gx, gx + 1) for iz in (gz - 1, gz, gz + 1) for q in grid.get((ix, iz), ())
+                   if q is not p and (q["x"] - p["x"]) ** 2 + (q["z"] - p["z"]) ** 2 < 100 * 100)
+
+    ribbon = [p for p in instances if p["kind"] == "ribbon_weed"]
+    counts = {id(p): neighbours(p) for p in ribbon}
+    median = sorted(counts.values())[len(counts) // 2] if counts else 0
+    out = []
+    for p in instances:
+        k = p["kind"]
+        h = spot_hash(p["x"], p["z"], 1)
+        if k in ACCENT_KEEP:
+            if h < ACCENT_KEEP[k]:
+                out.append(p)
+            continue
+        if k == "ribbon_weed":
+            edge = counts[id(p)] < median
+            if h < (RIBBON_KEEP_EDGE if edge else RIBBON_KEEP_INSIDE):
+                out.append(p)
+            elif not edge:
+                h2 = spot_hash(p["x"], p["z"], 2)
+                if h2 < 0.5:
+                    out.append(dict(p, kind="grass_tuft", scale=min(max(p["scale"], 1.0), 1.5)))
+                elif h2 < 0.75:
+                    out.append(dict(p, kind="broadleaf", scale=min(max(p["scale"] * 0.8, 0.85), 1.15)))
+            continue
+        out.append(p)
+    return out
+
+
 def preview(scene, instances, outdir):
     from PIL import Image, ImageDraw
     ss = load_tool("style_sheet")
@@ -477,7 +530,7 @@ def main():
     ap.add_argument("--preview", default=None)
     ap.add_argument("--c", action="store_true", help="write the game's data (src/fishmod_data/)")
     args = ap.parse_args()
-    inst = place(args.scene)
+    inst = accents(place(args.scene))
     counts = {}
     for it in inst:
         counts[it["kind"]] = counts.get(it["kind"], 0) + 1

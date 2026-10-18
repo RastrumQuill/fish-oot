@@ -1080,7 +1080,8 @@ void Fishmod_AdvanceTime(PlayState* play) {
  * water's own lights still give its colour), easing in and out over a few frames. Only the fog: the far plane
  * (and what the scene draws) stays vanilla's. gFishmodHaze: 0 above water, 1 under.
  */
-#define HAZE_FOG_NEAR 953 // the fog's start (of 1000, with vanilla's far plane; vanilla's water is about 990)
+#define HAZE_FOG_NEAR 945 // the fog's start (of 1000, with vanilla's far plane; vanilla's water is about 990).
+                          // 953 before the frame-rate pass: a little murkier, so the tall plants' 900 cut hides
 f32 gFishmodHaze;
 s32 gFishmodTexCompress;
 u16* gFishmodZSame; // (debug builds: main.c)
