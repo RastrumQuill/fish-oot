@@ -388,12 +388,16 @@ def thinned(instances):
     can't lie."""
     if not os.path.exists(THIN) or not BED:
         return instances
-    picked = {(o["kind"], o["x"], o["z"]) for o in json.load(open(THIN))["moss"]}
+    listed = json.load(open(THIN))["moss"]
+    picked = {(o["kind"], o["x"], o["z"]) for o in listed}
+    drop = {(o["kind"], o["x"], o["z"]) for o in listed if o.get("drop")}
     surface_at, floor_at = BED
     out = []
     for p in instances:
         if (p["kind"], int(p["x"]), int(p["z"])) not in picked:
             out.append(p)
+            continue
+        if (p["kind"], int(p["x"]), int(p["z"])) in drop:
             continue
         ps = surface_at(p["x"], p["z"])
         pf = floor_at(p["x"], p["z"], ps) if ps is not None else None
