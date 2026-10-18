@@ -386,8 +386,8 @@ def moss_fit(floor_at, px, pz, ps, pf, yaw, sc):
 # the same ones every time), cheapest look first: the ones with most cards and height go.
 DENSITY_CAP = 900.0
 DENSITY_CELL = 120
-CAP_CARDS = {"grass_tuft": 4, "broadleaf": 2, "bush_weed": 4, "big_pondweed": 2, "ribbon_weed": 3, "vine_strand": 2,
-             "tall_weed": 2, "kelp_frond": 1}
+# (the bed plants; the tall accents, already a third, are left alone: where they grow the views hold easily)
+CAP_CARDS = {"grass_tuft": 4, "broadleaf": 2, "bush_weed": 4, "big_pondweed": 2, "ribbon_weed": 3}
 
 
 def density_capped(instances):
