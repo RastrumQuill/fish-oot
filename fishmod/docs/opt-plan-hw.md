@@ -254,3 +254,7 @@ pixel counted when a channel moves more than 2 of 31). The table keeps the most 
 - **The criterion is strict:** the most any of 13,584 views needed, at 2 pixels. One view where a far plant's few
   pixels change sets the table. Only the maximum was stored, not how many views needed how much, so this run can't say
   what a looser line (a few dozen pixels, say) would allow.
+- **Used:** with the camera under water, each kind's cut, single-card and half-texture distances come from the
+  table (`Scatter_TunedDistances`: of the two measured times either side of the clock, the further), at the prop's
+  scale. Above water the hand-set distances stay: the tuning's views there (looking across the lake from anywhere,
+  at any pitch) were harsher than anything the game's camera does, so those numbers are set by eye instead.
