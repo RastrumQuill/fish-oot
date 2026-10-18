@@ -28,9 +28,9 @@ SURFACE = -1313  # the full lake
 SHADE = {"bush_weed": 1.0, "broadleaf": 1.0, "big_pondweed": 1.2, "kelp_frond": 1.2, "tall_weed": 1.0,
          "ribbon_weed": 0.7, "grass_tuft": 0.4, "fan_weed": 0.8, "vine_strand": 0.6, "lily_pad": 1.6,
          "spatterdock": 1.2, "float_leaves": 0.8, "pond_reed": 0.5, "reed_clump": 0.6, "cattails": 0.6}
-SIGMA = 220.0     # the shade's spread
+SIGMA = 170.0     # the shade's spread (tight: dark mats under the beds, lighter sand between)
 DENSE = 6.0       # this much shade nearby is a dense bed
-BED_DARK = 0.45   # how much of the sunlight a dense bed takes
+BED_DARK = 0.6    # how much of the sunlight a dense bed takes
 DEPTH_DARK = 0.3  # and the deep water, from DEPTH0 down to DEPTH1 below the surface
 DEPTH0, DEPTH1 = 250.0, 1100.0
 FADE = 80.0       # up to this far under the surface, less of it (no seam at the waterline)

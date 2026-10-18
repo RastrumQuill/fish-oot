@@ -911,6 +911,54 @@ def half_distance(mesh_path, tex_path):
     return PX_PER_UNIT * 2 / best if best > 0 else 0.0
 
 
+def rock_vc():
+    """Vanilla's Fishing Pond rock (its geometry, UVs and texture, from the extracted assets) with vertex colours in
+    place of its lighting normals, drawn unlit like the plants (lit by the scene's light colour, by time of day): moss
+    on the faces that look up, darker toward the base where it sits in the silt, a little of the sun's side baked in.
+    Returns (obj path, png path), or None without the extracted assets."""
+    obj = os.path.join(VANILLA, "objects", "object_fish")
+    vtx_src = os.path.join(obj, "gFishingRockModelVtx.inc.c")
+    dl_src = os.path.join(obj, "gFishingRockModelDL.inc.c")
+    tex_src = os.path.join(obj, "gFishingRockTex.rgba16.png")
+    if not all(os.path.exists(p) for p in (vtx_src, dl_src, tex_src)):
+        return None
+    import re as _re
+    verts = [tuple(int(v, 0) for v in m) for m in
+             _re.findall(r"VTX\(\s*(-?\w+),\s*(-?\w+),\s*(-?\w+),\s*(-?\w+),\s*(-?\w+),\s*(\w+),\s*(\w+),\s*(\w+),",
+                         open(vtx_src).read())]
+    tris = []
+    for m in _re.finditer(r"gsSP2Triangles\((\d+), (\d+), (\d+), 0, (\d+), (\d+), (\d+), 0\)", open(dl_src).read()):
+        v = list(map(int, m.groups()))
+        tris += [v[:3], v[3:]]
+    tw, th = Image.open(tex_src).size
+    sun = (0.3, 1.0, 0.2)
+    sl = math.sqrt(sum(c * c for c in sun))
+    sun = tuple(c / sl for c in sun)
+    os.makedirs(MESH_IMP, exist_ok=True)
+    out = os.path.join(MESH_IMP, "rock_vc.obj")
+    with open(out, "w") as f:
+        f.write("# vanilla's rock with vertex colours (gen_habitat.py rock_vc)\n")
+        for x, y, z, s_, t_, nx, ny, nz in verts:
+            n = [(c - 256 if c > 127 else c) / 127.0 for c in (nx, ny, nz)]
+            ln = math.sqrt(sum(c * c for c in n)) or 1.0
+            n = [c / ln for c in n]
+            up = max(0.0, n[1])
+            moss = max(0.0, min(1.0, (up - 0.35) / 0.45)) * 0.85
+            ao = 0.55 + 0.45 * max(0.0, min(1.0, (y + 5) / 55.0))
+            lit = 0.72 + 0.28 * max(0.0, sum(a * b for a, b in zip(n, sun)))
+            col = [(1 - moss) * 1.0 + moss * m for m in (0.70, 0.90, 0.52)]
+            col = [min(1.0, c * ao * lit) for c in col]
+            f.write(f"v {x} {y} {z} {col[0]:.3f} {col[1]:.3f} {col[2]:.3f}\n")
+        for x, y, z, s_, t_, *_ in verts:
+            f.write(f"vt {s_ / 32.0 / tw:.5f} {1.0 - t_ / 32.0 / th:.5f}\n")
+        for a, b, c in tris:
+            f.write(f"f {a + 1}/{a + 1} {b + 1}/{b + 1} {c + 1}/{c + 1}\n")
+    png = os.path.join(ART_ROM, "rock_vc.png")
+    os.makedirs(ART_ROM, exist_ok=True)
+    Image.open(tex_src).convert("RGBA").save(png)
+    return out, png
+
+
 def write_props_manifest():
     """The textures and models as an assets.py manifest (into src/fishmod_data/, generated at build time)."""
     import json
@@ -1011,6 +1059,13 @@ def write_props_manifest():
             # and from where a texel is under half a pixel, with the texture at half size (its own UVs)
             models.append({"name": "gFishmodProp_" + kind + "DLFarH", "src": os.path.relpath(far, ROOT),
                            "texture": halfname, "out": out, "separateMaterial": True})
+    # the rocks with vertex colours (they stay the vanilla kind ROCK; fishmod_scatter.c draws them with these)
+    rv = rock_vc()
+    if rv is not None:
+        textures.append({"name": "gFishmodProp_rockvcTex", "src": os.path.relpath(rv[1], ROOT), "format": "ci8",
+                         "out": out})
+        models.append({"name": "gFishmodProp_rockvcDL", "src": os.path.relpath(rv[0], ROOT),
+                       "texture": "gFishmodProp_rockvcTex", "out": out, "separateMaterial": True})
     with open(os.path.join(DATA, "props_manifest.json"), "w") as f:
         json.dump({"textures": textures, "materials": materials, "models": models}, f, indent=1)
     kinds = [k for k, _, _ in PROP_KINDS] + VANILLA_KINDS
