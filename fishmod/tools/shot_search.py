@@ -33,6 +33,7 @@ CARDS = {"grass_tuft": (4, 80), "ribbon_weed": (3, 60), "bush_weed": (4, 100), "
          "fan_weed": (2, 44), "rock": (1, 120), "boulder": (1, 120), "moss_patch": (1, 100), "lily_pad": (1, 110),
          "pond_reed": (1, 30), "reed_clump": (3, 40), "cattails": (3, 44), "spatterdock": (1, 60),
          "float_leaves": (1, 60)}
+FLAT = {"moss_patch", "pebble_patch", "leaf_litter", "lily_pad", "float_leaves", "spatterdock"}
 NOT_PLANT = {"rock", "boulder", "moss_patch", "pebble_patch", "lily_pad", "float_leaves", "spatterdock"}
 
 
@@ -48,9 +49,10 @@ class Scene:
         self.CUT = np.array([dist.get(k, (1600, 900))[1] for k in self.kind])
         self.CUT_ABOVE = np.array([dist.get(k, (1600, 900))[0] for k in self.kind])
         self.PLANT = np.array([k not in NOT_PLANT for k in self.kind])
+        self.FLAT = np.array([k in FLAT for k in self.kind])
 
-    def cost(self, eye, at, under=True, base=BASE_UNDER):
-        """(estimated RDP ms, plant screen cover, props drawn); base: the view's no-prop RDP time."""
+    def contrib(self, eye, at, under=True):
+        """Per prop: its share of the view's RDP time in ms, and whether it's drawn and on screen (its cover)."""
         eye = np.array(eye, float)
         fw = np.array(at, float) - eye
         fw /= np.linalg.norm(fw)
@@ -60,21 +62,35 @@ class Scene:
         d = self.P[:, :3] - eye
         dsq = d[:, 0] ** 2 + d[:, 2] ** 2
         ok = dsq < (self.CUT if under else self.CUT_ABOVE) ** 2
+        # upright plants: a card of their height and width, facing the camera
         c = d.copy()
-        c[:, 1] += self.H / 2
+        c[:, 1] += np.where(self.FLAT, 0, self.H / 2)
         z, x, y = c @ fw, c @ rt, c @ up
         ok &= z > -self.W
-        z = np.maximum(z, 15.0)
-        x0, x1 = (x - self.W / 2) * F / z + 160, (x + self.W / 2) * F / z + 160
-        y0, y1 = (y - self.H / 2) * F / z + 120, (y + self.H / 2) * F / z + 120
+        zc = np.maximum(z, 15.0)
+        x0, x1 = (x - self.W / 2) * F / zc + 160, (x + self.W / 2) * F / zc + 160
+        y0, y1 = (y - self.H / 2) * F / zc + 120, (y + self.H / 2) * F / zc + 120
+        # flat ones (moss, pads, decals): a level disc, its near and far edges along the look across the ground
+        fh = np.array([fw[0], 0.0, fw[2]])
+        fh /= max(np.linalg.norm(fh), 1e-6)
+        r = (self.W / 2)[:, None]
+        near_pt = c - r * fh
+        far_pt = c + r * fh
+        zn, zf = np.maximum(near_pt @ fw, 15.0), np.maximum(far_pt @ fw, 15.0)
+        yn, yf = (near_pt @ up) * F / zn + 120, (far_pt @ up) * F / zf + 120
+        y0 = np.where(self.FLAT, np.minimum(yn, yf), y0)
+        y1 = np.where(self.FLAT, np.maximum(yn, yf), y1)
         cx = np.clip(x1, 0, 320) - np.clip(x0, 0, 320)
         cy = np.clip(y1, 0, 240) - np.clip(y0, 0, 240)
         ok &= (cx > 0) & (cy > 0)
-        spans = np.where(ok, cy * self.NC, 0)
-        near = dsq < 500 ** 2
-        ms = base + KN * spans[near].sum() + KF * spans[~near].sum()
-        cover = np.where(ok & self.PLANT, np.minimum(cx * cy, 4000), 0).sum()
-        return float(ms), float(cover), int(ok.sum())
+        ms = np.where(ok, cy * self.NC, 0) * np.where(dsq < 500 ** 2, KN, KF)
+        return ms, ok, cx * cy
+
+    def cost(self, eye, at, under=True, base=BASE_UNDER):
+        """(estimated RDP ms, plant screen cover, props drawn); base: the view's no-prop RDP time."""
+        ms, ok, area = self.contrib(eye, at, under)
+        cover = np.where(ok & self.PLANT, np.minimum(area, 4000), 0).sum()
+        return float(base + ms.sum()), float(cover), int(ok.sum())
 
 
 def search(scene, tries, seed=1):

@@ -41,26 +41,8 @@ def turned(v):
 
 
 def contributions(sc, eye, at, under):
-    """Per prop: its share of the view's RDP time (shot_search.Scene.cost, unsummed)."""
-    fw = at - eye
-    fw /= np.linalg.norm(fw)
-    rt = np.cross(fw, [0, 1, 0])
-    rt /= np.linalg.norm(rt)
-    up = np.cross(rt, fw)
-    d = sc.P[:, :3] - eye
-    dsq = d[:, 0] ** 2 + d[:, 2] ** 2
-    ok = dsq < (sc.CUT if under else sc.CUT_ABOVE) ** 2
-    c = d.copy()
-    c[:, 1] += sc.H / 2
-    z, x, y = c @ fw, c @ rt, c @ up
-    ok &= z > -sc.W
-    z = np.maximum(z, 15.0)
-    x0, x1 = (x - sc.W / 2) * S.F / z + 160, (x + sc.W / 2) * S.F / z + 160
-    y0, y1 = (y - sc.H / 2) * S.F / z + 120, (y + sc.H / 2) * S.F / z + 120
-    cx = np.clip(x1, 0, 320) - np.clip(x0, 0, 320)
-    cy = np.clip(y1, 0, 240) - np.clip(y0, 0, 240)
-    ok &= (cx > 0) & (cy > 0)
-    return np.where(ok, cy * sc.NC, 0) * np.where(dsq < 500 ** 2, S.KN, S.KF)
+    """Per prop: its share of the view's RDP time (shot_search.Scene.contrib)."""
+    return sc.contrib(eye, at, under)[0]
 
 
 def main():
@@ -108,6 +90,7 @@ def main():
             sc.W[j] = MOSS_W * sc.P[j, 3]
             sc.NC[j] = 1
             sc.PLANT[j] = False
+            sc.FLAT[j] = True
         failing = still
     out = [{"kind": sc.kind[j], "x": int(sc.P[j, 0]), "z": int(sc.P[j, 2])} for j in np.nonzero(turned_to_moss)[0]]
     by = {}
