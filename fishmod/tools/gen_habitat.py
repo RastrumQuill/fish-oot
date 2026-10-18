@@ -298,7 +298,7 @@ def rom_moss():
     a dark olive moss, its contrast kept so the speckle reads at a distance."""
     src = vanilla("scenes/indoors/hairal_niwa_n/hairal_niwa_n_scene_000068F0_Tex.rgba16.png")
     out = Image.new("RGB", src.size)
-    pal = ["#14240c", "#22381a", "#34502a", "#4c6a34", "#6c8442"]
+    pal = ["#26361a", "#34482a", "#465c30", "#5c723a", "#788a48"]
     vals = [luma(src.getpixel((x, y))) for y in range(src.height) for x in range(src.width)]
     lo, hi = min(vals), max(vals)
     for y in range(src.height):
@@ -733,21 +733,22 @@ def mesh_flat_scatter(name, texture, count, spread, size, y, col, seed):
 
 
 def mesh_moss_patch():
-    """A low, lumpy dome of moss rising out of the bed: an 8-sided fan, its rim sunk under the sand so the bed cuts
-    the edge (an irregular outline from the terrain, no see-through texels), a few units high in the middle. The
-    texture is laid on from above and repeats, so the patch's size doesn't stretch it."""
+    """A low, lumpy mat of moss rising out of the bed: a 10-sided fan with a ragged rim sunk under the sand, so the bed
+    cuts the edge (an irregular outline from the terrain, no see-through texels), only a few units high in the
+    middle, so from the low under-water camera it covers few scanlines (cheap) and reads as a carpet, not a mound.
+    The texture is laid on from above and repeats, so the patch's size doesn't stretch it."""
     rnd = random.Random(121)
     m = Mesh("moss_patch", "moss")
-    radius, height, sides, tile = 46.0, 5.0, 8, 26.0
+    radius, height, sides, tile = 56.0, 2.8, 10, 26.0
     def uv(x, z):
         return (x / tile, z / tile)
-    c = m.vert((0, height, 0), uv(0, 0), (225, 235, 215))
+    c = m.vert((rnd.uniform(-6, 6), height, rnd.uniform(-6, 6)), uv(0, 0), (240, 245, 225))
     ring = []
     for k in range(sides):
-        t = 2 * math.pi * (k + rnd.uniform(-0.25, 0.25)) / sides
-        r = radius * rnd.uniform(0.7, 1.05)
+        t = 2 * math.pi * (k + rnd.uniform(-0.3, 0.3)) / sides
+        r = radius * rnd.uniform(0.55, 1.05)
         x, z = math.cos(t) * r, math.sin(t) * r
-        ring.append(m.vert((x, -2.5, z), uv(x, z), (120, 130, 110)))  # (darker at the rim, where it meets the sand)
+        ring.append(m.vert((x, -1.5, z), uv(x, z), (175, 185, 160)))  # (a little darker where it meets the sand)
     for k in range(sides):
         m.tri(c, ring[(k + 1) % sides], ring[k])
     return m
