@@ -178,7 +178,7 @@ Mean RDP time over the 22 stops (GCC save; the IDO save agrees within 1 point ev
 
 | | RDP | against base |
 |---|---|---|
-| base (as shipped in 5e) | 63.1 ms | |
+| base (as shipped in 5e) | 63.1 ms | (together, below) |
 | far props cut to outlines (`trimfar`) | 80.0 ms | +27% |
 | `notri` | 81.8 ms | +30% |
 | old edge mode (`altedge`) | 71.3 ms | +13% |
@@ -273,10 +273,10 @@ above water through the surface.
 | Step | Views over 50 ms |
 |---|---|
 | Before | 51% |
-| 1. Fewer cards: kelp 1 (turned to face the camera, `faceCam`), tall weed 2, ribbon weed 3 | |
-| 2. Shorter: kelp 260 -> 180, tall weed 190 -> 140 | |
-| 3. Tall kinds as accents: kelp and tall weed a third as many; ribbon weed keeps its beds' edges (half), the middles (a sixth kept) turn to grass and broadleaf (`gen_scatter.py accents`, by a hash of position, so the rest of the layout doesn't move) | |
-| 4. Under water: tall kinds cut at 900 (`UNDER_CUT_TALL`), the haze a little nearer (`HAZE_FOG_NEAR` 953 -> 945) | |
+| 1. Fewer cards: kelp 1 (turned to face the camera, `faceCam`), tall weed 2, ribbon weed 3 | (together, below) |
+| 2. Shorter: kelp 260 -> 180, tall weed 190 -> 140 | (together, below) |
+| 3. Tall kinds as accents: kelp and tall weed a third as many; ribbon weed keeps its beds' edges (half), the middles (a sixth kept) turn to grass and broadleaf (`gen_scatter.py accents`, by a hash of position, so the rest of the layout doesn't move) | (together, below) |
+| 4. Under water: tall kinds cut at 900 (`UNDER_CUT_TALL`), the haze a little nearer (`HAZE_FOG_NEAR` 953 -> 945) | (together, below) |
 | After 1-4 | 12% (p95 57.9 ms) |
 
 Still heavy: West weed flat (60% of views), North beach shallows (39%), Dry dock (22%), East shore lilies (21%).
