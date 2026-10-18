@@ -178,7 +178,7 @@ Mean RDP time over the 22 stops (GCC save; the IDO save agrees within 1 point ev
 
 | | RDP | against base |
 |---|---|---|
-| base (as shipped in 5e) | 63.1 ms | (together, below) |
+| base (as shipped in 5e) | 63.1 ms | |
 | far props cut to outlines (`trimfar`) | 80.0 ms | +27% |
 | `notri` | 81.8 ms | +30% |
 | old edge mode (`altedge`) | 71.3 ms | +13% |
