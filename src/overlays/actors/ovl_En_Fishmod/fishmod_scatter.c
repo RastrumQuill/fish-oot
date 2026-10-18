@@ -36,6 +36,7 @@
 #include "src/fishmod_data/fishmod_props_kinds.h"
 #include "fishmod_lod.h"
 #include "fishmod_lod_zones.h"
+#include "fishmod_lod_tune.h"
 
 // Lake Hylia's bed shaded under the full lake (fishmod/tools/gen_bedshade.py, made at build time)
 typedef struct FishmodBedShade {
@@ -139,6 +140,45 @@ static s16 sBillboardYaw;                    // the single cards' turn: facing t
 // are this much nearer there, so the far tiers still do their work
 #define UNDER_LOD_SCALE 0.5f
 static f32 sLodScale = 1.0f; // (as last built: UNDER_LOD_SCALE under water)
+// With the camera under water, each kind's distances as the LOD tuning measured them (fishmod_lod_tune.h: the
+// shortest that changed no view, per time of day), at the prop's scale; 0: the defaults. Above water the defaults
+// (set by eye: the tuning's views there were harsher than the game's).
+static f32 sTunedCut[FISHMOD_PROP_KIND_MAX];
+static f32 sTunedImp[FISHMOD_PROP_KIND_MAX];
+static f32 sTunedHalf[FISHMOD_PROP_KIND_MAX];
+
+/** The tuned distances for now: of the two measured times either side of the clock, the further (never short). */
+static void Scatter_TunedDistances(s32 under) {
+    // the table's times: dawn 6:30, noon, dusk 18:30, midnight
+    u16 t = gSaveContext.save.dayTime;
+    s32 a;
+    s32 b;
+    s32 k;
+    s32 i;
+
+    bzero(sTunedCut, sizeof(sTunedCut));
+    bzero(sTunedImp, sizeof(sTunedImp));
+    bzero(sTunedHalf, sizeof(sTunedHalf));
+    if (!under || (ARRAY_COUNT(sLodTuned) != FISHMOD_PROP_KIND_MAX)) {
+        return; // (above water, or the table is for another set of kinds)
+    }
+    if (t < CLOCK_TIME(6, 30)) {
+        a = 3, b = 0;
+    } else if (t < CLOCK_TIME(12, 0)) {
+        a = 0, b = 1;
+    } else if (t < CLOCK_TIME(18, 30)) {
+        a = 1, b = 2;
+    } else {
+        a = 2, b = 3;
+    }
+    for (k = 0; k < FISHMOD_PROP_KIND_MAX; k++) {
+        f32* out[3] = { &sTunedCut[k], &sTunedImp[k], &sTunedHalf[k] };
+
+        for (i = 0; i < 3; i++) {
+            *out[i] = MAX(sLodTuned[k][a][1][i], sLodTuned[k][b][1][i]);
+        }
+    }
+}
 #if FISHMOD_DEBUG
 static u32 sSetBench; // the bench flags the set was last made with
 #endif
@@ -314,6 +354,14 @@ static void Scatter_InitKinds(void) {
             sDistFar[0] = MAX(sDistFar[0], fade * ((FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][0] : sKinds[i].drawDist));
             sDistFar[1] =
                 MAX(sDistFar[1], fade * ((FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][1] : sKinds[i].drawDistUnder));
+            // (and the tuned distances under water, at any time of day: the chunks are gathered that far)
+            if (ARRAY_COUNT(sLodTuned) == FISHMOD_PROP_KIND_MAX) {
+                s32 t;
+
+                for (t = 0; t < FISHMOD_LOD_TUNE_TIMES; t++) {
+                    sDistFar[1] = MAX(sDistFar[1], fade * sLodTuned[i][t][1][0]);
+                }
+            }
         }
     }
 }
@@ -754,6 +802,8 @@ static s32 Scatter_Tier(FishmodProp* prop, FishmodPropKindInfo* info, s32 kind, 
     f32 s = prop->scale * (1.0f / 64.0f) * sLodScale;
     f32 farDist = PROP_FAR_DIST * sLodScale;
     f32 dy = eyeY - prop->y;
+    f32 impDist = (sTunedImp[kind] > 0.0f) ? sTunedImp[kind] * prop->scale * (1.0f / 64.0f) : info->impDist * s;
+    f32 halfDist = (sTunedHalf[kind] > 0.0f) ? sTunedHalf[kind] * prop->scale * (1.0f / 64.0f) : info->halfDist * s;
 
     if (info->xlu) {
         return TIER_NEAR;
@@ -779,14 +829,14 @@ static s32 Scatter_Tier(FishmodProp* prop, FishmodPropKindInfo* info, s32 kind, 
 #endif
     // (the dissolve past the cutoff comes first: under water the cutoffs can be nearer than PROP_FAR_DIST)
     if ((info->modelImp != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOIMP) && (SQ(dy) <= IMP_SLOPE_SQ * dSq) &&
-        (((dSq >= SQ(info->impDist * s)) && (dSq >= SQ(farDist))) ||
+        (((dSq >= SQ(impDist)) && (dSq >= SQ(farDist))) ||
          (dSq >= SQ(sKindMax[kind])))) {
         return TIER_IMP;
     }
     if (dSq < SQ(farDist)) {
         return TIER_NEAR;
     }
-    if ((info->modelHalf != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOFARTEX) && (dSq >= SQ(info->halfDist * s))) {
+    if ((info->modelHalf != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOFARTEX) && (dSq >= SQ(halfDist))) {
         return TIER_HALF;
     }
     return TIER_FAR;
@@ -836,7 +886,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 budget = PROP_BUDGET;
     s32 xluLeft = XLU_MAX;
     ScatterSet* set;
-    f32 viewCos = Scatter_ViewCos(play); // the view cone
+    f32 viewCos = Scatter_ViewCos(play); // the view cone (and the tuned distances, under water)
     f32 viewRoom = 0.0f;     // extra room round each prop and chunk for it
 #if FISHMOD_LOD_ZONE_COUNT > 0
     s32 zone = -1;
@@ -852,6 +902,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     }
 #endif
 
+    Scatter_TunedDistances(under);
 #if FISHMOD_DEBUG
     // the rotation check (FISHMOD_LOD_ROTATE) draws a reference with a much wider cone and nothing cut by distance
     if (gFishmodLodTest.active && gFishmodLodTest.wide) {
@@ -928,7 +979,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     // kind's distance (above or under water), kind by kind, each with its distance band.
     for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
         FishmodPropKindInfo* info = &sKinds[kind];
-        f32 maxDist = under ? info->drawDistUnder : info->drawDist;
+        f32 maxDist = under ? ((sTunedCut[kind] > 0.0f) ? sTunedCut[kind] : info->drawDistUnder) : info->drawDist;
         f32 maxSq;
         f32 reachSq;
 
