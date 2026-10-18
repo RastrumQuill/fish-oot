@@ -96,7 +96,7 @@ fi
 # the habitat props: textures edited from vanilla ones, models, and where they go (generated, not committed)
 FISHMOD_HW=$HW python3 fishmod/tools/gen_habitat.py > /dev/null
 python3 fishmod/tools/assets.py --manifest src/fishmod_data/props_manifest.json > /dev/null
-python3 fishmod/tools/gen_scatter.py --c
+python3 fishmod/tools/gen_scatter.py --c ${FISHMOD_UNTHINNED:+--unthinned}  # (FISHMOD_UNTHINNED=1: the beds before thinning, for A/B)
 # Lake Hylia's bed shaded under the water (generated, not committed)
 python3 fishmod/tools/gen_bedshade.py > /dev/null
 # the solid props' collision (rocks), added to the scene's at load (generated, not committed)
