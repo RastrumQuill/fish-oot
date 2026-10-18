@@ -112,7 +112,7 @@ RULES = {
     "leaf_litter": ((10, 120), 0.005, {11: 0.05, 13: 0.04, 4: 0.04}, (1, 1), (0.8, 1.3), False),
     # low domes of moss on flat bed in the shallows (castle hedge texture): cover between the plant clumps that costs
     # few pixels from the low under-water camera and no see-through texels
-    "moss_patch": ((6, 200), 0.05, {4: 0.08, 12: 0.08, 13: 0.08, 6: 0.06, 11: 0.06, 1: 0.05}, (2, 4), (0.6, 1.2), False),
+    "moss_patch": ((6, 260), 0.16, {4: 0.12, 12: 0.12, 13: 0.12, 6: 0.1, 11: 0.1, 1: 0.1, 3: 0.05}, (3, 6), (0.6, 1.2), False),
 }
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
 # meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
@@ -120,7 +120,7 @@ HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 190, "broadleaf": 40
           "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44,
           "old_posts": 60, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
 # How far apart a clump's plants are scattered (the rest: 14): tight, so a clump reads as one plant mass
-CLUSTER_SPREAD = {"grass_tuft": 11.0, "ribbon_weed": 12.0, "broadleaf": 12.0, "bush_weed": 15.0, "big_pondweed": 13.0}
+CLUSTER_SPREAD = {"moss_patch": 40.0, "grass_tuft": 11.0, "ribbon_weed": 12.0, "broadleaf": 12.0, "bush_weed": 15.0, "big_pondweed": 13.0}
 # The bed plants are lushest where the camera spends its time, the shallows by the shores, and thin out toward the
 # deep middle, which is mostly seen far off through the surface: their chance, by depth below the surface
 BED_KINDS = {"grass_tuft", "ribbon_weed", "broadleaf", "bush_weed", "big_pondweed", "vine_strand"}
@@ -300,9 +300,9 @@ def place(scene, seed=SEED):
                         continue
                     # flat patches (pebbles, leaf litter) only on flat ground, not hanging over an edge
                     if kind in FLAT_KINDS:
-                        # (the moss dome is smaller and its rim sinks into the sand, so it takes gentler slopes)
-                        r = (36 if kind == "moss_patch" else 50) * scale[1]
-                        tol = 9 if kind == "moss_patch" else 6
+                        # (the moss mat's rim sinks into the sand, so it takes gentle slopes)
+                        r = (32 if kind == "moss_patch" else 50) * scale[1]
+                        tol = 12 if kind == "moss_patch" else 6
                         corners = [floor_at(px + dx, pz + dz, ps) for dx, dz in ((r, 0), (-r, 0), (0, r), (0, -r))]
                         if any(c is None or abs(c - pf) > tol for c in corners):
                             continue
