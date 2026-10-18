@@ -1624,7 +1624,11 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
  * Modes: as shipped; the props' textures in 4 bits (gFishmodTexCompress); both caches filled with other data before
  * each frame's update (what the work costs coming from RDRAM rather than the cache); no props drawn; no fish drawn.
  */
+#ifdef FISHMOD_BENCH_STOPS
+#define BENCH_STOPS FISHMOD_BENCH_STOPS // (a script with its own stops, hwbench_shots)
+#else
 #define BENCH_STOPS 22
+#endif
 #define BENCH_SETTLE 60 // frames after arriving
 #define BENCH_SKIP 10   // frames after changing mode, not counted (the frame being timed runs behind)
 #define BENCH_FRAMES 60 // frames counted per block

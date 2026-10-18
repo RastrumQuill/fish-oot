@@ -142,7 +142,10 @@ def main():
     ap.add_argument("save")
     ap.add_argument("--vs")
     ap.add_argument("--md")
+    ap.add_argument("--shots", action="store_true", help="the save is from hwbench_shots (stops named Shot 1, 2, ...)")
     args = ap.parse_args()
+    if args.shots:
+        STOP_NAMES[:] = [f"Shot {i + 1}" for i in range(len(STOP_NAMES))]
     r = read(args.save)
     out = []
     p = out.append
