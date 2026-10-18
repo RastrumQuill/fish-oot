@@ -293,6 +293,20 @@ def rom_spatterdock():
     return res
 
 
+def rom_moss():
+    """Bed moss: the castle courtyard's hedge (fine, even leaf speckle, tiles) recoloured from its bright garden green to
+    a dark olive moss, its contrast kept so the speckle reads at a distance."""
+    src = vanilla("scenes/indoors/hairal_niwa_n/hairal_niwa_n_scene_000068F0_Tex.rgba16.png")
+    out = Image.new("RGB", src.size)
+    pal = ["#14240c", "#22381a", "#34502a", "#4c6a34", "#6c8442"]
+    vals = [luma(src.getpixel((x, y))) for y in range(src.height) for x in range(src.width)]
+    lo, hi = min(vals), max(vals)
+    for y in range(src.height):
+        for x in range(src.width):
+            out.putpixel((x, y), ramp(pal, (luma(src.getpixel((x, y))) - lo) / max(hi - lo, 1)))
+    return out
+
+
 def rom_colour(path, size=None):
     """A vanilla texture kept in colour (cut-out kept)."""
     src = vanilla(path)
@@ -325,6 +339,7 @@ ROM_TEXTURES = {
     "dock_planks": (lambda: rom_colour("scenes/misc/turibori/turibori_scene_0000ACE0_Tex.rgba16.png"), "ci8"),
     "dock_wood": (lambda: rom_colour("scenes/misc/turibori/turibori_scene_000081E0_Tex.rgba16.png"), "ci8"),
     "pebbles": (rom_pebbles, "ci4"),
+    "moss": (rom_moss, "ci4"),
     "lily_flower": (rom_lily_flower, "ci4"),
     "lily_centre": (rom_lily_centre, "ci4"),
 }
@@ -717,6 +732,27 @@ def mesh_flat_scatter(name, texture, count, spread, size, y, col, seed):
     return m
 
 
+def mesh_moss_patch():
+    """A low, lumpy dome of moss rising out of the bed: an 8-sided fan, its rim sunk under the sand so the bed cuts
+    the edge (an irregular outline from the terrain, no see-through texels), a few units high in the middle. The
+    texture is laid on from above and repeats, so the patch's size doesn't stretch it."""
+    rnd = random.Random(121)
+    m = Mesh("moss_patch", "moss")
+    radius, height, sides, tile = 46.0, 5.0, 8, 26.0
+    def uv(x, z):
+        return (x / tile, z / tile)
+    c = m.vert((0, height, 0), uv(0, 0), (225, 235, 215))
+    ring = []
+    for k in range(sides):
+        t = 2 * math.pi * (k + rnd.uniform(-0.25, 0.25)) / sides
+        r = radius * rnd.uniform(0.7, 1.05)
+        x, z = math.cos(t) * r, math.sin(t) * r
+        ring.append(m.vert((x, -2.5, z), uv(x, z), (120, 130, 110)))  # (darker at the rim, where it meets the sand)
+    for k in range(sides):
+        m.tri(c, ring[(k + 1) % sides], ring[k])
+    return m
+
+
 def mesh_branch():
     m = Mesh("branch", "bark")
     dark, light = hexc("#2b2311"), hexc("#707346")
@@ -833,6 +869,7 @@ MESHES = [
         "bush_weed", "bush_card", 46, 42, 3, hexc("#082b07"), hexc("#525d28"), 103 + i)),
     mesh_log,
     lambda: mesh_decal("pebble_patch", "pebbles", 120, (255, 255, 255)),
+    mesh_moss_patch,
     mesh_lily_flower,
     mesh_lily_centre,
 ]
@@ -868,6 +905,7 @@ PROP_KINDS = [
     ("dock_posts", "dock_wood", "ci8"),
     ("lily_flower", "lily_flower", "ci4"),
     ("lily_centre", "lily_centre", "ci4"),
+    ("moss_patch", "moss", "ci4"),
 ]
 COMPRESS_4BIT = {"ia8", "ci8"}  # formats that also get a 4-bit copy
 VANILLA_KINDS = ["pond_reed", "lily_pad", "rock"]  # object_fish's own (the Fishing Pond's reed, pads, rocks)
@@ -944,8 +982,8 @@ def rock_vc():
             n = [c / ln for c in n]
             up = max(0.0, n[1])
             moss = max(0.0, min(1.0, (up - 0.35) / 0.45)) * 0.85
-            ao = 0.55 + 0.45 * max(0.0, min(1.0, (y + 5) / 55.0))
-            lit = 0.72 + 0.28 * max(0.0, sum(a * b for a, b in zip(n, sun)))
+            ao = 0.72 + 0.28 * max(0.0, min(1.0, (y + 5) / 55.0))
+            lit = 0.8 + 0.2 * max(0.0, sum(a * b for a, b in zip(n, sun)))
             col = [(1 - moss) * 1.0 + moss * m for m in (0.70, 0.90, 0.52)]
             col = [min(1.0, c * ao * lit) for c in col]
             f.write(f"v {x} {y} {z} {col[0]:.3f} {col[1]:.3f} {col[2]:.3f}\n")

@@ -257,6 +257,7 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_GRASS_TUFT].drawDist = DIST_SMALL;
     sKinds[FISHMOD_PROP_LEAF_LITTER].drawDist = DIST_SMALL;
     sKinds[FISHMOD_PROP_PEBBLE_PATCH].drawDist = DIST_MID;
+    sKinds[FISHMOD_PROP_MOSS_PATCH].drawDist = DIST_MID;
     sKinds[FISHMOD_PROP_RIBBON_WEED].drawDist = DIST_MID;
     sKinds[FISHMOD_PROP_BROADLEAF].drawDist = DIST_MID;
     sKinds[FISHMOD_PROP_BUSH_WEED].drawDist = DIST_MID;
@@ -314,6 +315,7 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_DOCK_POSTS].plant = false;
     sKinds[FISHMOD_PROP_ROCK].plant = false;
     sKinds[FISHMOD_PROP_PEBBLE_PATCH].plant = false;
+    sKinds[FISHMOD_PROP_MOSS_PATCH].plant = false;
     sKinds[FISHMOD_PROP_SUNKEN_LOG].plant = false;
     sKinds[FISHMOD_PROP_BRANCH].plant = false;
     sKinds[FISHMOD_PROP_OLD_POSTS].plant = false;

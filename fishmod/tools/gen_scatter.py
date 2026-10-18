@@ -88,8 +88,8 @@ RULES = {
     # (the bed plants: fewer clumps, more and bigger plants in each, so beds read as beds with sand between them)
     "grass_tuft": ((4, 260), 0.035, {3: 0.04, 12: 0.05, 6: 0.05, 11: 0.05}, (4, 8), (1.0, 1.8), False),
     "ribbon_weed": ((25, 220), 0.02, {6: 0.13, 12: 0.13, 11: 0.09, 3: 0.035, 1: 0.09}, (5, 9), (1.0, 1.6), False),
-    "broadleaf": ((20, 160), 0.014, {4: 0.035, 12: 0.085, 13: 0.085}, (3, 6), (0.9, 1.5), False),
-    "bush_weed": ((60, 290), 0.014, {12: 0.042, 6: 0.042, 7: 0.07}, (3, 5), (1.0, 1.7), False),
+    "broadleaf": ((20, 160), 0.018, {4: 0.045, 12: 0.085, 13: 0.085}, (3, 6), (0.85, 1.25), False),
+    "bush_weed": ((60, 290), 0.014, {12: 0.042, 6: 0.042, 7: 0.07}, (3, 5), (0.9, 1.35), False),
     "tall_weed": ((110, 340), 0.0, {}, (3, 7), (0.8, 1.3), True),
     "rock": ((-10, 600), 0.006, {5: 0.35, 14: 0.12, 1: 0.25, 9: 0.1}, (1, 4), (0.15, 0.6), False),
     "pebble_patch": ((8, 60), 0.0, {1: 0.4, 3: 0.05, 15: 0.05}, (1, 3), (0.6, 1.2), False),
@@ -110,6 +110,9 @@ RULES = {
     "boulder": ((-20, 700), 0.0, {5: 0.06, 14: 0.08, 7: 0.03, 1: 0.03, 9: 0.05}, (1, 2), (0.9, 2.2), False),
     "old_posts": ((5, 200), 0.0, {2: 0.08}, (1, 2), (0.8, 1.2), False),  # old pilings by the lab's shore
     "leaf_litter": ((10, 120), 0.005, {11: 0.05, 13: 0.04, 4: 0.04}, (1, 1), (0.8, 1.3), False),
+    # low domes of moss on flat bed in the shallows (castle hedge texture): cover between the plant clumps that costs
+    # few pixels from the low under-water camera and no see-through texels
+    "moss_patch": ((6, 200), 0.05, {4: 0.08, 12: 0.08, 13: 0.08, 6: 0.06, 11: 0.06, 1: 0.05}, (2, 4), (0.6, 1.2), False),
 }
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
 # meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
@@ -125,10 +128,10 @@ BED_KINDS = {"grass_tuft", "ribbon_weed", "broadleaf", "bush_weed", "big_pondwee
 
 def depth_lushness(depth):
     if depth <= 140:
-        return 1.25
+        return 1.2
     if depth <= 320:
-        return 1.25 - 0.7 * (depth - 140) / 180
-    return 0.55
+        return 1.2 - 0.5 * (depth - 140) / 180
+    return 0.7
 
 
 # how far a prop spreads from its middle (patches spread wider): the bed is checked all round it
@@ -171,7 +174,7 @@ def lie_on_bed(floor_at, x, z, surface, here, yaw, half_len, half_wid):
             (max(-clamp, min(clamp, tx)), max(-clamp, min(clamp, tz))))
 
 
-FLAT_KINDS = {"pebble_patch", "leaf_litter"}  # flat on the bed
+FLAT_KINDS = {"pebble_patch", "leaf_litter", "moss_patch"}  # flat on the bed
 FLOATING = {"lily_pad", "float_leaves", "spatterdock", "vine_curtain"}  # sit on the surface, not the bed
 # Leaves floating on the surface lie side by side, not on top of each other: each one's round footprint (radius,
 # and its centre's offset in the model: vanilla's lily pad sits off its origin) at scale 1, and how far apart a
@@ -267,14 +270,15 @@ def place(scene, seed=SEED):
                     chance += 0.35 * max(0.0, min(1.0, (slope - 0.6) / 0.8))
                 if kind in BED_KINDS:
                     chance *= depth_lushness(depth)
-                # patchy: dense in some places, none in others (high contrast: thick beds, open sand between)
-                chance *= max(0.0, patch[kind](x, z) * 2.8 - 0.95)
+                # patchy: dense in some places, none in others (thick beds, open sand between; softer than before so the shallows
+                # aren't bare in places)
+                chance *= max(0.0, patch[kind](x, z) * 2.2 - 0.6)
                 if rnd.random() >= chance:
                     continue
                 n = rnd.randint(*cluster)
                 spread = FLOAT_SPREAD.get(kind, CLUSTER_SPREAD.get(kind, 14.0))
                 # a clump's own colour (each plant varies a little round it): beds vary clump to clump, like real ones
-                clump_tint = rnd.uniform(0.76, 1.1)
+                clump_tint = rnd.uniform(0.88, 1.1)
                 if kind in FLOAT_SPACE:
                     n *= 6  # leaves that would overlap are skipped: more tries, so the bed still fills in
                 for k in range(n):
@@ -296,9 +300,11 @@ def place(scene, seed=SEED):
                         continue
                     # flat patches (pebbles, leaf litter) only on flat ground, not hanging over an edge
                     if kind in FLAT_KINDS:
-                        r = 50 * scale[1]
+                        # (the moss dome is smaller and its rim sinks into the sand, so it takes gentler slopes)
+                        r = (36 if kind == "moss_patch" else 50) * scale[1]
+                        tol = 9 if kind == "moss_patch" else 6
                         corners = [floor_at(px + dx, pz + dz, ps) for dx, dz in ((r, 0), (-r, 0), (0, r), (0, -r))]
-                        if any(c is None or abs(c - pf) > 6 for c in corners):
+                        if any(c is None or abs(c - pf) > tol for c in corners):
                             continue
                     y = (ps + 1) if kind in FLOATING else pf  # floating: a unit above the water, not z-fighting it
                     sc = rnd.uniform(*scale)
