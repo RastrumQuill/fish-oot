@@ -187,6 +187,11 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
 - **Line tension:** it feels like a hair trigger. Re-check after the new fight choreography (it may already feel
   better) and in larger waters than Kokiri Forest. If it still needs a change, scale the tension by the fish's
   weight.
+- **Floating leaf mats:** pennywort-style leaves sit at the surface, not on the bed. The tiling pennywort texture
+  (`fishmod/art/canopy/pennywort.i4.png`) could make flat mats on the water at shallow edges: one layer, ragged
+  cut-out edges, dark silhouettes with light through the gaps from below. Fish could shelter under them. The
+  thick raised bed under water was dropped (two textures don't fit in texture memory at full size, and it isn't
+  how these plants grow).
 
 ### Water current (not a moonshot: small)
 Flowing water, where it actually flows (the Gerudo river's inflow into the lake, the rivers, Zora's River), pushes
