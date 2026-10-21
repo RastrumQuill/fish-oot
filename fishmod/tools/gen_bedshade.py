@@ -27,7 +27,9 @@ SURFACE = -1313  # the full lake
 # how much shade each kind casts on the bed around it
 SHADE = {"bush_weed": 1.0, "broadleaf": 1.0, "big_pondweed": 1.2, "kelp_frond": 1.2, "tall_weed": 1.0,
          "ribbon_weed": 0.7, "grass_tuft": 0.4, "fan_weed": 0.8, "vine_strand": 0.6, "lily_pad": 1.6,
-         "spatterdock": 1.2, "float_leaves": 0.8, "pond_reed": 0.5, "reed_clump": 0.6, "cattails": 0.6}
+         "spatterdock": 1.2, "float_leaves": 0.8, "pond_reed": 0.5, "reed_clump": 0.6, "cattails": 0.6,
+         # (moss mats: where the thinning turned a plant to moss, the bed stays as dark as under the plant)
+         "moss_patch": 0.8}
 SIGMA = 170.0     # the shade's spread (tight: dark mats under the beds, lighter sand between)
 DENSE = 6.0       # this much shade nearby is a dense bed
 BED_DARK = 0.6    # how much of the sunlight a dense bed takes
