@@ -1,0 +1,3871 @@
+{
+"limit": 48.0,
+"views": 150,
+"seeds": "7,19,23",
+"moss": [
+{
+"kind": "moss_patch",
+"x": -6,
+"z": 3035,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 349,
+"z": 2986,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 266,
+"z": 3020,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 363,
+"z": 2918,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 386,
+"z": 2883,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 393,
+"z": 2994,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 204,
+"z": 2992,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 187,
+"z": 2983,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 302,
+"z": 3011,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 238,
+"z": 2956,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 841,
+"z": 2882,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 895,
+"z": 2920,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 536,
+"z": 2957,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 531,
+"z": 2933,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 542,
+"z": 2944,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 529,
+"z": 2954,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 595,
+"z": 2945,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 566,
+"z": 2936,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 601,
+"z": 2926,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 783,
+"z": 2916,
+"drop": true
+},
+{
+"kind": "ribbon_weed",
+"x": 863,
+"z": 2829,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 532,
+"z": 3008,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": 571,
+"z": 2912,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 823,
+"z": 2893,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 782,
+"z": 2699,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 783,
+"z": 2762,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 782,
+"z": 2719,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 798,
+"z": 2748,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 864,
+"z": 2778,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 735,
+"z": 2798,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 619,
+"z": 2795,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 592,
+"z": 2839,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 568,
+"z": 2808,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 534,
+"z": 2843,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 536,
+"z": 2881,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 704,
+"z": 2834,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 695,
+"z": 2830,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 767,
+"z": 2844,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 707,
+"z": 2805,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 743,
+"z": 2828,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 634,
+"z": 2872,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 642,
+"z": 2816,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 893,
+"z": 2862,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 740,
+"z": 2909,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 747,
+"z": 2901,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 781,
+"z": 2922,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 737,
+"z": 2933,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 768,
+"z": 2970,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 844,
+"z": 2999,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 925,
+"z": 2833,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 933,
+"z": 2835,
+"drop": true
+},
+{
+"kind": "bush_weed",
+"x": 1054,
+"z": 2913,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": 1029,
+"z": 2891,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": 1024,
+"z": 2915,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -669,
+"z": 3333,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -675,
+"z": 3385,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -625,
+"z": 3325,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -610,
+"z": 3306,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -628,
+"z": 3245,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -144,
+"z": 3211,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -197,
+"z": 3301,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -112,
+"z": 3299,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 52,
+"z": 3301,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -219,
+"z": 3390,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -56,
+"z": 3361,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 0,
+"z": 3368,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -140,
+"z": 3403,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -82,
+"z": 3230,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -28,
+"z": 3237,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -24,
+"z": 3230,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -36,
+"z": 3360,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": -36,
+"z": 3257,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -39,
+"z": 3272,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -48,
+"z": 3270,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -30,
+"z": 3271,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -38,
+"z": 3263,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -28,
+"z": 3273,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -37,
+"z": 3272,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -23,
+"z": 3251,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -14,
+"z": 3269,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -18,
+"z": 3245,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -18,
+"z": 3253,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -187,
+"z": 3293,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -82,
+"z": 3329,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -98,
+"z": 3307,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -14,
+"z": 3321,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -10,
+"z": 3314,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -208,
+"z": 3346,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -209,
+"z": 3331,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -208,
+"z": 3322,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -208,
+"z": 3331,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -247,
+"z": 3373,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -224,
+"z": 3387,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -188,
+"z": 3356,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -181,
+"z": 3351,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -201,
+"z": 3360,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 0,
+"z": 3365,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -3,
+"z": 3370,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -6,
+"z": 3364,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -135,
+"z": 3414,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -51,
+"z": 3101,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -128,
+"z": 3116,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -8,
+"z": 3093,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -74,
+"z": 3100,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 77,
+"z": 3084,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -168,
+"z": 3104,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -4,
+"z": 3169,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -84,
+"z": 3088,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -96,
+"z": 3126,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 10,
+"z": 3091,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -15,
+"z": 3127,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -56,
+"z": 3163,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -170,
+"z": 3163,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -165,
+"z": 3181,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -236,
+"z": 3180,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 16,
+"z": 3151,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 78,
+"z": 3232,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -10,
+"z": 3167,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 9,
+"z": 3194,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 56,
+"z": 3155,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -160,
+"z": 3196,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -132,
+"z": 3161,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -134,
+"z": 3163,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -169,
+"z": 3162,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 87,
+"z": 3188,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 112,
+"z": 3190,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 12,
+"z": 3257,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -9,
+"z": 3264,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 52,
+"z": 3327,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 75,
+"z": 3312,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 38,
+"z": 3402,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 39,
+"z": 3322,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 121,
+"z": 3316,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -31,
+"z": 3399,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 0,
+"z": 3380,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 78,
+"z": 3399,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 133,
+"z": 3358,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 435,
+"z": 3190,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 458,
+"z": 3216,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 168,
+"z": 3331,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 161,
+"z": 3309,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 157,
+"z": 3344,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 174,
+"z": 3343,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 210,
+"z": 3340,
+"drop": true
+},
+{
+"kind": "ribbon_weed",
+"x": 510,
+"z": 3042,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 500,
+"z": 3353,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": 418,
+"z": 3262,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": 412,
+"z": 3252,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": 404,
+"z": 3267,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 407,
+"z": 3252,
+"drop": true
+},
+{
+"kind": "bush_weed",
+"x": 188,
+"z": 3397,
+"drop": true
+},
+{
+"kind": "bush_weed",
+"x": 179,
+"z": 3418,
+"drop": true
+},
+{
+"kind": "vine_strand",
+"x": 469,
+"z": 3357,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": 418,
+"z": 3172,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 206,
+"z": 3356,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 428,
+"z": 3115,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 384,
+"z": 3074,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 251,
+"z": 3059,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 353,
+"z": 3158,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 360,
+"z": 3207,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 315,
+"z": 3164,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 279,
+"z": 3157,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 340,
+"z": 3110,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 148,
+"z": 3171,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 166,
+"z": 3191,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 186,
+"z": 3264,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 160,
+"z": 3274,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 211,
+"z": 3235,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 420,
+"z": 3353,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 215,
+"z": 3366,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 240,
+"z": 3385,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 143,
+"z": 3346,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 845,
+"z": 3063,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 851,
+"z": 3072,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 841,
+"z": 3073,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 561,
+"z": 3124,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 874,
+"z": 3139,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 864,
+"z": 3177,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 900,
+"z": 3283,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 831,
+"z": 3395,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 862,
+"z": 3384,
+"drop": true
+},
+{
+"kind": "vine_strand",
+"x": 849,
+"z": 3355,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 839,
+"z": 3363,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": 551,
+"z": 3125,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 552,
+"z": 3121,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 551,
+"z": 3135,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 560,
+"z": 3223,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 564,
+"z": 3065,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 735,
+"z": 3036,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 634,
+"z": 3212,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 527,
+"z": 3314,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 692,
+"z": 3303,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 931,
+"z": 3144,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 958,
+"z": 3117,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 952,
+"z": 3096,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 1133,
+"z": 3253,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -1473,
+"z": 3638,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -1494,
+"z": 3661,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -1473,
+"z": 3639,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -1465,
+"z": 3646,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -1461,
+"z": 3647,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -1677,
+"z": 3769,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1531,
+"z": 3783,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1531,
+"z": 3785,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1660,
+"z": 3793,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": -1460,
+"z": 3619,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1485,
+"z": 3616,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1442,
+"z": 3609,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1525,
+"z": 3618,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1608,
+"z": 3655,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -1245,
+"z": 3572,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -1333,
+"z": 3796,
+"drop": true
+},
+{
+"kind": "ribbon_weed",
+"x": -1212,
+"z": 3577,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1362,
+"z": 3775,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -1361,
+"z": 3751,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1349,
+"z": 3802,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -1286,
+"z": 3692,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1353,
+"z": 3765,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1346,
+"z": 3759,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1361,
+"z": 3760,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1294,
+"z": 3501,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1358,
+"z": 3523,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1343,
+"z": 3584,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1337,
+"z": 3544,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1383,
+"z": 3533,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1283,
+"z": 3565,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1243,
+"z": 3562,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1388,
+"z": 3587,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1367,
+"z": 3550,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1311,
+"z": 3647,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1297,
+"z": 3591,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1269,
+"z": 3619,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1386,
+"z": 3701,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1339,
+"z": 3714,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1260,
+"z": 3740,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1324,
+"z": 3690,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1351,
+"z": 3704,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1282,
+"z": 3653,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1311,
+"z": 3657,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1311,
+"z": 3776,
+"drop": true
+},
+{
+"kind": "bush_weed",
+"x": -735,
+"z": 3505,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -718,
+"z": 3530,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -250,
+"z": 3471,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -255,
+"z": 3459,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -403,
+"z": 3542,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -275,
+"z": 3536,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -294,
+"z": 3540,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -572,
+"z": 3567,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -328,
+"z": 3579,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -261,
+"z": 3688,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -261,
+"z": 3693,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -251,
+"z": 3696,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -281,
+"z": 3696,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -336,
+"z": 3746,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -331,
+"z": 3752,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -344,
+"z": 3760,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -330,
+"z": 3747,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -354,
+"z": 3755,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -336,
+"z": 3764,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -575,
+"z": 3460,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -256,
+"z": 3456,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -274,
+"z": 3532,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -283,
+"z": 3537,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -294,
+"z": 3529,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -277,
+"z": 3531,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -334,
+"z": 3567,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -309,
+"z": 3552,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -621,
+"z": 3532,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -550,
+"z": 3485,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -603,
+"z": 3517,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -627,
+"z": 3456,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -256,
+"z": 3497,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -271,
+"z": 3576,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -423,
+"z": 3569,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -518,
+"z": 3605,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -453,
+"z": 3582,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -419,
+"z": 3585,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -386,
+"z": 3558,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -440,
+"z": 3557,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -372,
+"z": 3583,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -461,
+"z": 3580,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -340,
+"z": 3578,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -350,
+"z": 3554,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -516,
+"z": 3645,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -522,
+"z": 3662,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -553,
+"z": 3620,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -569,
+"z": 3661,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -484,
+"z": 3647,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -516,
+"z": 3631,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -479,
+"z": 3634,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -426,
+"z": 3653,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -374,
+"z": 3617,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -418,
+"z": 3671,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -415,
+"z": 3622,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -351,
+"z": 3643,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -521,
+"z": 3768,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -492,
+"z": 3784,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -467,
+"z": 3716,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -181,
+"z": 3458,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -142,
+"z": 3438,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -2,
+"z": 3451,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -28,
+"z": 3478,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -28,
+"z": 3501,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -38,
+"z": 3491,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -24,
+"z": 3475,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -35,
+"z": 3681,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -46,
+"z": 3485,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 121,
+"z": 3544,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 124,
+"z": 3557,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": 106,
+"z": 3542,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 126,
+"z": 3541,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 130,
+"z": 3642,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 120,
+"z": 3655,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 114,
+"z": 3640,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -216,
+"z": 3653,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -202,
+"z": 3665,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -212,
+"z": 3650,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -208,
+"z": 3654,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -214,
+"z": 3670,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -213,
+"z": 3656,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -242,
+"z": 3703,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -106,
+"z": 3715,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -141,
+"z": 3719,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 25,
+"z": 3792,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 7,
+"z": 3785,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": -199,
+"z": 3462,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -212,
+"z": 3449,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -198,
+"z": 3464,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -186,
+"z": 3443,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -203,
+"z": 3458,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -127,
+"z": 3429,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -130,
+"z": 3441,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -128,
+"z": 3451,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -217,
+"z": 3465,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -216,
+"z": 3476,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -217,
+"z": 3462,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -223,
+"z": 3464,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -42,
+"z": 3487,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -60,
+"z": 3478,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -37,
+"z": 3502,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -36,
+"z": 3474,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -15,
+"z": 3460,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -84,
+"z": 3541,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -109,
+"z": 3539,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -82,
+"z": 3550,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -44,
+"z": 3432,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -110,
+"z": 3633,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -129,
+"z": 3596,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -246,
+"z": 3660,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 201,
+"z": 3772,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 344,
+"z": 3465,
+"drop": true
+},
+{
+"kind": "ribbon_weed",
+"x": 339,
+"z": 3468,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": 168,
+"z": 3453,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": 192,
+"z": 3440,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 441,
+"z": 3467,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 451,
+"z": 3479,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 444,
+"z": 3466,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 446,
+"z": 3467,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 435,
+"z": 3466,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 461,
+"z": 3478,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 147,
+"z": 3667,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 278,
+"z": 3630,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 254,
+"z": 3640,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 501,
+"z": 3761,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 489,
+"z": 3760,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 152,
+"z": 3783,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 147,
+"z": 3778,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 369,
+"z": 3795,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": 172,
+"z": 3454,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 197,
+"z": 3442,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 263,
+"z": 3439,
+"drop": true
+},
+{
+"kind": "ribbon_weed",
+"x": 584,
+"z": 3536,
+"drop": true
+},
+{
+"kind": "vine_strand",
+"x": 589,
+"z": 3487,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 582,
+"z": 3522,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 891,
+"z": 3561,
+"drop": false
+},
+{
+"kind": "kelp_frond",
+"x": 958,
+"z": 3770,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -2972,
+"z": 4099,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -2654,
+"z": 4152,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -2653,
+"z": 4140,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -2734,
+"z": 4117,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1836,
+"z": 3804,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -2112,
+"z": 4154,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1483,
+"z": 3816,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1479,
+"z": 3820,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1482,
+"z": 3808,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -1722,
+"z": 3836,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -1294,
+"z": 3895,
+"drop": true
+},
+{
+"kind": "ribbon_weed",
+"x": -1327,
+"z": 3824,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -1356,
+"z": 3829,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -1265,
+"z": 4068,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -1308,
+"z": 3811,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1268,
+"z": 4137,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1277,
+"z": 4133,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -1261,
+"z": 4142,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -1271,
+"z": 4132,
+"drop": true
+},
+{
+"kind": "bush_weed",
+"x": -1284,
+"z": 3890,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -1356,
+"z": 3876,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": -1285,
+"z": 3849,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1304,
+"z": 3870,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1281,
+"z": 3877,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1276,
+"z": 3879,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1304,
+"z": 4017,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1299,
+"z": 4011,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1286,
+"z": 4061,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -1271,
+"z": 4066,
+"drop": true
+},
+{
+"kind": "bush_weed",
+"x": -504,
+"z": 3885,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -210,
+"z": 3864,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": 165,
+"z": 3824,
+"drop": false
+},
+{
+"kind": "kelp_frond",
+"x": 987,
+"z": 3832,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3064,
+"z": 4302,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3043,
+"z": 4296,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3008,
+"z": 4291,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -2848,
+"z": 4207,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -2710,
+"z": 4364,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -2450,
+"z": 4427,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -1624,
+"z": 4313,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -1624,
+"z": 4310,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -1306,
+"z": 4213,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -4144,
+"z": 4941,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -4162,
+"z": 4940,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -3941,
+"z": 4911,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4245,
+"z": 5097,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4233,
+"z": 5098,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4201,
+"z": 5045,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4119,
+"z": 5129,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4103,
+"z": 5192,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4269,
+"z": 5231,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4298,
+"z": 5285,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4088,
+"z": 5296,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4266,
+"z": 5334,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3867,
+"z": 5254,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3810,
+"z": 5254,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3771,
+"z": 5256,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3777,
+"z": 5289,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -4045,
+"z": 5331,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -3725,
+"z": 5032,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -3712,
+"z": 5051,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -3829,
+"z": 5055,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4077,
+"z": 5206,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4084,
+"z": 5284,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3962,
+"z": 5276,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3985,
+"z": 5277,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3821,
+"z": 5326,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3768,
+"z": 5188,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3726,
+"z": 5234,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3718,
+"z": 5238,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3814,
+"z": 5269,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3803,
+"z": 5255,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3749,
+"z": 5168,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3921,
+"z": 5306,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3324,
+"z": 5003,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3588,
+"z": 5064,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3599,
+"z": 5090,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3355,
+"z": 5126,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3379,
+"z": 5226,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3642,
+"z": 5267,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3355,
+"z": 5283,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3468,
+"z": 5315,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3535,
+"z": 5201,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3547,
+"z": 5202,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3678,
+"z": 5292,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4310,
+"z": 5353,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -4178,
+"z": 5459,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4242,
+"z": 5494,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4237,
+"z": 5496,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4389,
+"z": 5545,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4385,
+"z": 5538,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4204,
+"z": 5535,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4203,
+"z": 5525,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4148,
+"z": 5541,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4204,
+"z": 5583,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4205,
+"z": 5569,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4222,
+"z": 5578,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4254,
+"z": 5577,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4090,
+"z": 5363,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4094,
+"z": 5349,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4128,
+"z": 5388,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4164,
+"z": 5458,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4160,
+"z": 5471,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4184,
+"z": 5472,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4101,
+"z": 5526,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4328,
+"z": 5560,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4163,
+"z": 5714,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4171,
+"z": 5696,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4148,
+"z": 5700,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -4120,
+"z": 5440,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4358,
+"z": 5434,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4376,
+"z": 5608,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4294,
+"z": 5607,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4288,
+"z": 5628,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4303,
+"z": 5641,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4301,
+"z": 5599,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -3834,
+"z": 5494,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -4084,
+"z": 5346,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4039,
+"z": 5466,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4017,
+"z": 5482,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4031,
+"z": 5492,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -3971,
+"z": 5576,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3880,
+"z": 5342,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3963,
+"z": 5438,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -4031,
+"z": 5612,
+"drop": true
+},
+{
+"kind": "bush_weed",
+"x": -4045,
+"z": 5605,
+"drop": true
+},
+{
+"kind": "bush_weed",
+"x": -3894,
+"z": 5580,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3883,
+"z": 5595,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3880,
+"z": 5611,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3704,
+"z": 5424,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4028,
+"z": 5511,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4075,
+"z": 5570,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4082,
+"z": 5582,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4050,
+"z": 5721,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3814,
+"z": 5403,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -4086,
+"z": 5409,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3791,
+"z": 5501,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3781,
+"z": 5483,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3996,
+"z": 5556,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3991,
+"z": 5516,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": -3890,
+"z": 5451,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -3887,
+"z": 5482,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": -4024,
+"z": 5602,
+"drop": true
+},
+{
+"kind": "grass_tuft",
+"x": -3403,
+"z": 5370,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -3663,
+"z": 5647,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -3651,
+"z": 5624,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -3639,
+"z": 5357,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3658,
+"z": 5498,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3480,
+"z": 5588,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3489,
+"z": 5601,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3691,
+"z": 5355,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3699,
+"z": 5343,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3686,
+"z": 5363,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3638,
+"z": 5406,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3646,
+"z": 5456,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -3666,
+"z": 5467,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2409,
+"z": 5514,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2396,
+"z": 5710,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2727,
+"z": 5657,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2724,
+"z": 5666,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2727,
+"z": 5665,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4225,
+"z": 5742,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": -4114,
+"z": 5877,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4210,
+"z": 5752,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4222,
+"z": 5771,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4140,
+"z": 5886,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4123,
+"z": 5875,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4289,
+"z": 5990,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": -4383,
+"z": 5895,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4172,
+"z": 5764,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4168,
+"z": 5746,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4094,
+"z": 5740,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4205,
+"z": 5785,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4176,
+"z": 5779,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4171,
+"z": 5797,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4321,
+"z": 5852,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4300,
+"z": 5830,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -4151,
+"z": 5919,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -4140,
+"z": 5936,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -4177,
+"z": 5981,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4037,
+"z": 6101,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": -4064,
+"z": 6063,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3957,
+"z": 5731,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3835,
+"z": 5805,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3839,
+"z": 5789,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": -3913,
+"z": 6045,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4087,
+"z": 5748,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4040,
+"z": 5876,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4039,
+"z": 5871,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": -4059,
+"z": 5867,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3868,
+"z": 5750,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3939,
+"z": 5838,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3758,
+"z": 6046,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3766,
+"z": 6056,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": -3628,
+"z": 5958,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2774,
+"z": 5803,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2781,
+"z": 5805,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2816,
+"z": 5789,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2799,
+"z": 5789,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2816,
+"z": 5796,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2800,
+"z": 5777,
+"drop": false
+},
+{
+"kind": "bush_weed",
+"x": 2553,
+"z": 5963,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2705,
+"z": 5759,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2712,
+"z": 5744,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 2470,
+"z": 6016,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 2657,
+"z": 6101,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 2671,
+"z": 6076,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2928,
+"z": 5818,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2825,
+"z": 5786,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2907,
+"z": 5803,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2884,
+"z": 5809,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2880,
+"z": 5780,
+"drop": false
+},
+{
+"kind": "moss_patch",
+"x": 2849,
+"z": 5746,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 2843,
+"z": 5725,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 2922,
+"z": 5925,
+"drop": true
+},
+{
+"kind": "moss_patch",
+"x": 2887,
+"z": 6101,
+"drop": true
+},
+{
+"kind": "broadleaf",
+"x": -4207,
+"z": 6184,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2140,
+"z": 6387,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2141,
+"z": 6389,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2146,
+"z": 6411,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2277,
+"z": 6444,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2401,
+"z": 6460,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2221,
+"z": 6432,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2285,
+"z": 6384,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2291,
+"z": 6362,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2170,
+"z": 6426,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2163,
+"z": 6435,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2290,
+"z": 6435,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2301,
+"z": 6454,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 2179,
+"z": 6371,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 2263,
+"z": 6394,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2455,
+"z": 6441,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2624,
+"z": 6151,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2440,
+"z": 6442,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2038,
+"z": 6702,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 1971,
+"z": 6853,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 1973,
+"z": 6625,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2023,
+"z": 6856,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2134,
+"z": 6831,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2241,
+"z": 6673,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2092,
+"z": 6841,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 2560,
+"z": 6588,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2520,
+"z": 6528,
+"drop": false
+},
+{
+"kind": "vine_strand",
+"x": 1618,
+"z": 7109,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 1806,
+"z": 7129,
+"drop": false
+},
+{
+"kind": "grass_tuft",
+"x": 1890,
+"z": 7201,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2041,
+"z": 6979,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2029,
+"z": 7011,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 1894,
+"z": 7157,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 2000,
+"z": 6896,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 1938,
+"z": 7057,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 1921,
+"z": 7120,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 1923,
+"z": 7115,
+"drop": false
+},
+{
+"kind": "broadleaf",
+"x": 1920,
+"z": 7127,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 1971,
+"z": 6933,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 1923,
+"z": 6966,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 1917,
+"z": 6953,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 1858,
+"z": 7110,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 1883,
+"z": 7131,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 1896,
+"z": 7122,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 1956,
+"z": 7182,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2169,
+"z": 6971,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2364,
+"z": 6959,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2122,
+"z": 7225,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 2114,
+"z": 7227,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2199,
+"z": 7073,
+"drop": false
+},
+{
+"kind": "big_pondweed",
+"x": 2287,
+"z": 7095,
+"drop": false
+},
+{
+"kind": "ribbon_weed",
+"x": 1760,
+"z": 7388,
+"drop": false
+}
+]
+}
