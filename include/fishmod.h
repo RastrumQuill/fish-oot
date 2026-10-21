@@ -329,13 +329,6 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NODISSOLVE (1 << 14) // the single cards pop at the cutoff instead of dissolving
 #define FISHMOD_BENCH_ZSAME (1 << 15)      // the depth buffer in the frame buffers' 1 MB bank (bank layout test)
 #define FISHMOD_BENCH_SKYUNDER (1 << 16)   // the skybox drawn with the camera under water too, as vanilla
-// With the camera under water (the haze full) the skybox can't be seen: not drawn, and the frame cleared to the
-// fog's colour instead of black (FISHMOD_OPT 5)
-#if FISHMOD_OPT >= 5
-#define FISHMOD_NO_SKY() ((gFishmodHaze >= 1.0f) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_SKYUNDER))
-#else
-#define FISHMOD_NO_SKY() 0
-#endif
 #define FISHMOD_BENCH_1CYCLE (1 << 4)     // the props in 1-cycle mode (no fog, no tint): pipeline or memory bound?
 #define FISHMOD_BENCH_NONEAR (1 << 5)     // props within FISHMOD_BENCH_NEAR not drawn
 #define FISHMOD_BENCH_NOFAR (1 << 6)      // props past it not drawn
@@ -387,6 +380,13 @@ extern s16 gFishmodDebugFocusYaw;
     }
 #define FISHMOD_BENCH_SKIP(flag) 0
 #define FISHMOD_ZBUFFER ((u16*)gZBuffer)
+#endif
+// With the camera under water (the haze full) the skybox can't be seen: not drawn, and the frame cleared to the
+// fog's colour instead of black (FISHMOD_OPT 5)
+#if FISHMOD_OPT >= 5
+#define FISHMOD_NO_SKY() ((gFishmodHaze >= 1.0f) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_SKYUNDER))
+#else
+#define FISHMOD_NO_SKY() 0
 #endif
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */
