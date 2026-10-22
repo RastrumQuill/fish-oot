@@ -1293,6 +1293,13 @@ unsigned long long __lshrdi3(unsigned long long a, int b) {
     }
     return ((unsigned long long)hi << 32) | lo;
 }
+// GCC -Os turns some string formatting into a call to strcpy, which the game's libc doesn't have
+char* strcpy(char* dst, const char* src) {
+    char* d = dst;
+
+    while ((*d++ = *src++) != '\0') {}
+    return dst;
+}
 long long __fixdfdi(double d) {
     return __d_to_ll(d);
 }

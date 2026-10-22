@@ -2604,6 +2604,7 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
 
 #endif
 
+#if FISHMOD_DEBUG
 /**
  * How many of the static collision lookup's nodes a scene used, of how many it had (BgCheck_Allocate), written to
  * SRAM 0x7D00 ('FMCO', then scene, used, max) as each scene loads: the extra rock collision must leave room, since
@@ -2618,3 +2619,4 @@ void Fishmod_DebugColNodes(s32 sceneId, s32 used, s32 max) {
     sRec[3] = max;
     SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7D00, sRec, sizeof(sRec), OS_WRITE);
 }
+#endif
