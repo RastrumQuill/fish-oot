@@ -733,13 +733,14 @@ def mesh_flat_scatter(name, texture, count, spread, size, y, col, seed):
 
 
 def mesh_moss_patch():
-    """A low, lumpy mat of moss rising out of the bed: a 14-sided fan with a ragged rim sunk under the sand, so the bed
+    """A low, lumpy mat of moss rising out of the bed: an 8-sided fan (the console pays per triangle and per prop, so
+    fewer, bigger mats) with a ragged rim sunk under the sand, so the bed
     cuts the edge (an irregular outline from the terrain, no see-through texels), only a few units high in the
     middle, so from the low under-water camera it covers few scanlines (cheap) and reads as a carpet, not a mound.
     The texture is laid on from above and repeats, so the patch's size doesn't stretch it."""
     rnd = random.Random(121)
     m = Mesh("moss_patch", "moss")
-    radius, height, sides, tile = 56.0, 2.8, 14, 26.0
+    radius, height, sides, tile = 72.0, 3.0, 8, 26.0
     def uv(x, z):
         return (x / tile, z / tile)
     c = m.vert((rnd.uniform(-6, 6), height, rnd.uniform(-6, 6)), uv(0, 0), (240, 245, 225))

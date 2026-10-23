@@ -356,7 +356,7 @@ def place(scene, seed=SEED):
 # random numbers, so changing them never moves anything else. On the bed in the shallows, in clusters, tilted to the
 # bed's slope; not where the bed bends too much for a flat mat (it would float at one edge).
 MOSS = {"depth": (6, 260), "base": 0.1, "boosts": {4: 0.08, 12: 0.08, 13: 0.08, 6: 0.07, 11: 0.07, 1: 0.07, 3: 0.03},
-        "cluster": (3, 6), "scale": (0.6, 1.2), "spread": 40.0, "radius": 46.0}
+        "cluster": (1, 3), "scale": (0.75, 1.15), "spread": 55.0, "radius": 60.0}
 
 
 BED = []  # (surface_at, floor_at) of the last place(), for the thinning pass

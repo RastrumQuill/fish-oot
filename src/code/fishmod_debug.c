@@ -1634,13 +1634,16 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 #define BENCH_FRAMES 60 // frames counted per block
 #define BENCH_ROUNDS 2  // blocks per mode per visit (interleaved: A B C D E A B C D E)
 #define BENCH_MICRO_FRAMES 30
+#define BENCH_VERSION 6
+#ifndef FISHMOD_BENCH_LAPS
+#define FISHMOD_BENCH_LAPS 15 // then it stops and says so
+#endif
 
 typedef enum BenchMode {
     BENCH_BASE,
-    BENCH_NOIMP,      // no far single cards: whole cards out to the cutoff (FISHMOD_BENCH_NOIMP)
-    BENCH_NOFARTEX,   // far props on full-size textures (FISHMOD_BENCH_NOFARTEX)
-    BENCH_NODISSOLVE, // the single cards pop at the cutoff (FISHMOD_BENCH_NODISSOLVE)
-    BENCH_ZSAME,      // the depth buffer in the frame buffers' bank (FISHMOD_BENCH_ZSAME)
+    BENCH_NOSWAY,  // no sway matrix (FISHMOD_BENCH_NOSWAY)
+    BENCH_MTXONLY, // each prop's colour and matrices, not its triangles (FISHMOD_BENCH_MTXONLY)
+    BENCH_NOMOSS,  // no moss mats (FISHMOD_BENCH_NOMOSS)
     BENCH_NONEAR,   // the props past FISHMOD_BENCH_NEAR only
     BENCH_NOFAR,    // the props within it only
     BENCH_NOPROPS,
@@ -1858,10 +1861,9 @@ static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
 static void Bench_SetMode(s32 mode) {
     static const s32 sFlags[BENCH_MODES] = {
         0,
-        FISHMOD_BENCH_NOIMP,
-        FISHMOD_BENCH_NOFARTEX,
-        FISHMOD_BENCH_NODISSOLVE,
-        FISHMOD_BENCH_ZSAME,
+        FISHMOD_BENCH_NOSWAY,
+        FISHMOD_BENCH_MTXONLY,
+        FISHMOD_BENCH_NOMOSS,
         FISHMOD_BENCH_NONEAR,
         FISHMOD_BENCH_NOFAR,
         FISHMOD_BENCH_NOPROPS,
@@ -1873,7 +1875,7 @@ static void Bench_SetMode(s32 mode) {
 
 static void Bench_Save(void) {
     sBench.magic = 0x4642454E; // 'FBEN'
-    sBench.version = 5;
+    sBench.version = BENCH_VERSION;
     sBench.stops = BENCH_STOPS;
     sBench.modes = BENCH_MODES;
     sBench.metrics = BENCH_METRICS;
@@ -1914,12 +1916,20 @@ static void Fishmod_BenchUpdate(PlayState* play) {
         }
         // carry on from an earlier night (the save file keeps the sums)
         SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_READ);
-        if ((sBench.magic != 0x4642454E) || (sBench.version != 4) || (sBench.hw != FISHMOD_HW)) {
+        if ((sBench.magic != 0x4642454E) || (sBench.version != BENCH_VERSION) || (sBench.hw != FISHMOD_HW)) {
             bzero(&sBench, sizeof(sBench));
         }
     }
     Fishmod_SampleRdp();
 
+    if (sBench.laps >= FISHMOD_BENCH_LAPS) {
+        // done: everything is in the save; nothing more is measured
+        Bench_SetMode(BENCH_BASE);
+        Fishmod_DebugPrintf(2, "BENCH DONE: %d laps saved", sBench.laps);
+        Fishmod_DebugPrintf(3, "You can turn the console off");
+        Fishmod_DebugPrintf(4, "and send the .sav file");
+        return;
+    }
     mode = sBenchBlock % BENCH_MODES;
     switch (sBenchState) {
         case 0: // arriving
@@ -1965,7 +1975,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
             break;
     }
     {
-        static const char* sModeNames[] = { "base", "noimp", "nofartex", "nodissolve", "zsame", "nonear", "nofar", "noprops", "nosky" };
+        static const char* sModeNames[] = { "base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky" };
 
         Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
                             (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);

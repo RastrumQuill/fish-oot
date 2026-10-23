@@ -18,6 +18,7 @@ MODES_V = {
     3: ["base", "altedge", "trimfar", "nonear", "nofar", "noprops", "nosky", "noxlu"],
     4: ["base", "altedge", "trimfar", "notri", "nostrict", "nonear", "nofar", "noprops", "nosky"],
     5: ["base", "noimp", "nofartex", "nodissolve", "zsame", "nonear", "nofar", "noprops", "nosky"],
+    6: ["base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky"],
 }
 MODE_DOC = {
     "base": "as shipped",
@@ -38,6 +39,9 @@ MODE_DOC = {
     "nonear": "only the props past 500 units",
     "nofar": "only the props within 500 units",
     "nosky": "no props, no skybox",
+    "nosway": "no sway matrix (one matrix per prop, not two)",
+    "mtxonly": "each prop's colour and matrices sent, not its triangles (the per-prop setup alone)",
+    "nomoss": "no moss mats",
     "noxlu": "no props, no room translucency (the water surface)",
 }
 METRICS = ["period", "cpu_update", "cpu_draw", "rsp_gfx", "rdp", "rsp_audio", "dp_clock", "dp_buf", "dp_pipe",

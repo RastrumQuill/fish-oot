@@ -329,6 +329,9 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NODISSOLVE (1 << 14) // the single cards pop at the cutoff instead of dissolving
 #define FISHMOD_BENCH_ZSAME (1 << 15)      // the depth buffer in the frame buffers' 1 MB bank (bank layout test)
 #define FISHMOD_BENCH_SKYUNDER (1 << 16)   // the skybox drawn with the camera under water too, as vanilla
+#define FISHMOD_BENCH_NOSWAY (1 << 17)     // no sway matrix (one matrix per prop instead of two)
+#define FISHMOD_BENCH_MTXONLY (1 << 18)    // each prop's colour and matrices sent, but not its triangles
+#define FISHMOD_BENCH_NOMOSS (1 << 19)     // no moss mats
 #define FISHMOD_BENCH_1CYCLE (1 << 4)     // the props in 1-cycle mode (no fog, no tint): pipeline or memory bound?
 #define FISHMOD_BENCH_NONEAR (1 << 5)     // props within FISHMOD_BENCH_NEAR not drawn
 #define FISHMOD_BENCH_NOFAR (1 << 6)      // props past it not drawn

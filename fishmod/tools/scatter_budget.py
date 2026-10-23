@@ -62,6 +62,8 @@ def distances():
             u = min(u, lod[k][1])
         if tuned.get(k):
             u = tuned[k]
+        if k == "MOSS_PATCH":
+            a, u = 600.0, 500.0  # (fishmod_scatter.c: moss near only)
         out[k.lower()] = (a, u)
     return out
 
