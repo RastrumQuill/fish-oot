@@ -1925,6 +1925,7 @@ static void Fishmod_BenchUpdate(PlayState* play) {
     if (sBench.laps >= FISHMOD_BENCH_LAPS) {
         // done: everything is in the save; nothing more is measured
         Bench_SetMode(BENCH_BASE);
+        sTourDebugText = true; // (the bench hides the text until now)
         Fishmod_DebugPrintf(2, "BENCH DONE: %d laps saved", sBench.laps);
         Fishmod_DebugPrintf(3, "You can turn the console off");
         Fishmod_DebugPrintf(4, "and send the .sav file");
