@@ -264,7 +264,9 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_GRASS_TUFT].drawDist = DIST_SMALL;
     sKinds[FISHMOD_PROP_LEAF_LITTER].drawDist = DIST_SMALL;
     sKinds[FISHMOD_PROP_PEBBLE_PATCH].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_MOSS_PATCH].drawDist = DIST_MID;
+    // moss mats: low on the bed, faint shapes past this, and each costs about as much to issue as a few hundred
+    // scanlines (hwbench-5h): near ones only
+    sKinds[FISHMOD_PROP_MOSS_PATCH].drawDist = 600.0f;
     sKinds[FISHMOD_PROP_RIBBON_WEED].drawDist = DIST_MID;
     sKinds[FISHMOD_PROP_BROADLEAF].drawDist = DIST_MID;
     sKinds[FISHMOD_PROP_BUSH_WEED].drawDist = DIST_MID;
@@ -352,6 +354,8 @@ static void Scatter_InitKinds(void) {
             sReach[i][0] = sKinds[i].drawDist;
             sReach[i][1] = sKinds[i].drawDistUnder;
         }
+        // (moss: nearer still in the haze)
+        sKinds[FISHMOD_PROP_MOSS_PATCH].drawDistUnder = sReach[FISHMOD_PROP_MOSS_PATCH][1] = 500.0f;
 #define X(id, above, under)                                    \
     if ((above) > 0) {                                         \
         sKinds[FISHMOD_PROP_##id].drawDist = MIN(sKinds[FISHMOD_PROP_##id].drawDist, (above)); \
@@ -1275,6 +1279,9 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 continue;
             }
         }
+        if ((kind == FISHMOD_PROP_MOSS_PATCH) && FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOMOSS)) {
+            continue;
+        }
 #endif
         disp = info->xlu ? &xlu : &opa;
         tier = set->tier[n];
@@ -1329,11 +1336,14 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             }
         }
         gSPMatrix((*disp)++, &set->mtx[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        if (info->sway != 0) {
+        if ((info->sway != 0) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSWAY)) {
             // neighbours share a phase: a wave through the bed
             s32 ph = ((prop->x + prop->z) >> 7) & (SWAY_PHASES - 1);
 
             gSPMatrix((*disp)++, &frame->sway[kind * SWAY_PHASES + ph], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
+        }
+        if (FISHMOD_BENCH_SKIP(FISHMOD_BENCH_MTXONLY)) {
+            continue; // everything a prop sends but its own triangles (what the per-prop setup costs)
         }
         gSPDisplayList((*disp)++, (tier == TIER_IMP)    ? info->modelImp
                                   : (tier == TIER_HALF) ? info->modelHalf
