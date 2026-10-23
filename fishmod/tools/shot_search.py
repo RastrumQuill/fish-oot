@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Console frame-time estimate for any camera at Lake Hylia, and a search for under-water shots that fit a budget.
 
-The model (fitted to hardware bench 4: each stop's near and far prop cost against what bench 4's placement put on
-screen there, 44 points): the RDP's prop time is the scanlines each prop's cards cover, summed over its cards,
-  near (within 500): 0.00326 ms per card-scanline, far: 0.00242 ms   (rms error 3.2 ms per stop)
-which fits far better than pixels (rms 6.9) or counts: the cost is per span (each scanline's run starts with a
-memory fetch), so tall, many-card plants cost most and low flat ones (moss, decals) almost nothing from a low camera.
+The model (fitted to hardware benches 4 and 5h: each stop's near and far prop cost against what each placement put
+on screen there, 88 points): the scanlines each prop's cards cover, summed over its cards, plus a fixed cost per prop
+drawn,
+  near (within 500): 0.00265 ms per card-scanline + 0.107 ms per prop
+  far:               0.00173 ms per card-scanline + 0.072 ms per prop    (rms 2.3-3.0 ms per stop on each bench)
+Scanlines alone fit bench 4 (rms 3.7) but missed 5h by 14 ms on average: 5h draws many more, smaller props (moss
+mats), and each prop costs about as much to issue as a few hundred scanlines.
 Far props' cheaper tiers since bench 4 (single card, half texture) aren't modelled: far is an upper bound.
 CPU and RSP time per prop isn't modelled either (props past ~900 a frame, or a big jump in count, need a bench).
 
@@ -23,7 +25,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import rdp_estimate as R  # noqa: E402
 
-KN, KF = 0.00326, 0.00242  # ms per card-scanline, near / far
+KN, KF = 0.00265, 0.00173  # ms per card-scanline, near / far
+PN, PF = 0.107, 0.072      # ms per prop drawn, near / far (its fixed cost: commands, state, setup)
 BASE_UNDER = 30.0          # no-prop RDP time under water (hwbench-4: most stops 25-31 ms)
 F = 207.8                  # focal length in pixels: 240 lines, 60 degrees
 SURFACE = -1313
@@ -83,7 +86,8 @@ class Scene:
         cx = np.clip(x1, 0, 320) - np.clip(x0, 0, 320)
         cy = np.clip(y1, 0, 240) - np.clip(y0, 0, 240)
         ok &= (cx > 0) & (cy > 0)
-        ms = np.where(ok, cy * self.NC, 0) * np.where(dsq < 500 ** 2, KN, KF)
+        near = dsq < 500 ** 2
+        ms = np.where(ok, cy * self.NC * np.where(near, KN, KF) + np.where(near, PN, PF), 0)
         return ms, ok, cx * cy
 
     def cost(self, eye, at, under=True, base=BASE_UNDER):
