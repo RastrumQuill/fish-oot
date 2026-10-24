@@ -34,6 +34,8 @@
 #define ROSTER_SLEEP_DIST 1800.0f // and is removed when he's this far away (while it's just cruising)
 #define ROSTER_CHECKS_PER_FRAME 48 // (FISHMOD_OPT 5) roster records looked at per frame
 #define ROSTER_SPAWNS_PER_FRAME 2  // (FISHMOD_OPT 5) fish woken per frame
+#define HOME_CROWD_DIST 300.0f    // (FISHMOD_OPT 5) a fish's home by cover is skipped if this close to
+#define HOME_CROWD_MAX 6          // this many other homes already (dense weed drew too many fish to one spot)
 #define THINK_BUDGET 16           // full AI updates per frame for fish cruising far from Link and the bobber
 #define THINK_FAR_DIST 300.0f
 #if FISHMOD_OPT >= 5
@@ -139,6 +141,24 @@ void EnFishmod_RosterForget(EnFishmod* fish) {
     }
 }
 
+#if FISHMOD_OPT >= 5
+/** How many of the roster's homes so far are within HOME_CROWD_DIST of a point (across the ground). */
+static s32 Roster_Crowd(Vec3f* pos) {
+    s32 n = 0;
+    s32 i;
+
+    for (i = 0; i < sRosterCount; i++) {
+        f32 dx = sRoster[i].home.x - pos->x;
+        f32 dz = sRoster[i].home.z - pos->z;
+
+        if (SQ(dx) + SQ(dz) < SQ(HOME_CROWD_DIST)) {
+            n++;
+        }
+    }
+    return n;
+}
+#endif
+
 /**
  * The scene's fish for today: the same as Rod_SpawnFish chose them before (a random water box, a spot in it, a
  * species by weight, a size), but from a seed of the scene and the day so they're the same every visit.
@@ -212,8 +232,21 @@ static void Manager_BuildRoster(PlayState* play) {
         radius = CLAMP_MIN(box->xLength, box->zLength) * 0.6f;
 #if FISHMOD_OPT >= 5
         // most fish live by cover (weed beds, rocks, reeds, pads), the rest out in the open water
-        if ((Rand_ZeroOne() < 0.75f) && EnFishmod_ScatterRandomCover(&center)) {
-            radius = 120.0f;
+        // (a few tries for cover that isn't crowded with homes already; else the open water)
+        if (Rand_ZeroOne() < 0.75f) {
+            Vec3f cover;
+            s32 tries;
+
+            for (tries = 0; tries < 4; tries++) {
+                if (!EnFishmod_ScatterRandomCover(&cover)) {
+                    break;
+                }
+                if (Roster_Crowd(&cover) < HOME_CROWD_MAX) {
+                    center = cover;
+                    radius = 120.0f;
+                    break;
+                }
+            }
         }
 #endif
         if (EnFishmod_FindWaterPoint(play, &center, radius, 25.0f, &rec->home, &surface, &floor)) {
