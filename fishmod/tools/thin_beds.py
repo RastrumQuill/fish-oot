@@ -160,6 +160,8 @@ def main():
     ap.add_argument("--passes", type=int, default=60)
     ap.add_argument("--no-restore", dest="restore", action="store_false",
                     help="skip putting back what the passes took and no direction needs gone")
+    ap.add_argument("--restore-limit", type=float, default=46.0,
+                    help="what's put back keeps every direction under this (a margin for spots it never saw)")
     a = ap.parse_args()
     if os.path.exists(OUT):
         os.remove(OUT)  # (measured on the placement without it)
@@ -211,7 +213,7 @@ def main():
             sc.FLAT[j] = True
         failing = still
     if a.restore:
-        restore(sc, dirs, a.limit, thin, moss, turned_to_moss, dropped)
+        restore(sc, dirs, a.restore_limit, thin, moss, turned_to_moss, dropped)
     out = [{"kind": sc.kind[j], "x": int(sc.P[j, 0]), "z": int(sc.P[j, 2]), "drop": bool(dropped[j])}
            for j in np.nonzero(turned_to_moss | dropped)[0]]
     by = {}
@@ -219,7 +221,7 @@ def main():
         by[o["kind"]] = by.get(o["kind"], 0) + 1
     print(f"{int((turned_to_moss & ~dropped).sum())} plants to moss of {int(thin.sum())}, "
           f"{int(dropped.sum())} dropped (moss mats, or plants turned to moss and then still too much):", by)
-    json.dump({"limit": a.limit, "views": a.views, "seeds": a.seeds, "moss": out}, open(OUT, "w"), indent=0)
+    json.dump({"limit": a.limit, "restore_limit": a.restore_limit, "views": a.views, "seeds": a.seeds, "moss": out}, open(OUT, "w"), indent=0)
 
 
 if __name__ == "__main__":
