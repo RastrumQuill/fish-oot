@@ -14,6 +14,15 @@
 - **Worst frames** (63-67 ms) at the East weed flats happen with no props too: CPU update there is 24-28 ms
   (the fish), not drawing.
 
+## Follow-up (emulator, not the console)
+- **Fish:** the East weed flats (the densest cover) drew too many fish homes: holding the camera there in ares, 79
+  fish awake and 29 full AI updates a frame, against 65 and 19 at the West flat. Homes by cover now skip a spot
+  with 6 homes already within 300 (else the open water; the lake keeps its 300 fish). Fish update, average /
+  worst, holding the camera at each stop: East (under) 10.8 / 24.3 -> 7.9 / 17.3 ms, West (under) 8.8 / 27.0 ->
+  9.5 / 17.7 ms; worst frame East 63.6 -> 57.2 ms.
+- **Plants:** thin_beds.py charged dropped props their fixed per-prop cost, so it thinned far more than needed.
+  Fixed, with a pass that puts back whatever no view needs gone, aimed at 46 ms: 4020 props (5i had 3325).
+
 # Hardware bench (original-hardware build)
 
 15 full laps, 330 stop visits.
