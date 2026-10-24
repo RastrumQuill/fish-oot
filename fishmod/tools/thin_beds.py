@@ -46,18 +46,127 @@ def contributions(sc, eye, at, under):
     return sc.contrib(eye, at, under)[0]
 
 
+def prop_vs_dirs(sc, j, D):
+    """Prop j's share of each direction's RDP time (the same sums as shot_search.Scene.contrib, for one prop over
+    many directions)."""
+    E, FW, RT, UP, U = D["eye"], D["fw"], D["rt"], D["up"], D["under"]
+    d = sc.P[j, :3][None, :] - E
+    dsq = d[:, 0] ** 2 + d[:, 2] ** 2
+    ok = dsq < np.where(U, sc.CUT[j], sc.CUT_ABOVE[j]) ** 2
+    if not ok.any():
+        return np.zeros(len(E))
+    H, W, flat = sc.H[j], sc.W[j], sc.FLAT[j]
+    c = d.copy()
+    if not flat:
+        c[:, 1] += H / 2
+    z, x, y = (c * FW).sum(1), (c * RT).sum(1), (c * UP).sum(1)
+    ok &= z > -W
+    zc = np.maximum(z, 15.0)
+    x0, x1 = (x - W / 2) * S.F / zc + 160, (x + W / 2) * S.F / zc + 160
+    if flat:
+        fh = FW * np.array([1.0, 0.0, 1.0])
+        fh /= np.maximum(np.linalg.norm(fh, axis=1), 1e-6)[:, None]
+        near_pt, far_pt = c - (W / 2) * fh, c + (W / 2) * fh
+        zn = np.maximum((near_pt * FW).sum(1), 15.0)
+        zf = np.maximum((far_pt * FW).sum(1), 15.0)
+        yn, yf = (near_pt * UP).sum(1) * S.F / zn + 120, (far_pt * UP).sum(1) * S.F / zf + 120
+        y0, y1 = np.minimum(yn, yf), np.maximum(yn, yf)
+    else:
+        y0, y1 = (y - H / 2) * S.F / zc + 120, (y + H / 2) * S.F / zc + 120
+    cx = np.clip(x1, 0, 320) - np.clip(x0, 0, 320)
+    cy = np.clip(y1, 0, 240) - np.clip(y0, 0, 240)
+    ok &= (cx > 0) & (cy > 0)
+    near = dsq < 500 ** 2
+    return np.where(ok, cy * sc.NC[j] * np.where(near, S.KN, S.KF) + np.where(near, S.PN, S.PF), 0.0)
+
+
+def restore(sc, dirs, limit, thin, moss, turned_to_moss, dropped):
+    """The passes take a plant out of every failing direction at once, so they overshoot. Put back, one step at a time
+    (a dropped mat back as moss, a plant made moss back as itself), whatever no direction needs gone: cheapest first."""
+    E = np.array([d[0] for d in dirs], float)
+    T = np.array([d[1] for d in dirs], float)
+    FW = T - E
+    FW /= np.linalg.norm(FW, axis=1)[:, None]
+    RT = np.cross(FW, [0, 1, 0])
+    RT /= np.linalg.norm(RT, axis=1)[:, None]
+    D = {"eye": E, "fw": FW, "rt": RT, "up": np.cross(RT, FW), "under": np.array([d[2] for d in dirs])}
+    total = np.array([d[3] for d in dirs], float)
+    for j in range(len(sc.kind)):
+        total += prop_vs_dirs(sc, j, D)
+    plant_shape = {}
+
+    def as_plant(j):
+        k = sc.kind[j]
+        sc.H[j] = S.R.HEIGHT.get(k, 40) * sc.P[j, 3]
+        sc.W[j] = (S.CARDS[k][1] if k in S.CARDS else S.R.HEIGHT.get(k, 40)) * sc.P[j, 3]
+        sc.NC[j] = S.CARDS.get(k, (2, 0))[0]
+        sc.PLANT[j], sc.FLAT[j] = True, False
+
+    def as_moss(j):
+        sc.H[j], sc.W[j], sc.NC[j] = MOSS_H * sc.P[j, 3], MOSS_W * sc.P[j, 3], 1
+        sc.PLANT[j], sc.FLAT[j] = False, True
+
+    back = [0, 0]
+    for rnd in range(4):  # (what can't come back early may fit once its neighbours have settled)
+        cand = [j for j in np.nonzero(turned_to_moss | dropped)[0]]
+        trial = []
+        for j in cand:
+            old = prop_vs_dirs(sc, j, D)
+            state = (sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j])
+            if dropped[j]:
+                sc.CUT[j], sc.CUT_ABOVE[j] = sc.cut0[j]
+                if not moss[j]:
+                    as_moss(j)
+            else:
+                as_plant(j)
+            new = prop_vs_dirs(sc, j, D)
+            sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j] = state
+            trial.append((float((new - old).clip(0).sum()), j))
+        trial.sort()
+        n0 = back[:]
+        for _, j in trial:
+            old = prop_vs_dirs(sc, j, D)
+            state = (sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j])
+            was_dropped = dropped[j]
+            if was_dropped:
+                sc.CUT[j], sc.CUT_ABOVE[j] = sc.cut0[j]
+                if not moss[j]:
+                    as_moss(j)
+            else:
+                as_plant(j)
+            new = prop_vs_dirs(sc, j, D)
+            t = total + new - old
+            if (t[new > old] <= limit).all():
+                total = t
+                if was_dropped:
+                    dropped[j] = False
+                    back[0] += 1
+                else:
+                    turned_to_moss[j] = False
+                    back[1] += 1
+            else:
+                sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j] = state
+        print(f"restore round {rnd + 1}: {back[0] - n0[0]} mats back, {back[1] - n0[1]} plants back")
+        if back == n0:
+            break
+    print(f"restored: {back[0]} mats, {back[1]} plants; directions over {limit} ms: {int((total > limit).sum())}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=float, default=48.0)
     ap.add_argument("--views", type=int, default=60)
     ap.add_argument("--seeds", default="7,19,23", help="sets of spots (section_budget.py --seed 11 is kept for checking)")
     ap.add_argument("--passes", type=int, default=60)
+    ap.add_argument("--no-restore", dest="restore", action="store_false",
+                    help="skip putting back what the passes took and no direction needs gone")
     a = ap.parse_args()
     if os.path.exists(OUT):
         os.remove(OUT)  # (measured on the placement without it)
         print("note: run gen_scatter.py --c first, so the placement has no thinning applied")
     finder, boxes, zones, gs = B.setting()
     sc = S.Scene()
+    sc.cut0 = list(zip(sc.CUT.copy(), sc.CUT_ABOVE.copy()))
     bases = B.stop_bases()
     dirs = []
     for seed in (int(x) for x in a.seeds.split(",")):
@@ -92,7 +201,7 @@ def main():
         for j in pick:
             if moss[j] or turned_to_moss[j]:
                 dropped[j] = True
-                sc.NC[j] = 0
+                sc.CUT[j] = sc.CUT_ABOVE[j] = 0  # (not drawn: no cost at all, not even the per-prop one)
                 continue
             turned_to_moss[j] = True
             sc.H[j] = MOSS_H * sc.P[j, 3]
@@ -101,6 +210,8 @@ def main():
             sc.PLANT[j] = False
             sc.FLAT[j] = True
         failing = still
+    if a.restore:
+        restore(sc, dirs, a.limit, thin, moss, turned_to_moss, dropped)
     out = [{"kind": sc.kind[j], "x": int(sc.P[j, 0]), "z": int(sc.P[j, 2]), "drop": bool(dropped[j])}
            for j in np.nonzero(turned_to_moss | dropped)[0]]
     by = {}
