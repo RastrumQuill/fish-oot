@@ -6,7 +6,7 @@ The room's ground is lit by the scene's lights, so its vertices hold normals, no
 makes a second, finer copy of the bed under the water instead, lying on it, with its own vertex colours: greener
 where the weed beds grow (from the placement before any thinning), in soft patches, darker in deep water, fading to
 the plain bed toward the surface. It lies on the bed and is drawn over it as a decal (the depth test allows for
-coplanar surfaces). It uses the bed's own textures; the game draws it near the camera when the camera
+coplanar surfaces). It uses the bed's own sand texture; the game draws it near the camera when the camera
 is under water, unlit, times the scene's light (as the props are). Without FISHMOD_BEDSKIN=1 it writes an empty file.
 
 Made from the scene's own geometry (the extracted assets), so written to src/fishmod_data/ (not committed).
@@ -41,6 +41,10 @@ PLANTS = {"bush_weed": 1.0, "broadleaf": 1.0, "big_pondweed": 1.2, "kelp_frond":
 VTX = re.compile(r"VTX\(\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\w+),\s*(-?\w+),")
 LOAD = re.compile(r"gsDPLoadTextureBlock\((\w+), G_IM_FMT_(\w+), G_IM_SIZ_(\w+), \w+,\s*\w+, 0, ([^,]+), ([^,]+), "
                   r"(\w+), (\w+), (\w+), (\w+)\)")
+# the second texture (the bed's materials blend it over the first by the environment's alpha: on the lake bed it's the
+# sand, the first the bright ripples): the copy uses the second where there is one
+LOAD1 = re.compile(r"gsDPLoadMultiBlock\((\w+), \w+, 1, G_IM_FMT_(\w+), G_IM_SIZ_(\w+), \w+,\s*\w+, 0, ([^,]+), "
+                   r"([^,]+), (\w+), (\w+), (\w+), (\w+)\)")
 
 
 def tx_flags(s):
@@ -79,7 +83,7 @@ def room_triangles():
         load = None
         for line in text.split("),"):
             line = line.strip() + ")"
-            m = LOAD.search(line)
+            m = LOAD.search(line) or LOAD1.search(line)
             if m:
                 load = (m.group(1), m.group(2), m.group(3), tx_flags(m.group(4)), tx_flags(m.group(5)),
                         tx_num(m.group(6)), tx_num(m.group(7)), tx_num(m.group(8)), tx_num(m.group(9)))
