@@ -37,9 +37,11 @@ Notes only, not built in test5: lures, sinkers and the sinking lure (item 5), ho
 5. **Quests**, once everything looks and feels good.
 
 ### 2. Before the refactor: lures, bottles, fish as items
-- **Lures as a C-button item, tied to the bow like the magic arrows** (an item that goes with the bow and the rod).
-- **More bottles**, filling the room made on the pause menu by shrinking everything, kept in proportion, so more
-  items fit.
+- **Lures (and the sinker) as a C-button item tied to the rod**, the way the magic arrows go with the bow.
+- **The coral hook** as an upgrade to the rod (like Hookshot to Longshot), not a separate item.
+- **The item grid redone completely:** the rod, lures and sinker break the vanilla grid, so everything shrinks in
+  proportion to make room. **More bottles** fill the gaps that leaves (how many isn't fixed: they're there to fill
+  the voids).
 - **Fish as real items:** a bottled fish shows its species and size in the inventory, and the buyer you sell bottled
   things to says what he's getting. Never just "fish" any more: size and species matter.
 
