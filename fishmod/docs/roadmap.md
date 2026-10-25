@@ -177,6 +177,16 @@ fishmod_debug.c have grown large (split by job); the bench, tour and capture scr
 (gen_scatter, thin_beds, section_budget, shot_search, rdp_estimate) load each other ad hoc; experiments left behind
 switches (FISHMOD_BEDSKIN, the bench modes) to keep or drop.
 
+**Two versions, as a first-class split (not scattered `FISHMOD_HW` checks):**
+- **Original hardware** (`--hw`): the constraining platform, so the one the work is tuned on: thinned beds, fewer
+  cards, the tall plants as accents, the coloured bed (F3DEX3), a solid 20 fps on the console.
+- **Emulator** (the definitive version): lusher, with the tall kelp forests and plants with more cards, since
+  emulators don't pay the RDP's fill and per-triangle costs. Its own placement, density and draw distances; the same
+  game otherwise.
+The split should be one setting (a build profile) that picks the placement data, plant models, draw distances and
+budgets together, with each tool (gen_habitat, gen_scatter, thin_beds, LOD tables) taking the profile, and both built
+and checked every release.
+
 - **More fishing spots:** some grottos have large bodies of water (at least one known), and the Water Temple could
   be interesting.
   The Great Deku Tree's water too (with grottos, the oasis, etc.).
