@@ -5,16 +5,17 @@
 
 /*
  * The bed-skin test (fishmod/build.sh --bedskin, fishmod/tools/gen_bedskin.py): a finer copy of a scene's bed under the
- * water, lying on it (a decal), with its own vertex colours (greener under the weed beds, in patches), drawn near the
- * camera when it's under water, instead of moss mats. Every part is a multiple of 8 bytes, so the parts follow each
- * other with no padding: header, textures, chunks, batches, vertices, triangles (3 bytes each).
+ * water, lying on it (a decal), with the bed's own materials and lighting and its own vertex colours on top (F3DEX3's
+ * packed normals: normals in the vertex's flag, colours multiplying the lit result): greener under the weed beds, in
+ * patches. Drawn when the camera is under water, instead of moss mats. Every part is a multiple of 8 bytes, so the
+ * parts follow each other with no padding: header, materials, chunks, batches, vertices, triangles (3 bytes each).
  */
 
 #define FISHMOD_BED_MAGIC 0x46424544 // 'FBED'
 
 typedef struct FishmodBedHeader {
     /* 0x00 */ u32 magic;
-    /* 0x04 */ u16 texCount;
+    /* 0x04 */ u16 matCount;
     /* 0x06 */ u16 chunkCount;
     /* 0x08 */ u16 batchCount;
     /* 0x0A */ u16 pad;
@@ -23,8 +24,8 @@ typedef struct FishmodBedHeader {
     /* 0x14 */ u32 pad2[3];
 } FishmodBedHeader; // size = 0x20
 
-typedef struct FishmodBedTex {
-    /* 0x00 */ u32 segAddr; // in the scene's segment (all RGBA 16-bit)
+typedef struct FishmodBedTexLoad {
+    /* 0x00 */ u32 segAddr; // in the scene's segment (all RGBA 16-bit); 0: none
     /* 0x04 */ u8 width;
     /* 0x05 */ u8 height;
     /* 0x06 */ u8 cms;
@@ -33,8 +34,18 @@ typedef struct FishmodBedTex {
     /* 0x09 */ u8 maskt;
     /* 0x0A */ u8 shifts;
     /* 0x0B */ u8 shiftt;
-    /* 0x0C */ u32 pad;
-} FishmodBedTex; // size = 0x10
+} FishmodBedTexLoad; // size = 0xC
+
+// One of the bed's own materials, as the room draws it: two textures blended by the environment's alpha (the second
+// loaded at TMEM 0x100 as tile 1), times the lit shade, and maybe scrolled like the scene's segment 8 or 9 does.
+typedef struct FishmodBedMat {
+    /* 0x00 */ FishmodBedTexLoad tex0;
+    /* 0x0C */ FishmodBedTexLoad tex1;
+    /* 0x18 */ u8 envAlpha;
+    /* 0x19 */ u8 scroll; // 0, or 8 / 9: the scene's scrolling (Scene_DrawConfigLakeHylia)
+    /* 0x1A */ u8 prim[3]; // (one texture: its colour times the shade times this, as the room's own)
+    /* 0x1D */ u8 pad[3];
+} FishmodBedMat; // size = 0x20
 
 typedef struct FishmodBedChunk {
     /* 0x00 */ s16 x; // its centre, across the ground
@@ -52,7 +63,7 @@ typedef struct FishmodBedBatch {
     /* 0x02 */ u16 triStart;
     /* 0x04 */ u8 vtxCount; // up to 32, loaded at 0
     /* 0x05 */ u8 triCount;
-    /* 0x06 */ u8 tex;
+    /* 0x06 */ u8 mat;
     /* 0x07 */ u8 pad;
 } FishmodBedBatch; // size = 0x8
 

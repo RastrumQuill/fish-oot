@@ -27,18 +27,17 @@ LIFT = 0         # on the vanilla bed: drawn over it as a decal (the depth test 
 CELL = 512       # chunks the game picks by distance
 
 # Colour (multiplies the sand texture; 1 = the bed as it is)
-GREEN = (0.86, 1.00, 0.68)  # weed-bed silt
-OLIVE = (0.90, 0.86, 0.66)  # browner patches
+GREEN = (0.62, 0.92, 0.42)  # weed-bed silt
+OLIVE = (0.80, 0.82, 0.50)  # browner patches
 SIGMA = 150.0               # how far a plant greens the bed around it
 DENSE = 5.0                 # this much plant nearby is a full bed
-DEEP0, DEEP1 = 250.0, 1100.0
 FADE = 60.0                 # up to this far under the surface, less of it (no seam at the waterline)
 # plant weights (how much bed each greens); the same kinds as gen_bedshade's shade
 PLANTS = {"bush_weed": 1.0, "broadleaf": 1.0, "big_pondweed": 1.2, "kelp_frond": 1.0, "tall_weed": 1.0,
           "ribbon_weed": 0.8, "grass_tuft": 0.6, "fan_weed": 0.8, "vine_strand": 0.6, "lily_pad": 0.5,
           "spatterdock": 0.5, "pond_reed": 0.4, "reed_clump": 0.5, "cattails": 0.5}
 
-VTX = re.compile(r"VTX\(\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\w+),\s*(-?\w+),")
+VTX = re.compile(r"VTX\(\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\w+),\s*(-?\w+),\s*(-?\w+),\s*(-?\w+),\s*(-?\w+),")
 LOAD = re.compile(r"gsDPLoadTextureBlock\((\w+), G_IM_FMT_(\w+), G_IM_SIZ_(\w+), \w+,\s*\w+, 0, ([^,]+), ([^,]+), "
                   r"(\w+), (\w+), (\w+), (\w+)\)")
 # the second texture (the bed's materials blend it over the first by the environment's alpha: on the lake bed it's the
@@ -66,27 +65,53 @@ def tex_size(name):
     return w, ht
 
 
+def s8(v):
+    v = int(v, 0)
+    return v - 256 if v >= 128 else v
+
+
 def room_triangles():
-    """Every triangle of the room's display lists: (texture load, three (x, y, z, s, t))."""
+    """Every triangle of the room's display lists: (material, three (x, y, z, s, t, nx, ny, nz)). A material is the
+    first texture's load, the second's (or None), the environment's alpha and the scene segment it scrolls with (0, 8
+    or 9), as the room's commands left them."""
     arrays = {}
 
     def vtx(name):
         if name not in arrays:
             path = glob.glob(os.path.join(SCENE, f"*{name}*.inc.c"))[0]
-            arrays[name] = [tuple(int(m.group(i), 0) for i in range(1, 6)) for m in VTX.finditer(open(path).read())]
+            arrays[name] = [tuple(int(m.group(i), 0) for i in range(1, 6)) + tuple(s8(m.group(i)) for i in (6, 7, 8))
+                            for m in VTX.finditer(open(path).read())]
         return arrays[name]
+
+    def tex(m):
+        return (m.group(1), m.group(2), m.group(3), tx_flags(m.group(4)), tx_flags(m.group(5)), tx_num(m.group(6)),
+                tx_num(m.group(7)), tx_num(m.group(8)), tx_num(m.group(9)))
 
     tris = []
     for dl in sorted(glob.glob(os.path.join(SCENE, "gSpot06DL_*_DL.inc.c"))):
         text = re.sub(r"\n\s+", " ", open(dl).read())
         buf = [None] * 64
-        load = None
+        t0 = t1 = None
+        env = 128  # (Scene_DrawConfigLakeHylia's, each frame)
+        scroll = 0
+        prim = (255, 255, 255)
         for line in text.split("),"):
             line = line.strip() + ")"
-            m = LOAD.search(line) or LOAD1.search(line)
+            m = LOAD.search(line)
             if m:
-                load = (m.group(1), m.group(2), m.group(3), tx_flags(m.group(4)), tx_flags(m.group(5)),
-                        tx_num(m.group(6)), tx_num(m.group(7)), tx_num(m.group(8)), tx_num(m.group(9)))
+                t0, t1, scroll = tex(m), None, 0
+            m = LOAD1.search(line)
+            if m:
+                t1 = tex(m)
+            m = re.search(r"gsDPSetEnvColor\([^,]+, [^,]+, [^,]+, (\w+)\)", line)
+            if m:
+                env = int(m.group(1), 0)
+            m = re.search(r"gsDPSetPrimColor\([^,]+, [^,]+, (\w+), (\w+), (\w+), \w+\)", line)
+            if m:
+                prim = tuple(int(m.group(i), 0) for i in (1, 2, 3))
+            m = re.search(r"gsSPDisplayList\(0x0([89])000000\)", line)
+            if m:
+                scroll = int(m.group(1))
             m = re.search(r"gsSPVertex\(&(\w+)\[(\d+)\], (\d+), (\d+)\)", line)
             if m:
                 arr = vtx(m.group(1))
@@ -94,11 +119,22 @@ def room_triangles():
                 for i in range(n):
                     buf[d + i] = arr[s + i]
             m = re.search(r"gsSP(2Triangles|1Triangle)\(([^)]*)\)", line)
-            if m:
+            if m and t0 is not None:
                 a = [int(x) for x in m.group(2).split(",")]
                 for k in (0, 4) if m.group(1) == "2Triangles" else (0,):
-                    tris.append((load, buf[a[k]], buf[a[k + 1]], buf[a[k + 2]]))
+                    tris.append(((t0, t1, env, scroll, prim if t1 is None else (255, 255, 255)), buf[a[k]],
+                                 buf[a[k + 1]], buf[a[k + 2]]))
     return tris
+
+
+def pack_normal(n):
+    """F3DEX3's packed normal (G_PACKED_NORMALS, the 5-6-5 encoding from Tiny3D): x in the top 5 bits, y in the
+    next 6, z in the low 5, each signed. Not normalised: a shorter normal takes less of the sun (gen_bedshade.py)."""
+    x, y, z = n
+    xi = max(-16, min(15, int(round(x * 15.5))))
+    yi = max(-32, min(31, int(round(y * 31.5))))
+    zi = max(-16, min(15, int(round(z * 15.5))))
+    return ((xi & 0x1F) << 11) | ((yi & 0x3F) << 5) | (zi & 0x1F)
 
 
 def hash01(ix, iz, salt):
@@ -118,25 +154,33 @@ def noise(x, z, scale, salt):
     return a * (1 - tz) + b * tz
 
 
-def colour(x, y, z, ny, plants):
-    """(r, g, b) of the bed here, and how green it is (0 sand, 1 full weed-bed green)."""
+def colour(x, y, z, plants):
+    """(r, g, b) on top of the lit bed here (white: the bed as it is), and how green it is (0 sand, 1 full green)."""
     depth = SURFACE - y
     near = sum(w * math.exp(-((x - px) ** 2 + (z - pz) ** 2) / (2 * SIGMA ** 2)) for px, pz, w in plants
                if abs(x - px) < 3 * SIGMA and abs(z - pz) < 3 * SIGMA)
     dense = 1.0 - math.exp(-near / DENSE)
     patch = noise(x, z, 520.0, 1) * 0.5 + noise(x, z, 190.0, 2) * 0.3 + noise(x, z, 90.0, 4) * 0.2
     g = min(max(-0.3 + 0.8 * dense + 1.2 * (patch - 0.5), 0.0), 1.0)
+    g *= min(max(depth / FADE, 0.0), 1.0)
+    if os.environ.get("FISHMOD_BEDSKIN_WHITE") == "1":
+        g = 0.0  # (a check: the copy should then look just like the bed under it)
     olive = noise(x, z, 340.0, 3)
     tint = [GREEN[i] * (1 - olive) + OLIVE[i] * olive for i in range(3)]
-    deep = min(max((depth - DEEP0) / (DEEP1 - DEEP0), 0.0), 1.0)
-    bright = (1.0 - 0.15 * dense) * (1.0 - 0.25 * deep) * (0.85 + 0.15 * max(ny, 0.0))
-    fade = min(max(depth / FADE, 0.0), 1.0)
-    out = []
-    for i in range(3):
-        c = (1.0 - g) + g * tint[i]
-        c = 1.0 - (1.0 - c * bright) * fade
-        out.append(max(0, min(255, round(255 * c))))
-    return out, g * fade
+    return [max(0, min(255, round(255 * ((1.0 - g) + g * tint[i])))) for i in range(3)], g
+
+
+def shade(x, y, z, pts, bs):
+    """gen_bedshade.py's sunlight factor for the bed here (its normals are shortened by it in the game)."""
+    depth = SURFACE - y
+    if depth <= 0:
+        return 1.0
+    near = sum(w * math.exp(-((x - px) ** 2 + (z - pz) ** 2) / (2 * bs.SIGMA ** 2)) for px, pz, w in pts
+               if abs(x - px) < 3 * bs.SIGMA and abs(z - pz) < 3 * bs.SIGMA)
+    dense = 1.0 - math.exp(-near / bs.DENSE)
+    deep = min(max((depth - bs.DEPTH0) / (bs.DEPTH1 - bs.DEPTH0), 0.0), 1.0)
+    f = (1.0 - bs.BED_DARK * dense) * (1.0 - bs.DEPTH_DARK * deep)
+    return 1.0 - (1.0 - f) * min(depth / bs.FADE, 1.0)
 
 
 def subdivide(tri, edge):
@@ -149,7 +193,7 @@ def subdivide(tri, edge):
         for j in range(n + 1 - i):
             u, v = i / n, j / n
             w = 1 - u - v
-            verts[(i, j)] = tuple(w * a[k] + u * b[k] + v * c[k] for k in range(5))
+            verts[(i, j)] = tuple(w * a[k] + u * b[k] + v * c[k] for k in range(8))
     tris = []
     for i in range(n):
         for j in range(n - i):
@@ -157,6 +201,16 @@ def subdivide(tri, edge):
             if j < n - i - 1:
                 tris.append(((i + 1, j), (i + 1, j + 1), (i, j + 1)))
     return verts, tris
+
+
+def tex_load(load):
+    """A FishmodBedTexLoad initialiser."""
+    if load is None:
+        return "{ 0, 0, 0, 0, 0, 0, 0, 0, 0 }"
+    name, _, _, cms, cmt, masks, maskt, shifts, shiftt = load
+    w, h = tex_size(name)
+    off = int(re.search(r"_([0-9A-F]{8})_Tex", name).group(1), 16)
+    return f"{{ 0x{0x02000000 | off:08X}, {w}, {h}, {cms}, {cmt}, {masks}, {maskt}, {shifts}, {shiftt} }}"
 
 
 def write_empty():
@@ -188,13 +242,20 @@ def main():
     spec.loader.exec_module(gs)
     plants = [(p["x"], p["z"], PLANTS[p["kind"]] * p["scale"]) for p in gs.accents(gs.place("SCENE_LAKE_HYLIA"))
               if p["kind"] in PLANTS]
+    spec = importlib.util.spec_from_file_location("gen_bedshade",
+                                                  os.path.join(ROOT, "fishmod", "tools", "gen_bedshade.py"))
+    bs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bs)
+    shade_pts = [(p["x"], p["z"], bs.SHADE[p["kind"]] * p["scale"]) for p in gs.place("SCENE_LAKE_HYLIA")
+                 if p["kind"] in bs.SHADE]
 
-    under = [t for t in room_triangles() if t[0] is not None and min(v[1] for v in t[1:]) < SURFACE - 5]
+    under = [t for t in room_triangles() if min(v[1] for v in t[1:]) < SURFACE - 5]
     for t in under:
-        if t[0][1] != "RGBA" or t[0][2] != "16b":
-            raise SystemExit(f"bed texture {t[0][0]} isn't RGBA 16-bit")
-    texs = sorted({t[0] for t in under})
-    tex_index = {t: i for i, t in enumerate(texs)}
+        for load in t[0][:2]:
+            if load is not None and (load[1] != "RGBA" or load[2] != "16b"):
+                raise SystemExit(f"bed texture {load[0]} isn't RGBA 16-bit")
+    mats = sorted({t[0] for t in under}, key=repr)
+    mat_index = {m: i for i, m in enumerate(mats)}
 
     # cut, colour, and file each small triangle under the chunk its middle is in
     vcache = {}
@@ -202,21 +263,22 @@ def main():
     chunks = {}
     for ti, tri in enumerate(under):
         verts, tris = subdivide(tri, args.edge)
-        p = [tri[k][:3] for k in (1, 2, 3)]
-        e1 = [p[1][k] - p[0][k] for k in range(3)]
-        e2 = [p[2][k] - p[0][k] for k in range(3)]
-        nrm = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
-        ln = math.sqrt(sum(c * c for c in nrm)) or 1.0
-        ny = abs(nrm[1]) / ln
-        for key, (x, y, z, s, t) in verts.items():
+        # the darkening as the room has it: at its own corners, blended across (as its lit colours are)
+        corner = [shade(v[0], v[1], v[2], shade_pts, bs) for v in tri[1:]]
+        n = max(i for i, _ in verts) or 1
+        for key, (x, y, z, s, t, nx, ny, nz) in verts.items():
             vcache[(ti, key)] = len(vlist)
-            rgb, green = colour(x, y, z, ny, plants)
-            vlist.append((round(x), round(y) + LIFT, round(z), round(s), round(t), *rgb, green))
+            rgb, green = colour(x, y, z, plants)
+            ln = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+            u, v = key[0] / n, key[1] / n
+            f = (1 - u - v) * corner[0] + u * corner[1] + v * corner[2]
+            flag = pack_normal((nx / ln * f, ny / ln * f, nz / ln * f))
+            vlist.append((round(x), round(y) + LIFT, round(z), round(s), round(t), *rgb, green, flag))
         for a, b, c in tris:
             ia, ib, ic = vcache[(ti, a)], vcache[(ti, b)], vcache[(ti, c)]
             cx = (vlist[ia][0] + vlist[ib][0] + vlist[ic][0]) / 3
             cz = (vlist[ia][2] + vlist[ib][2] + vlist[ic][2]) / 3
-            chunks.setdefault((int(cx // CELL), int(cz // CELL)), []).append((tex_index[tri[0]], ia, ib, ic))
+            chunks.setdefault((int(cx // CELL), int(cz // CELL)), []).append((mat_index[tri[0]], ia, ib, ic))
 
     # per chunk and texture, batches of up to 32 vertices
     out_v, out_t, batches, chunk_rows = [], [], [], []
@@ -259,17 +321,15 @@ def main():
                 "Do not edit.\n")
         f.write('#include "fishmod_bedskin.h"\n#include "gfx.h"\n\n')
         f.write("typedef struct {\n    FishmodBedHeader header;\n")
-        f.write(f"    FishmodBedTex tex[{len(texs)}];\n    FishmodBedChunk chunks[{len(chunk_rows)}];\n")
+        f.write(f"    FishmodBedMat mats[{len(mats)}];\n    FishmodBedChunk chunks[{len(chunk_rows)}];\n")
         f.write(f"    FishmodBedBatch batches[{len(batches)}];\n    Vtx vtx[{len(out_v)}];\n")
         f.write(f"    u8 tris[{len(tri_bytes)}];\n}} FishmodBed_spot06;\n\n")
         f.write("FishmodBed_spot06 gFishmodBed_spot06 = {\n")
-        f.write(f"    {{ FISHMOD_BED_MAGIC, {len(texs)}, {len(chunk_rows)}, {len(batches)}, 0, {len(out_v)}, "
+        f.write(f"    {{ FISHMOD_BED_MAGIC, {len(mats)}, {len(chunk_rows)}, {len(batches)}, 0, {len(out_v)}, "
                 f"{len(out_t)}, {{ 0, 0, 0 }} }},\n    {{\n")
-        for name, _, _, cms, cmt, masks, maskt, shifts, shiftt in texs:
-            w, h = tex_size(name)
-            off = int(re.search(r"_([0-9A-F]{8})_Tex", name).group(1), 16)
-            f.write(f"        {{ 0x{0x02000000 | off:08X}, {w}, {h}, {cms}, {cmt}, {masks}, {maskt}, {shifts}, "
-                    f"{shiftt}, 0 }},\n")
+        for t0, t1, env, scroll, prim in mats:
+            f.write(f"        {{ {tex_load(t0)}, {tex_load(t1)}, {env}, {scroll}, {{ {prim[0]}, {prim[1]}, {prim[2]} }}, "
+                    f"{{ 0 }} }},\n")
         f.write("    },\n    {\n")
         for row in chunk_rows:
             f.write("        { %d, %d, %d, %d, %d, %d, %d, 0 },\n" % row)
@@ -277,13 +337,13 @@ def main():
         for row in batches:
             f.write("        { %d, %d, %d, %d, %d, 0 },\n" % row)
         f.write("    },\n    {\n")
-        for x, y, z, s, t, r, g, b, _ in out_v:
-            f.write(f"        VTX({x}, {y}, {z}, {s}, {t}, {r}, {g}, {b}, 255),\n")
+        for x, y, z, s, t, r, g, b, _, flag in out_v:
+            f.write(f"        {{ {{ {{ {x}, {y}, {z} }}, 0x{flag:04X}, {{ {s}, {t} }}, {{ {r}, {g}, {b}, 255 }} }} }},\n")
         f.write("    },\n    {\n")
         for i in range(0, len(tri_bytes), 24):
             f.write("        " + ", ".join(str(b) for b in tri_bytes[i:i + 24]) + ",\n")
         f.write("    },\n};\n")
-    size = 32 + 16 * len(texs) + 16 * len(chunk_rows) + 8 * len(batches) + 16 * len(out_v) + len(tri_bytes)
+    size = 32 + 32 * len(mats) + 16 * len(chunk_rows) + 8 * len(batches) + 16 * len(out_v) + len(tri_bytes)
     print(f"bed skin: {len(under)} bed triangles -> {len(out_t)} ({len(out_v)} vertices) in {len(chunk_rows)} "
           f"chunks, {len(batches)} batches, {size / 1024:.1f} KB -> {os.path.relpath(OUT, ROOT)}")
     if args.png:
