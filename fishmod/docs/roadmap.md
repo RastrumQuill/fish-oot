@@ -52,11 +52,22 @@ Notes only, not built in test5: lures, sinkers and the sinking lure (item 5), ho
     less than it does now. Not a setting to remember: the C buttons pick the lure, the game picks the depth.
   - **The time of day without a big clock** (ideas, none chosen): a small sun/moon mark only while the rod is out; or
     on the pause screen only; or in the fishing log's notes ("bites best at dusk").
-  - **The fishing log from the pause menu** (ideas): on the item grid, the rod's description opens a short log page
-    (catches, records, species seen), so it needs no new pause page.
+  - **The fishing log from the pause menu: A on the rod.** On the item page A does nothing in vanilla (C assigns,
+    Z/R turn the page; A only equips on the equipment page and plays a song on the quest page), so A on the rod opens
+    the log (catches, records, species seen), the way A on a song shows it. A on a bottled fish could show that
+    fish (species, size, where it was caught) the same way.
 
 ### 3. The refactor
 Mostly consolidation: keep what works, as one system, instead of the "million compiler flags" way it grew.
+
+**This mod may become one of three parts.** It has to stay manageable as one module among others:
+- its own folders (code, data, tools, docs), with vanilla files touched only at a few clearly marked hooks, each a
+  one-line call into the mod;
+- its own block of the save, its own item and flag numbers taken from one table, so another part can claim others
+  without clashing;
+- its own build settings in one place, built alone or together with the other parts;
+- shared pieces (the pause-menu grid, the save framework, the D-pad C buttons, the build profiles) written as
+  framework the other parts use too, not inside the fishing code.
 - **One framework** for everything (settings, data, tools), instead of a flag per experiment; everything not used
   any more removed.
 - **Notes cleaned up** a lot: one current set, older notes removed.
