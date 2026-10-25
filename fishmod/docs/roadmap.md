@@ -171,6 +171,12 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
 
 ## Notes for later
 
+### After update 5: a refactor
+Once test 5 ships: a pass over the mod's code and tools before more features. Candidates: fishmod_scatter.c and
+fishmod_debug.c have grown large (split by job); the bench, tour and capture scripts share a lot; the habitat tools
+(gen_scatter, thin_beds, section_budget, shot_search, rdp_estimate) load each other ad hoc; experiments left behind
+switches (FISHMOD_BEDSKIN, the bench modes) to keep or drop.
+
 - **More fishing spots:** some grottos have large bodies of water (at least one known), and the Water Temple could
   be interesting.
   The Great Deku Tree's water too (with grottos, the oasis, etc.).

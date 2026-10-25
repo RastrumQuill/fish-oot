@@ -234,6 +234,9 @@ CPP_DEFINES += -DFISHMOD_OPT=$(FISHMOD_OPT)
 # FISHMOD_HW=1: the original-hardware version (fewer, cheaper pixels for the RDP; see fishmod_scatter.c)
 FISHMOD_HW ?= 0
 CPP_DEFINES += -DFISHMOD_HW=$(FISHMOD_HW)
+# FISHMOD_BEDSKIN=1: the bed-skin test (fishmod/tools/gen_bedskin.py: the bed coloured per vertex, no moss mats)
+FISHMOD_BEDSKIN ?= 0
+CPP_DEFINES += -DFISHMOD_BEDSKIN=$(FISHMOD_BEDSKIN)
 
 # FISHMOD_FASTTRIG=1: polynomial sin/cos in place of the sine table (Math_SinS/Math_CosS, whole game)
 FISHMOD_FASTTRIG ?= 0

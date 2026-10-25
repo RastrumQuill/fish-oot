@@ -45,6 +45,14 @@ typedef struct FishmodBedShade {
 } FishmodBedShade;
 #include "src/fishmod_data/fishmod_bedshade.h"
 
+#if FISHMOD_BEDSKIN
+#include "fishmod_bedskin.h"
+// the bed-skin test (fishmod/tools/gen_bedskin.py): the bed coloured per vertex, near the camera, under water
+#define BED_DRAW_DIST 1100.0f // the haze hides everything past ~900
+static FishmodBedHeader* sBed;
+static s32 sBedDrawn; // (debug: triangles sent last frame)
+#endif
+
 typedef enum FishmodPropKind {
 #define X(id, name) FISHMOD_PROP_##id,
     FISHMOD_PROP_KINDS(X)
@@ -464,6 +472,9 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sDryFor = -1;
     sBedShadedRoom = NULL;
     Scatter_AllocBuffers();
+#if FISHMOD_BEDSKIN
+    sBed = Fishmod_LoadBed(play->sceneId);
+#endif
 #if FISHMOD_DEBUG
     {
         u32 maxFree;
@@ -471,8 +482,14 @@ void EnFishmod_ScatterLoad(PlayState* play) {
         u32 alloc;
 
         ZeldaArena_GetSizes(&maxFree, &free, &alloc);
-        Fishmod_DebugPrintf(10, "props %d bufs %s arena free %dK (max %dK)", sScatter->count,
-                            (sBufs != NULL) ? "ok" : "NONE", (s32)(free >> 10), (s32)(maxFree >> 10));
+        Fishmod_DebugPrintf(10, "props %d bufs %s arena free %dK (max %dK)%s", sScatter->count,
+                            (sBufs != NULL) ? "ok" : "NONE", (s32)(free >> 10), (s32)(maxFree >> 10),
+#if FISHMOD_BEDSKIN
+                            (sBed != NULL) ? " bed ok" : " bed NONE"
+#else
+                            ""
+#endif
+        );
     }
 #endif
     Scatter_InitKinds();
@@ -544,6 +561,12 @@ void EnFishmod_ScatterUnload(void) {
         ZeldaArena_Free(sChunkDry);
         sChunkDry = NULL;
     }
+#if FISHMOD_BEDSKIN
+    if (sBed != NULL) {
+        ZeldaArena_Free(sBed);
+        sBed = NULL;
+    }
+#endif
     Scatter_FreeBuffers();
 }
 
@@ -863,6 +886,88 @@ static s32 Scatter_Tier(FishmodProp* prop, FishmodPropKindInfo* info, s32 kind, 
     }
     return TIER_FAR;
 }
+
+#if FISHMOD_BEDSKIN
+/**
+ * The bed-skin test: the coloured copy of the bed (drawn on it as a decal) in the chunks near the camera and not
+ * behind it, with the bed's own textures times its vertex colours times the scene's light on a level bed (the ambient light and
+ * each directional light by how high it stands), fogged like the props. Unlit: its vertices hold colours.
+ */
+static Gfx* Scatter_DrawBed(PlayState* play, Gfx* gfx, Vec3f* eye, f32 lookX, f32 lookZ) {
+    FishmodBedHeader* bed = sBed;
+    FishmodBedTex* tex = (FishmodBedTex*)(bed + 1);
+    FishmodBedChunk* chunks = (FishmodBedChunk*)(tex + bed->texCount);
+    FishmodBedBatch* batches = (FishmodBedBatch*)(chunks + bed->chunkCount);
+    Vtx* vtx = (Vtx*)(batches + bed->batchCount);
+    u8* tris = (u8*)(vtx + bed->vtxCount);
+    EnvironmentContext* env = &play->envCtx;
+    f32 hl = sqrtf(SQ(lookX) + SQ(lookZ));
+    s32 curTex = -1;
+    u32 light[3];
+    s32 c;
+    s32 i;
+
+    for (i = 0; i < 3; i++) {
+        s32 l = play->lightCtx.ambientColor[i] +
+                ((env->dirLight1.params.dir.color[i] * CLAMP_MIN(env->dirLight1.params.dir.y, 0)) >> 7) +
+                ((env->dirLight2.params.dir.color[i] * CLAMP_MIN(env->dirLight2.params.dir.y, 0)) >> 7);
+
+        // (as bright as the lit bed it lies on, measured in ares: a third brighter, and red twice as bright again,
+        // since the bed's own material blends in a second, warmer texture this copy doesn't use)
+        light[i] = CLAMP_MAX((l * ((i == 0) ? 34 : 21)) >> 4, 255);
+    }
+    if (hl > 0.001f) {
+        lookX /= hl;
+        lookZ /= hl;
+    }
+    gfx = Gfx_SetupDL(gfx, SETUPDL_25);
+    gDPPipeSync(gfx++);
+    gDPSetTextureLUT(gfx++, G_TT_NONE);
+    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0, COMBINED);
+    gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, G_RM_RA_ZB_OPA_DECAL2); // (over the bed: coplanar)
+    gSPClearGeometryMode(gfx++, G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
+    gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH | G_CULL_BACK);
+    gSPTexture(gfx++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
+    gDPSetPrimColor(gfx++, 0, 0, light[0], light[1], light[2], 255);
+    gSPMatrix(gfx++, &gIdentityMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW); // (its vertices are in the world)
+    sBedDrawn = 0;
+    for (c = 0; c < bed->chunkCount; c++) {
+        FishmodBedChunk* chunk = &chunks[c];
+        f32 dx = chunk->x - eye->x;
+        f32 dz = chunk->z - eye->z;
+        f32 d = sqrtf(SQ(dx) + SQ(dz));
+        s32 b;
+
+        if ((d - chunk->radius > BED_DRAW_DIST) || ((dx * lookX + dz * lookZ) < -(f32)chunk->radius)) {
+            continue;
+        }
+        for (b = chunk->firstBatch; b < chunk->firstBatch + chunk->batchCount; b++) {
+            FishmodBedBatch* batch = &batches[b];
+            u8* t = &tris[batch->triStart * 3];
+            s32 n;
+
+            if (batch->tex != curTex) {
+                FishmodBedTex* tx = &tex[batch->tex];
+
+                curTex = batch->tex;
+                gDPPipeSync(gfx++);
+                gDPLoadTextureBlock(gfx++, (void*)tx->segAddr, G_IM_FMT_RGBA, G_IM_SIZ_16b, tx->width, tx->height, 0,
+                                    tx->cms, tx->cmt, tx->masks, tx->maskt, tx->shifts, tx->shiftt);
+            }
+            gSPVertex(gfx++, &vtx[batch->vtxStart], batch->vtxCount, 0);
+            sBedDrawn += batch->triCount;
+            for (n = 0; n + 1 < batch->triCount; n += 2, t += 6) {
+                gSP2Triangles(gfx++, t[0], t[1], t[2], 0, t[3], t[4], t[5], 0);
+            }
+            if (n < batch->triCount) {
+                gSP1Triangle(gfx++, t[0], t[1], t[2], 0);
+            }
+        }
+    }
+    gSPTexture(gfx++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+    return gfx;
+}
+#endif
 
 /** The cosine of the angle from the look direction to the screen's corner, with VIEW_MARGIN: from the view's field of
  * view (vertical) and the 4:3 screen. */
@@ -1385,14 +1490,26 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     sT1 += osGetTime() - tStart;
     sT2++;
     if ((play->gameplayFrames & 15) == 0) { // (printing is slow: not every frame)
-        Fishmod_DebugPrintf(10, "p%d b%d us %d+%d", set->count, sBuilt, (s32)OS_CYCLES_TO_USEC(sT0 / sT2),
-                            (s32)OS_CYCLES_TO_USEC(sT1 / sT2));
+        Fishmod_DebugPrintf(10, "p%d b%d us %d+%d%s%d", set->count, sBuilt, (s32)OS_CYCLES_TO_USEC(sT0 / sT2),
+                            (s32)OS_CYCLES_TO_USEC(sT1 / sT2),
+#if FISHMOD_BEDSKIN
+                            (sBed == NULL) ? " NOBED" : (gFishmodHaze >= 1.0f) ? " bed" : " bed(above)"
+                            , sBedDrawn
+#else
+                            "", 0
+#endif
+        );
         sT0 = sT1 = sT2 = 0;
         sBuilt = 0;
     }
 #endif
 
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
+#if FISHMOD_BEDSKIN
+    if ((sBed != NULL) && (gFishmodHaze >= 1.0f)) {
+        POLY_OPA_DISP = Scatter_DrawBed(play, POLY_OPA_DISP, &eye, lookX, lookZ);
+    }
+#endif
     gSPDisplayList(POLY_OPA_DISP++, frame->opa);
     gSPDisplayList(POLY_XLU_DISP++, frame->xlu);
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
