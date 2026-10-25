@@ -912,9 +912,9 @@ static Gfx* Scatter_DrawBed(PlayState* play, Gfx* gfx, Vec3f* eye, f32 lookX, f3
                 ((env->dirLight1.params.dir.color[i] * CLAMP_MIN(env->dirLight1.params.dir.y, 0)) >> 7) +
                 ((env->dirLight2.params.dir.color[i] * CLAMP_MIN(env->dirLight2.params.dir.y, 0)) >> 7);
 
-        // (as bright as the lit bed it lies on, measured in ares: a third brighter, and red twice as bright again,
-        // since the bed's own material blends in a second, warmer texture this copy doesn't use)
-        light[i] = CLAMP_MAX((l * ((i == 0) ? 34 : 21)) >> 4, 255);
+        // (the colour of the lit bed it lies on, measured in ares: brighter, and bluer, since the bed's own material
+        // blends some of its bright, blue ripple texture over the sand this copy uses)
+        light[i] = CLAMP_MAX((l * ((i == 0) ? 19 : (i == 1) ? 21 : 28)) >> 4, 255);
     }
     if (hl > 0.001f) {
         lookX /= hl;
