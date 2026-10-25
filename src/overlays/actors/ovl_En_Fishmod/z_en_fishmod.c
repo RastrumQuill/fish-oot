@@ -2217,6 +2217,11 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     }
 #endif
 
+#if FISHMOD_DEBUG
+    if ((gFishmodBench & FISHMOD_BENCH_NOFISHAI) && (this->type == FISHMOD_TYPE_FISH)) {
+        return; // the hardware bench, timing the rest without the fish's thinking and swimming
+    }
+#endif
     if (this->type == FISHMOD_TYPE_ROD) {
         EnFishmod_RodUpdate(this, play);
         gFishmodRodState.splashed = false;
