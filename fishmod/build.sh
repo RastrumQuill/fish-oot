@@ -13,8 +13,6 @@
 #   --gcc LEVEL    the game's code (src/code, overlays, the mod) is compiled with GCC (boot, libultra, libc and audio stay
 #                  on IDO). The default is O2 (hwbench-4: CPU time 14-16% lower, no other change); --gcc Os is the other
 #                  level. Outputs get a -gccOs suffix for Os only
-#   --bedskin      the bed-skin test: Lake Hylia's bed coloured per vertex instead of moss mats
-#                  (gen_bedskin.py); outputs get a -bedskin suffix
 #   --ido          everything with IDO, as the decompilation builds; outputs get an -ido suffix
 # Needs `flips` on PATH (or FLIPS=/path/to/flips) for the release patch.
 set -euo pipefail
@@ -35,7 +33,6 @@ OPT=0
 TESTMODE=0
 FASTTRIG=0
 HW=0
-BEDSKIN=0
 GCC="O2"
 MAKE_ARGS=()
 while [ $# -gt 0 ]; do
@@ -47,7 +44,6 @@ while [ $# -gt 0 ]; do
         --testmode) TESTMODE=1 ;;
         --fasttrig) FASTTRIG=1 ;;
         --hw) HW=1 ;;
-        --bedskin) BEDSKIN=1 ;;
         --gcc) GCC="$2"; shift ;;
         --ido) GCC="" ;;
         *) MAKE_ARGS+=("$1") ;;
@@ -77,7 +73,7 @@ mkdir -p "$OUT_DIR"
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT testmode=$TESTMODE fasttrig=$FASTTRIG hw=$HW gcc=$GCC bedskin=$BEDSKIN"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT testmode=$TESTMODE fasttrig=$FASTTRIG hw=$HW gcc=$GCC"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -100,12 +96,9 @@ fi
 # the habitat props: textures edited from vanilla ones, models, and where they go (generated, not committed)
 FISHMOD_HW=$HW python3 fishmod/tools/gen_habitat.py > /dev/null
 python3 fishmod/tools/assets.py --manifest src/fishmod_data/props_manifest.json > /dev/null
-export FISHMOD_BEDSKIN=$BEDSKIN
 python3 fishmod/tools/gen_scatter.py --c ${FISHMOD_UNTHINNED:+--unthinned}  # (FISHMOD_UNTHINNED=1: the beds before thinning, for A/B)
 # Lake Hylia's bed shaded under the water (generated, not committed)
 python3 fishmod/tools/gen_bedshade.py > /dev/null
-# the bed-skin test's coloured bed (an empty file unless --bedskin; generated, not committed)
-python3 fishmod/tools/gen_bedskin.py
 # the solid props' collision (rocks), added to the scene's at load (generated, not committed)
 python3 fishmod/tools/gen_collision.py
 # the water floor maps, baked from the extracted scenes and the props' collision (generated, not committed)
@@ -115,7 +108,7 @@ GCC_ARGS=()
 if [ -n "$GCC" ]; then
     GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC")
 fi
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG FISHMOD_HW=$HW FISHMOD_BEDSKIN=$BEDSKIN \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG FISHMOD_HW=$HW \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -136,9 +129,6 @@ if [ "$TESTMODE" = 1 ]; then
 fi
 if [ "$HW" = 1 ]; then
     SUFFIX="$SUFFIX-hw"
-fi
-if [ "$BEDSKIN" = 1 ]; then
-    SUFFIX="$SUFFIX-bedskin"
 fi
 if [ -z "$GCC" ]; then
     SUFFIX="$SUFFIX-ido"

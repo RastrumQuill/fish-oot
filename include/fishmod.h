@@ -332,7 +332,6 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOSWAY (1 << 17)     // no sway matrix (one matrix per prop instead of two)
 #define FISHMOD_BENCH_MTXONLY (1 << 18)    // each prop's colour and matrices sent, but not its triangles
 #define FISHMOD_BENCH_NOMOSS (1 << 19)     // no moss mats
-#define FISHMOD_BENCH_NOBEDSKIN (1 << 20)  // (the bed-skin test) the plain bed, without its coloured copy
 #define FISHMOD_BENCH_1CYCLE (1 << 4)     // the props in 1-cycle mode (no fog, no tint): pipeline or memory bound?
 #define FISHMOD_BENCH_NONEAR (1 << 5)     // props within FISHMOD_BENCH_NEAR not drawn
 #define FISHMOD_BENCH_NOFAR (1 << 6)      // props past it not drawn
@@ -416,7 +415,6 @@ FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId);
 #include "fishmod_scatter.h"
 // The scene's scattered habitat props (fishmod/tools/gen_scatter.py), or NULL
 FishmodScatterHeader* Fishmod_LoadScatter(s16 sceneId);
-struct FishmodBedHeader* Fishmod_LoadBed(s16 sceneId);
 // Adds the scene's habitat-prop collision (rocks) to its collision header, before BgCheck reads it
 struct CollisionHeader;
 void Fishmod_AddPropCollision(struct PlayState* play, struct CollisionHeader* colHeader);

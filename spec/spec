@@ -1526,11 +1526,3 @@ beginseg
     romalign 0x1000
     include "$(BUILD_DIR)/src/fishmod_data/fishmod_col_spot06.o"
 endseg
-
-// fishmod: the bed-skin test's coloured bed (fishmod/tools/gen_bedskin.py; an empty header unless --bedskin)
-beginseg
-    name "fishmod_bed_spot06"
-    compress
-    romalign 0x1000
-    include "$(BUILD_DIR)/src/fishmod_data/fishmod_bed_spot06.o"
-endseg
