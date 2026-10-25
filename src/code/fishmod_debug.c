@@ -492,7 +492,11 @@ static f32 sTourRise;
 static u16 sTourPress;
 static s8 sTourStickX;
 static s8 sTourStickY;
+#ifdef FISHMOD_TOUR_START
+static s32 sTourDebugText = true; // (held at one stop: for profiling, so the numbers show)
+#else
 static s32 sTourDebugText;
+#endif
 
 #ifdef FISHMOD_LOD_CALIBRATE
 static void Fishmod_LodUpdate(PlayState* play);

@@ -50,9 +50,14 @@ def stop_bases():
     return out
 
 
+# The bed-skin test (FISHMOD_BEDSKIN=1): under water the bed is drawn a second time, coloured (gen_bedskin.py); a
+# guess at its cost until a bench measures it.
+BEDSKIN_MS = 3.0 if os.environ.get("FISHMOD_BEDSKIN") == "1" else 0.0
+
+
 def base_for(bases, eye, under):
     same = [b for b in bases if b[1] == under] or bases
-    return min(same, key=lambda b: (b[0][0] - eye[0]) ** 2 + (b[0][2] - eye[2]) ** 2)[2]
+    return min(same, key=lambda b: (b[0][0] - eye[0]) ** 2 + (b[0][2] - eye[2]) ** 2)[2] + (BEDSKIN_MS if under else 0)
 
 
 def floor(finder, x, z, top=100000):
