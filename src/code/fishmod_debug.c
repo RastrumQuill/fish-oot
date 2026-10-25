@@ -503,6 +503,9 @@ static void Fishmod_LodUpdate(PlayState* play);
 #endif
 #ifdef FISHMOD_HWBENCH
 static void Fishmod_BenchUpdate(PlayState* play);
+#ifdef FISHMOD_BENCH_ROAM
+static s32 Bench_Roam(Vec3f* eye, Vec3f* at);
+#endif
 #endif
 
 static void Fishmod_TourGo(s32 stop) {
@@ -651,6 +654,12 @@ static void Fishmod_TourUpdate(PlayState* play) {
     eye.x = at.x + dx * c + dz * sn;
     eye.z = at.z - dx * sn + dz * c;
     eye.y = sTourEye.y + arc + sTourRise;
+#if defined(FISHMOD_HWBENCH) && defined(FISHMOD_BENCH_ROAM)
+    if (Bench_Roam(&eye, &at)) {
+        sTourEye = eye; // (the next glide starts from here)
+        sTourAt = at;
+    }
+#endif
     Play_SetCameraAtEye(play, sTourCamId, &at, &eye);
 
     // under the surface: the water's own lights (its colour and fog), as when the main camera dives
@@ -1635,10 +1644,19 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 #endif
 #define BENCH_SETTLE 60 // frames after arriving
 #define BENCH_SKIP 10   // frames after changing mode, not counted (the frame being timed runs behind)
+#ifdef FISHMOD_BENCH_ROAM
+#define BENCH_FRAMES 200 // frames counted per block: one flight along the leg
+#define BENCH_ROUNDS 1
+#else
 #define BENCH_FRAMES 60 // frames counted per block
 #define BENCH_ROUNDS 2  // blocks per mode per visit (interleaved: A B C D E A B C D E)
+#endif
 #define BENCH_MICRO_FRAMES 30
+#ifdef FISHMOD_BENCH_ROAM
+#define BENCH_VERSION 7
+#else
 #define BENCH_VERSION 6
+#endif
 #ifndef FISHMOD_BENCH_LAPS
 #define FISHMOD_BENCH_LAPS 15 // then it stops and says so
 #endif
@@ -1863,6 +1881,19 @@ static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
 }
 
 static void Bench_SetMode(s32 mode) {
+#ifdef FISHMOD_BENCH_ROAM
+    static const s32 sFlags[BENCH_MODES] = {
+        0,
+        FISHMOD_BENCH_NOFISHAI,
+        FISHMOD_BENCH_NOFISH,
+        FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI,
+        FISHMOD_BENCH_NOPROPS,
+        FISHMOD_BENCH_NOROOMXLU,
+        FISHMOD_BENCH_NOSKY,
+        FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI | FISHMOD_BENCH_NOROOMXLU |
+            FISHMOD_BENCH_NOSKY,
+    };
+#else
     static const s32 sFlags[BENCH_MODES] = {
         0,
         FISHMOD_BENCH_NOSWAY,
@@ -1873,9 +1904,62 @@ static void Bench_SetMode(s32 mode) {
         FISHMOD_BENCH_NOPROPS,
         FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOSKY,
     };
+#endif
 
     gFishmodBench = sFlags[mode];
 }
+
+#ifdef FISHMOD_BENCH_ROAM
+/**
+ * The roaming bench: while a leg is timed, the camera flies from this stop to the next, looking about as it goes (a
+ * pan left and right, and up and down), the same flight in every mode. Returns false while not timing.
+ */
+static s32 Bench_Roam(Vec3f* eye, Vec3f* at) {
+    s32 n = ARRAY_COUNT(sTourStops);
+    FishmodTourStop* from = &sTourStops[sTourStop];
+    FishmodTourStop* to = &sTourStops[(sTourStop + 1) % n];
+    f32 t;
+    f32 s;
+    f32 arc;
+    f32 yaw;
+    f32 dx;
+    f32 dz;
+    f32 dist;
+    f32 c;
+    f32 sn;
+    Vec3f e;
+    Vec3f a;
+
+    if (sBenchState != 1) {
+        return false;
+    }
+    t = CLAMP(sBenchFrame / (f32)(BENCH_SKIP + BENCH_FRAMES), 0.0f, 1.0f);
+    s = t * t * (3.0f - 2.0f * t);
+    e.x = from->eye.x + (to->eye.x - from->eye.x) * s;
+    e.y = from->eye.y + (to->eye.y - from->eye.y) * s;
+    e.z = from->eye.z + (to->eye.z - from->eye.z) * s;
+    a.x = from->at.x + (to->at.x - from->at.x) * s;
+    a.y = from->at.y + (to->at.y - from->at.y) * s;
+    a.z = from->at.z + (to->at.z - from->at.z) * s;
+    // over the land on long hops, as the tour's glide
+    arc = sqrtf(SQ(to->eye.x - from->eye.x) + SQ(to->eye.z - from->eye.z)) * 0.25f;
+    arc = CLAMP_MAX(arc, 700.0f) * sinf(s * M_PI);
+    e.y += arc;
+    a.y += arc;
+    // looking about: turned about the eye up to 70 degrees each way, and up and down a little
+    yaw = 1.2f * sinf(t * 3.0f * M_PI);
+    dx = a.x - e.x;
+    dz = a.z - e.z;
+    dist = sqrtf(SQ(dx) + SQ(dz));
+    c = cosf(yaw);
+    sn = sinf(yaw);
+    at->x = e.x + dx * c + dz * sn;
+    at->z = e.z - dx * sn + dz * c;
+    at->y = a.y + dist * 0.2f * sinf(t * 5.0f * M_PI);
+    *eye = e;
+    return true;
+}
+#endif
 
 static void Bench_Save(void) {
     sBench.magic = 0x4642454E; // 'FBEN'
@@ -1980,7 +2064,12 @@ static void Fishmod_BenchUpdate(PlayState* play) {
             break;
     }
     {
+#ifdef FISHMOD_BENCH_ROAM
+        static const char* sModeNames[] = { "base", "fishfrozen", "nofishdraw", "nofish", "noprops", "nowater", "nosky",
+                                            "bare" };
+#else
         static const char* sModeNames[] = { "base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky" };
+#endif
 
         Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
                             (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);
