@@ -1506,7 +1506,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
 #if FISHMOD_BEDSKIN
-    if ((sBed != NULL) && (gFishmodHaze >= 1.0f)) {
+    if ((sBed != NULL) && (gFishmodHaze >= 1.0f) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOBEDSKIN)) {
         POLY_OPA_DISP = Scatter_DrawBed(play, POLY_OPA_DISP, &eye, lookX, lookZ);
     }
 #endif
