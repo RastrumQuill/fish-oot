@@ -119,12 +119,13 @@ def noise(x, z, scale, salt):
 
 
 def colour(x, y, z, ny, plants):
+    """(r, g, b) of the bed here, and how green it is (0 sand, 1 full weed-bed green)."""
     depth = SURFACE - y
     near = sum(w * math.exp(-((x - px) ** 2 + (z - pz) ** 2) / (2 * SIGMA ** 2)) for px, pz, w in plants
                if abs(x - px) < 3 * SIGMA and abs(z - pz) < 3 * SIGMA)
     dense = 1.0 - math.exp(-near / DENSE)
-    patch = noise(x, z, 520.0, 1) * 0.65 + noise(x, z, 190.0, 2) * 0.35
-    g = min(max(0.05 + 0.75 * dense + 0.8 * (patch - 0.5), 0.0), 1.0)
+    patch = noise(x, z, 520.0, 1) * 0.5 + noise(x, z, 190.0, 2) * 0.3 + noise(x, z, 90.0, 4) * 0.2
+    g = min(max(-0.3 + 0.8 * dense + 1.2 * (patch - 0.5), 0.0), 1.0)
     olive = noise(x, z, 340.0, 3)
     tint = [GREEN[i] * (1 - olive) + OLIVE[i] * olive for i in range(3)]
     deep = min(max((depth - DEEP0) / (DEEP1 - DEEP0), 0.0), 1.0)
@@ -135,7 +136,7 @@ def colour(x, y, z, ny, plants):
         c = (1.0 - g) + g * tint[i]
         c = 1.0 - (1.0 - c * bright) * fade
         out.append(max(0, min(255, round(255 * c))))
-    return out
+    return out, g * fade
 
 
 def subdivide(tri, edge):
@@ -171,6 +172,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--edge", type=float, default=180.0, help="longest edge after cutting")
     ap.add_argument("--png")
+    ap.add_argument("--map", help="a top-down map of where the bed is green and where it's sand, with the shares")
+    ap.add_argument("--spots", type=int, default=0,
+                    help="write fishmod/scripts/look_bedskin.inc.c: this many views down onto the bed, on sand, on "
+                         "weed-bed green and on the edges between (for the A/B capture, coloured bed on and off)")
     args = ap.parse_args()
     if os.environ.get("FISHMOD_BEDSKIN") != "1":
         write_empty()
@@ -205,7 +210,8 @@ def main():
         ny = abs(nrm[1]) / ln
         for key, (x, y, z, s, t) in verts.items():
             vcache[(ti, key)] = len(vlist)
-            vlist.append((round(x), round(y) + LIFT, round(z), round(s), round(t), *colour(x, y, z, ny, plants)))
+            rgb, green = colour(x, y, z, ny, plants)
+            vlist.append((round(x), round(y) + LIFT, round(z), round(s), round(t), *rgb, green))
         for a, b, c in tris:
             ia, ib, ic = vcache[(ti, a)], vcache[(ti, b)], vcache[(ti, c)]
             cx = (vlist[ia][0] + vlist[ib][0] + vlist[ic][0]) / 3
@@ -271,7 +277,7 @@ def main():
         for row in batches:
             f.write("        { %d, %d, %d, %d, %d, 0 },\n" % row)
         f.write("    },\n    {\n")
-        for x, y, z, s, t, r, g, b in out_v:
+        for x, y, z, s, t, r, g, b, _ in out_v:
             f.write(f"        VTX({x}, {y}, {z}, {s}, {t}, {r}, {g}, {b}, 255),\n")
         f.write("    },\n    {\n")
         for i in range(0, len(tri_bytes), 24):
@@ -291,6 +297,99 @@ def main():
                 col = tuple(sum(v[5 + k] for v in vs) // 3 for k in range(3))
                 d.polygon([((v[0] + 4800) / 5, (v[2] - 3300) / 5) for v in vs], fill=col)
         img.save(args.png)
+
+    if args.map:
+        bed_map(chunks, vlist, args.map)
+    if args.spots:
+        write_spots(vlist, args.spots)
+
+
+def bed_map(chunks, vlist, path):
+    """Top-down: sand light, green as drawn; the share of the bed's area that is sand, part green, green."""
+    from PIL import Image, ImageDraw
+
+    img = Image.new("RGB", (1400, 1300), (20, 30, 40))
+    d = ImageDraw.Draw(img)
+    share = [0.0, 0.0, 0.0]
+    for tris in chunks.values():
+        for _, ia, ib, ic in tris:
+            vs = [vlist[ia], vlist[ib], vlist[ic]]
+            g = sum(v[8] for v in vs) / 3
+            a = abs((vs[1][0] - vs[0][0]) * (vs[2][2] - vs[0][2]) - (vs[2][0] - vs[0][0]) * (vs[1][2] - vs[0][2])) / 2
+            share[0 if g < 0.2 else 1 if g < 0.5 else 2] += a
+            sand, green = (222, 206, 160), (70, 120, 50)
+            col = tuple(round(sand[k] * (1 - g) + green[k] * g) for k in range(3))
+            d.polygon([((v[0] + 4800) / 5, (v[2] - 3300) / 5) for v in vs], fill=col)
+    total = sum(share) or 1.0
+    text = (f"sand {100 * share[0] / total:.0f}%   part green {100 * share[1] / total:.0f}%   "
+            f"green {100 * share[2] / total:.0f}%   (of the bed under the lake)")
+    d.text((20, 1270), text, fill=(255, 255, 255))
+    img.save(path)
+    print(text)
+
+
+def write_spots(vlist, count):
+    """Views from a diver's height down onto the bed: a third on sand, a third on green, a third on the edges between
+    (where the green varies most nearby), each well apart."""
+    import random
+
+    pts = [(v[0], v[1], v[2], v[8]) for v in vlist if SURFACE - v[1] > 260]
+    grid = {}
+    for p in pts:
+        grid.setdefault((p[0] // 300, p[2] // 300), []).append(p)
+
+    def around(p):
+        out = []
+        for gx in range(p[0] // 300 - 1, p[0] // 300 + 2):
+            for gz in range(p[2] // 300 - 1, p[2] // 300 + 2):
+                out += [q for q in grid.get((gx, gz), []) if (q[0] - p[0]) ** 2 + (q[2] - p[2]) ** 2 < 250 ** 2]
+        return out
+
+    rng = random.Random(5)
+    cands = rng.sample(pts, min(len(pts), 1500))
+    scored = []
+    for p in cands:
+        near = around(p)
+        gs = [q[3] for q in near]
+        mean = sum(gs) / len(gs)
+        spread = (sum((g - mean) ** 2 for g in gs) / len(gs)) ** 0.5
+        scored.append((p, mean, spread))
+    picks = []
+
+    def take(key, n, label):
+        for p, mean, spread in sorted(scored, key=key):
+            if sum(1 for q in picks if q[1] == label) >= n:
+                break
+            if all((p[0] - q[0][0]) ** 2 + (p[2] - q[0][2]) ** 2 > 900 ** 2 for q in picks):
+                picks.append((p, label))
+
+    n = max(1, count // 3)
+    take(lambda r: r[1], n, "sand")
+    take(lambda r: -r[1], n, "green")
+    take(lambda r: -r[2], count - 2 * n, "edge")
+    out = os.path.join(ROOT, "fishmod", "scripts", "look_bedskin.inc.c")
+    with open(out, "w") as f:
+        f.write("// The bed-skin test, looked at: views from a diver's height down onto the bed (on sand, on\n"
+                "// weed-bed green and on the edges between; picked by fishmod/tools/gen_bedskin.py --spots),\n"
+                "// each frozen and shown with the coloured bed and without it.\n"
+                "// Build: fishmod/build.sh --script look_bedskin --opt 5 --hw --bedskin; capture:\n"
+                "// fishmod/tools/edge_ab_capture.py ROM OUT --stops N (\"new\" has it, \"old\" is the plain bed).\n")
+        f.write("#define FISHMOD_EDGE_AB 1\n#define FISHMOD_TOUR_AUTO 400\n")
+        f.write("#define FISHMOD_EDGE_AB_FLAGS FISHMOD_BENCH_NOBEDSKIN\n")
+        f.write("#define FISHMOD_SCRIPT_ENTRANCE ENTR_LAKE_HYLIA_0\n#define FISHMOD_SCRIPT_DAY 1        // a clear day\n")
+        f.write("#define FISHMOD_SCRIPT_TIME 0x8000  // midday\n#define FISHMOD_TOUR\n")
+        f.write("static Vec3f sScriptStartPos = { -649.0f, -1250.0f, 3121.0f };\n")
+        f.write("static s16 sScriptStartYaw = (s16)0x8000;\n")
+        f.write("static FishmodAutoplayStep sScriptSteps[] = {\n    { 1, 0, 0, 0, true },\n};\n\n")
+        f.write("static FishmodTourStop sTourStops[] = {\n")
+        for i, (p, label) in enumerate(picks):
+            ang = rng.uniform(0, 2 * math.pi)
+            ex, ez = p[0] - math.cos(ang) * 230, p[2] - math.sin(ang) * 230
+            ey = min(p[1] + 150, SURFACE - 25)
+            f.write(f'    {{ {{ {round(ex)}, {round(ey)}, {round(ez)} }}, {{ {p[0]}, {p[1]}, {p[2]} }}, '
+                    f'"{i + 1}. {label}", "", "", "" }},\n')
+        f.write("};\n")
+    print(f"{len(picks)} views -> {os.path.relpath(out, ROOT)}: " + ", ".join(lb for _, lb in picks))
 
 
 if __name__ == "__main__":
