@@ -183,7 +183,8 @@ Then 5 (feel) and 7 (behaviour) together, since bites depend on mood and senses.
    0x7D00 as a scene loads). CPU update in the ares tour: 16.4 → 17.7 ms, hidden behind the RDP.
 4. **A sound keeps going while fishing**: probably the reel sound while the hook sinks after the bobber lands.
 5. **Plants and the dock ignore night**: they stay lit as by day.
-6. **Equipment on C buttons**: boots, tunics and swords should be assignable to C, for convenience.
+6. **Equipment on C buttons**: boots, tunics and swords should be assignable to C, for convenience. **Moved to the
+   refactor** (roadmap: "The order from here", with the D-pad as more C buttons).
 7. **Still a lot of pop-in** (above water: the original 800-1600 draw distances; see the rotation check).
 
 ## Rocks (after test 5)

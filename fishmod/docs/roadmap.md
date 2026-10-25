@@ -1,7 +1,7 @@
 # Roadmap
 
-Kokiri Forest comes first: fishing there has to be solid before other areas get fish. The goals below are for later
-and are not being worked on yet.
+Kokiri Forest comes first: fishing there has to be solid before other areas get fish. "The order from here" is the
+plan after test 5; the sections after it are ideas for later, not being worked on yet.
 
 ## Rule: no performance cost
 
@@ -27,6 +27,61 @@ The plan is in [v5-plan.md](v5-plan.md). Items:
 13. **Lake Hylia** sub-biomes with their own fish.
 
 Notes only, not built in test5: lures, sinkers and the sinking lure (item 5), hookshot fishing.
+
+## The order from here
+
+1. **Finish test 5** (the items above, the test 5 feedback, the lake at 20 fps on the console).
+2. **Before the refactor: lures, bottles, fish as items.**
+3. **The refactor.**
+4. **Content:** fish and foliage in Hyrule's other waters.
+5. **Quests**, once everything looks and feels good.
+
+### 2. Before the refactor: lures, bottles, fish as items
+- **Lures as a C-button item, tied to the bow like the magic arrows** (an item that goes with the bow and the rod).
+- **More bottles**, filling the room made on the pause menu by shrinking everything, kept in proportion, so more
+  items fit.
+- **Fish as real items:** a bottled fish shows its species and size in the inventory, and the buyer you sell bottled
+  things to says what he's getting. Never just "fish" any more: size and species matter.
+
+### 3. The refactor
+Mostly consolidation: keep what works, as one system, instead of the "million compiler flags" way it grew.
+- **One framework** for everything (settings, data, tools), instead of a flag per experiment; everything not used
+  any more removed.
+- **Notes cleaned up** a lot: one current set, older notes removed.
+- **Two versions, as a first-class split** (one build profile, not scattered `FISHMOD_HW` checks):
+  - **Original hardware** (`--hw`): the constraining platform, so the one the work is tuned on: thinned beds, fewer
+    cards, the tall plants as accents, the coloured bed (F3DEX3), a solid 20 fps on the console.
+  - **Emulator** (the definitive version): lusher, with the tall kelp forests and plants with more cards, since
+    emulators don't pay the RDP's fill and per-triangle costs. Its own placement, density and draw distances; the
+    same game otherwise.
+  The profile picks the placement data, plant models, draw distances and budgets together; each tool (gen_habitat,
+  gen_scatter, thin_beds, the LOD tables) takes it; both versions are built and checked every release.
+- **Code to tidy:** fishmod_scatter.c and fishmod_debug.c have grown large (split by job); the bench, tour and capture
+  scripts share a lot; the habitat tools (gen_scatter, thin_beds, section_budget, shot_search, rdp_estimate) load
+  each other ad hoc; experiments left switches behind (FISHMOD_BEDSKIN, the bench modes): keep or drop each.
+- **Quality of life:** the D-pad as more C buttons; boots, tunics and swords assignable to C buttons (test 5
+  feedback 6); others to be found.
+
+### 4. Content
+Fish and foliage in every decent-sized natural water (not, say, Kakariko's well):
+- Hyrule Field's waters; inside the Great Deku Tree; Kokiri Forest and the Lost Woods.
+- Zora's River at the Zora's Domain entrance; inside Zora's Domain (fish, little foliage); the region behind King
+  Zora.
+- Gerudo Valley; the desert oasis; the Hyrule Castle moat; anywhere else with a natural water of size.
+Also:
+- **The beehive in Kokiri Forest** moves somewhere that makes more sense for a hive.
+- **Drinking larvae** for a very small heal, as in Twilight Princess (the drinking animation).
+
+### 5. Quests (ideas so far; more needed)
+1. **The rod:** a new Kokiri gives Link the fishing rod with a bobber, for shooting down the beehive, saying he uses
+   the larvae for bait. Link has no bottle yet, but has just finished the first dungeon, so the first bottle is
+   close, and he realises it can hold bait.
+2. **The Lake Hylia lab:** give your fish to the lab, which keeps them in its water (the aquarium moonshot); enough
+   variety earns something.
+3. **The sinking lure at the Fishing Pond:** the owner is still upset, but in effect tells you to take it with you.
+4. **Fishing-related bottle quests.**
+5. **Ways to get the other lures and sinkers.**
+6. **Bait in the Fishing Pond's quest.**
 
 ## Planned
 
@@ -170,22 +225,6 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
 - **F3DEX3 build flag** (ares only so far).
 
 ## Notes for later
-
-### After update 5: a refactor
-Once test 5 ships: a pass over the mod's code and tools before more features. Candidates: fishmod_scatter.c and
-fishmod_debug.c have grown large (split by job); the bench, tour and capture scripts share a lot; the habitat tools
-(gen_scatter, thin_beds, section_budget, shot_search, rdp_estimate) load each other ad hoc; experiments left behind
-switches (FISHMOD_BEDSKIN, the bench modes) to keep or drop.
-
-**Two versions, as a first-class split (not scattered `FISHMOD_HW` checks):**
-- **Original hardware** (`--hw`): the constraining platform, so the one the work is tuned on: thinned beds, fewer
-  cards, the tall plants as accents, the coloured bed (F3DEX3), a solid 20 fps on the console.
-- **Emulator** (the definitive version): lusher, with the tall kelp forests and plants with more cards, since
-  emulators don't pay the RDP's fill and per-triangle costs. Its own placement, density and draw distances; the same
-  game otherwise.
-The split should be one setting (a build profile) that picks the placement data, plant models, draw distances and
-budgets together, with each tool (gen_habitat, gen_scatter, thin_beds, LOD tables) taking the profile, and both built
-and checked every release.
 
 - **More fishing spots:** some grottos have large bodies of water (at least one known), and the Water Temple could
   be interesting.
