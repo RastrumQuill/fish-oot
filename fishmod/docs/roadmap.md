@@ -43,7 +43,17 @@ Notes only, not built in test5: lures, sinkers and the sinking lure (item 5), ho
   proportion to make room. **More bottles** fill the gaps that leaves (how many isn't fixed: they're there to fill
   the voids).
 - **Fish as real items:** a bottled fish shows its species and size in the inventory, and the buyer you sell bottled
-  things to says what he's getting. Never just "fish" any more: size and species matter.
+  things to says what he's getting. Never just "fish" any more: size and species matter. (Selling stays a small
+  extra: the economy is broken enough already. One fish at a time is fine.)
+- **Fishing quality of life:**
+  - **"New record!"** when a catch beats your best for its species.
+  - **Depth handled for you:** the float and the sinker settle at a sane depth for where the bait lands (from the
+    water's depth there and what lives at that spot), and fish look further up and down for food, so depth matters
+    less than it does now. Not a setting to remember: the C buttons pick the lure, the game picks the depth.
+  - **The time of day without a big clock** (ideas, none chosen): a small sun/moon mark only while the rod is out; or
+    on the pause screen only; or in the fishing log's notes ("bites best at dusk").
+  - **The fishing log from the pause menu** (ideas): on the item grid, the rod's description opens a short log page
+    (catches, records, species seen), so it needs no new pause page.
 
 ### 3. The refactor
 Mostly consolidation: keep what works, as one system, instead of the "million compiler flags" way it grew.
@@ -61,8 +71,18 @@ Mostly consolidation: keep what works, as one system, instead of the "million co
 - **Code to tidy:** fishmod_scatter.c and fishmod_debug.c have grown large (split by job); the bench, tour and capture
   scripts share a lot; the habitat tools (gen_scatter, thin_beds, section_budget, shot_search, rdp_estimate) load
   each other ad hoc; experiments left switches behind (FISHMOD_BEDSKIN, the bench modes): keep or drop each.
-- **Quality of life:** the D-pad as more C buttons; boots, tunics and swords assignable to C buttons (test 5
-  feedback 6); others to be found.
+- **Quality of life:**
+  - the D-pad as more C buttons (bottles, boots, tunics, swords: test 5 feedback 6);
+  - faster text: hold B to fill a box at once, and skip text already read (item gets, repeated owl talk);
+  - strength scales Link's strength everywhere, and more than now: casting distance (50% further across the upgrades
+    isn't nearly enough: Link throws stone pillars at his strongest) and how fast he pushes and pulls blocks;
+  - others to be found.
+- **Debug only in test builds, behind holding L** (an unused button) plus the D-pad, so the D-pad is free for the C
+  buttons. The release builds (hardware and emulator) have no debug features.
+- **A bigger save, verified:** the mod's data (fish records, the log, the lab's tank, new items) in a larger save
+  (flashcarts and emulators take it). Each part gets a version and a checksum; a part that fails is taken from the
+  backup copy if that one is good, and otherwise loaded anyway with a warning, never wiped (vanilla deletes a save
+  whose checksum fails). Someone editing the file by hand isn't punished: a small tool recomputes the checksums.
 
 ### 4. Content
 Fish and foliage in every decent-sized natural water (not, say, Kakariko's well):
@@ -79,7 +99,8 @@ Also:
    the larvae for bait. Link has no bottle yet, but has just finished the first dungeon, so the first bottle is
    close, and he realises it can hold bait.
 2. **The Lake Hylia lab:** give your fish to the lab, which keeps them in its water (the aquarium moonshot); enough
-   variety earns something.
+   variety earns something. The scientist already keeps flags on what you do outside the conversation: what he says
+   depends on how the tank was when you last spoke and how it is now (how many fish, how many species).
 3. **The sinking lure at the Fishing Pond:** the owner is still upset, but in effect tells you to take it with you.
 4. **Fishing-related bottle quests.**
 5. **Ways to get the other lures and sinkers.**
