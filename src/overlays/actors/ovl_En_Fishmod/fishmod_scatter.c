@@ -48,7 +48,7 @@ typedef struct FishmodBedShade {
 #if FISHMOD_BEDSKIN
 #include "fishmod_bedskin.h"
 // the bed-skin test (fishmod/tools/gen_bedskin.py): the bed coloured per vertex, near the camera, under water
-#define BED_DRAW_DIST 1100.0f // the haze hides everything past ~900
+#define BED_DRAW_DIST 4000.0f // as far as the bed shows through the haze (it does, well past the props)
 static FishmodBedHeader* sBed;
 static s32 sBedDrawn; // (debug: triangles sent last frame)
 #endif
