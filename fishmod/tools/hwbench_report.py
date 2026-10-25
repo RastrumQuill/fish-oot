@@ -19,13 +19,14 @@ MODES_V = {
     4: ["base", "altedge", "trimfar", "notri", "nostrict", "nonear", "nofar", "noprops", "nosky"],
     5: ["base", "noimp", "nofartex", "nodissolve", "zsame", "nonear", "nofar", "noprops", "nosky"],
     6: ["base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky"],
+    7: ["base", "fishfrozen", "nofishdraw", "nofish", "noprops", "nowater", "noskyonly", "bare"],  # roaming
 }
 MODE_DOC = {
     "base": "as shipped",
     "tex4": "props' textures in 4 bits (half the memory per texture load)",
     "cold": "caches filled with other data before each update (CPU work from RDRAM, not the cache)",
     "noprops": "props not drawn (what the props cost)",
-    "nofish": "fish not drawn (what the fish cost to draw)",
+    "nofish": "fish not drawn (what the fish cost to draw; in v7 not updated either)",
     "notri": "the small plants' cut outlines instead of one triangle per card",
     "nostrict": "the nearest props by band and kind, not strictly nearest first",
     "trimfar": "far props cut to their outlines too, as before (what the uncut far models save)",
@@ -43,6 +44,11 @@ MODE_DOC = {
     "mtxonly": "each prop's colour and matrices sent, not its triangles (the per-prop setup alone)",
     "nomoss": "no moss mats",
     "noxlu": "no props, no room translucency (the water surface)",
+    "fishfrozen": "the fish frozen: no AI or swimming (still drawn)",
+    "nofishdraw": "the fish not drawn (still thinking and swimming)",
+    "nowater": "no water surface (room translucency)",
+    "noskyonly": "no skybox (props and fish as shipped)",
+    "bare": "no props, no fish, no water surface, no skybox",
 }
 METRICS = ["period", "cpu_update", "cpu_draw", "rsp_gfx", "rdp", "rsp_audio", "dp_clock", "dp_buf", "dp_pipe",
            "dp_tmem", "scatter", "fish_upd", "fish_draw", "props"]
@@ -151,6 +157,10 @@ def main():
     if args.shots:
         STOP_NAMES[:] = [f"Shot {i + 1}" for i in range(len(STOP_NAMES))]
     r = read(args.save)
+    if r["version"] == 7:
+        # the roaming bench times the flight from each stop to the next
+        n = len(STOP_NAMES)
+        STOP_NAMES[:] = [f"{STOP_NAMES[i]} -> {STOP_NAMES[(i + 1) % n]}" for i in range(n)]
     out = []
     p = out.append
     if args.vs:
