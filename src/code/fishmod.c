@@ -867,7 +867,6 @@ s32 Fishmod_CanUseRod(PlayState* play) {
 #include "zelda_arena.h"
 #include "tha.h"
 #include "fishmod_collision.h"
-#include "fishmod_bedskin.h"
 
 #define FISHMOD_WATERMAP(sceneId, segment) DECLARE_ROM_SEGMENT(segment)
 #include "fishmod_watermap_scenes.h"
@@ -989,31 +988,6 @@ FishmodScatterHeader* Fishmod_LoadScatter(s16 sceneId) {
         }
     }
     return NULL;
-}
-
-DECLARE_ROM_SEGMENT(fishmod_bed_spot06)
-
-/**
- * The bed-skin test's coloured bed (fishmod/tools/gen_bedskin.py) for a scene, loaded into the zelda arena, or NULL
- * (none for the scene, or the build has the empty one).
- */
-FishmodBedHeader* Fishmod_LoadBed(s16 sceneId) {
-    size_t size = (uintptr_t)_fishmod_bed_spot06SegmentRomEnd - (uintptr_t)_fishmod_bed_spot06SegmentRomStart;
-    FishmodBedHeader* bed;
-
-    if ((sceneId != SCENE_LAKE_HYLIA) || (size <= sizeof(FishmodBedHeader))) {
-        return NULL;
-    }
-    bed = ZeldaArena_Malloc(size);
-    if (bed == NULL) {
-        return NULL;
-    }
-    DmaMgr_RequestSync(bed, (uintptr_t)_fishmod_bed_spot06SegmentRomStart, size);
-    if ((bed->magic != FISHMOD_BED_MAGIC) || (bed->chunkCount == 0)) {
-        ZeldaArena_Free(bed);
-        return NULL;
-    }
-    return bed;
 }
 
 FishmodWaterMapHeader* Fishmod_LoadWaterMap(s16 sceneId) {

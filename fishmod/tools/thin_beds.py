@@ -21,10 +21,6 @@ import section_budget as B  # noqa: E402
 import shot_search as S  # noqa: E402
 
 OUT = os.path.join(S.R.ROOT, "fishmod", "data", "lake_hylia_thin.json")
-# the bed-skin test (FISHMOD_BEDSKIN=1): no moss mats; a picked plant just goes, and its own list
-NO_MOSS = os.environ.get("FISHMOD_BEDSKIN") == "1"
-if NO_MOSS:
-    OUT = os.path.join(S.R.ROOT, "fishmod", "data", "lake_hylia_thin_bedskin.json")
 THINNABLE = {"grass_tuft", "broadleaf", "bush_weed", "big_pondweed", "ribbon_weed", "vine_strand", "kelp_frond",
              "tall_weed", "fan_weed"}
 MOSS_H, MOSS_W = S.R.HEIGHT.get("moss_patch", 20), S.CARDS["moss_patch"][1]
@@ -119,7 +115,7 @@ def restore(sc, dirs, limit, thin, moss, turned_to_moss, dropped):
             state = (sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j])
             if dropped[j]:
                 sc.CUT[j], sc.CUT_ABOVE[j] = sc.cut0[j]
-                if not moss[j] and not NO_MOSS:
+                if not moss[j]:
                     as_moss(j)
             else:
                 as_plant(j)
@@ -134,7 +130,7 @@ def restore(sc, dirs, limit, thin, moss, turned_to_moss, dropped):
             was_dropped = dropped[j]
             if was_dropped:
                 sc.CUT[j], sc.CUT_ABOVE[j] = sc.cut0[j]
-                if not moss[j] and not NO_MOSS:
+                if not moss[j]:
                     as_moss(j)
             else:
                 as_plant(j)
@@ -205,7 +201,7 @@ def main():
         if not still or not pick:
             break
         for j in pick:
-            if moss[j] or turned_to_moss[j] or NO_MOSS:
+            if moss[j] or turned_to_moss[j]:
                 dropped[j] = True
                 sc.CUT[j] = sc.CUT_ABOVE[j] = 0  # (not drawn: no cost at all, not even the per-prop one)
                 continue

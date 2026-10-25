@@ -73,7 +73,7 @@ Mostly consolidation: keep what works, as one system, instead of the "million co
 - **Notes cleaned up** a lot: one current set, older notes removed.
 - **Two versions, as a first-class split** (one build profile, not scattered `FISHMOD_HW` checks):
   - **Original hardware** (`--hw`): the constraining platform, so the one the work is tuned on: thinned beds, fewer
-    cards, the tall plants as accents, the coloured bed (F3DEX3), a solid 20 fps on the console.
+    cards, the tall plants as accents, a solid 20 fps on the console.
   - **Emulator** (the definitive version): lusher, with the tall kelp forests and plants with more cards, since
     emulators don't pay the RDP's fill and per-triangle costs. Its own placement, density and draw distances; the
     same game otherwise.
@@ -81,7 +81,7 @@ Mostly consolidation: keep what works, as one system, instead of the "million co
   gen_scatter, thin_beds, the LOD tables) takes it; both versions are built and checked every release.
 - **Code to tidy:** fishmod_scatter.c and fishmod_debug.c have grown large (split by job); the bench, tour and capture
   scripts share a lot; the habitat tools (gen_scatter, thin_beds, section_budget, shot_search, rdp_estimate) load
-  each other ad hoc; experiments left switches behind (FISHMOD_BEDSKIN, the bench modes): keep or drop each.
+  each other ad hoc; experiments left switches behind (the bench modes): keep or drop each.
 - **Quality of life:**
   - the D-pad as more C buttons (bottles, boots, tunics, swords: test 5 feedback 6);
   - faster text: hold B to fill a box at once, and skip text already read (item gets, repeated owl talk);

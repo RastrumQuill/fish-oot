@@ -185,11 +185,6 @@ FLOAT_OVERLAP = 0.95
 SEED = 4
 
 
-# The bed-skin test (FISHMOD_BEDSKIN=1, fishmod/build.sh --bedskin): the bed itself is coloured (gen_bedskin.py), so
-# no moss mats; where the density cap or the thinning would make one, the plant just goes. Its own thinning list.
-BEDSKIN = os.environ.get("FISHMOD_BEDSKIN") == "1"
-
-
 def place(scene, seed=SEED):
     folder = SCENES[scene]
     d = os.path.join(gw.SCENES, folder)
@@ -351,9 +346,8 @@ def place(scene, seed=SEED):
                     out.append({"kind": kind, "x": px, "y": y, "z": pz, "yaw": yaw, "tilt": tilt,
                                 "scale": sc, "tint": clump_tint * rnd.uniform(0.95, 1.04)})
                 break  # one rule per candidate: keeps kinds from stacking on one spot
-    if not BEDSKIN:
-        out += place_moss(seed, rnd_state=None, surface_at=surface_at, floor_at=floor_at, zones=zones,
-                          excluded=excluded, boxes=boxes)
+    out += place_moss(seed, rnd_state=None, surface_at=surface_at, floor_at=floor_at, zones=zones,
+                      excluded=excluded, boxes=boxes)
     BED[:] = [surface_at, floor_at]
     return out
 
@@ -417,19 +411,17 @@ def density_capped(instances):
         if id(p) not in turn:
             out.append(p)
             continue
-        if BEDSKIN:
-            continue
         ps = surface_at(p["x"], p["z"])
         pf = floor_at(p["x"], p["z"], ps) if ps is not None else None
         sc = min(max(p["scale"], 0.7), 1.1)
         fit = moss_fit(floor_at, p["x"], p["z"], ps, pf, p["yaw"], sc) if pf is not None else None
         if fit is not None:
             out.append(dict(p, kind="moss_patch", y=fit[0], tilt=fit[1], scale=sc))
-    print(f"density cap: {len(turn)} plants " + ("gone" if BEDSKIN else "to moss (or gone where a mat can't lie)"))
+    print(f"density cap: {len(turn)} plants to moss (or gone where a mat can't lie)")
     return out
 
 
-THIN = os.path.join(ROOT, "fishmod", "data", "lake_hylia_thin_bedskin.json" if BEDSKIN else "lake_hylia_thin.json")
+THIN = os.path.join(ROOT, "fishmod", "data", "lake_hylia_thin.json")
 
 
 def thinned(instances):
@@ -446,7 +438,7 @@ def thinned(instances):
         if (p["kind"], int(p["x"]), int(p["z"])) not in picked:
             out.append(p)
             continue
-        if BEDSKIN or (p["kind"], int(p["x"]), int(p["z"])) in drop:
+        if (p["kind"], int(p["x"]), int(p["z"])) in drop:
             continue
         ps = surface_at(p["x"], p["z"])
         pf = floor_at(p["x"], p["z"], ps) if ps is not None else None
