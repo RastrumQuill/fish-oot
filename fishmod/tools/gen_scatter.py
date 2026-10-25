@@ -136,6 +136,9 @@ FOOTPRINT = {"grass_tuft": 40, "ribbon_weed": 32, "bush_weed": 50, "tall_weed": 
              "big_pondweed": 30, "kelp_frond": 15, "vine_strand": 12, "fan_weed": 22, "bank_roots": 35}
 # props that lie along the bed, tilted to its slope: half their length (along the model's x) and half their width
 TILTED = {"sunken_log": (150, 15), "branch": (70, 6)}
+# short plants that lean with the slope they grow on (their footprint's edges on the bed), up to SLOPE_MAX
+SLOPED = ("grass_tuft",)
+SLOPE_MAX = math.radians(25)
 # Rocks (all one vanilla model) get variety for free: stretched along each axis by a hash of where they stand (the
 # game computes the same, fishmod_scatter.c Scatter_RockStretch: no per-prop data) and tilted a little at random
 ROCK_KINDS = ("rock", "boulder")
@@ -338,6 +341,10 @@ def place(scene, seed=SEED):
                         y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, TILTED[kind][0] * sc, TILTED[kind][1] * sc)
                         if max(abs(tilt[0]), abs(tilt[1])) > math.radians(25):
                             continue  # too steep: it would have rolled further down
+                    if kind in SLOPED:
+                        r = FOOTPRINT.get(kind, 20) * sc
+                        y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, r, r)
+                        tilt = tuple(max(-SLOPE_MAX, min(SLOPE_MAX, t)) for t in tilt)
                     if kind in FLOAT_SPACE:
                         circle = leaf_circle(kind, px, pz, yaw, sc)
                         if not leaf_free(circle):
@@ -346,8 +353,6 @@ def place(scene, seed=SEED):
                     out.append({"kind": kind, "x": px, "y": y, "z": pz, "yaw": yaw, "tilt": tilt,
                                 "scale": sc, "tint": clump_tint * rnd.uniform(0.95, 1.04)})
                 break  # one rule per candidate: keeps kinds from stacking on one spot
-    out += place_moss(seed, rnd_state=None, surface_at=surface_at, floor_at=floor_at, zones=zones,
-                      excluded=excluded, boxes=boxes)
     BED[:] = [surface_at, floor_at]
     return out
 
@@ -410,14 +415,7 @@ def density_capped(instances):
     for p in instances:
         if id(p) not in turn:
             out.append(p)
-            continue
-        ps = surface_at(p["x"], p["z"])
-        pf = floor_at(p["x"], p["z"], ps) if ps is not None else None
-        sc = min(max(p["scale"], 0.7), 1.1)
-        fit = moss_fit(floor_at, p["x"], p["z"], ps, pf, p["yaw"], sc) if pf is not None else None
-        if fit is not None:
-            out.append(dict(p, kind="moss_patch", y=fit[0], tilt=fit[1], scale=sc))
-    print(f"density cap: {len(turn)} plants to moss (or gone where a mat can't lie)")
+    print(f"density cap: {len(turn)} plants gone")
     return out
 
 
@@ -425,28 +423,11 @@ THIN = os.path.join(ROOT, "fishmod", "data", "lake_hylia_thin.json")
 
 
 def thinned(instances):
-    """The plants thin_beds.py picked (where the console needs it) turned into moss mats, or dropped where a mat
-    can't lie."""
+    """Without the plants thin_beds.py picked (where the console needs it)."""
     if not os.path.exists(THIN) or not BED:
         return instances
-    listed = json.load(open(THIN))["moss"]
-    picked = {(o["kind"], o["x"], o["z"]) for o in listed}
-    drop = {(o["kind"], o["x"], o["z"]) for o in listed if o.get("drop")}
-    surface_at, floor_at = BED
-    out = []
-    for p in instances:
-        if (p["kind"], int(p["x"]), int(p["z"])) not in picked:
-            out.append(p)
-            continue
-        if (p["kind"], int(p["x"]), int(p["z"])) in drop:
-            continue
-        ps = surface_at(p["x"], p["z"])
-        pf = floor_at(p["x"], p["z"], ps) if ps is not None else None
-        sc = min(max(p["scale"], 0.7), 1.1)
-        fit = moss_fit(floor_at, p["x"], p["z"], ps, pf, p["yaw"], sc) if pf is not None else None
-        if fit is not None:
-            out.append(dict(p, kind="moss_patch", y=fit[0], tilt=fit[1], scale=sc))
-    return out
+    picked = {(o["kind"], o["x"], o["z"]) for o in json.load(open(THIN))["drop"]}
+    return [p for p in instances if (p["kind"], int(p["x"]), int(p["z"])) not in picked]
 
 
 def place_moss(seed, rnd_state, surface_at, floor_at, zones, excluded, boxes):

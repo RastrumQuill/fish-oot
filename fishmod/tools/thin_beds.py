@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Thin the plant beds only where the console needs it: every sampled spot (section_budget.py's game-like cameras,
 looked at in eight directions) must stay under the frame-time limit by shot_search.py's model. Wherever a
-direction is over, the plant costing that view the most is turned into a moss mat (nearly free to draw), so the bed
-stays covered and green; where a moss mat is still the costliest, it goes. Repeats until every spot holds. Writes the list of turned plants (by position) to
-fishmod/data/lake_hylia_thin.json; gen_scatter.py applies it after placing, so nothing else moves.
+direction is over, the plant costing that view the most goes; repeats until every spot holds, then puts back, one at a
+time, whatever no view needs gone. Writes the list of plants that go (by position) to fishmod/data/lake_hylia_thin.json;
+gen_scatter.py applies it after placing, so nothing else moves.
 
 Usage: thin_beds.py [--limit 48] [--views 150] [--seeds 7,19,23]   (then gen_scatter.py --c; check with
        section_budget.py --seed 11, spots it never saw)
@@ -23,7 +23,6 @@ import shot_search as S  # noqa: E402
 OUT = os.path.join(S.R.ROOT, "fishmod", "data", "lake_hylia_thin.json")
 THINNABLE = {"grass_tuft", "broadleaf", "bush_weed", "big_pondweed", "ribbon_weed", "vine_strand", "kelp_frond",
              "tall_weed", "fan_weed"}
-MOSS_H, MOSS_W = S.R.HEIGHT.get("moss_patch", 20), S.CARDS["moss_patch"][1]
 
 
 def turned(v):
@@ -80,9 +79,9 @@ def prop_vs_dirs(sc, j, D):
     return np.where(ok, cy * sc.NC[j] * np.where(near, S.KN, S.KF) + np.where(near, S.PN, S.PF), 0.0)
 
 
-def restore(sc, dirs, limit, thin, moss, turned_to_moss, dropped):
-    """The passes take a plant out of every failing direction at once, so they overshoot. Put back, one step at a time
-    (a dropped mat back as moss, a plant made moss back as itself), whatever no direction needs gone: cheapest first."""
+def restore(sc, dirs, limit, dropped):
+    """The passes take a plant out of every failing direction at once, so they overshoot. Put back, one at a time,
+    whatever no direction needs gone: cheapest first."""
     E = np.array([d[0] for d in dirs], float)
     T = np.array([d[1] for d in dirs], float)
     FW = T - E
@@ -93,63 +92,30 @@ def restore(sc, dirs, limit, thin, moss, turned_to_moss, dropped):
     total = np.array([d[3] for d in dirs], float)
     for j in range(len(sc.kind)):
         total += prop_vs_dirs(sc, j, D)
-    plant_shape = {}
 
-    def as_plant(j):
-        k = sc.kind[j]
-        sc.H[j] = S.R.HEIGHT.get(k, 40) * sc.P[j, 3]
-        sc.W[j] = (S.CARDS[k][1] if k in S.CARDS else S.R.HEIGHT.get(k, 40)) * sc.P[j, 3]
-        sc.NC[j] = S.CARDS.get(k, (2, 0))[0]
-        sc.PLANT[j], sc.FLAT[j] = True, False
+    def cost_back(j):
+        """(its share of each direction if put back, as it is now)"""
+        sc.CUT[j], sc.CUT_ABOVE[j] = sc.cut0[j]
+        new = prop_vs_dirs(sc, j, D)
+        sc.CUT[j] = sc.CUT_ABOVE[j] = 0
+        return new
 
-    def as_moss(j):
-        sc.H[j], sc.W[j], sc.NC[j] = MOSS_H * sc.P[j, 3], MOSS_W * sc.P[j, 3], 1
-        sc.PLANT[j], sc.FLAT[j] = False, True
-
-    back = [0, 0]
+    back = 0
     for rnd in range(4):  # (what can't come back early may fit once its neighbours have settled)
-        cand = [j for j in np.nonzero(turned_to_moss | dropped)[0]]
-        trial = []
-        for j in cand:
-            old = prop_vs_dirs(sc, j, D)
-            state = (sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j])
-            if dropped[j]:
-                sc.CUT[j], sc.CUT_ABOVE[j] = sc.cut0[j]
-                if not moss[j]:
-                    as_moss(j)
-            else:
-                as_plant(j)
-            new = prop_vs_dirs(sc, j, D)
-            sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j] = state
-            trial.append((float((new - old).clip(0).sum()), j))
-        trial.sort()
-        n0 = back[:]
+        trial = sorted((float(cost_back(j).sum()), j) for j in np.nonzero(dropped)[0])
+        n0 = back
         for _, j in trial:
-            old = prop_vs_dirs(sc, j, D)
-            state = (sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j])
-            was_dropped = dropped[j]
-            if was_dropped:
-                sc.CUT[j], sc.CUT_ABOVE[j] = sc.cut0[j]
-                if not moss[j]:
-                    as_moss(j)
-            else:
-                as_plant(j)
-            new = prop_vs_dirs(sc, j, D)
-            t = total + new - old
-            if (t[new > old] <= limit).all():
+            new = cost_back(j)
+            t = total + new
+            if (t[new > 0] <= limit).all():
                 total = t
-                if was_dropped:
-                    dropped[j] = False
-                    back[0] += 1
-                else:
-                    turned_to_moss[j] = False
-                    back[1] += 1
-            else:
-                sc.H[j], sc.W[j], sc.NC[j], sc.PLANT[j], sc.FLAT[j], sc.CUT[j], sc.CUT_ABOVE[j] = state
-        print(f"restore round {rnd + 1}: {back[0] - n0[0]} mats back, {back[1] - n0[1]} plants back")
+                dropped[j] = False
+                sc.CUT[j], sc.CUT_ABOVE[j] = sc.cut0[j]
+                back += 1
+        print(f"restore round {rnd + 1}: {back - n0} plants back")
         if back == n0:
             break
-    print(f"restored: {back[0]} mats, {back[1]} plants; directions over {limit} ms: {int((total > limit).sum())}")
+    print(f"restored: {back} plants; directions over {limit} ms: {int((total > limit).sum())}")
 
 
 def main():
@@ -179,8 +145,6 @@ def main():
                 dirs.append((e, t, u, B.base_for(bases, e, u), z["id"]))
     print(f"{len(dirs)} view directions")
     thin = np.array([k in THINNABLE for k in sc.kind])
-    moss = np.array([k == "moss_patch" for k in sc.kind])
-    turned_to_moss = np.zeros(len(sc.kind), bool)
     dropped = np.zeros(len(sc.kind), bool)
     failing = list(range(len(dirs)))
     for p in range(a.passes):
@@ -192,36 +156,27 @@ def main():
             if base + c.sum() <= a.limit:
                 continue
             still.append(i)
-            # the costliest plant becomes moss; a moss mat (placed, or made from a plant) costliest of all goes
-            cand = np.where((thin | moss | turned_to_moss) & ~dropped, c, 0)
+            # the costliest plant in the view goes
+            cand = np.where(thin & ~dropped, c, 0)
             j = int(np.argmax(cand))
             if cand[j] > 0:
                 pick.add(j)
-        print(f"pass {p + 1}: {len(still)} directions over {a.limit} ms; turning {len(pick)} plants to moss")
+        print(f"pass {p + 1}: {len(still)} directions over {a.limit} ms; dropping {len(pick)} plants")
         if not still or not pick:
             break
         for j in pick:
-            if moss[j] or turned_to_moss[j]:
-                dropped[j] = True
-                sc.CUT[j] = sc.CUT_ABOVE[j] = 0  # (not drawn: no cost at all, not even the per-prop one)
-                continue
-            turned_to_moss[j] = True
-            sc.H[j] = MOSS_H * sc.P[j, 3]
-            sc.W[j] = MOSS_W * sc.P[j, 3]
-            sc.NC[j] = 1
-            sc.PLANT[j] = False
-            sc.FLAT[j] = True
+            dropped[j] = True
+            sc.CUT[j] = sc.CUT_ABOVE[j] = 0  # (not drawn: no cost at all, not even the per-prop one)
         failing = still
     if a.restore:
-        restore(sc, dirs, a.restore_limit, thin, moss, turned_to_moss, dropped)
-    out = [{"kind": sc.kind[j], "x": int(sc.P[j, 0]), "z": int(sc.P[j, 2]), "drop": bool(dropped[j])}
-           for j in np.nonzero(turned_to_moss | dropped)[0]]
+        restore(sc, dirs, a.restore_limit, dropped)
+    out = [{"kind": sc.kind[j], "x": int(sc.P[j, 0]), "z": int(sc.P[j, 2])} for j in np.nonzero(dropped)[0]]
     by = {}
     for o in out:
         by[o["kind"]] = by.get(o["kind"], 0) + 1
-    print(f"{int((turned_to_moss & ~dropped).sum())} plants to moss of {int(thin.sum())}, "
-          f"{int(dropped.sum())} dropped (moss mats, or plants turned to moss and then still too much):", by)
-    json.dump({"limit": a.limit, "restore_limit": a.restore_limit, "views": a.views, "seeds": a.seeds, "moss": out}, open(OUT, "w"), indent=0)
+    print(f"{int(dropped.sum())} plants of {int(thin.sum())} go:", by)
+    json.dump({"limit": a.limit, "restore_limit": a.restore_limit, "views": a.views, "seeds": a.seeds, "drop": out},
+              open(OUT, "w"), indent=0)
 
 
 if __name__ == "__main__":
