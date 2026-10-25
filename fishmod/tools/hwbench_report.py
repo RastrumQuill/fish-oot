@@ -19,6 +19,7 @@ MODES_V = {
     4: ["base", "altedge", "trimfar", "notri", "nostrict", "nonear", "nofar", "noprops", "nosky"],
     5: ["base", "noimp", "nofartex", "nodissolve", "zsame", "nonear", "nofar", "noprops", "nosky"],
     6: ["base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky"],
+    7: ["base", "nosway", "mtxonly", "nobedskin", "nonear", "nofar", "noprops", "nosky"],
 }
 MODE_DOC = {
     "base": "as shipped",
@@ -42,6 +43,7 @@ MODE_DOC = {
     "nosway": "no sway matrix (one matrix per prop, not two)",
     "mtxonly": "each prop's colour and matrices sent, not its triangles (the per-prop setup alone)",
     "nomoss": "no moss mats",
+    "nobedskin": "the plain bed, without the bed-skin test's coloured copy (what it costs)",
     "noxlu": "no props, no room translucency (the water surface)",
 }
 METRICS = ["period", "cpu_update", "cpu_draw", "rsp_gfx", "rdp", "rsp_audio", "dp_clock", "dp_buf", "dp_pipe",
