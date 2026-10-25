@@ -1638,7 +1638,11 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 #define BENCH_FRAMES 60 // frames counted per block
 #define BENCH_ROUNDS 2  // blocks per mode per visit (interleaved: A B C D E A B C D E)
 #define BENCH_MICRO_FRAMES 30
+#if FISHMOD_BEDSKIN
+#define BENCH_VERSION 7 // (the bed-skin test: its third mode is the plain bed, not "no moss")
+#else
 #define BENCH_VERSION 6
+#endif
 #ifndef FISHMOD_BENCH_LAPS
 #define FISHMOD_BENCH_LAPS 15 // then it stops and says so
 #endif
@@ -1867,7 +1871,11 @@ static void Bench_SetMode(s32 mode) {
         0,
         FISHMOD_BENCH_NOSWAY,
         FISHMOD_BENCH_MTXONLY,
+#if FISHMOD_BEDSKIN
+        FISHMOD_BENCH_NOBEDSKIN,
+#else
         FISHMOD_BENCH_NOMOSS,
+#endif
         FISHMOD_BENCH_NONEAR,
         FISHMOD_BENCH_NOFAR,
         FISHMOD_BENCH_NOPROPS,
@@ -1980,7 +1988,13 @@ static void Fishmod_BenchUpdate(PlayState* play) {
             break;
     }
     {
-        static const char* sModeNames[] = { "base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky" };
+        static const char* sModeNames[] = { "base", "nosway", "mtxonly",
+#if FISHMOD_BEDSKIN
+                                       "nobedskin",
+#else
+                                       "nomoss",
+#endif
+                                       "nonear", "nofar", "noprops", "nosky" };
 
         Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
                             (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);
