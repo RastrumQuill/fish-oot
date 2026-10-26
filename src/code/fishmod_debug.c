@@ -47,6 +47,7 @@
 #include "letterbox.h"
 #include "actor.h"
 #include "libc64/malloc.h"
+#include "message.h"
 
 void Sram_InitDebugSave(void);
 
@@ -492,7 +493,7 @@ static f32 sTourRise;
 static u16 sTourPress;
 static s8 sTourStickX;
 static s8 sTourStickY;
-#ifdef FISHMOD_TOUR_START
+#if defined(FISHMOD_TOUR_START) || defined(FISHMOD_BENCH_SHOWTEXT)
 static s32 sTourDebugText = true; // (held at one stop: for profiling, so the numbers show)
 #else
 static s32 sTourDebugText;
@@ -1644,7 +1645,13 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 #endif
 #define BENCH_SETTLE 60 // frames after arriving
 #define BENCH_SKIP 10   // frames after changing mode, not counted (the frame being timed runs behind)
-#ifdef FISHMOD_BENCH_ROAM
+#if defined(FISHMOD_BENCH_PLAY) && defined(FISHMOD_BENCH_FRAMES)
+#define BENCH_FRAMES FISHMOD_BENCH_FRAMES // (the short test)
+#define BENCH_ROUNDS 1
+#elif defined(FISHMOD_BENCH_PLAY)
+#define BENCH_FRAMES 240 // frames counted per block: Link on his way along the leg
+#define BENCH_ROUNDS 1
+#elif defined(FISHMOD_BENCH_ROAM)
 #define BENCH_FRAMES 200 // frames counted per block: one flight along the leg
 #define BENCH_ROUNDS 1
 #else
@@ -1652,7 +1659,10 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 #define BENCH_ROUNDS 2  // blocks per mode per visit (interleaved: A B C D E A B C D E)
 #endif
 #define BENCH_MICRO_FRAMES 30
-#ifdef FISHMOD_BENCH_ROAM
+#if defined(FISHMOD_BENCH_PLAY)
+#define BENCH_VERSION 8
+#define BENCH_CONDS 8 // the times of day (4) x clear or rain
+#elif defined(FISHMOD_BENCH_ROAM)
 #define BENCH_VERSION 7
 #else
 #define BENCH_VERSION 6
@@ -1727,9 +1737,15 @@ typedef struct BenchResults {
     u32 visits;
     BenchCell cell[BENCH_STOPS][BENCH_MODES];
     BenchMicro micro[BENCH_TESTS][2]; // [test][RDP idle, busy]
+#ifdef BENCH_CONDS
+    BenchCell cond[BENCH_CONDS][BENCH_MODES]; // all the legs, per time of day and weather
+#endif
 } BenchResults;
 
 static BenchResults sBench;
+#ifdef BENCH_CONDS
+static s32 sPbCond; // this lap's time of day and weather (the play bench)
+#endif
 static s32 sBenchState; // 0: arriving, 1: measuring, 2: micro
 static s32 sBenchFrame;
 static s32 sBenchBlock; // block in this visit
@@ -1857,6 +1873,14 @@ static void Bench_Record(s32 stop, s32 mode) {
         cell->sum[i] += v[i];
         cell->max[i] = MAX(cell->max[i], v[i]);
     }
+#ifdef BENCH_CONDS
+    cell = &sBench.cond[sPbCond][mode];
+    cell->frames++;
+    for (i = 0; i < BENCH_METRICS; i++) {
+        cell->sum[i] += v[i];
+        cell->max[i] = MAX(cell->max[i], v[i]);
+    }
+#endif
 }
 
 /** Where the bench is, written to SRAM 0x7000 as each mode starts (0x7E00 is the profile): if the console crashes, the save says where. */
@@ -1881,7 +1905,19 @@ static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
 }
 
 static void Bench_SetMode(s32 mode) {
-#ifdef FISHMOD_BENCH_ROAM
+#if defined(FISHMOD_BENCH_PLAY)
+    static const s32 sFlags[BENCH_MODES] = {
+        0, // the first pass along the leg (fish waking as Link arrives)
+        0,
+        FISHMOD_BENCH_NOFISHAI,
+        FISHMOD_BENCH_NOFISH,
+        FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI,
+        FISHMOD_BENCH_NOPROPS,
+        FISHMOD_BENCH_NOROOMXLU,
+        FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI | FISHMOD_BENCH_NOROOMXLU |
+            FISHMOD_BENCH_NOSKY,
+    };
+#elif defined(FISHMOD_BENCH_ROAM)
     static const s32 sFlags[BENCH_MODES] = {
         0,
         FISHMOD_BENCH_NOFISHAI,
@@ -1972,16 +2008,14 @@ static void Bench_Save(void) {
     SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_WRITE);
 }
 
-static void Fishmod_BenchUpdate(PlayState* play) {
-    s32 stop = sTourStop;
-    s32 mode;
-
+/** The memory tests' buffer, and the sums so far from the save. False if there's no memory for it. */
+static s32 Bench_Init(void) {
     if (sBenchBuf == NULL) {
         s32 i;
 
         sBenchBuf = SYSTEM_ARENA_MALLOC(BENCH_BUF_SIZE, "../fishmod_debug.c", __LINE__);
         if (sBenchBuf == NULL) {
-            return;
+            return false;
         }
         // the chase's cycle: each of the first 2048 lines (of 16 bytes) points to the next in a shuffled order
         {
@@ -2007,6 +2041,16 @@ static void Fishmod_BenchUpdate(PlayState* play) {
         if ((sBench.magic != 0x4642454E) || (sBench.version != BENCH_VERSION) || (sBench.hw != FISHMOD_HW)) {
             bzero(&sBench, sizeof(sBench));
         }
+    }
+    return true;
+}
+
+static void Fishmod_BenchUpdate(PlayState* play) {
+    s32 stop = sTourStop;
+    s32 mode;
+
+    if (!Bench_Init()) {
+        return;
     }
     Fishmod_SampleRdp();
 
@@ -2075,6 +2119,321 @@ static void Fishmod_BenchUpdate(PlayState* play) {
                             (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);
     }
 }
+
+#ifdef FISHMOD_BENCH_PLAY
+/*
+ * The play bench (fishmod/scripts/hwbench_play.inc.c): Link plays the lake instead of a free camera flying it. He
+ * runs, swims and dives from each tour stop to the next with the game's own camera behind him, and every third leg he
+ * fishes from where he stands if he's on land (casting, waiting on the float, striking and reeling in what bites).
+ * Each leg is timed once per mode, Link put back at its start each time: the first pass (the fish ahead waking as he
+ * comes) and then the repeats. Each lap is at one time of day and weather, the clock held there: dawn, midday, dusk
+ * and night, clear and in rain, in turn.
+ */
+#define PB_SKIP 30   // frames after putting Link back, not counted (the camera catching up)
+#define PB_CLEANUP 400 // at most, after a fishing block: reeling in and through any catch (not counted)
+#define PB_ARRIVED 90.0f
+
+static s32 sPbState; // 0: new lap (reload the lake), 1: loading, 2: a block, 3: after a block, 4: memory tests
+static s32 sPbLeg;
+static s32 sPbBlock;
+static s32 sPbFrame;
+static s32 sPbFishing;
+static s32 sPbStuckFrame;
+static Vec3f sPbStuckPos;
+static s8 sPbStickX;
+static s8 sPbStickY;
+static u16 sPbButton;
+static s32 sPbActive;
+static s32 sPbTimer;
+
+static const u16 sPbTimes[4] = { CLOCK_TIME(6, 30), CLOCK_TIME(12, 0), CLOCK_TIME(17, 30), CLOCK_TIME(23, 0) };
+// the laps' conditions in turn (time + 4 * rain): clear dawn, rain midday, clear dusk, rain night, rain dawn,
+// clear midday, rain dusk, clear night
+static const u8 sPbOrder[BENCH_CONDS] = { 0, 5, 2, 7, 4, 1, 6, 3 };
+
+/** Puts Link at (x, z) on the ground or the water there, facing yaw. */
+static void PlayBench_Place(PlayState* play, Player* player, f32 x, f32 probeY, f32 z, s16 yaw) {
+    CollisionPoly* poly;
+    WaterBox* box;
+    Vec3f probe;
+    f32 floor;
+    f32 surface;
+
+    probe.x = x;
+    probe.y = probeY + 200.0f;
+    probe.z = z;
+    floor = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &probe);
+    if (floor < -30000.0f) {
+        floor = player->actor.world.pos.y;
+    }
+    if (BgCheck_GetWaterSurface(play, &play->colCtx, x, z, &surface, &box) && (surface > floor)) {
+        floor = surface;
+    }
+    player->actor.world.pos.x = player->actor.prevPos.x = x;
+    player->actor.world.pos.y = player->actor.prevPos.y = floor + 2.0f;
+    player->actor.world.pos.z = player->actor.prevPos.z = z;
+    player->actor.shape.rot.y = player->actor.world.rot.y = player->yaw = yaw;
+    player->actor.home.pos = player->actor.world.pos;
+    player->actor.speed = 0.0f;
+    player->actor.velocity.y = 0.0f;
+    player->actor.floorBgId = BGCHECK_SCENE; // (not carried back by whatever he stood on)
+    sPbStuckFrame = 0;
+    sPbStuckPos = player->actor.world.pos;
+}
+
+/** Rain on or off without loading the scene again (the day's own weather is clear: FISHMOD_SCRIPT_DAY). */
+static void PlayBench_SetRain(PlayState* play, s32 rain) {
+    EnvironmentContext* envCtx = &play->envCtx;
+
+    envCtx->precipitation[PRECIP_RAIN_MAX] = rain ? 20 : 0;
+    envCtx->precipitation[PRECIP_RAIN_CUR] = rain ? 20 : 0;
+    envCtx->stormState = rain ? STORM_STATE_ON : STORM_STATE_OFF;
+    envCtx->skyboxConfig = envCtx->changeSkyboxNextConfig = rain ? 1 : 0;
+    envCtx->lightConfig = envCtx->changeLightNextConfig = rain ? 2 : 0;
+}
+
+/** True for a stop under the water (its title ends "(under)"). */
+static s32 PlayBench_Under(const char* title) {
+    s32 len = 0;
+
+    while (title[len] != '\0') {
+        len++;
+    }
+    return (len >= 7) && (title[len - 7] == '(') && (title[len - 2] == 'r') && (title[len - 1] == ')');
+}
+
+/** The stick for heading toward a world yaw (the stick is read relative to the camera). */
+static void PlayBench_Steer(PlayState* play, s16 yaw, s32 mag) {
+    s16 rel = yaw - Camera_GetInputDirYaw(GET_ACTIVE_CAM(play));
+
+    sPbStickX = (s8)(-Math_SinS(rel) * mag);
+    sPbStickY = (s8)(Math_CosS(rel) * mag);
+}
+
+/** The auto-angler's buttons for the rod's state (as FISHMOD_AUTO_ANGLER). */
+static u16 PlayBench_Angle(void) {
+    switch (gFishmodRodInfo.state) {
+        case 0: // rod away
+        case 1: // held: cast
+            return ((sPbTimer % 40) == 0) ? BTN_CLEFT : 0;
+        case 2: // wind-up
+            return (gFishmodRodInfo.castPower < 0.5f) ? BTN_CLEFT : 0;
+        case 4: // float: strike on a bite
+            return (gFishmodRodInfo.biting && ((sPbTimer % 4) == 0)) ? BTN_B : 0;
+        case 5: // on the ground: reel back
+            return BTN_A;
+        case 6: // fight: reel while the tension is comfortable
+            return (gFishmodRodInfo.tension < 60.0f) ? BTN_A : 0;
+        case 7: // landed: through the catch textbox
+            return ((gFishmodRodInfo.choice != 0) && ((sPbTimer % 8) == 0)) ? BTN_A : 0;
+    }
+    return 0;
+}
+
+static void Fishmod_PlayBenchUpdate(PlayState* play) {
+    Player* player = GET_PLAYER(play);
+#ifdef FISHMOD_BENCH_LEGS
+    s32 n = FISHMOD_BENCH_LEGS; // (the short test: a lap of the first few legs)
+#else
+    s32 n = ARRAY_COUNT(sTourStops);
+#endif
+    FishmodTourStop* from;
+    FishmodTourStop* to;
+    s32 mode;
+    s32 i;
+
+    if (!Bench_Init() || (player == NULL)) {
+        return;
+    }
+    Fishmod_SampleRdp();
+    sPbTimer++;
+    sPbStickX = sPbStickY = 0;
+    sPbButton = 0;
+    sPbActive = true;
+
+    if (sBench.laps >= FISHMOD_BENCH_LAPS) {
+        Bench_SetMode(BENCH_BASE);
+        sPbActive = false;
+        sTourDebugText = true;
+        Fishmod_DebugPrintf(2, "BENCH DONE: %d laps saved", sBench.laps);
+        Fishmod_DebugPrintf(3, "You can turn the console off");
+        Fishmod_DebugPrintf(4, "and send the .sav file");
+        return;
+    }
+    sPbCond = sPbOrder[sBench.laps % BENCH_CONDS];
+    // the lake's enemies still bite, but he never runs out of hearts (the bench must outlast the night)
+    gSaveContext.save.info.playerData.health = gSaveContext.save.info.playerData.healthCapacity;
+    if (sPbState >= 2) {
+        gSaveContext.save.dayTime = sPbTimes[sPbCond % 4]; // the clock held
+    }
+    // no one stops to talk: the owl goes, and any text is passed through
+    {
+        Actor* actor = play->actorCtx.actorLists[ACTORCAT_NPC].head;
+
+        for (; actor != NULL; actor = actor->next) {
+            if (actor->id == ACTOR_EN_OWL) {
+                Actor_Kill(actor);
+            }
+        }
+    }
+    if ((Message_GetState(&play->msgCtx) != TEXT_STATE_NONE) && ((sPbTimer % 8) == 0)) {
+        sPbButton = BTN_A;
+    }
+
+    from = &sTourStops[sPbLeg];
+    to = &sTourStops[(sPbLeg + 1) % n];
+    mode = sPbBlock;
+    switch (sPbState) {
+        case 0: // a new lap: this lap's time and weather, set in place (as the Song of Storms brings rain)
+            Bench_SetMode(BENCH_BASE);
+            gSaveContext.save.dayTime = sPbTimes[sPbCond % 4];
+            PlayBench_SetRain(play, sPbCond >= 4);
+            sPbState = 1;
+            sPbFrame = 0;
+            sPbLeg = 0;
+            sPbBlock = 0;
+            break;
+
+        case 1: // the light and the rain settling
+            if (++sPbFrame > 100) {
+                sPbState = 2;
+                sPbFrame = 0;
+            }
+            break;
+
+        case 2: { // a block: Link on his way along the leg
+            f32 dx;
+            f32 dz;
+            f32 dist;
+
+            if (sPbFrame == 0) {
+                Bench_SetMode(mode);
+                Bench_Breadcrumb(sPbLeg, mode, sPbBlock);
+                // every other leg on the lake bed in the iron boots; the rest in his own boots (swimming, running,
+                // fishing)
+                Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, (((sPbLeg % 2) == 0) && ((sPbLeg % 3) != 1))
+                                                                ? EQUIP_VALUE_BOOTS_IRON
+                                                                : EQUIP_VALUE_BOOTS_KOKIRI);
+                Player_SetEquipmentData(play, player);
+                PlayBench_Place(play, player, from->eye.x, from->eye.y, from->eye.z,
+                                Math_Vec3f_Yaw(&from->eye, &to->eye));
+                sPbFishing = false;
+            }
+            if (sPbFrame == 10) {
+                // every third leg he fishes, if he's standing on land
+                sPbFishing = ((sPbLeg % 3) == 1) && !(player->stateFlags1 & PLAYER_STATE1_27) &&
+                             (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND);
+            }
+            if (sPbFrame >= PB_SKIP) {
+                Bench_Record(sPbLeg, mode);
+            }
+            dx = to->eye.x - player->actor.world.pos.x;
+            dz = to->eye.z - player->actor.world.pos.z;
+            dist = sqrtf(SQ(dx) + SQ(dz));
+            if (sPbFishing && (sPbFrame > 10)) {
+                if (sPbFrame < 16) {
+                    PlayBench_Steer(play, Math_Atan2S(dz, dx), 20); // face the water first
+                } else {
+                    sPbButton |= PlayBench_Angle();
+                }
+            } else if (sPbFrame > 2) {
+                if (dist > PB_ARRIVED) {
+                    PlayBench_Steer(play, Math_Atan2S(dz, dx), 80);
+                }
+                // diving where the leg's end is under the water
+                if ((player->stateFlags1 & PLAYER_STATE1_27) && PlayBench_Under(to->title) &&
+                    ((sPbTimer % 90) == 0)) {
+                    sPbButton |= BTN_A;
+                }
+                // stuck on a wall or a ledge: on along the way
+                if (++sPbStuckFrame >= 40) {
+                    f32 moved = Math_Vec3f_DistXZ(&player->actor.world.pos, &sPbStuckPos);
+
+                    if ((moved < 25.0f) && (dist > PB_ARRIVED * 2)) {
+                        f32 step = 200.0f / dist;
+
+                        PlayBench_Place(play, player, player->actor.world.pos.x + dx * step,
+                                        player->actor.world.pos.y, player->actor.world.pos.z + dz * step,
+                                        Math_Atan2S(dz, dx));
+                    }
+                    sPbStuckFrame = 0;
+                    sPbStuckPos = player->actor.world.pos;
+                }
+            }
+            if (++sPbFrame >= PB_SKIP + BENCH_FRAMES) {
+                sPbState = 3;
+                sPbFrame = 0;
+            }
+            break;
+        }
+
+        case 3: // after a block: the line reeled in and any catch put away, then the next mode, or the next leg
+            Bench_SetMode(BENCH_BASE);
+            if ((gFishmodRodInfo.state > 1) && (sPbFrame++ < PB_CLEANUP)) {
+                if (gFishmodRodInfo.state == 7) {
+                    sPbButton |= ((sPbTimer % 8) == 0) ? BTN_A : 0;
+                } else if (gFishmodRodInfo.state != 2) {
+                    sPbButton |= BTN_A;
+                }
+                break;
+            }
+            sPbFrame = 0;
+            if (++sPbBlock < BENCH_MODES) {
+                sPbState = 2;
+            } else {
+                sPbState = 4;
+            }
+            break;
+
+        default: // the memory tests, then the next leg
+            Bench_Micro();
+            if (++sPbFrame >= BENCH_MICRO_FRAMES) {
+                sBench.visits++;
+                sPbBlock = 0;
+                sPbFrame = 0;
+                if (++sPbLeg >= n) {
+                    sBench.laps++;
+                    sPbState = 0;
+                } else {
+                    sPbState = 2;
+                }
+                Bench_Save();
+            }
+            break;
+    }
+    {
+        static const char* sModeNames[] = { "fresh", "base", "fishfrozen", "nofishdraw", "nofish", "noprops",
+                                            "nowater", "bare" };
+
+#ifdef FISHMOD_BENCH_SHOWTEXT
+        Fishmod_DebugPrintf(3, "pb s%d f%d P %d %d %d st%08X", sPbState, sPbFrame, (s32)player->actor.world.pos.x,
+                            (s32)player->actor.world.pos.y, (s32)player->actor.world.pos.z, player->stateFlags1);
+#endif
+        Fishmod_DebugPrintf(2, "bench lap %d leg %d %s c%d", sBench.laps + 1, sPbLeg + 1,
+                            ((sPbState == 2) && (sPbBlock < BENCH_MODES)) ? sModeNames[sPbBlock] : "-", sPbCond);
+    }
+}
+
+/** The bench's controller: what Fishmod_PlayBenchUpdate decided last frame. */
+static s32 PlayBench_Input(Input* input) {
+    u16 buttonDiff;
+
+    if (!sPbActive) {
+        return false;
+    }
+    input->prev = input->cur;
+    input->cur.button = sPbButton;
+    input->cur.stick_x = sPbStickX;
+    input->cur.stick_y = sPbStickY;
+    buttonDiff = input->prev.button ^ input->cur.button;
+    input->press.button = input->cur.button & buttonDiff;
+    input->rel.button = input->prev.button & buttonDiff;
+    PadUtils_UpdateRelXY(input);
+    input->press.stick_x = 0;
+    input->press.stick_y = 0;
+    return true;
+}
+#endif
 #endif
 
 static void Fishmod_TourDraw(Gfx** gfxP) {
@@ -2206,6 +2565,8 @@ void Fishmod_DebugBoot(void) {
     Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_MASTER);
     Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_IRON);
     Inventory_ChangeEquipment(EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_ZORA); // no drowning
+    Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HYLIAN);
+    SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA); // the lake full, as the test build has it
 #endif
     gSaveContext.respawnFlag = 0;
     gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = ENTR_LOAD_OPENING;
@@ -2654,7 +3015,11 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         Fishmod_ViewUpdate(play);
     }
 #endif
-#ifdef FISHMOD_TOUR
+#if defined(FISHMOD_BENCH_PLAY)
+    if (sPlacedPlayer && (sPlayFrames > 40)) {
+        Fishmod_PlayBenchUpdate(play);
+    }
+#elif defined(FISHMOD_TOUR)
     if (sPlacedPlayer && (sPlayFrames > 40)) {
         Fishmod_TourUpdate(play);
     }
@@ -2690,6 +3055,11 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     FishmodAutoplayStep* step;
     u16 buttonDiff;
 
+#ifdef FISHMOD_BENCH_PLAY
+    if (PlayBench_Input(input)) {
+        return;
+    }
+#endif
 #ifdef FISHMOD_TOUR
     // the tour has the controller: Link stands still
     if (sTourCamId != SUB_CAM_ID_DONE) {
@@ -2880,6 +3250,11 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
     }
 #ifdef FISHMOD_PLAYLOG
     return; // played as the test build: the frame counter only
+#endif
+#ifdef FISHMOD_BENCH_PLAY
+    if (!sTourDebugText) {
+        return; // the bench as played: nothing over the frames being timed until it's done
+    }
 #endif
 #ifdef FISHMOD_TOUR
     if (sTourCamId != SUB_CAM_ID_DONE) {
