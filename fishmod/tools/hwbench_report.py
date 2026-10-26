@@ -20,7 +20,10 @@ MODES_V = {
     5: ["base", "noimp", "nofartex", "nodissolve", "zsame", "nonear", "nofar", "noprops", "nosky"],
     6: ["base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky"],
     7: ["base", "fishfrozen", "nofishdraw", "nofish", "noprops", "nowater", "noskyonly", "bare"],  # roaming
+    8: ["fresh", "base", "fishfrozen", "nofishdraw", "nofish", "noprops", "nowater", "bare"],  # Link plays
 }
+CONDS = ["clear dawn", "clear midday", "clear dusk", "clear night", "rain dawn", "rain midday", "rain dusk",
+         "rain night"]
 MODE_DOC = {
     "base": "as shipped",
     "tex4": "props' textures in 4 bits (half the memory per texture load)",
@@ -45,6 +48,7 @@ MODE_DOC = {
     "nomoss": "no moss mats",
     "noxlu": "no props, no room translucency (the water surface)",
     "fishfrozen": "the fish frozen: no AI or swimming (still drawn)",
+    "fresh": "as shipped, the first pass along the leg (the fish ahead waking as Link arrives)",
     "nofishdraw": "the fish not drawn (still thinking and swimming)",
     "nowater": "no water surface (room translucency)",
     "noskyonly": "no skybox (props and fish as shipped)",
@@ -95,7 +99,18 @@ def read(path):
             ctx.append(struct.unpack(">III", d[o:o + 12]))
             o += 12
         micro.append(ctx)
-    return dict(version=version, hw=hw, laps=laps, visits=visits, cells=cells, micro=micro)
+    conds = []
+    if version == 8:
+        for c in range(len(CONDS)):
+            row = []
+            for m in range(modes):
+                frames = struct.unpack(">I", d[o:o + 4])[0]
+                sums = struct.unpack(f">{metrics}I", d[o + 4:o + 4 + 4 * metrics])
+                maxs = struct.unpack(f">{metrics}I", d[o + 4 + 4 * metrics:o + 4 + 8 * metrics])
+                row.append((frames, sums, maxs))
+                o += 4 + 8 * metrics
+            conds.append(row)
+    return dict(version=version, hw=hw, laps=laps, visits=visits, cells=cells, micro=micro, conds=conds)
 
 
 def avg(cell, name):
@@ -157,7 +172,7 @@ def main():
     if args.shots:
         STOP_NAMES[:] = [f"Shot {i + 1}" for i in range(len(STOP_NAMES))]
     r = read(args.save)
-    if r["version"] == 7:
+    if r["version"] in (7, 8):
         # the roaming bench times the flight from each stop to the next
         n = len(STOP_NAMES)
         STOP_NAMES[:] = [f"{STOP_NAMES[i]} -> {STOP_NAMES[(i + 1) % n]}" for i in range(n)]
@@ -178,8 +193,22 @@ def main():
       "**pipe** = drawing, **tmem** = loading textures.\n")
 
     totals = {m: [0.0, 0, 0.0] for m in MODES}
-    p("| stop | mode | fps | CPU upd | CPU draw | RSP | RDP ms | buf | pipe | tmem | props | worst frame |")
-    p("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    if r["conds"]:
+        p("## By time of day and weather (all legs)\n")
+        p("| conditions | mode | frames | fps | CPU upd | CPU draw | RSP | RDP | fish upd | fish draw | worst frame |")
+        p("|---|---|---|---|---|---|---|---|---|---|---|")
+        for c, row in enumerate(r["conds"]):
+            for m, cell in enumerate(row):
+                if not cell[0] or MODES[m] not in ("fresh", "base", "fishfrozen", "nofish"):
+                    continue
+                f = lambda k: avg(cell, k) / 1000
+                p(f"| {CONDS[c] if m == 0 else ''} | {MODES[m]} | {cell[0]} | {1e6 / avg(cell, 'period'):.1f} | "
+                  f"{f('cpu_update'):.1f} | {f('cpu_draw'):.1f} | {f('rsp_gfx'):.1f} | {f('rdp'):.1f} | "
+                  f"{f('fish_upd'):.1f} | {f('fish_draw'):.1f} | {cell[2][METRICS.index('period')] / 1000:.0f} ms |")
+        p("")
+    p("| stop | mode | fps | CPU upd | CPU draw | RSP | RDP ms | buf | pipe | tmem | fish upd | fish draw | props | "
+      "worst frame |")
+    p("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for s, row in enumerate(r["cells"]):
         for m, cell in enumerate(row):
             if not cell[0]:
@@ -194,7 +223,8 @@ def main():
             p(f"| {s + 1} {STOP_NAMES[s] if m == 0 else ''} | {MODES[m]} | {1e6 / period:.1f} | "
               f"{avg(cell, 'cpu_update') / 1000:.1f} | {avg(cell, 'cpu_draw') / 1000:.1f} | "
               f"{avg(cell, 'rsp_gfx') / 1000:.1f} | {avg(cell, 'rdp') / 1000:.1f} | {pct('dp_buf')} | "
-              f"{pct('dp_pipe')} | {pct('dp_tmem')} | {avg(cell, 'props'):.0f} | {worst:.0f} ms |")
+              f"{pct('dp_pipe')} | {pct('dp_tmem')} | {avg(cell, 'fish_upd') / 1000:.1f} | "
+              f"{avg(cell, 'fish_draw') / 1000:.1f} | {avg(cell, 'props'):.0f} | {worst:.0f} ms |")
 
     p("\n## Each mode against the build as shipped (all stops)\n")
     p("Frame times stop at the 20 fps cap (50 ms), so the RDP's own time shows the modes' cost better.\n")
