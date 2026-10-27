@@ -78,6 +78,13 @@ def read(path):
         names = MODES_V.get(version, MODES_V[max(MODES_V)])
         print(f"(last breadcrumb: lap {laps + 1}, stop {cstop + 1}, mode {names[cmode] if cmode < len(names) else cmode}, "
               f"block {cblock}; {count} written)")
+    if d[0x7B00:0x7B04] == b"FSTL":
+        beat, pc, ra, sp, sr = struct.unpack(">5I", d[0x7B04:0x7B18])
+        bench = struct.unpack(">6I", d[0x7B18:0x7B30])
+        stack = struct.unpack(">48I", d[0x7B30:0x7BF0])
+        print(f"(STALL: no frame for 10 s after play frame {beat}; graphics thread pc {pc:08x} ra {ra:08x} sp {sp:08x}; "
+              f"bench lap {bench[0] + 1} leg {bench[1] + 1} block {bench[2]} state {bench[3]} frame {bench[4]})")
+        print("(its stack: " + " ".join(f"{w:08x}" for w in stack) + ")")
     if d[0x7C00:0x7C04] == b"FFLT":
         kind, thread, pc, cause, bad, ra, sp = struct.unpack(">7I", d[0x7C04:0x7C20])
         bench = struct.unpack(">6I", d[0x7C20:0x7C38])
