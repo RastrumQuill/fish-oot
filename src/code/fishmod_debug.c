@@ -2245,6 +2245,13 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     if (!Bench_Init() || (player == NULL)) {
         return;
     }
+#ifdef FISHMOD_STALL_TEST
+    if (sPbTimer == FISHMOD_STALL_TEST) {
+        volatile s32 forever = 1;
+
+        while (forever) {} // (checking the watchdog)
+    }
+#endif
 #ifdef FISHMOD_FAULT_TEST
     if (sPbTimer == FISHMOD_FAULT_TEST) {
         *(volatile u32*)0x10 = 0; // (checking the crash record)
@@ -2932,10 +2939,19 @@ static void Fishmod_PlayLog(PlayState* play) {
 }
 #endif
 
+#ifdef FISHMOD_HWBENCH
+static void Watchdog_Start(void);
+static volatile u32 sWatchdogBeat;
+#endif
+
 void Fishmod_DebugPlayUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     sPlayFrames++;
+#ifdef FISHMOD_HWBENCH
+    sWatchdogBeat = sPlayFrames;
+    Watchdog_Start();
+#endif
     Fishmod_DebugTiming();
 #ifdef FISHMOD_PLAYLOG
     Fishmod_PlayLog(play);
@@ -3231,6 +3247,91 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     }
 }
 
+
+#ifdef FISHMOD_HWBENCH
+/**
+ * The watchdog: a thread of its own that wakes every 2 seconds and checks the game's frames are still going. If none
+ * has passed for 10 seconds (a hang, an endless loop, the graphics waiting forever) it writes to SRAM 0x7B00 ('FSTL')
+ * where the graphics thread is (its pc, ra, sp and the top of its stack) and what the bench was doing, once. A crash
+ * is caught by the fault handler instead (Fishmod_DebugFault), but this also catches what never faults.
+ */
+extern OSThread sGraphThread;
+
+static OSThread sWatchdogThread;
+static u64 sWatchdogStack[0x400 / sizeof(u64)];
+static OSMesgQueue sWatchdogQueue;
+static OSMesg sWatchdogMsg;
+static OSTimer sWatchdogTimer;
+static volatile u32 sWatchdogBeat; // play frames, counted by Fishmod_DebugPlayUpdate
+
+static void Watchdog_Entry(void* arg) {
+    static struct {
+        u32 magic; // 'FSTL'
+        u32 beat;  // play frames when it stopped
+        u32 pc;
+        u32 ra;
+        u32 sp;
+        u32 sr;
+        u32 bench[6]; // play bench: lap, leg, block, state, frame, play frames
+        u32 stack[48];
+    } sRec;
+    u32 last = 0;
+    s32 still = 0;
+    s32 done = false;
+    OSMesg msg;
+    s32 i;
+
+    while (true) {
+        osRecvMesg(&sWatchdogQueue, &msg, OS_MESG_BLOCK);
+        if (done) {
+            continue;
+        }
+        if (sWatchdogBeat != last) {
+            last = sWatchdogBeat;
+            still = 0;
+            continue;
+        }
+        if (++still < 5) {
+            continue;
+        }
+        sRec.magic = 0x4653544C;
+        sRec.beat = last;
+        sRec.pc = sGraphThread.context.pc;
+        sRec.ra = (u32)sGraphThread.context.ra;
+        sRec.sp = (u32)sGraphThread.context.sp;
+        sRec.sr = sGraphThread.context.sr;
+#ifdef FISHMOD_BENCH_PLAY
+        sRec.bench[0] = sBench.laps;
+        sRec.bench[1] = sPbLeg;
+        sRec.bench[2] = sPbBlock;
+        sRec.bench[3] = sPbState;
+        sRec.bench[4] = sPbFrame;
+#endif
+        sRec.bench[5] = last;
+        for (i = 0; i < ARRAY_COUNT(sRec.stack); i++) {
+            u32 addr = sRec.sp + i * 4;
+
+            // the graphics thread's stack (it's in RDRAM; anything else is left out)
+            sRec.stack[i] = ((addr >= 0x80000000) && (addr < 0x80800000)) ? *(u32*)addr : 0;
+        }
+        SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7B00, &sRec, sizeof(sRec), OS_WRITE);
+        done = true;
+    }
+}
+
+static void Watchdog_Start(void) {
+    static s32 sStarted;
+
+    if (sStarted) {
+        return;
+    }
+    sStarted = true;
+    osCreateMesgQueue(&sWatchdogQueue, &sWatchdogMsg, 1);
+    osCreateThread(&sWatchdogThread, 99, Watchdog_Entry, NULL, (u8*)sWatchdogStack + sizeof(sWatchdogStack), 120);
+    osStartThread(&sWatchdogThread);
+    osSetTimer(&sWatchdogTimer, OS_USEC_TO_CYCLES(2000000), OS_USEC_TO_CYCLES(2000000), &sWatchdogQueue, NULL);
+}
+#endif
 
 /**
  * A crash or a hang, written to SRAM 0x7C00 for hwbench_report.py: the thread and where it stopped, what the bench
