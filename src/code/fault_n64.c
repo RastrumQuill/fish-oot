@@ -787,6 +787,9 @@ void Fault_ThreadEntry(UNUSED void* arg0) {
             }
         } while (faultedThread == NULL);
         gFaultFaultedThread = faultedThread;
+#if FISHMOD_DEBUG
+        Fishmod_DebugFault(faultedThread, NULL, NULL);
+#endif
         Fault_LogThreadContext(faultedThread);
         osSyncPrintf("%d %s %d:%s = %d\n", osGetThreadId(NULL), "fault.c", 1454, "fault_display_enable",
                      gFaultDisplayEnable);
@@ -839,6 +842,9 @@ NORETURN void Fault_AddHungupAndCrashImpl(const char* exp1, const char* exp2) {
     osSyncPrintf("HungUp on Thread %d", osGetThreadId(NULL));
     osSyncPrintf("%s\n", exp1 != NULL ? exp1 : "(NULL)");
     osSyncPrintf("%s\n", exp2 != NULL ? exp2 : "(NULL)");
+#if FISHMOD_DEBUG
+    Fishmod_DebugFault(NULL, exp1, exp2);
+#endif
     while (gFaultDisplayEnable == 0) {
         Fault_SleepImpl(1000);
     }
