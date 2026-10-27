@@ -2245,6 +2245,11 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     if (!Bench_Init() || (player == NULL)) {
         return;
     }
+#ifdef FISHMOD_FAULT_TEST
+    if (sPbTimer == FISHMOD_FAULT_TEST) {
+        *(volatile u32*)0x10 = 0; // (checking the crash record)
+    }
+#endif
     Fishmod_SampleRdp();
     sPbTimer++;
     sPbStickX = sPbStickY = 0;
@@ -2380,6 +2385,7 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
             sPbFrame = 0;
             if (++sPbBlock < BENCH_MODES) {
                 sPbState = 2;
+                Bench_Save(); // after every block: a run cut short keeps what it timed
             } else {
                 sPbState = 4;
             }
@@ -3223,6 +3229,64 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
         sScriptStepFrame = 0;
         sScriptStepIndex++;
     }
+}
+
+
+/**
+ * A crash or a hang, written to SRAM 0x7C00 for hwbench_report.py: the thread and where it stopped, what the bench
+ * was doing, and a hang's message. The console shows the crash screen only after a button combination, so without
+ * this a crash on the hardware is just a frozen picture.
+ */
+void Fishmod_DebugFault(OSThread* thread, const char* exp1, const char* exp2) {
+    static struct {
+        u32 magic; // 'FFLT'
+        u32 kind;  // 1: crash, 2: hang
+        u32 thread;
+        u32 pc;
+        u32 cause;
+        u32 badvaddr;
+        u32 ra;
+        u32 sp;
+        u32 bench[6]; // play bench: lap, leg, block, state, frame, play frames
+        char text[64]; // a hang's two messages
+    } sRec;
+    s32 i = 0;
+
+    sRec.magic = 0x46464C54;
+    sRec.kind = (thread != NULL) ? 1 : 2;
+    sRec.thread = (thread != NULL) ? thread->id : osGetThreadId(NULL);
+    if (thread != NULL) {
+        sRec.pc = thread->context.pc;
+        sRec.cause = thread->context.cause;
+        sRec.badvaddr = thread->context.badvaddr;
+        sRec.ra = (u32)thread->context.ra;
+        sRec.sp = (u32)thread->context.sp;
+    }
+#ifdef FISHMOD_BENCH_PLAY
+    sRec.bench[0] = sBench.laps;
+    sRec.bench[1] = sPbLeg;
+    sRec.bench[2] = sPbBlock;
+    sRec.bench[3] = sPbState;
+    sRec.bench[4] = sPbFrame;
+#endif
+    sRec.bench[5] = sPlayFrames;
+    {
+        const char* parts[2];
+        s32 p;
+
+        parts[0] = exp1;
+        parts[1] = exp2;
+        for (p = 0; p < 2; p++) {
+            const char* c = parts[p];
+
+            while ((c != NULL) && (*c != '\0') && (i < (s32)sizeof(sRec.text) - 2)) {
+                sRec.text[i++] = *c++;
+            }
+            sRec.text[i++] = '|';
+        }
+        sRec.text[MIN(i, (s32)sizeof(sRec.text) - 1)] = '\0';
+    }
+    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7C00, &sRec, sizeof(sRec), OS_WRITE);
 }
 
 void Fishmod_DebugPrintf(s32 line, const char* fmt, ...) {

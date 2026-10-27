@@ -78,6 +78,13 @@ def read(path):
         names = MODES_V.get(version, MODES_V[max(MODES_V)])
         print(f"(last breadcrumb: lap {laps + 1}, stop {cstop + 1}, mode {names[cmode] if cmode < len(names) else cmode}, "
               f"block {cblock}; {count} written)")
+    if d[0x7C00:0x7C04] == b"FFLT":
+        kind, thread, pc, cause, bad, ra, sp = struct.unpack(">7I", d[0x7C04:0x7C20])
+        bench = struct.unpack(">6I", d[0x7C20:0x7C38])
+        text = d[0x7C38:0x7C78].split(b"\0")[0].decode("ascii", "replace")
+        print(f"({'CRASH' if kind == 1 else 'HANG'} on thread {thread}: pc {pc:08x} cause {cause:08x} "
+              f"badvaddr {bad:08x} ra {ra:08x} sp {sp:08x} {text}; bench lap {bench[0] + 1} leg {bench[1] + 1} "
+              f"block {bench[2]} state {bench[3]} frame {bench[4]}, play frame {bench[5]})")
     if magic != 0x4642454E:
         raise SystemExit(f"no bench results in {path}")
     laps, visits = struct.unpack(">II", d[12:20])

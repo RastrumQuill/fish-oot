@@ -463,6 +463,8 @@ void Fishmod_DebugPlayUpdate(struct PlayState* play);
 void Fishmod_DebugDrawText(struct GameState* gameState, Gfx** gfxP);
 void Fishmod_DebugPrintf(s32 line, const char* fmt, ...);
 void Fishmod_DebugColNodes(s32 sceneId, s32 used, s32 max);
+// A crash or a hang, written to SRAM 0x7C00 ('FFLT') so the save says where it happened (fault_n64.c calls it)
+void Fishmod_DebugFault(struct OSThread* thread, const char* exp1, const char* exp2);
 #endif
 
 #endif
