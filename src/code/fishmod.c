@@ -916,6 +916,12 @@ void Fishmod_AddPropCollision(PlayState* play, CollisionHeader* colHeader) {
 #if FISHMOD_OPT >= 5
     s32 i;
 
+#if FISHMOD_DEBUG
+    if (gFishmodNoPropCol) {
+        return; // (a bench without the rocks' collision, to see what it costs)
+    }
+#endif
+
     for (i = 0; i < ARRAY_COUNT(sPropCollisions); i++) {
         if (sPropCollisions[i].sceneId == play->sceneId) {
             size_t size = sPropCollisions[i].romEnd - sPropCollisions[i].romStart;

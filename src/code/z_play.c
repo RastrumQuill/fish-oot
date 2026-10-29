@@ -604,9 +604,9 @@ void Play_Update(PlayState* this) {
     s32 isPaused;
     STACK_PAD(s32);
 
-    Fishmod_PlayUpdate(this);
+    FISHMOD_SECT(FISHMOD_SECT_FM_PLAY, Fishmod_PlayUpdate(this));
 #if FISHMOD_DEBUG
-    Fishmod_DebugPlayUpdate(this);
+    FISHMOD_SECT(FISHMOD_SECT_FM_DEBUG, Fishmod_DebugPlayUpdate(this));
 #endif
 
 #if DEBUG_FEATURES
@@ -1019,7 +1019,7 @@ void Play_Update(PlayState* this) {
             if (!DEBUG_FEATURES) {}
 
             PLAY_LOG(3561);
-            Object_UpdateEntries(&this->objectCtx);
+            FISHMOD_SECT(FISHMOD_SECT_OBJECTS, Object_UpdateEntries(&this->objectCtx));
 
             PLAY_LOG(3577);
 
@@ -1042,37 +1042,37 @@ void Play_Update(PlayState* this) {
                     }
                 } else {
                     PLAY_LOG(3606);
-                    Room_ProcessRoomRequest(this, &this->roomCtx);
+                    FISHMOD_SECT(FISHMOD_SECT_ROOMREQ, Room_ProcessRoomRequest(this, &this->roomCtx));
 
                     PLAY_LOG(3612);
-                    CollisionCheck_AT(this, &this->colChkCtx);
+                    FISHMOD_SECT(FISHMOD_SECT_COL_AT, CollisionCheck_AT(this, &this->colChkCtx));
 
                     PLAY_LOG(3618);
-                    CollisionCheck_OC(this, &this->colChkCtx);
+                    FISHMOD_SECT(FISHMOD_SECT_COL_OC, CollisionCheck_OC(this, &this->colChkCtx));
 
                     PLAY_LOG(3624);
-                    CollisionCheck_Damage(this, &this->colChkCtx);
+                    FISHMOD_SECT(FISHMOD_SECT_COL_DAMAGE, CollisionCheck_Damage(this, &this->colChkCtx));
 
                     PLAY_LOG(3631);
-                    CollisionCheck_ClearContext(this, &this->colChkCtx);
+                    FISHMOD_SECT(FISHMOD_SECT_COL_CLEAR, CollisionCheck_ClearContext(this, &this->colChkCtx));
 
                     PLAY_LOG(3637);
 
                     if (!this->haltAllActors) {
-                        Actor_UpdateAll(this, &this->actorCtx);
+                        FISHMOD_SECT(FISHMOD_SECT_ACTORS, Actor_UpdateAll(this, &this->actorCtx));
                     }
 
                     PLAY_LOG(3643);
-                    Cutscene_UpdateManual(this, &this->csCtx);
+                    FISHMOD_SECT(FISHMOD_SECT_CUTSCENE, Cutscene_UpdateManual(this, &this->csCtx));
 
                     PLAY_LOG(3648);
-                    Cutscene_UpdateScripted(this, &this->csCtx);
+                    FISHMOD_SECT(FISHMOD_SECT_CUTSCENE, Cutscene_UpdateScripted(this, &this->csCtx));
 
                     PLAY_LOG(3651);
-                    Effect_UpdateAll(this);
+                    FISHMOD_SECT(FISHMOD_SECT_EFFECTS, Effect_UpdateAll(this));
 
                     PLAY_LOG(3657);
-                    EffectSs_UpdateAll(this);
+                    FISHMOD_SECT(FISHMOD_SECT_EFFECTS, EffectSs_UpdateAll(this));
 
                     PLAY_LOG(3662);
                 }
@@ -1081,10 +1081,10 @@ void Play_Update(PlayState* this) {
             }
 
             PLAY_LOG(3672);
-            func_80095AA0(this, &this->roomCtx.curRoom, &input[1], 0);
+            FISHMOD_SECT(FISHMOD_SECT_ROOMFX, func_80095AA0(this, &this->roomCtx.curRoom, &input[1], 0));
 
             PLAY_LOG(3675);
-            func_80095AA0(this, &this->roomCtx.prevRoom, &input[1], 1);
+            FISHMOD_SECT(FISHMOD_SECT_ROOMFX, func_80095AA0(this, &this->roomCtx.prevRoom, &input[1], 1));
 
             PLAY_LOG(3677);
 
@@ -1109,31 +1109,31 @@ void Play_Update(PlayState* this) {
             }
 
             PLAY_LOG(3708);
-            Skybox_Update(&this->skyboxCtx);
+            FISHMOD_SECT(FISHMOD_SECT_SKYBOX, Skybox_Update(&this->skyboxCtx));
 
             PLAY_LOG(3716);
 
             if (IS_PAUSED(&this->pauseCtx)) {
                 PLAY_LOG(3721);
-                KaleidoScopeCall_Update(this);
+                FISHMOD_SECT(FISHMOD_SECT_MESSAGE, KaleidoScopeCall_Update(this));
             } else if (this->gameOverCtx.state != GAMEOVER_INACTIVE) {
                 PLAY_LOG(3727);
-                GameOver_Update(this);
+                FISHMOD_SECT(FISHMOD_SECT_MESSAGE, GameOver_Update(this));
             } else {
                 PLAY_LOG(3733);
-                Message_Update(this);
+                FISHMOD_SECT(FISHMOD_SECT_MESSAGE, Message_Update(this));
             }
 
             PLAY_LOG(3737);
 
             PLAY_LOG(3742);
-            Interface_Update(this);
+            FISHMOD_SECT(FISHMOD_SECT_INTERFACE, Interface_Update(this));
 
             PLAY_LOG(3765);
-            AnimTaskQueue_Update(this, &this->animTaskQueue);
+            FISHMOD_SECT(FISHMOD_SECT_ANIMTASK, AnimTaskQueue_Update(this, &this->animTaskQueue));
 
             PLAY_LOG(3771);
-            SfxSource_UpdateAll(this);
+            FISHMOD_SECT(FISHMOD_SECT_SFXSRC, SfxSource_UpdateAll(this));
 
             PLAY_LOG(3777);
             Letterbox_Update(R_UPDATE_RATE);
@@ -1161,18 +1161,18 @@ skip:
         for (i = 0; i < NUM_CAMS; i++) {
             if ((i != this->nextCamId) && (this->cameraPtrs[i] != NULL)) {
                 PLAY_LOG(3809);
-                Camera_Update(this->cameraPtrs[i]);
+                FISHMOD_SECT(FISHMOD_SECT_CAMERA, Camera_Update(this->cameraPtrs[i]));
             }
         }
 
-        Camera_Update(this->cameraPtrs[this->nextCamId]);
+        FISHMOD_SECT(FISHMOD_SECT_CAMERA, Camera_Update(this->cameraPtrs[this->nextCamId]));
 
         PLAY_LOG(3814);
     }
 
     PLAY_LOG(3816);
-    Environment_Update(this, &this->envCtx, &this->lightCtx, &this->pauseCtx, &this->msgCtx, &this->gameOverCtx,
-                       this->state.gfxCtx);
+    FISHMOD_SECT(FISHMOD_SECT_ENV, Environment_Update(this, &this->envCtx, &this->lightCtx, &this->pauseCtx,
+                                                      &this->msgCtx, &this->gameOverCtx, this->state.gfxCtx));
 }
 
 void Play_DrawOverlayElements(PlayState* this) {
