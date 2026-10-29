@@ -2510,13 +2510,28 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                         actor->colorFilterTimer--;
                     }
 #if FISHMOD_DEBUG
-                    if (actor->id == ACTOR_EN_FISHMOD) {
-                        FISHMOD_PROF(FISHMOD_PROF_U_ENGINE, actor->update(actor, play));
-                    } else
-#endif
                     {
-                        actor->update(actor, play);
+                        // each kind's update timed, for the area bench
+                        OSTime start = osGetTime();
+                        u32 cycles;
+
+                        if (actor->id == ACTOR_EN_FISHMOD) {
+                            FISHMOD_PROF(FISHMOD_PROF_U_ENGINE, actor->update(actor, play));
+                        } else {
+                            actor->update(actor, play);
+                        }
+                        cycles = (u32)(osGetTime() - start);
+                        if ((u32)actor->id < FISHMOD_ACTOR_IDS) {
+                            gFishmodActorCycles[actor->id] += cycles;
+                            if (gFishmodActorCount[actor->id] < 255) {
+                                gFishmodActorCount[actor->id]++;
+                            }
+                        }
+                        gFishmodCatCycles[i] += cycles;
                     }
+#else
+                    actor->update(actor, play);
+#endif
                     DynaPoly_UnsetAllInteractFlags(play, &play->colCtx.dyna, actor);
                 }
 
@@ -2527,7 +2542,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
         }
 
         if (i == ACTORCAT_BG) {
-            DynaPoly_UpdateContext(play, &play->colCtx.dyna);
+            FISHMOD_SECT(FISHMOD_SECT_DYNAPOLY, DynaPoly_UpdateContext(play, &play->colCtx.dyna));
         }
     }
 

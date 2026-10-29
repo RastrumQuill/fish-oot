@@ -287,6 +287,43 @@ typedef enum FishmodCpuTimer {
     FISHMOD_CPU_MAX
 } FishmodCpuTimer;
 extern OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
+// The update's steps, timed one by one (Play_Update, Actor_UpdateAll) for the area bench (FISHMOD_BENCH_AREA): summed
+// over a frame, cleared by whoever reads them
+typedef enum FishmodSect {
+    FISHMOD_SECT_FM_PLAY,    // Fishmod_PlayUpdate (the mod's per-frame work outside its actors)
+    FISHMOD_SECT_FM_DEBUG,   // Fishmod_DebugPlayUpdate (the debug harness and the benches themselves)
+    FISHMOD_SECT_OBJECTS,    // Object_UpdateEntries
+    FISHMOD_SECT_ROOMREQ,    // Room_ProcessRoomRequest
+    FISHMOD_SECT_COL_AT,     // CollisionCheck_AT
+    FISHMOD_SECT_COL_OC,     // CollisionCheck_OC
+    FISHMOD_SECT_COL_DAMAGE, // CollisionCheck_Damage
+    FISHMOD_SECT_COL_CLEAR,  // CollisionCheck_ClearContext
+    FISHMOD_SECT_ACTORS,     // Actor_UpdateAll (all of it)
+    FISHMOD_SECT_DYNAPOLY,   //   DynaPoly_UpdateContext (inside it)
+    FISHMOD_SECT_CUTSCENE,   // Cutscene_UpdateManual + Scripted
+    FISHMOD_SECT_EFFECTS,    // Effect_UpdateAll + EffectSs_UpdateAll
+    FISHMOD_SECT_ROOMFX,     // the rooms' per-frame updates (func_80095AA0)
+    FISHMOD_SECT_SKYBOX,     // Skybox_Update
+    FISHMOD_SECT_MESSAGE,    // Message_Update (or the pause menu, or game over)
+    FISHMOD_SECT_INTERFACE,  // Interface_Update
+    FISHMOD_SECT_ANIMTASK,   // AnimTaskQueue_Update
+    FISHMOD_SECT_SFXSRC,     // SfxSource_UpdateAll
+    FISHMOD_SECT_CAMERA,     // Camera_Update (every camera)
+    FISHMOD_SECT_ENV,        // Environment_Update
+    FISHMOD_SECT_MAX
+} FishmodSect;
+#define FISHMOD_ACTOR_IDS 480 // (ACTOR_ID_MAX is 471)
+#define FISHMOD_ACTOR_CATS 12
+extern OSTime gFishmodSect[FISHMOD_SECT_MAX];
+extern u32 gFishmodActorCycles[FISHMOD_ACTOR_IDS]; // each actor kind's updates this frame (CPU count cycles)
+extern u8 gFishmodActorCount[FISHMOD_ACTOR_IDS];   // and how many of it updated
+extern u32 gFishmodCatCycles[FISHMOD_ACTOR_CATS];
+#define FISHMOD_SECT(slot, stmt)                          \
+    {                                                     \
+        OSTime sectStart_ = osGetTime();                  \
+        stmt;                                             \
+        gFishmodSect[slot] += osGetTime() - sectStart_;   \
+    }
 
 // Finer timers for the parts of a fish's update and draw (fishmod/tools/read_stats.py --prof). Nested slots are
 // also counted in the slot around them.
@@ -382,6 +419,10 @@ extern s16 gFishmodDebugFocusYaw;
     {                            \
         stmt;                    \
     }
+#define FISHMOD_SECT(slot, stmt) \
+    {                            \
+        stmt;                    \
+    }
 #define FISHMOD_BENCH_SKIP(flag) 0
 #define FISHMOD_ZBUFFER ((u16*)gZBuffer)
 #endif
@@ -419,6 +460,9 @@ FishmodScatterHeader* Fishmod_LoadScatter(s16 sceneId);
 // Adds the scene's habitat-prop collision (rocks) to its collision header, before BgCheck reads it
 struct CollisionHeader;
 void Fishmod_AddPropCollision(struct PlayState* play, struct CollisionHeader* colHeader);
+#if FISHMOD_DEBUG
+extern s32 gFishmodNoPropCol; // the debug harness can leave the props' collision out (FISHMOD_SCRIPT_NO_PROPCOL)
+#endif
 
 // Time: the 20 minute day and the hidden clock for places where time stands still (fishmod.c)
 void Fishmod_AdvanceTime(struct PlayState* play);

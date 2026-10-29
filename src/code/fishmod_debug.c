@@ -59,6 +59,14 @@ typedef struct FishmodTourStop {
     const char* lines[3];
 } FishmodTourStop;
 
+// A spot for the area bench (FISHMOD_BENCH_AREA): where Link walks, and from how high to look for the ground there
+typedef struct FishmodAreaSpot {
+    s16 x;
+    s16 z;
+    s16 probeY;
+    const char* name;
+} FishmodAreaSpot;
+
 // A viewpoint for the LOD sweep (fishmod/tools/gen_lod_views.py)
 typedef struct FishmodLodView {
     Vec3s eye;
@@ -2120,36 +2128,12 @@ static void Fishmod_BenchUpdate(PlayState* play) {
     }
 }
 
-#ifdef FISHMOD_BENCH_PLAY
-/*
- * The play bench (fishmod/scripts/hwbench_play.inc.c): Link plays the lake instead of a free camera flying it. He
- * runs, swims and dives from each tour stop to the next with the game's own camera behind him, and every third leg he
- * fishes from where he stands if he's on land (casting, waiting on the float, striking and reeling in what bites).
- * Each leg is timed once per mode, Link put back at its start each time: the first pass (the fish ahead waking as he
- * comes) and then the repeats. Each lap is at one time of day and weather, the clock held there: dawn, midday, dusk
- * and night, clear and in rain, in turn.
- */
-#define PB_SKIP 30   // frames after putting Link back, not counted (the camera catching up)
-#define PB_CLEANUP 400 // at most, after a fishing block: reeling in and through any catch (not counted)
-#define PB_ARRIVED 90.0f
-
-static s32 sPbState; // 0: new lap (reload the lake), 1: loading, 2: a block, 3: after a block, 4: memory tests
-static s32 sPbLeg;
-static s32 sPbBlock;
-static s32 sPbFrame;
-static s32 sPbFishing;
+#if defined(FISHMOD_BENCH_PLAY) || defined(FISHMOD_BENCH_AREA)
+// (Link's placing and steering, for the play bench and the area bench)
 static s32 sPbStuckFrame;
 static Vec3f sPbStuckPos;
 static s8 sPbStickX;
 static s8 sPbStickY;
-static u16 sPbButton;
-static s32 sPbActive;
-static s32 sPbTimer;
-
-static const u16 sPbTimes[4] = { CLOCK_TIME(6, 30), CLOCK_TIME(12, 0), CLOCK_TIME(17, 30), CLOCK_TIME(23, 0) };
-// the laps' conditions in turn (time + 4 * rain): clear dawn, rain midday, clear dusk, rain night, rain dawn,
-// clear midday, rain dusk, clear night
-static const u8 sPbOrder[BENCH_CONDS] = { 0, 5, 2, 7, 4, 1, 6, 3 };
 
 /** Puts Link at (x, z) on the ground or the water there, facing yaw. */
 static void PlayBench_Place(PlayState* play, Player* player, f32 x, f32 probeY, f32 z, s16 yaw) {
@@ -2181,6 +2165,43 @@ static void PlayBench_Place(PlayState* play, Player* player, f32 x, f32 probeY, 
     sPbStuckPos = player->actor.world.pos;
 }
 
+/** The stick for heading toward a world yaw (the stick is read relative to the camera). */
+static void PlayBench_Steer(PlayState* play, s16 yaw, s32 mag) {
+    s16 rel = yaw - Camera_GetInputDirYaw(GET_ACTIVE_CAM(play));
+
+    sPbStickX = (s8)(-Math_SinS(rel) * mag);
+    sPbStickY = (s8)(Math_CosS(rel) * mag);
+}
+#endif
+
+#ifdef FISHMOD_BENCH_PLAY
+/*
+ * The play bench (fishmod/scripts/hwbench_play.inc.c): Link plays the lake instead of a free camera flying it. He
+ * runs, swims and dives from each tour stop to the next with the game's own camera behind him, and every third leg he
+ * fishes from where he stands if he's on land (casting, waiting on the float, striking and reeling in what bites).
+ * Each leg is timed once per mode, Link put back at its start each time: the first pass (the fish ahead waking as he
+ * comes) and then the repeats. Each lap is at one time of day and weather, the clock held there: dawn, midday, dusk
+ * and night, clear and in rain, in turn.
+ */
+#define PB_SKIP 30   // frames after putting Link back, not counted (the camera catching up)
+#define PB_CLEANUP 400 // at most, after a fishing block: reeling in and through any catch (not counted)
+#define PB_ARRIVED 90.0f
+
+static s32 sPbState; // 0: new lap (reload the lake), 1: loading, 2: a block, 3: after a block, 4: memory tests
+static s32 sPbLeg;
+static s32 sPbBlock;
+static s32 sPbFrame;
+static s32 sPbFishing;
+static u16 sPbButton;
+static s32 sPbActive;
+static s32 sPbTimer;
+
+static const u16 sPbTimes[4] = { CLOCK_TIME(6, 30), CLOCK_TIME(12, 0), CLOCK_TIME(17, 30), CLOCK_TIME(23, 0) };
+// the laps' conditions in turn (time + 4 * rain): clear dawn, rain midday, clear dusk, rain night, rain dawn,
+// clear midday, rain dusk, clear night
+static const u8 sPbOrder[BENCH_CONDS] = { 0, 5, 2, 7, 4, 1, 6, 3 };
+
+
 /** Rain on or off without loading the scene again (the day's own weather is clear: FISHMOD_SCRIPT_DAY). */
 static void PlayBench_SetRain(PlayState* play, s32 rain) {
     EnvironmentContext* envCtx = &play->envCtx;
@@ -2202,13 +2223,6 @@ static s32 PlayBench_Under(const char* title) {
     return (len >= 7) && (title[len - 7] == '(') && (title[len - 2] == 'r') && (title[len - 1] == ')');
 }
 
-/** The stick for heading toward a world yaw (the stick is read relative to the camera). */
-static void PlayBench_Steer(PlayState* play, s16 yaw, s32 mag) {
-    s16 rel = yaw - Camera_GetInputDirYaw(GET_ACTIVE_CAM(play));
-
-    sPbStickX = (s8)(-Math_SinS(rel) * mag);
-    sPbStickY = (s8)(Math_CosS(rel) * mag);
-}
 
 /** The auto-angler's buttons for the rod's state (as FISHMOD_AUTO_ANGLER). */
 static u16 PlayBench_Angle(void) {
@@ -2447,6 +2461,266 @@ static s32 PlayBench_Input(Input* input) {
     return true;
 }
 #endif
+
+#ifdef FISHMOD_BENCH_AREA
+/*
+ * The area bench (fishmod/scripts/hwbench_area.inc.c): at each spot Link walks a slow circle, four ways in turn (the
+ * iron boots or his own; everything as shipped, or the mod's fish, props, water surface and sky off), and every step
+ * of the update (FishmodSect) and every kind of actor is timed. The sums go to SRAM after every spot.
+ */
+#define AREA_VARIANTS 4
+#define AREA_SETTLE 40
+#define AREA_FRAMES 200
+#define AREA_TOP 16 // actor kinds kept per cell, the costliest
+#define AREA_SPOTS ARRAY_COUNT(sAreaSpots)
+#define AREA_BARE (FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI | FISHMOD_BENCH_NOROOMXLU | \
+                   FISHMOD_BENCH_NOSKY)
+
+typedef enum AreaMetric {
+    AM_PERIOD,
+    AM_CPU_UPDATE,
+    AM_CPU_DRAW,
+    AM_RSP,
+    AM_RDP,
+    AM_FISH_UPD,  // the fish's own updates (FISHMOD_PROF_U_ENGINE)
+    AM_FISH_DRAW,
+    AM_SCATTER,
+    AM_ACTORS_N,  // actors updated (count)
+    AM_SECT0,     // then FISHMOD_SECT_MAX steps
+    AM_CAT0 = AM_SECT0 + FISHMOD_SECT_MAX, // then the actor categories
+    AREA_METRICS = AM_CAT0 + FISHMOD_ACTOR_CATS
+} AreaMetric;
+
+typedef struct AreaActor {
+    u16 id;
+    u8 most; // most of it updating in one frame
+    u8 pad;
+    u32 usec; // summed over the cell's frames
+} AreaActor;
+
+typedef struct AreaCell {
+    u32 frames;
+    u32 sum[AREA_METRICS]; // microseconds (counts for AM_ACTORS_N)
+    u32 maxPeriod;
+    AreaActor top[AREA_TOP];
+} AreaCell;
+
+typedef struct AreaResults {
+    u32 magic; // 'FARE'
+    u8 version;
+    u8 spots;
+    u8 variants;
+    u8 sects;
+    u8 cats;
+    u8 top;
+    u8 hw;
+    u8 pad;
+    u32 laps;
+    u32 spot; // where it got to (for a run cut short)
+    u32 variant;
+    AreaCell cell[ARRAY_COUNT(sAreaSpots)][AREA_VARIANTS];
+} AreaResults;
+
+static AreaResults sArea;
+static u32* sAreaActorUsec; // [spot][variant][FISHMOD_ACTOR_IDS], microseconds
+static u8* sAreaActorMost;  // [spot][variant][FISHMOD_ACTOR_IDS]
+static s32 sAreaSpot;
+static s32 sAreaVariant;
+static s32 sAreaFrame;
+static s32 sAreaActive;
+static s32 sAreaTimer;
+static u16 sAreaButton;
+
+/** Called every frame from Fishmod_DebugTiming, before the step timers are cleared: one frame into the cell. */
+static void AreaBench_Sample(void) {
+    AreaCell* cell;
+    u32 v[AREA_METRICS];
+    s32 i;
+    s32 base;
+
+    if (!sAreaActive || (sAreaFrame <= AREA_SETTLE) || (sAreaActorUsec == NULL)) {
+        return;
+    }
+    cell = &sArea.cell[sAreaSpot][sAreaVariant];
+    v[AM_PERIOD] = (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
+    v[AM_CPU_UPDATE] = sLastCpu[FISHMOD_CPU_UPDATE];
+    v[AM_CPU_DRAW] = sLastCpu[FISHMOD_CPU_DRAW];
+    v[AM_RSP] = (u32)OS_CYCLES_TO_USEC(gRSPGfxTimeTotal);
+    v[AM_RDP] = (u32)OS_CYCLES_TO_USEC(gRDPTimeTotal);
+    v[AM_FISH_UPD] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_U_ENGINE]);
+    v[AM_FISH_DRAW] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_D_ENGINE]);
+    v[AM_SCATTER] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_D_SCATTER]);
+    v[AM_ACTORS_N] = 0;
+    for (i = 0; i < FISHMOD_SECT_MAX; i++) {
+        v[AM_SECT0 + i] = (u32)OS_CYCLES_TO_USEC(gFishmodSect[i]);
+    }
+    for (i = 0; i < FISHMOD_ACTOR_CATS; i++) {
+        v[AM_CAT0 + i] = (u32)OS_CYCLES_TO_USEC((OSTime)gFishmodCatCycles[i]);
+    }
+    base = (sAreaSpot * AREA_VARIANTS + sAreaVariant) * FISHMOD_ACTOR_IDS;
+    for (i = 0; i < FISHMOD_ACTOR_IDS; i++) {
+        if (gFishmodActorCount[i] != 0) {
+            v[AM_ACTORS_N] += gFishmodActorCount[i];
+            sAreaActorUsec[base + i] += (u32)OS_CYCLES_TO_USEC((OSTime)gFishmodActorCycles[i]);
+            sAreaActorMost[base + i] = MAX(sAreaActorMost[base + i], gFishmodActorCount[i]);
+        }
+    }
+    if (v[AM_PERIOD] > 500000) {
+        return; // a load or a stall elsewhere: not a frame
+    }
+    cell->frames++;
+    for (i = 0; i < AREA_METRICS; i++) {
+        cell->sum[i] += v[i];
+    }
+    cell->maxPeriod = MAX(cell->maxPeriod, v[AM_PERIOD]);
+}
+
+static void AreaBench_Save(void) {
+    s32 spot;
+    s32 var;
+    s32 i;
+    s32 k;
+
+    // each cell's costliest kinds of actor, from the full tallies
+    for (spot = 0; spot < (s32)AREA_SPOTS; spot++) {
+        for (var = 0; var < AREA_VARIANTS; var++) {
+            AreaCell* cell = &sArea.cell[spot][var];
+            s32 base = (spot * AREA_VARIANTS + var) * FISHMOD_ACTOR_IDS;
+
+            bzero(cell->top, sizeof(cell->top));
+            for (i = 0; i < FISHMOD_ACTOR_IDS; i++) {
+                u32 us = sAreaActorUsec[base + i];
+
+                if (us == 0) {
+                    continue;
+                }
+                for (k = 0; k < AREA_TOP; k++) {
+                    if (us > cell->top[k].usec) {
+                        s32 m;
+
+                        for (m = AREA_TOP - 1; m > k; m--) {
+                            cell->top[m] = cell->top[m - 1];
+                        }
+                        cell->top[k].id = i;
+                        cell->top[k].most = sAreaActorMost[base + i];
+                        cell->top[k].usec = us;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    sArea.magic = 0x46415245; // 'FARE'
+    sArea.version = 1;
+    sArea.spots = AREA_SPOTS;
+    sArea.variants = AREA_VARIANTS;
+    sArea.sects = FISHMOD_SECT_MAX;
+    sArea.cats = FISHMOD_ACTOR_CATS;
+    sArea.top = AREA_TOP;
+    sArea.hw = FISHMOD_HW;
+    sArea.spot = sAreaSpot;
+    sArea.variant = sAreaVariant;
+    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sArea, sizeof(sArea), OS_WRITE);
+}
+
+static void Fishmod_AreaBenchUpdate(PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    const FishmodAreaSpot* spot;
+
+    if (player == NULL) {
+        return;
+    }
+    if (sAreaActorUsec == NULL) {
+        u32 n = AREA_SPOTS * AREA_VARIANTS * FISHMOD_ACTOR_IDS;
+
+        sAreaActorUsec = SYSTEM_ARENA_MALLOC(n * sizeof(u32), "../fishmod_debug.c", __LINE__);
+        sAreaActorMost = SYSTEM_ARENA_MALLOC(n, "../fishmod_debug.c", __LINE__);
+        if ((sAreaActorUsec == NULL) || (sAreaActorMost == NULL)) {
+            Fishmod_DebugPrintf(2, "area bench: no memory");
+            sAreaActorUsec = NULL;
+            return;
+        }
+        bzero(sAreaActorUsec, n * sizeof(u32));
+        bzero(sAreaActorMost, n);
+        // the actor tallies start over with each run: a save from before is left as it was until the first spot
+        bzero(&sArea, sizeof(sArea));
+    }
+    sAreaTimer++;
+    sPbStickX = sPbStickY = 0;
+    sAreaButton = 0;
+    sAreaActive = true;
+    gSaveContext.save.info.playerData.health = gSaveContext.save.info.playerData.healthCapacity;
+    gSaveContext.save.dayTime = FISHMOD_SCRIPT_TIME;
+    {
+        Actor* actor = play->actorCtx.actorLists[ACTORCAT_NPC].head;
+
+        for (; actor != NULL; actor = actor->next) {
+            if (actor->id == ACTOR_EN_OWL) {
+                Actor_Kill(actor);
+            }
+        }
+    }
+    if ((Message_GetState(&play->msgCtx) != TEXT_STATE_NONE) && ((sAreaTimer % 8) == 0)) {
+        sAreaButton = BTN_A;
+    }
+    if (sArea.laps >= FISHMOD_BENCH_LAPS) {
+        gFishmodBench = 0;
+        sAreaActive = false;
+        sTourDebugText = true;
+        Fishmod_DebugPrintf(2, "BENCH DONE: %d laps saved", sArea.laps);
+        Fishmod_DebugPrintf(3, "You can turn the console off");
+        Fishmod_DebugPrintf(4, "and send the .sav file");
+        return;
+    }
+
+    spot = &sAreaSpots[sAreaSpot];
+    if (sAreaFrame == 0) {
+        // the iron boots on the bed (variants 0, 1) or his own (2, 3); as shipped (0, 2) or the mod's work off (1, 3)
+        Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, (sAreaVariant < 2) ? EQUIP_VALUE_BOOTS_IRON
+                                                                       : EQUIP_VALUE_BOOTS_KOKIRI);
+        Player_SetEquipmentData(play, player);
+        PlayBench_Place(play, player, spot->x, spot->probeY, spot->z, (s16)(sAreaTimer * 0x1000));
+        gFishmodBench = (sAreaVariant & 1) ? AREA_BARE : 0;
+    }
+    if (sAreaFrame > 4) {
+        // a slow circle: the heading turns once round over the spot's frames
+        s16 yaw = (s16)(sAreaFrame * (0x10000 / (AREA_SETTLE + AREA_FRAMES)));
+
+        PlayBench_Steer(play, yaw, 45);
+    }
+    if (++sAreaFrame > AREA_SETTLE + AREA_FRAMES) {
+        sAreaFrame = 0;
+        if (++sAreaVariant >= AREA_VARIANTS) {
+            sAreaVariant = 0;
+            if (++sAreaSpot >= (s32)AREA_SPOTS) {
+                sAreaSpot = 0;
+                sArea.laps++;
+            }
+            AreaBench_Save();
+        }
+    }
+    Fishmod_DebugPrintf(2, "area lap %d spot %d %s v%d", sArea.laps + 1, sAreaSpot + 1, spot->name, sAreaVariant);
+}
+
+static s32 AreaBench_Input(Input* input) {
+    u16 buttonDiff;
+
+    if (!sAreaActive) {
+        return false;
+    }
+    input->prev = input->cur;
+    input->cur.button = sAreaButton;
+    input->cur.stick_x = sPbStickX;
+    input->cur.stick_y = sPbStickY;
+    buttonDiff = input->prev.button ^ input->cur.button;
+    input->press.button = input->cur.button & buttonDiff;
+    input->rel.button = input->prev.button & buttonDiff;
+    PadUtils_UpdateRelXY(input);
+    input->press.stick_x = 0;
+    input->press.stick_y = 0;
+    return true;
+}
+#endif
 #endif
 
 static void Fishmod_TourDraw(Gfx** gfxP) {
@@ -2528,7 +2802,12 @@ static s32 sPlayFrames;
 static s32 sPlacedPlayer;
 static char sDebugLines[FISHMOD_DEBUG_LINES][FISHMOD_DEBUG_LINE_LEN];
 
+s32 gFishmodNoPropCol;
+
 void Fishmod_DebugBoot(void) {
+#ifdef FISHMOD_SCRIPT_NO_PROPCOL
+    gFishmodNoPropCol = true;
+#endif
     gSaveContext.save.linkAge = LINK_AGE_CHILD;
     gSaveContext.fileNum = 0xFF;
     Sram_InitDebugSave();
@@ -2624,6 +2903,10 @@ s32 Fishmod_DebugNormalBoot(void) {
 }
 
 OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
+OSTime gFishmodSect[FISHMOD_SECT_MAX];
+u32 gFishmodActorCycles[FISHMOD_ACTOR_IDS];
+u8 gFishmodActorCount[FISHMOD_ACTOR_IDS];
+u32 gFishmodCatCycles[FISHMOD_ACTOR_CATS];
 #ifndef FISHMOD_HWBENCH
 static u32 sLastCpu[FISHMOD_CPU_MAX];
 #endif
@@ -2740,6 +3023,13 @@ static void Fishmod_DebugTiming(void) {
         }
     }
     Fishmod_DebugProfile(sStatsFrames > FISHMOD_STATS_SKIP);
+#ifdef FISHMOD_BENCH_AREA
+    AreaBench_Sample();
+#endif
+    bzero(gFishmodSect, sizeof(gFishmodSect));
+    bzero(gFishmodActorCycles, sizeof(gFishmodActorCycles));
+    bzero(gFishmodActorCount, sizeof(gFishmodActorCount));
+    bzero(gFishmodCatCycles, sizeof(gFishmodCatCycles));
 }
 
 s32 Fishmod_DebugRosterCount(void) {
@@ -3037,7 +3327,11 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         Fishmod_ViewUpdate(play);
     }
 #endif
-#if defined(FISHMOD_BENCH_PLAY)
+#if defined(FISHMOD_BENCH_AREA)
+    if (sPlacedPlayer && (sPlayFrames > 40)) {
+        Fishmod_AreaBenchUpdate(play);
+    }
+#elif defined(FISHMOD_BENCH_PLAY)
     if (sPlacedPlayer && (sPlayFrames > 40)) {
         Fishmod_PlayBenchUpdate(play);
     }
@@ -3079,6 +3373,11 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
 
 #ifdef FISHMOD_BENCH_PLAY
     if (PlayBench_Input(input)) {
+        return;
+    }
+#endif
+#ifdef FISHMOD_BENCH_AREA
+    if (AreaBench_Input(input)) {
         return;
     }
 #endif
@@ -3306,6 +3605,11 @@ static void Watchdog_Entry(void* arg) {
         sRec.bench[2] = sPbBlock;
         sRec.bench[3] = sPbState;
         sRec.bench[4] = sPbFrame;
+#elif defined(FISHMOD_BENCH_AREA)
+        sRec.bench[0] = sArea.laps;
+        sRec.bench[1] = sAreaSpot;
+        sRec.bench[2] = sAreaVariant;
+        sRec.bench[4] = sAreaFrame;
 #endif
         sRec.bench[5] = last;
         for (i = 0; i < ARRAY_COUNT(sRec.stack); i++) {
@@ -3369,6 +3673,11 @@ void Fishmod_DebugFault(OSThread* thread, const char* exp1, const char* exp2) {
     sRec.bench[2] = sPbBlock;
     sRec.bench[3] = sPbState;
     sRec.bench[4] = sPbFrame;
+#elif defined(FISHMOD_BENCH_AREA)
+    sRec.bench[0] = sArea.laps;
+    sRec.bench[1] = sAreaSpot;
+    sRec.bench[2] = sAreaVariant;
+    sRec.bench[4] = sAreaFrame;
 #endif
     sRec.bench[5] = sPlayFrames;
     {
@@ -3416,7 +3725,7 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
 #ifdef FISHMOD_PLAYLOG
     return; // played as the test build: the frame counter only
 #endif
-#ifdef FISHMOD_BENCH_PLAY
+#if defined(FISHMOD_BENCH_PLAY) || defined(FISHMOD_BENCH_AREA)
     if (!sTourDebugText) {
         return; // the bench as played: nothing over the frames being timed until it's done
     }
