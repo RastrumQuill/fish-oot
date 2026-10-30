@@ -34,7 +34,6 @@
 #include "src/fishmod_data/fishmod_props.inc.c"
 #include "src/fishmod_data/fishmod_props_kinds.h"
 #include "fishmod_lod.h"
-#include "fishmod_lod_zones.h"
 #include "fishmod_lod_tune.h"
 
 // Lake Hylia's bed shaded under the full lake (fishmod/tools/gen_bedshade.py, made at build time)
@@ -77,7 +76,6 @@ typedef struct FishmodPropKindInfo {
 } FishmodPropKindInfo;
 
 #define DIST_SMALL 800.0f
-#define ZONE_FLOOR 300.0f // a zone's distances no nearer than this
 #define DIST_MID 1200.0f
 #define DIST_FAR 1600.0f
 // Props drawn per frame at most. They are drawn nearest band first (whatever their kind), so the budget runs out on
@@ -199,7 +197,6 @@ static s32 sEdgeNear; // the props being drawn are within PROP_EDGE_RA_DIST
 static FishmodPropKindInfo sKinds[FISHMOD_PROP_KIND_MAX];
 static f32 sDistFar[2]; // the furthest any kind is drawn: above water, under it (how far the chunks are looked at)
 static f32 sExtentMax; // the furthest any prop reaches from where it stands (the chunks' view test)
-static f32 sReach[FISHMOD_PROP_KIND_MAX][2]; // each kind's own reach [above, under water], before the measured cuts
 
 static void Scatter_InitKinds(void) {
 #define X(id, name)                                                       \
@@ -343,11 +340,9 @@ static void Scatter_InitKinds(void) {
         // the frame is the same and cheaper
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
             sKinds[i].drawDistUnder = MIN(sKinds[i].drawDist, DIST_UNDER_FOG);
-            sReach[i][0] = sKinds[i].drawDist;
-            sReach[i][1] = sKinds[i].drawDistUnder;
         }
         // (moss: nearer still in the haze)
-        sKinds[FISHMOD_PROP_MOSS_PATCH].drawDistUnder = sReach[FISHMOD_PROP_MOSS_PATCH][1] = 500.0f;
+        sKinds[FISHMOD_PROP_MOSS_PATCH].drawDistUnder = 500.0f;
 #define X(id, above, under)                                    \
     if ((above) > 0) {                                         \
         sKinds[FISHMOD_PROP_##id].drawDist = MIN(sKinds[FISHMOD_PROP_##id].drawDist, (above)); \
@@ -359,12 +354,10 @@ static void Scatter_InitKinds(void) {
 #undef X
         sDistFar[0] = sDistFar[1] = 0.0f;
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
-            // (a zone's distances can be longer than the global ones, never longer than the reach)
             f32 fade = (sKinds[i].modelImp != NULL) ? (1.0f + FADE_BAND) : 1.0f; // (the dissolve, past the distance)
 
-            sDistFar[0] = MAX(sDistFar[0], fade * ((FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][0] : sKinds[i].drawDist));
-            sDistFar[1] =
-                MAX(sDistFar[1], fade * ((FISHMOD_LOD_ZONE_COUNT > 0) ? sReach[i][1] : sKinds[i].drawDistUnder));
+            sDistFar[0] = MAX(sDistFar[0], fade * sKinds[i].drawDist);
+            sDistFar[1] = MAX(sDistFar[1], fade * sKinds[i].drawDistUnder);
             // (and the tuned distances under water, at any time of day: the chunks are gathered that far)
             if (ARRAY_COUNT(sLodTuned) == FISHMOD_PROP_KIND_MAX) {
                 s32 t;
@@ -386,7 +379,8 @@ static FishmodProp* sProps;
 // adult before the Water Temple is cleared). So it is worked out once, on the first frame drawn (the lake's own actor
 // sets the level during the scene's first update), and again only if that save flag changes.
 static u8* sChunkDry;
-static s8 sDryFor = -1; // the flag the table was made for; -1: not made yet
+static s32 sDryFor;  // the water levels (Scatter_WaterLevels) the dry table was made for
+static u8 sDryMade;  // made at all yet
 static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded again is the ROM's again)
 
 // Two frames' worth of matrices and commands (the RSP reads last frame's while this one is built), in buffers of
@@ -453,7 +447,7 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sChunkSurface = (s16*)((u8*)sScatter + sScatter->chunkSurfaceOffset);
     sProps = (FishmodProp*)((u8*)sScatter + sScatter->propsOffset);
     sChunkDry = ZeldaArena_Malloc(sScatter->width * sScatter->depth);
-    sDryFor = -1;
+    sDryMade = false;
     sBedShadedRoom = NULL;
     Scatter_AllocBuffers();
 #if FISHMOD_DEBUG
@@ -657,8 +651,13 @@ static void Scatter_ShadeBed(PlayState* play) {
     u32 last = 0;
     s32 i;
 
-    if ((play->sceneId != SCENE_LAKE_HYLIA) || (room == NULL) || (room == sBedShadedRoom) ||
-        (LINK_IS_ADULT && !GET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA))) {
+    f32 surface;
+    WaterBox* box;
+
+    // only the scene it was made for, with the water at the level it was made for (not a drained lake)
+    if ((play->sceneId != FISHMOD_BEDSHADE_SCENE) || (room == NULL) || (room == sBedShadedRoom) ||
+        !BgCheck_GetWaterSurface(play, &play->colCtx, FISHMOD_BEDSHADE_X, FISHMOD_BEDSHADE_Z, &surface, &box) ||
+        (surface < FISHMOD_BEDSHADE_SURFACE - 20.0f)) {
         return;
     }
     for (i = 0; i < FISHMOD_BEDSHADE_COUNT; i++) {
@@ -673,15 +672,28 @@ static void Scatter_ShadeBed(PlayState* play) {
     sBedShadedRoom = room;
 }
 
+/** The scene's water levels in one number: it changes when any water box rises or falls (a lake refilling). */
+static s32 Scatter_WaterLevels(PlayState* play) {
+    WaterBox* boxes = SEGMENTED_TO_VIRTUAL(play->colCtx.colHeader->waterBoxes);
+    s32 sum = 0;
+    s32 i;
+
+    for (i = 0; i < play->colCtx.colHeader->numWaterBoxes; i++) {
+        sum = sum * 31 + boxes[i].ySurface + ((boxes[i].properties & WATERBOX_IS_DISABLED) ? 7 : 0);
+    }
+    return sum;
+}
+
 static void Scatter_UpdateDry(PlayState* play) {
-    s8 flag = GET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA) ? 1 : 0;
+    s32 levels = Scatter_WaterLevels(play);
     s32 c;
 
     Scatter_ShadeBed(play);
-    if (flag == sDryFor) {
+    if (sDryMade && (levels == sDryFor)) {
         return;
     }
-    sDryFor = flag;
+    sDryMade = true;
+    sDryFor = levels;
     for (c = 0; c < sScatter->width * sScatter->depth; c++) {
         WaterBox* box;
         f32 surface;
@@ -888,19 +900,6 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     ScatterSet* set;
     f32 viewCos = Scatter_ViewCos(play); // the view cone (and the tuned distances, under water)
     f32 viewRoom = 0.0f;     // extra room round each prop and chunk for it
-#if FISHMOD_LOD_ZONE_COUNT > 0
-    s32 zone = -1;
-
-    if (play->sceneId == SCENE_LAKE_HYLIA) {
-        s32 zx = (s32)((eye.x - FISHMOD_LOD_ZONE_X0) / FISHMOD_LOD_ZONE_CELL);
-        s32 zz = (s32)((eye.z - FISHMOD_LOD_ZONE_Z0) / FISHMOD_LOD_ZONE_CELL);
-
-        if ((eye.x >= FISHMOD_LOD_ZONE_X0) && (eye.z >= FISHMOD_LOD_ZONE_Z0) && (zx < FISHMOD_LOD_ZONE_W) &&
-            (zz < FISHMOD_LOD_ZONE_H)) {
-            zone = sLodZoneGrid[zz * FISHMOD_LOD_ZONE_W + zx];
-        }
-    }
-#endif
 
     Scatter_TunedDistances(under);
 #if FISHMOD_DEBUG
@@ -983,12 +982,6 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         f32 maxSq;
         f32 reachSq;
 
-#if FISHMOD_LOD_ZONE_COUNT > 0
-        // what the sweep measured from the camera's zone, where it measured it
-        if ((zone >= 0) && (kind < FISHMOD_LOD_ZONE_KINDS) && (sLodZoneDist[zone][under][kind] != 0)) {
-            maxDist = MIN(sReach[kind][under], MAX(sLodZoneDist[zone][under][kind] * 100.0f, ZONE_FLOOR));
-        }
-#endif
 #if FISHMOD_DEBUG
         if (gFishmodLodTest.active && !gFishmodLodTest.asGame) {
             // calibrating: everything out to DIST_CALIBRATE (the test's cut comes later, so it changes nothing else)

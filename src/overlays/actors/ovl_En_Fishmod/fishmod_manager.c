@@ -431,17 +431,6 @@ void EnFishmod_ManagerUpdate(EnFishmod* this, PlayState* play) {
     }
     Manager_UpdateMoods();
     EnFishmod_ParticlesUpdate(play);
-    // Lake Hylia's gossip stones keep vanilla's default draw range (about 1350 units), so across the lake they pop in
-    // and out: they get a longer one (three simple models)
-    if ((play->sceneId == SCENE_LAKE_HYLIA) && ((this->timer & 31) == 0)) {
-        Actor* actor = play->actorCtx.actorLists[ACTORCAT_PROP].head;
-
-        for (; actor != NULL; actor = actor->next) {
-            if ((actor->id == ACTOR_EN_GS) && (actor->cullingVolumeDistance < 4000.0f)) {
-                actor->cullingVolumeDistance = 4000.0f;
-            }
-        }
-    }
 }
 
 /**

@@ -1589,10 +1589,6 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
         colCtx->subdivAmount.z = 2;
     } else if (BgCheck_IsSpotScene(play) == true) {
         colCtx->memSize = 0xF000;
-        // fishmod: Lake Hylia's rocks add polygons to its collision (fishmod/tools/gen_collision.py)
-        if (play->sceneId == SCENE_LAKE_HYLIA) {
-            colCtx->memSize = 0xF000 + 0x10000;
-        }
         PRINTF(T("/* BGCheck Spot用サイズ %dbyte */\n", "/* BGCheck Spot Size %dbyte */\n"), 0xF000);
         colCtx->dyna.polyNodesMax = 1000;
         colCtx->dyna.polyListMax = 512;
@@ -1600,12 +1596,6 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
         colCtx->subdivAmount.x = 16;
         colCtx->subdivAmount.y = 4;
         colCtx->subdivAmount.z = 16;
-        // fishmod: a finer lookup grid for Lake Hylia, so each cell's list stays short with the rocks added (and
-        // collision checks there get cheaper than vanilla's)
-        if (play->sceneId == SCENE_LAKE_HYLIA) {
-            colCtx->subdivAmount.x = 32;
-            colCtx->subdivAmount.z = 32;
-        }
     } else {
         if (BgCheck_TryGetCustomMemsize(play->sceneId, &customMemSize)) {
             colCtx->memSize = customMemSize;
@@ -1633,6 +1623,8 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
             colCtx->subdivAmount.z = 16;
         }
     }
+    // fishmod: room for the scene's prop collision, and a finer lookup grid for it (fishmod_collision_scenes.h)
+    Fishmod_SizeCollision(play->sceneId, &colCtx->memSize, &colCtx->subdivAmount);
     colCtx->lookupTbl = THA_AllocTailAlign(&play->state.tha,
                                            colCtx->subdivAmount.x * sizeof(StaticLookup) * colCtx->subdivAmount.y *
                                                colCtx->subdivAmount.z,
