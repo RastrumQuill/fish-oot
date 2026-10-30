@@ -493,6 +493,7 @@ def spot_hash(x, z, salt=0):
 # the surface. Plants inside a rock that grew are taken out.
 ROCK_TOP = 56          # the vanilla rock's top at scale 1, before its stretch
 ROCK_MERGE = 20        # rocks this close to a bigger one (edge to edge) join it
+ROCK_GROUP_MAX = 4     # at most this many rocks become one
 ROCK_SCALE_MAX = 3.2   # (the scale is kept in 64ths of a byte)
 ROCK_SMALL = 0.45      # a lone rock smaller than this is a pebble: a share of them go
 ROCK_SMALL_KEEP = 0.6
@@ -562,10 +563,12 @@ def rocks_reworked(instances):
             continue
         used[i] = True
         group = [r]
-        # the rocks touching this one (the biggest left), not the ones touching those: one broad rock, not a reef
-        for j, o in enumerate(rocks):
-            if not used[j] and math.hypot(o["x"] - r["x"], o["z"] - r["z"]) < (
-                    rock_reach(r["x"], r["z"], r["scale"]) + rock_reach(o["x"], o["z"], o["scale"]) + ROCK_MERGE):
+        # the nearest few rocks touching this one (the biggest left), not the ones touching those: one broad rock, not
+        # a reef, and a field of rocks stays a field of (fewer, broader) rocks
+        near = sorted((math.hypot(o["x"] - r["x"], o["z"] - r["z"]), j) for j, o in enumerate(rocks) if not used[j])
+        for d, j in near[:ROCK_GROUP_MAX - 1]:
+            o = rocks[j]
+            if d < rock_reach(r["x"], r["z"], r["scale"]) + rock_reach(o["x"], o["z"], o["scale"]) + ROCK_MERGE:
                 used[j] = True
                 group.append(o)
         if len(group) == 1:
