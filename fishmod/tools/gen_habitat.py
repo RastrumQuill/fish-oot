@@ -918,7 +918,6 @@ PROP_KINDS = [
     ("lily_centre", "lily_centre", "ci4"),
     ("moss_patch", "moss", "ci4"),
 ]
-COMPRESS_4BIT = {"ia8", "ci8"}  # formats that also get a 4-bit copy
 VANILLA_KINDS = ["pond_reed", "lily_pad", "rock"]  # object_fish's own (the Fishing Pond's reed, pads, rocks)
 DATA = os.path.join(ROOT, "src", "fishmod_data")
 
@@ -1030,15 +1029,6 @@ def write_props_manifest():
                 src = os.path.join(ART_ROM, tex + "_pad.png")
             textures.append({"name": "gFishmodProp_" + tex + "Tex", "src": os.path.relpath(src, ROOT),
                              "format": fmt, "out": out})
-            if fmt in COMPRESS_4BIT:
-                # the same texture in 4 bits (16 colours, the palette in TMEM): half the memory read per load,
-                # decoded by the RDP for nothing. The game can draw with either (gFishmodTexCompress).
-                src4 = os.path.join(ART_ROM, tex + "_4.png")
-                Image.open(src).convert("RGBA").save(src4)
-                textures.append({"name": "gFishmodProp_" + tex + "Tex4", "src": os.path.relpath(src4, ROOT),
-                                 "format": "ci4", "out": out})
-                materials.append({"name": "gFishmodProp_" + tex + "Material4", "texture": "gFishmodProp_" + tex + "Tex4",
-                                  "out": out, "clamp": kind in TRI_KINDS})
         mesh = os.path.join(MESH_TRIM, kind + ".obj")
         if not os.path.exists(mesh):
             mesh = os.path.join(MESH, kind + ".obj")
@@ -1065,12 +1055,6 @@ def write_props_manifest():
             if half_texture(tex_src, half_png):
                 textures.append({"name": "gFishmodProp_" + tex + "HalfTex", "src": os.path.relpath(half_png, ROOT),
                                  "format": fmt, "out": out})
-                if fmt in COMPRESS_4BIT:
-                    textures.append({"name": "gFishmodProp_" + tex + "HalfTex4", "src": os.path.relpath(half_png, ROOT),
-                                     "format": "ci4", "out": out})
-                    materials.append({"name": "gFishmodProp_" + tex + "Material4Half",
-                                      "texture": "gFishmodProp_" + tex + "HalfTex4", "out": out,
-                                      "clamp": kind in TRI_KINDS})
                 have_half.add(tex)
         if tex in have_half:
             halfname = "gFishmodProp_" + tex + "HalfTex"
@@ -1138,21 +1122,10 @@ def write_props_manifest():
         f.write("#define FISHMOD_PROP_KINDS_HALF(X) \\\n")
         for k, tex, d in half_kinds:
             f.write(f"    X({k.upper()}, {k}, {tex}, {d}) \\\n")
-        f.write("\n// the half-size textures that also come in 4 bits: kind, texture\n")
-        f.write("#define FISHMOD_PROP_KINDS_4BIT_HALF(X) \\\n")
-        fmts = {k: fm for k, _, fm in PROP_KINDS}
-        for k, tex, d in half_kinds:
-            if fmts[k] in COMPRESS_4BIT:
-                f.write(f"    X({k.upper()}, {tex}) \\\n")
         f.write("\n// the kinds with a far single card (...DLImp, fishmod/tools/impostor.py): kind, from how far (scale 1)\n")
         f.write("#define FISHMOD_PROP_KINDS_IMP(X) \\\n")
         for k, d in imp_kinds:
             f.write(f"    X({k.upper()}, {k}, {d}) \\\n")
-        f.write("\n// the kinds whose texture also comes in 4 bits: kind, texture\n")
-        f.write("#define FISHMOD_PROP_KINDS_4BIT(X) \\\n")
-        for k, tex, fmt in PROP_KINDS:
-            if fmt in COMPRESS_4BIT:
-                f.write(f"    X({k.upper()}, {tex}) \\\n")
         f.write("\n")
     return kinds
 

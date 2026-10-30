@@ -511,12 +511,6 @@ static s32 sTourDebugText;
 #ifdef FISHMOD_LOD_CALIBRATE
 static void Fishmod_LodUpdate(PlayState* play);
 #endif
-#ifdef FISHMOD_HWBENCH
-static void Fishmod_BenchUpdate(PlayState* play);
-#ifdef FISHMOD_BENCH_ROAM
-static s32 Bench_Roam(Vec3f* eye, Vec3f* at);
-#endif
-#endif
 
 static void Fishmod_TourGo(s32 stop) {
     s32 n = ARRAY_COUNT(sTourStops);
@@ -664,12 +658,6 @@ static void Fishmod_TourUpdate(PlayState* play) {
     eye.x = at.x + dx * c + dz * sn;
     eye.z = at.z - dx * sn + dz * c;
     eye.y = sTourEye.y + arc + sTourRise;
-#if defined(FISHMOD_HWBENCH) && defined(FISHMOD_BENCH_ROAM)
-    if (Bench_Roam(&eye, &at)) {
-        sTourEye = eye; // (the next glide starts from here)
-        sTourAt = at;
-    }
-#endif
     Play_SetCameraAtEye(play, sTourCamId, &at, &eye);
 
     // under the surface: the water's own lights (its colour and fog), as when the main camera dives
@@ -688,9 +676,6 @@ static void Fishmod_TourUpdate(PlayState* play) {
     }
 #ifdef FISHMOD_LOD_CALIBRATE
     Fishmod_LodUpdate(play);
-#endif
-#ifdef FISHMOD_HWBENCH
-    Fishmod_BenchUpdate(play);
 #endif
 }
 
@@ -1638,60 +1623,30 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 #endif
 #ifdef FISHMOD_HWBENCH
 /*
- * The hardware bench (fishmod/scripts/hwbench.inc.c): for the console, all night. The tour's stops in turn; at each,
- * blocks of frames in each mode, timed, and the RDP's own counters (only the console has them: how much of its time
- * goes on fetching commands and waiting on memory, drawing, loading textures). Then a few memory tests, with the RDP
- * busy and with it idle. Lap after lap, the sums go to SRAM after each stop (the SummerCart writes them to the .sav):
- * fishmod/tools/hwbench_report.py reads it.
- *
- * Modes: as shipped; the props' textures in 4 bits (gFishmodTexCompress); both caches filled with other data before
- * each frame's update (what the work costs coming from RDRAM rather than the cache); no props drawn; no fish drawn.
+ * The hardware benches' shared core (the play bench, FISHMOD_BENCH_PLAY; the area bench has its own records): blocks
+ * of frames in each mode, timed, with the RDP's own counters (only the console has them: how much of its time goes on
+ * fetching commands and waiting on memory, drawing, loading textures), and a few memory tests, with the RDP busy and
+ * idle. The sums go to SRAM as they're made (the SummerCart writes them to the .sav): hwbench_report.py reads them.
  */
-#ifdef FISHMOD_BENCH_STOPS
-#define BENCH_STOPS FISHMOD_BENCH_STOPS // (a script with its own stops, hwbench_shots)
-#else
-#define BENCH_STOPS 22
-#endif
-#define BENCH_SETTLE 60 // frames after arriving
+#define BENCH_STOPS 22  // the tour's stops: the legs between them
 #define BENCH_SKIP 10   // frames after changing mode, not counted (the frame being timed runs behind)
-#if defined(FISHMOD_BENCH_PLAY) && defined(FISHMOD_BENCH_FRAMES)
+#if defined(FISHMOD_BENCH_FRAMES)
 #define BENCH_FRAMES FISHMOD_BENCH_FRAMES // (the short test)
-#define BENCH_ROUNDS 1
-#elif defined(FISHMOD_BENCH_PLAY)
-#define BENCH_FRAMES 240 // frames counted per block: Link on his way along the leg
-#define BENCH_ROUNDS 1
-#elif defined(FISHMOD_BENCH_ROAM)
-#define BENCH_FRAMES 200 // frames counted per block: one flight along the leg
-#define BENCH_ROUNDS 1
 #else
-#define BENCH_FRAMES 60 // frames counted per block
-#define BENCH_ROUNDS 2  // blocks per mode per visit (interleaved: A B C D E A B C D E)
+#define BENCH_FRAMES 240 // frames counted per block: Link on his way along the leg
 #endif
+#define BENCH_ROUNDS 1
 #define BENCH_MICRO_FRAMES 30
-#if defined(FISHMOD_BENCH_PLAY)
 #define BENCH_VERSION 8
 #define BENCH_CONDS 8 // the times of day (4) x clear or rain
-#elif defined(FISHMOD_BENCH_ROAM)
-#define BENCH_VERSION 7
-#else
-#define BENCH_VERSION 6
-#endif
 #ifndef FISHMOD_BENCH_LAPS
 #define FISHMOD_BENCH_LAPS 15 // then it stops and says so
 #endif
 
-typedef enum BenchMode {
-    BENCH_BASE,
-    BENCH_NOSWAY,  // no sway matrix (FISHMOD_BENCH_NOSWAY)
-    BENCH_MTXONLY, // each prop's colour and matrices, not its triangles (FISHMOD_BENCH_MTXONLY)
-    BENCH_NOMOSS,  // no moss mats (FISHMOD_BENCH_NOMOSS)
-    BENCH_NONEAR,   // the props past FISHMOD_BENCH_NEAR only
-    BENCH_NOFAR,    // the props within it only
-    BENCH_NOPROPS,
-    BENCH_NOSKY,    // no props and no skybox
-    BENCH_MODES,
-    BENCH_MICRO = BENCH_MODES
-} BenchMode;
+// the play bench's modes (Bench_SetMode has what each switches off)
+#define BENCH_BASE 0
+#define BENCH_MODES 8
+#define BENCH_MICRO BENCH_MODES
 
 typedef enum BenchMetric {
     BM_PERIOD,     // frame period, us (the time between graph updates)
@@ -1914,7 +1869,6 @@ static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
 }
 
 static void Bench_SetMode(s32 mode) {
-#if defined(FISHMOD_BENCH_PLAY)
     static const s32 sFlags[BENCH_MODES] = {
         0, // the first pass along the leg (fish waking as Link arrives)
         0,
@@ -1926,85 +1880,8 @@ static void Bench_SetMode(s32 mode) {
         FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI | FISHMOD_BENCH_NOROOMXLU |
             FISHMOD_BENCH_NOSKY,
     };
-#elif defined(FISHMOD_BENCH_ROAM)
-    static const s32 sFlags[BENCH_MODES] = {
-        0,
-        FISHMOD_BENCH_NOFISHAI,
-        FISHMOD_BENCH_NOFISH,
-        FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI,
-        FISHMOD_BENCH_NOPROPS,
-        FISHMOD_BENCH_NOROOMXLU,
-        FISHMOD_BENCH_NOSKY,
-        FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI | FISHMOD_BENCH_NOROOMXLU |
-            FISHMOD_BENCH_NOSKY,
-    };
-#else
-    static const s32 sFlags[BENCH_MODES] = {
-        0,
-        FISHMOD_BENCH_NOSWAY,
-        FISHMOD_BENCH_MTXONLY,
-        FISHMOD_BENCH_NOMOSS,
-        FISHMOD_BENCH_NONEAR,
-        FISHMOD_BENCH_NOFAR,
-        FISHMOD_BENCH_NOPROPS,
-        FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOSKY,
-    };
-#endif
-
     gFishmodBench = sFlags[mode];
 }
-
-#ifdef FISHMOD_BENCH_ROAM
-/**
- * The roaming bench: while a leg is timed, the camera flies from this stop to the next, looking about as it goes (a
- * pan left and right, and up and down), the same flight in every mode. Returns false while not timing.
- */
-static s32 Bench_Roam(Vec3f* eye, Vec3f* at) {
-    s32 n = ARRAY_COUNT(sTourStops);
-    FishmodTourStop* from = &sTourStops[sTourStop];
-    FishmodTourStop* to = &sTourStops[(sTourStop + 1) % n];
-    f32 t;
-    f32 s;
-    f32 arc;
-    f32 yaw;
-    f32 dx;
-    f32 dz;
-    f32 dist;
-    f32 c;
-    f32 sn;
-    Vec3f e;
-    Vec3f a;
-
-    if (sBenchState != 1) {
-        return false;
-    }
-    t = CLAMP(sBenchFrame / (f32)(BENCH_SKIP + BENCH_FRAMES), 0.0f, 1.0f);
-    s = t * t * (3.0f - 2.0f * t);
-    e.x = from->eye.x + (to->eye.x - from->eye.x) * s;
-    e.y = from->eye.y + (to->eye.y - from->eye.y) * s;
-    e.z = from->eye.z + (to->eye.z - from->eye.z) * s;
-    a.x = from->at.x + (to->at.x - from->at.x) * s;
-    a.y = from->at.y + (to->at.y - from->at.y) * s;
-    a.z = from->at.z + (to->at.z - from->at.z) * s;
-    // over the land on long hops, as the tour's glide
-    arc = sqrtf(SQ(to->eye.x - from->eye.x) + SQ(to->eye.z - from->eye.z)) * 0.25f;
-    arc = CLAMP_MAX(arc, 700.0f) * sinf(s * M_PI);
-    e.y += arc;
-    a.y += arc;
-    // looking about: turned about the eye up to 70 degrees each way, and up and down a little
-    yaw = 1.2f * sinf(t * 3.0f * M_PI);
-    dx = a.x - e.x;
-    dz = a.z - e.z;
-    dist = sqrtf(SQ(dx) + SQ(dz));
-    c = cosf(yaw);
-    sn = sinf(yaw);
-    at->x = e.x + dx * c + dz * sn;
-    at->z = e.z - dx * sn + dz * c;
-    at->y = a.y + dist * 0.2f * sinf(t * 5.0f * M_PI);
-    *eye = e;
-    return true;
-}
-#endif
 
 static void Bench_Save(void) {
     sBench.magic = 0x4642454E; // 'FBEN'
@@ -2052,81 +1929,6 @@ static s32 Bench_Init(void) {
         }
     }
     return true;
-}
-
-static void Fishmod_BenchUpdate(PlayState* play) {
-    s32 stop = sTourStop;
-    s32 mode;
-
-    if (!Bench_Init()) {
-        return;
-    }
-    Fishmod_SampleRdp();
-
-    if (sBench.laps >= FISHMOD_BENCH_LAPS) {
-        // done: everything is in the save; nothing more is measured
-        Bench_SetMode(BENCH_BASE);
-        sTourDebugText = true; // (the bench hides the text until now)
-        Fishmod_DebugPrintf(2, "BENCH DONE: %d laps saved", sBench.laps);
-        Fishmod_DebugPrintf(3, "You can turn the console off");
-        Fishmod_DebugPrintf(4, "and send the .sav file");
-        return;
-    }
-    mode = sBenchBlock % BENCH_MODES;
-    switch (sBenchState) {
-        case 0: // arriving
-            Bench_SetMode(BENCH_BASE);
-            if (sTourFrame >= TOUR_GLIDE + BENCH_SETTLE) {
-                sBenchState = 1;
-                sBenchBlock = 0;
-                sBenchFrame = 0;
-                Bench_Breadcrumb(stop, 0, 0);
-                Bench_SetMode(0);
-            }
-            break;
-
-        case 1: // measuring
-            if (sBenchFrame >= BENCH_SKIP) {
-                Bench_Record(stop, mode);
-            }
-            if (++sBenchFrame >= BENCH_SKIP + BENCH_FRAMES) {
-                sBenchFrame = 0;
-                if (++sBenchBlock >= BENCH_MODES * BENCH_ROUNDS) {
-                    sBenchState = 2;
-                    Bench_SetMode(BENCH_BASE);
-                    break;
-                }
-                mode = sBenchBlock % BENCH_MODES;
-                Bench_Breadcrumb(stop, mode, sBenchBlock);
-                Bench_SetMode(mode);
-            }
-            break;
-
-        default: // the memory tests, then on to the next stop
-            Bench_Micro();
-            if (++sBenchFrame >= BENCH_MICRO_FRAMES) {
-                sBench.visits++;
-                if (stop + 1 >= BENCH_STOPS) {
-                    sBench.laps++;
-                }
-                Bench_Save();
-                Fishmod_TourGo(stop + 1);
-                sBenchState = 0;
-                sBenchFrame = 0;
-            }
-            break;
-    }
-    {
-#ifdef FISHMOD_BENCH_ROAM
-        static const char* sModeNames[] = { "base", "fishfrozen", "nofishdraw", "nofish", "noprops", "nowater", "nosky",
-                                            "bare" };
-#else
-        static const char* sModeNames[] = { "base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky" };
-#endif
-
-        Fishmod_DebugPrintf(2, "bench lap %d stop %d %s", sBench.laps + 1, stop + 1,
-                            (sBenchState == 0) ? "-" : (sBenchState == 2) ? "mem" : sModeNames[mode]);
-    }
 }
 
 #if defined(FISHMOD_BENCH_PLAY) || defined(FISHMOD_BENCH_AREA)
@@ -2883,9 +2685,6 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.showTitleCard = false;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
 
-#ifdef FISHMOD_SCRIPT_TEXCOMPRESS
-    gFishmodTexCompress = 1; // the props' textures in 4 bits from the start
-#endif
 #ifdef FISHMOD_SCRIPT_ALTEDGE
     gFishmodBench |= FISHMOD_BENCH_ALTEDGE; // the props' other edge mode from the start
 #endif
@@ -2898,11 +2697,7 @@ void Fishmod_DebugBoot(void) {
 
 /** True if the script spawns its own fish, so the fish object is needed even in scenes without fishing. */
 s32 Fishmod_DebugWantsFish(void) {
-#if defined(FISHMOD_SCRIPT_FISH_TANK) || defined(FISHMOD_SCRIPT_EXTRA_FISH)
-    return true;
-#else
     return false;
-#endif
 }
 
 s32 Fishmod_DebugNormalBoot(void) {
@@ -3361,45 +3156,6 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         sScriptActive = true;
         // the same random numbers every run, so benchmark runs of different builds start alike
         Rand_Seed(0x46495348);
-#endif
-#ifdef FISHMOD_SCRIPT_EXTRA_FISH
-        {
-            // a crowd of fish around Link for stress tests: the Kokiri species in turn, in a ring
-            static u8 sKinds[] = { FISHMOD_SPECIES_GREENGILL, FISHMOD_SPECIES_HYRULE_BASS, FISHMOD_SPECIES_SANKE_CARP,
-                                   FISHMOD_SPECIES_ORDON_CATFISH, FISHMOD_SPECIES_HYRULE_MINNOW,
-                                   FISHMOD_SPECIES_HYLIAN_LOACH };
-            s32 n;
-
-            for (n = 0; n < FISHMOD_SCRIPT_EXTRA_FISH; n++) {
-                s16 yaw = n * (0x10000 / FISHMOD_SCRIPT_EXTRA_FISH);
-                f32 r = 40.0f + (n % 4) * 30.0f;
-
-                Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, sScriptStartPos.x + Math_SinS(yaw) * r,
-                            sScriptStartPos.y + 30.0f + (n % 3) * 15.0f, sScriptStartPos.z + Math_CosS(yaw) * r, 0,
-                            yaw, 0, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sKinds[n % ARRAY_COUNT(sKinds)]));
-            }
-        }
-#endif
-#ifdef FISHMOD_SCRIPT_FISH_TANK
-        {
-            // fill the scene's first water box with fish, spread on a grid across it at all depths (stress tests)
-            static u8 sKinds[] = { FISHMOD_SPECIES_GREENGILL, FISHMOD_SPECIES_HYRULE_BASS, FISHMOD_SPECIES_SANKE_CARP,
-                                   FISHMOD_SPECIES_ORDON_CATFISH, FISHMOD_SPECIES_HYRULE_MINNOW,
-                                   FISHMOD_SPECIES_HYLIAN_LOACH };
-            WaterBox* box = SEGMENTED_TO_VIRTUAL(play->colCtx.colHeader->waterBoxes);
-            s32 cols = 6;
-            s32 rows = (FISHMOD_SCRIPT_FISH_TANK + cols - 1) / cols;
-            s32 n;
-
-            for (n = 0; n < FISHMOD_SCRIPT_FISH_TANK; n++) {
-                f32 x = box->xMin + box->xLength * ((n % cols) + 0.5f) / cols;
-                f32 z = box->zMin + box->zLength * ((n / cols) + 0.5f) / rows;
-                f32 y = box->ySurface - 20.0f - (n * 37 % 300);
-
-                Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, x, y, z, 0, (s16)(n * 0x2800), 0,
-                            FISHMOD_PARAMS(FISHMOD_TYPE_FISH, sKinds[n % ARRAY_COUNT(sKinds)]));
-            }
-        }
 #endif
 #ifdef FISHMOD_SCRIPT_TEST_RELEASE
         {
