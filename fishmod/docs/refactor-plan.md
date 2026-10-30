@@ -145,6 +145,14 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
     build, so what's under them is compiled out.
   - Checks: a compile of every debug job and of each script setting; the state fingerprints match (bait, lakecast,
     invtest); both release profiles build.
+- **Performance before and after (ares, hw profile, the same scripts at b17be94 and after stage 9, run side by
+  side):** no slowdown from the code. Per fish, the update costs the same or less (AI 129-150 us a call against
+  142-238 before; water queries 10-34 us against 15-18). The whole-run fish update was higher after (area bench 3.2 ->
+  4.7 ms a frame, lakecast 8.2 -> 10.0), but only because on the bench's day 1 more of the roster's homes land near
+  the bench spots (54 within wake range against about 35): the private random numbers (stage 7) place each day's fish
+  differently. Over days 2, 3 and 5 the counts overlap (homes in range 30-49 before, 35-45 after), and no fish were
+  stuck awake (all wandering, the rest asleep as before). Everything else (draw, props, RSP, RDP) the same.
+  Benchmarks that compare builds should now be read per fish, or over several days.
 - **9: done.** One index of current notes (`fishmod/docs/README.md`). The finished bench reports and the
   optimization plan moved to `docs/history/`.
 
