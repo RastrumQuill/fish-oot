@@ -106,6 +106,10 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
   check follows the scene's water levels (a lake refilling) instead of Lake Hylia's flag; beehive spots are a table;
   the dropped per-zone draw distances removed (game and tool). Fingerprints match stage 4 in all three scenarios (with the fix for
   the fish's Init: the actor now asks for gameplay_keep, so a fish points segment 6 at object_fish itself).
+- **6, profiles: wired.** `fishmod/data/profiles.json` (hw, emu) read by `fishmod/tools/build_profile.py`; `build.sh
+  --profile` (`--hw` the same as `--profile hw`) writes the C header and brings F3DEX3 and the output suffix; the
+  scatter's distances and budgets and gen_scatter's thinning come from it. Both profiles hold today's values (emu
+  without F3DEX3), so performance tuning per profile can start from here.
 
 ## Decisions (made)
 

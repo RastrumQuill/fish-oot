@@ -65,8 +65,12 @@ in [docs/DECOMP_README.md](docs/DECOMP_README.md) for version `ntsc-1.2` (Linux 
 ```bash
 cp /path/to/your/rom baseroms/ntsc-1.2/baserom.z64   # .z64, .v64 or .n64
 make setup VERSION=ntsc-1.2
-fishmod/build.sh --testmode --hw --f3dex3             # -> fishmod/out/fish-oot-f3dex3-test-hw.bps (the test builds)
+fishmod/build.sh --testmode --hw                      # -> fishmod/out/fish-oot-f3dex3-test-hw.bps (console test build)
+fishmod/build.sh --testmode                           # -> fishmod/out/fish-oot-test.bps (emulator test build)
 ```
+
+Builds are made for a profile (`fishmod/data/profiles.json`): `hw` for the console and accurate emulators such as
+ares (F3DEX3, tuned to the RDP's limits), `emu` (the default) for HLE emulators such as Project64.
 
 `fishmod/build.sh` needs [Flips](https://github.com/Alcaro/Flips) on `PATH` (or `FLIPS=/path/to/flips`).
 To check the toolchain on an unmodified tree, `make VERSION=ntsc-1.2 REGION=US rom compress` should end with
@@ -78,9 +82,10 @@ To check the toolchain on an unmodified tree, `make VERSION=ntsc-1.2 REGION=US r
 |---|---|
 | `fishmod/data/species.json` | every species: looks, sizes, behavior, bait, flavor text. `fishmod/tools/gen_species.py` and `gen_textures.py` turn it into game data and the wiki |
 | `src/overlays/actors/ovl_En_Fishmod/` | the fish (`z_en_fishmod.c`), the fishing controller: rod, bobber, camera, fight (`fishmod_rod.c`), and the cached ground height under the water (`fishmod_water.c`) |
-| `src/code/fishmod.c` | which scenes have fishing, loading the fish model there, the rod on L |
+| `src/code/fishmod.c` | which scenes have fish, the rod's controller (any scene), saving, the weather |
+| `fishmod/data/profiles.json` | the build profiles (`build.sh --profile emu\|hw`): draw distances, prop budgets, thinning, F3DEX3 |
 | `fishmod/build.sh --debug` | debug build: boots straight into Kokiri with the rod and shows debug text |
-| `fishmod/build.sh --f3dex3` | build with the [F3DEX3](fishmod/docs/f3dex3.md) graphics microcode (off by default: no measurable gain in Kokiri, and it doesn't run on HLE emulators) |
+| `fishmod/build.sh --f3dex3` | build with the [F3DEX3](fishmod/docs/f3dex3.md) graphics microcode whatever the profile says (the `hw` profile has it; HLE emulators can't run it) |
 | `fishmod/build.sh --script NAME` | debug build that plays `fishmod/scripts/NAME.inc.c`: `angler` (a bot that fishes by itself), `shore` (the bot, standing back from the water), `follow` (camera chases a fish), `photo` (wiki renders), `anim` (the animation studio), `hwbench_play` / `hwbench_area` (benchmarks), `cast` |
 | `fishmod/tools/photo_capture.py` | captures the wiki renders from the photo build in ares |
 | `fishmod/tools/water_map.py` | maps fishable water and shore spots in a scene |
