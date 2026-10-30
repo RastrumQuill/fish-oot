@@ -478,7 +478,7 @@ s32 EnFishmod_ScatterRandomCover(Vec3f* out) {
         return false;
     }
     for (tries = 0; tries < 8; tries++) {
-        FishmodProp* prop = &sProps[(s32)Rand_ZeroFloat(sScatter->count - 0.01f)];
+        FishmodProp* prop = &sProps[(s32)Fishmod_RandZeroFloat(gFishmodRngNow, sScatter->count - 0.01f)];
 
         if ((prop->kind == FISHMOD_PROP_LILY_FLOWER) || (prop->kind == FISHMOD_PROP_LILY_CENTRE)) {
             continue;
@@ -507,7 +507,7 @@ s32 EnFishmod_ScatterRandomDrawnPlant(Vec3f* eye, f32 range, Vec3f* out) {
         return false;
     }
     for (tries = 0; tries < 6; tries++) {
-        FishmodProp* prop = &sProps[set->prop[(s32)Rand_ZeroFloat(set->count - 0.01f)]];
+        FishmodProp* prop = &sProps[set->prop[(s32)Fishmod_RandZeroFloat(gFishmodRngNow, set->count - 0.01f)]];
         FishmodPropKindInfo* info = &sKinds[prop->kind];
 
         if (!info->plant || info->floating || info->xlu) {

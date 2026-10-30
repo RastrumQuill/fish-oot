@@ -83,7 +83,7 @@ static void Particles_SpawnTrail(PlayState* play, Vec3f* eye) {
         return;
     }
     // a short trail: one or two bubbles, a little apart
-    n = 1 + (s32)Rand_ZeroFloat(1.99f);
+    n = 1 + (s32)Fishmod_RandZeroFloat(gFishmodRngNow, 1.99f);
     for (i = 0; (i < BUBBLE_MAX) && (n > 0); i++) {
         FishmodBubble* b = &sBubbles[i];
 
@@ -91,14 +91,14 @@ static void Particles_SpawnTrail(PlayState* play, Vec3f* eye) {
             continue;
         }
         b->alive = true;
-        b->pos.x = from.x + Rand_CenteredFloat(10.0f);
-        b->pos.y = from.y + 8.0f + Rand_ZeroFloat(30.0f) - n * 6.0f;
-        b->pos.z = from.z + Rand_CenteredFloat(10.0f);
+        b->pos.x = from.x + Fishmod_RandCenteredFloat(gFishmodRngNow, 10.0f);
+        b->pos.y = from.y + 8.0f + Fishmod_RandZeroFloat(gFishmodRngNow, 30.0f) - n * 6.0f;
+        b->pos.z = from.z + Fishmod_RandCenteredFloat(gFishmodRngNow, 10.0f);
         b->surface = surface;
-        b->rise = 1.0f + Rand_ZeroFloat(0.8f);
-        b->scale = 6 + (s32)Rand_ZeroFloat(9.0f);
-        b->tex = Rand_ZeroOne() < 0.5f;
-        b->wobble = (s32)Rand_ZeroFloat(255.0f);
+        b->rise = 1.0f + Fishmod_RandZeroFloat(gFishmodRngNow, 0.8f);
+        b->scale = 6 + (s32)Fishmod_RandZeroFloat(gFishmodRngNow, 9.0f);
+        b->tex = Fishmod_RandZeroOne(gFishmodRngNow) < 0.5f;
+        b->wobble = (s32)Fishmod_RandZeroFloat(gFishmodRngNow, 255.0f);
         n--;
     }
 }
@@ -111,9 +111,9 @@ static void Particles_PlaceSpeck(PlayState* play, FishmodSpeck* s, Vec3f* eye) {
     s->alive = false;
     for (tries = 0; tries < 3; tries++) {
         Vec3f p;
-        f32 r = SPECK_NEAR + Rand_ZeroFloat(SPECK_RANGE - SPECK_NEAR);
-        s16 yaw = (s16)Rand_ZeroFloat(65535.0f);
-        s16 pitch = (s16)Rand_CenteredFloat(0x5000);
+        f32 r = SPECK_NEAR + Fishmod_RandZeroFloat(gFishmodRngNow, SPECK_RANGE - SPECK_NEAR);
+        s16 yaw = (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 65535.0f);
+        s16 pitch = (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x5000);
 
         p.x = eye->x + Math_CosS(pitch) * Math_SinS(yaw) * r;
         p.y = eye->y + Math_SinS(pitch) * r;
@@ -121,12 +121,12 @@ static void Particles_PlaceSpeck(PlayState* play, FishmodSpeck* s, Vec3f* eye) {
         if (EnFishmod_WaterFloor(play, p.x, p.z, &surface, &floor, false) && (p.y < surface - 4.0f) &&
             (p.y > floor + 2.0f)) {
             s->pos = p;
-            s->vel.x = Rand_CenteredFloat(0.16f);
-            s->vel.y = -0.02f - Rand_ZeroFloat(0.05f);
-            s->vel.z = Rand_CenteredFloat(0.16f);
-            s->phase = (s16)Rand_ZeroFloat(65535.0f);
-            s->alpha = 90 + (s32)Rand_ZeroFloat(90.0f);
-            s->size = 50 + (s32)Rand_ZeroFloat(25.0f); // a little dot, about a unit across with a soft edge
+            s->vel.x = Fishmod_RandCenteredFloat(gFishmodRngNow, 0.16f);
+            s->vel.y = -0.02f - Fishmod_RandZeroFloat(gFishmodRngNow, 0.05f);
+            s->vel.z = Fishmod_RandCenteredFloat(gFishmodRngNow, 0.16f);
+            s->phase = (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 65535.0f);
+            s->alpha = 90 + (s32)Fishmod_RandZeroFloat(gFishmodRngNow, 90.0f);
+            s->size = 50 + (s32)Fishmod_RandZeroFloat(gFishmodRngNow, 25.0f); // a little dot, about a unit across with a soft edge
             s->fade = 0;
             s->leaving = false;
             s->alive = true;

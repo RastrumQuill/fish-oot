@@ -265,6 +265,23 @@ typedef struct FishmodSaveData {
 #define FISHMOD_TIME_SEED() ((u32)osGetTime())
 #endif
 
+/*
+ * The mod's own random numbers (fishmod.c), so it never draws from or reseeds the game's: vanilla's randomness
+ * doesn't depend on how many fish there are, and each fish of the roster is made from a stream of its own (its scene,
+ * the day and its slot), so a change to one fish never reshuffles the others.
+ */
+typedef struct FishmodRng {
+    u32 state;
+} FishmodRng;
+
+extern FishmodRng gFishmodRng;     // the fish's play: seeded as each scene loads (fixed in scripted debug runs)
+extern FishmodRng* gFishmodRngNow; // the stream the mod draws from: gFishmodRng, or a roster fish's while it's made
+void Fishmod_RandSeed(FishmodRng* rng, u32 seed);
+u32 Fishmod_RandNext(FishmodRng* rng);
+f32 Fishmod_RandZeroOne(FishmodRng* rng);
+f32 Fishmod_RandZeroFloat(FishmodRng* rng, f32 f);
+f32 Fishmod_RandCenteredFloat(FishmodRng* rng, f32 f);
+
 #define SLOT_FISHING_ROD 24
 #define SLOT_LURE_1 25
 #define SLOT_LURE_2 26
