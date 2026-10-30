@@ -220,6 +220,11 @@ extern Gfx gFishmodRodMaterialDL[];
 extern Gfx gFishmodRodSegmentDL[];
 extern Gfx gFishmodLineModelDL[];
 extern Gfx gFishmodLureHookDL[];
+// what the rod does to a fish (z_en_fishmod.c)
+void EnFishmod_FishHook(struct EnFishmod* this);
+void EnFishmod_FishTire(struct EnFishmod* this, f32 amount);
+void EnFishmod_FishPullTo(struct EnFishmod* this, Vec3f* pos);
+void EnFishmod_FishLetGo(struct EnFishmod* this, Vec3f* spot);
 void EnFishmod_RodInit(struct EnFishmod* this, struct PlayState* play);
 void EnFishmod_RodUpdate(struct EnFishmod* this, struct PlayState* play);
 void EnFishmod_RodDraw(struct EnFishmod* this, struct PlayState* play);
@@ -227,6 +232,7 @@ void EnFishmod_RodDestroy(struct EnFishmod* this, struct PlayState* play);
 
 // Called by fish
 s32 EnFishmod_RodBobberInWater(void);
+s32 EnFishmod_RodClaim(struct EnFishmod* fish);
 void EnFishmod_RodNibble(struct EnFishmod* fish);
 void EnFishmod_RodBite(struct EnFishmod* fish);
 void EnFishmod_RodRelease(struct EnFishmod* fish);
