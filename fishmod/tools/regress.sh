@@ -19,7 +19,7 @@ git checkout -q -- fishmod/assets/habitat 2>/dev/null || true  # (the build rege
 n=170
 for s in "${SCRIPTS[@]}"; do
     d="$OUT/$LABEL/$s"; rm -rf "$d/shots" "$d/r.ram"; n=$((n + 1))
-    (DISP=":$n" timeout 600 fishmod/tools/ares_capture.sh "$d/r.z64" "$d/shots" 240 30 > /dev/null 2>&1 || true) &
+    (DISP=":$n" timeout 900 fishmod/tools/ares_capture.sh "$d/r.z64" "$d/shots" 400 60 > /dev/null 2>&1 || true) &
 done
 wait
 for s in "${SCRIPTS[@]}"; do echo "== $s"; python3 fishmod/tools/state_hash.py "$OUT/$LABEL/$s/r.ram" | tail -2; done

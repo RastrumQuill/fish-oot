@@ -247,11 +247,7 @@ void Fishmod_PlayUpdate(PlayState* play) {
         u16 press = play->state.input[0].press.button;
         s16 entrance = -1;
 
-        // D-pad Right: the props' textures in 4 bits or 8 (for comparing); D-pad Left: the RDP readout
-        if (CHECK_BTN_ALL(press, BTN_DRIGHT)) {
-            gFishmodTexCompress ^= 1;
-            Sfx_PlaySfxCentered(gFishmodTexCompress ? NA_SE_SY_CAMERA_ZOOM_UP : NA_SE_SY_CAMERA_ZOOM_DOWN);
-        }
+        // D-pad Left: the RDP readout
         if (CHECK_BTN_ALL(press, BTN_DLEFT)) {
             sFpsDetail ^= 1;
         }
@@ -858,10 +854,9 @@ void Fishmod_DrawFps(Gfx** gfxP) {
     GfxPrint_SetPos(&printer, 17, 27); // bottom middle: clear of the hearts, buttons, map and rupees
     GfxPrint_Printf(&printer, "%2d.%dfps", sFpsTenths / 10, sFpsTenths % 10);
     if (sFpsDetail) {
-        // RDP busy fetching/held up (buf), drawing (pipe), loading textures (tmem), % of its cycles; 4-bit textures
+        // RDP busy fetching/held up (buf), drawing (pipe), loading textures (tmem), % of its cycles
         GfxPrint_SetPos(&printer, 10, 26);
-        GfxPrint_Printf(&printer, "b%2d p%2d t%2d tex%s", sRdpPct[0], sRdpPct[1], sRdpPct[2],
-                        gFishmodTexCompress ? "4" : "8");
+        GfxPrint_Printf(&printer, "b%2d p%2d t%2d", sRdpPct[0], sRdpPct[1], sRdpPct[2]);
     }
     *gfxP = GfxPrint_Close(&printer);
     GfxPrint_Destroy(&printer);
@@ -1167,8 +1162,6 @@ void Fishmod_AdvanceTime(PlayState* play) {
 #define HAZE_FOG_NEAR 945 // the fog's start (of 1000, with vanilla's far plane; vanilla's water is about 990).
                           // 953 before the frame-rate pass: a little murkier, so the tall plants' 900 cut hides
 f32 gFishmodHaze;
-s32 gFishmodTexCompress;
-u16* gFishmodZSame; // (debug builds: main.c)
 
 static void Fishmod_UpdateHaze(PlayState* play) {
     Vec3f eye = play->view.eye;

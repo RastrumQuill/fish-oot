@@ -54,13 +54,11 @@ typedef enum FishmodPropKind {
 
 typedef struct FishmodPropKindInfo {
     Gfx* material;
-    Gfx* material4; // the same texture in 4 bits (gFishmodTexCompress), or NULL
     Gfx* model;
     Gfx* modelFar; // past PROP_FAR_DIST: the cards uncut (the same picture in fewer triangles), or the same model
     Gfx* modelAlt; // the one-triangle kinds' cut outline (the bench's comparison), else the model
     Gfx* modelHalf;     // far, on the texture at half size (...DLFarH), or NULL
     Gfx* materialHalf;  // its texture
-    Gfx* material4Half; // and in 4 bits, or NULL
     f32 halfDist;       // from how far (at scale 1) a texel of the full texture is under half a pixel
     Gfx* modelImp;      // the far single card (fishmod/tools/impostor.py), turned to face the camera, or NULL
     Gfx* materialImp;
@@ -211,9 +209,6 @@ static void Scatter_InitKinds(void) {
     // the generated kinds (the vanilla ones are set below)
     FISHMOD_PROP_KINDS_GENERATED(X)
 #undef X
-#define X(id, tex) sKinds[FISHMOD_PROP_##id].material4 = gFishmodProp_##tex##Material4;
-    FISHMOD_PROP_KINDS_4BIT(X)
-#undef X
     sKinds[FISHMOD_PROP_POND_REED].material = gFishingReedMaterialDL;
     sKinds[FISHMOD_PROP_POND_REED].model = gFishingReedModelDL;
     sKinds[FISHMOD_PROP_LILY_PAD].material = gFishingLilyPadMaterialDL;
@@ -240,9 +235,6 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_##id].materialHalf = gFishmodProp_##name##DLFarHMaterial; \
     sKinds[FISHMOD_PROP_##id].halfDist = (dist);
     FISHMOD_PROP_KINDS_HALF(X)
-#undef X
-#define X(id, tex) sKinds[FISHMOD_PROP_##id].material4Half = gFishmodProp_##tex##Material4Half;
-    FISHMOD_PROP_KINDS_4BIT_HALF(X)
 #undef X
 #define X(id, name, dist)                                                    \
     sKinds[FISHMOD_PROP_##id].modelImp = gFishmodProp_##name##DLImp;          \
@@ -730,18 +722,6 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
 #endif
         mode = ra ? (AA_EN | Z_CMP | Z_UPD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE)
                   : (AA_EN | Z_CMP | Z_UPD | IM_RD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE);
-#if FISHMOD_DEBUG
-        if (gFishmodBench & FISHMOD_BENCH_NOZUPD) {
-            mode &= ~Z_UPD;
-        }
-        if (gFishmodBench & FISHMOD_BENCH_1CYCLE) {
-            // (the bench's question only: no fog and no tint, so not the same picture)
-            gDPSetCycleType(gfx++, G_CYC_1CYCLE);
-            gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0);
-            gDPSetRenderMode(gfx++, mode | GBL_c1(G_BL_CLR_IN, G_BL_A_IN, G_BL_CLR_MEM, G_BL_A_MEM),
-                             mode | GBL_c2(G_BL_CLR_IN, G_BL_A_IN, G_BL_CLR_MEM, G_BL_A_MEM));
-        } else
-#endif
         {
             if (tier == TIER_IMP) {
                 // the single card: its alpha times the primitive's (how far it has faded), against noise
@@ -765,11 +745,9 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
     if (tier == TIER_IMP) {
         gSPDisplayList(gfx++, info->materialImp);
     } else if (tier == TIER_HALF) {
-        gSPDisplayList(gfx++, ((gFishmodTexCompress != 0) && (info->material4Half != NULL)) ? info->material4Half
-                                                                                         : info->materialHalf);
+        gSPDisplayList(gfx++, info->materialHalf);
     } else {
-        gSPDisplayList(gfx++,
-                       ((gFishmodTexCompress != 0) && (info->material4 != NULL)) ? info->material4 : info->material);
+        gSPDisplayList(gfx++, info->material);
     }
     return gfx;
 }
@@ -1271,18 +1249,6 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         kind = prop->kind;
         info = &sKinds[kind];
         dSq = SQ(prop->x - eye.x) + SQ(prop->z - eye.z);
-#if FISHMOD_DEBUG
-        if (gFishmodBench & (FISHMOD_BENCH_NONEAR | FISHMOD_BENCH_NOFAR)) {
-            s32 near = dSq < SQ(FISHMOD_BENCH_NEAR);
-
-            if (near ? (gFishmodBench & FISHMOD_BENCH_NONEAR) : (gFishmodBench & FISHMOD_BENCH_NOFAR)) {
-                continue;
-            }
-        }
-        if ((kind == FISHMOD_PROP_MOSS_PATCH) && FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOMOSS)) {
-            continue;
-        }
-#endif
         disp = info->xlu ? &xlu : &opa;
         tier = set->tier[n];
         key = kind + tier * FISHMOD_PROP_KIND_MAX;
@@ -1336,14 +1302,11 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             }
         }
         gSPMatrix((*disp)++, &set->mtx[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        if ((info->sway != 0) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSWAY)) {
+        if (info->sway != 0) {
             // neighbours share a phase: a wave through the bed
             s32 ph = ((prop->x + prop->z) >> 7) & (SWAY_PHASES - 1);
 
             gSPMatrix((*disp)++, &frame->sway[kind * SWAY_PHASES + ph], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
-        }
-        if (FISHMOD_BENCH_SKIP(FISHMOD_BENCH_MTXONLY)) {
-            continue; // everything a prop sends but its own triangles (what the per-prop setup costs)
         }
         gSPDisplayList((*disp)++, (tier == TIER_IMP)    ? info->modelImp
                                   : (tier == TIER_HALF) ? info->modelHalf

@@ -419,30 +419,14 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOPROPS (1 << 0)
 #define FISHMOD_BENCH_NOFISH (1 << 1)
 #define FISHMOD_BENCH_ALTEDGE (1 << 2)    // the props' old edge mode (anti-aliased in the RDP, reading the colour buffer)
-#define FISHMOD_BENCH_NOZUPD (1 << 3)     // the props don't write the depth buffer
-#define FISHMOD_BENCH_TRIMFAR (1 << 9)    // far props drawn cut to their outlines too (the old way)
-#define FISHMOD_BENCH_NOTRI (1 << 10)     // the small plants' cut outlines instead of one triangle per card
-#define FISHMOD_BENCH_NOSTRICT (1 << 11)  // (hwbench-4 only: strict nearest-first order, since dropped, made no difference)
 #define FISHMOD_BENCH_NOIMP (1 << 12)      // no far single cards: the whole cards out to the cutoff
 #define FISHMOD_BENCH_NOFARTEX (1 << 13)   // far props on their full-size textures
 #define FISHMOD_BENCH_NODISSOLVE (1 << 14) // the single cards pop at the cutoff instead of dissolving
-#define FISHMOD_BENCH_ZSAME (1 << 15)      // the depth buffer in the frame buffers' 1 MB bank (bank layout test)
 #define FISHMOD_BENCH_SKYUNDER (1 << 16)   // the skybox drawn with the camera under water too, as vanilla
-#define FISHMOD_BENCH_NOSWAY (1 << 17)     // no sway matrix (one matrix per prop instead of two)
-#define FISHMOD_BENCH_MTXONLY (1 << 18)    // each prop's colour and matrices sent, but not its triangles
-#define FISHMOD_BENCH_NOMOSS (1 << 19)     // no moss mats
 #define FISHMOD_BENCH_NOFISHAI (1 << 20)   // the fish frozen: no thinking or swimming (still drawn)
-#define FISHMOD_BENCH_1CYCLE (1 << 4)     // the props in 1-cycle mode (no fog, no tint): pipeline or memory bound?
-#define FISHMOD_BENCH_NONEAR (1 << 5)     // props within FISHMOD_BENCH_NEAR not drawn
-#define FISHMOD_BENCH_NOFAR (1 << 6)      // props past it not drawn
 #define FISHMOD_BENCH_NOSKY (1 << 7)      // no skybox
 #define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
-#define FISHMOD_BENCH_NEAR 500.0f
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
-// the depth buffer to draw with: the bench's ZSAME mode puts it in the frame buffers' 1 MB bank (main.c reserves room
-// just below them), to measure how much the banks matter
-extern u16* gFishmodZSame;
-#define FISHMOD_ZBUFFER ((FISHMOD_BENCH_SKIP(FISHMOD_BENCH_ZSAME) && (gFishmodZSame != NULL)) ? gFishmodZSame : (u16*)gZBuffer)
 extern s32 gFishmodBench;
 extern s32 gFishmodScatterDrawn; // props drawn in the last frame
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
@@ -539,8 +523,6 @@ s32 Fishmod_Weather(struct PlayState* play);
 f32 Fishmod_Light(struct PlayState* play);
 // Underwater haze, 0 (camera above water) to 1 (under)
 extern f32 gFishmodHaze;
-// the props' textures in 4 bits instead of 8 (half the memory read per texture load): a switch for measuring
-extern s32 gFishmodTexCompress;
 // the RDP's hardware counters over the last frame (Fishmod_SampleRdp; RDP clock cycles, 24 bits)
 typedef struct FishmodRdpCounters {
     u32 clock;
