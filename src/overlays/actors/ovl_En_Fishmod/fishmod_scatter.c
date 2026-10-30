@@ -44,6 +44,7 @@ typedef struct FishmodBedShade {
     s8 normal[3];
 } FishmodBedShade;
 #include "src/fishmod_data/fishmod_bedshade.h"
+#include "sys_math.h" // (Math_Atan2S: without its prototype its floats were passed as doubles)
 
 typedef enum FishmodPropKind {
 #define X(id, name) FISHMOD_PROP_##id,
@@ -571,7 +572,7 @@ static void Scatter_RockStretch(FishmodProp* prop, f32* out) {
     h *= 0x2C1B3C6Du;
     h ^= h >> 12;
     out[0] = 0.75f + (h & 0xFF) * (0.6f / 255.0f);
-    out[1] = 0.7f + ((h >> 8) & 0xFF) * (0.45f / 255.0f);
+    out[1] = 0.5f + ((h >> 8) & 0xFF) * (0.3f / 255.0f); // (flat: gen_scatter.py rock_stretch)
     out[2] = 0.75f + ((h >> 16) & 0xFF) * (0.6f / 255.0f);
 }
 

@@ -36,6 +36,7 @@
 #include "camera.h"
 #include "interface.h"
 #include "z_lib.h"
+#include "sys_math.h" // (Math_Atan2S: without its prototype its floats were passed as doubles)
 #include "speed_meter.h"
 #include "ultra64/convert.h"
 #include "bgcheck.h"
@@ -3229,6 +3230,12 @@ static void Fishmod_PlayLog(PlayState* play) {
 }
 #endif
 
+#ifdef FISHMOD_SCRIPT_WALK_TO
+// the script's walk: Link is steered (by the camera, as the stick works) toward a point, from frame 60 until there
+static s8 sWalkStickX;
+static s8 sWalkStickY;
+static s32 sWalking;
+#endif
 #ifdef FISHMOD_HWBENCH
 static void Watchdog_Start(void);
 static volatile u32 sWatchdogBeat;
@@ -3238,6 +3245,36 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     sPlayFrames++;
+#ifdef FISHMOD_SCRIPT_WALK_TO
+    if ((player != NULL) && sPlacedPlayer && (sPlayFrames > 60)) {
+        static const Vec3f sTo = FISHMOD_SCRIPT_WALK_TO;
+        f32 dx = sTo.x - player->actor.world.pos.x;
+        f32 dz = sTo.z - player->actor.world.pos.z;
+
+        sWalking = (SQ(dx) + SQ(dz)) > SQ(30.0f);
+#ifdef FISHMOD_SCRIPT_WALK_PROBE
+        {
+            // his highest point while near the probe (a rock's middle): does he step up onto it?
+            static const Vec3f sProbe = FISHMOD_SCRIPT_WALK_PROBE;
+            static f32 sTop = -32000.0f;
+            static f32 sLow = 32000.0f;
+
+            if (SQ(player->actor.world.pos.x - sProbe.x) + SQ(player->actor.world.pos.z - sProbe.z) < SQ(30.0f)) {
+                sTop = MAX(sTop, player->actor.world.pos.y);
+            } else {
+                sLow = MIN(sLow, player->actor.world.pos.y);
+            }
+            Fishmod_DebugPrintf(4, "walk probe: highest near %d, lowest off %d", (s32)sTop, (s32)sLow);
+        }
+#endif
+        if (sWalking) {
+            s16 rel = Math_Atan2S(dz, dx) - Camera_GetInputDirYaw(GET_ACTIVE_CAM(play));
+
+            sWalkStickX = (s8)(-Math_SinS(rel) * 60);
+            sWalkStickY = (s8)(Math_CosS(rel) * 60);
+        }
+    }
+#endif
 #ifdef FISHMOD_HWBENCH
     sWatchdogBeat = sPlayFrames;
     Watchdog_Start();
@@ -3371,6 +3408,18 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     FishmodAutoplayStep* step;
     u16 buttonDiff;
 
+#ifdef FISHMOD_SCRIPT_WALK_TO
+    if (sWalking) {
+        input->prev = input->cur;
+        input->cur.button = 0;
+        input->cur.stick_x = sWalkStickX;
+        input->cur.stick_y = sWalkStickY;
+        input->press.button = input->rel.button = 0;
+        PadUtils_UpdateRelXY(input);
+        input->press.stick_x = input->press.stick_y = 0;
+        return;
+    }
+#endif
 #ifdef FISHMOD_BENCH_PLAY
     if (PlayBench_Input(input)) {
         return;
