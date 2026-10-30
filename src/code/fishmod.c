@@ -17,6 +17,7 @@
 #include "controller.h"
 #include "interface.h"
 #include "item.h"
+#include "inventory.h"
 #include "message.h"
 #include "message_data_fmt.h"
 #include "save.h"
@@ -343,6 +344,11 @@ s32 Fishmod_UseItem(PlayState* play, s32 item) {
     s32 bait;
     s32 next;
 
+    if (FISHMOD_IS_LURE_ITEM(item)) {
+        // placeholder: lures can be put on a C button, but don't go on the line yet
+        Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+        return true;
+    }
     if (FISHMOD_IS_BAIT_ITEM(item)) {
         bait = FISHMOD_BAIT_BEE_LARVA;
         next = sNextLarva[item - ITEM_BOTTLE_LARVA_3];
@@ -369,9 +375,9 @@ static u8 sLarvaCaughtText;
 void Fishmod_OnBottleCatch(s32 actorId, s32 slot) {
     if (actorId == ACTOR_EN_FISHMOD) {
         sLarvaCaughtText = true;
-    } else if ((actorId == ACTOR_EN_FISH) && (slot >= SLOT_BOTTLE_1) && (slot <= SLOT_BOTTLE_4)) {
+    } else if ((actorId == ACTOR_EN_FISH) && FISHMOD_IS_BOTTLE_SLOT(slot)) {
         // the flopping fish poured out on land: if it was one of fishmod's, it's that fish again
-        FISHMOD_SAVE->bottleFish[slot - SLOT_BOTTLE_1] = sFloppingFish;
+        FISHMOD_SAVE->bottleFish[FISHMOD_BOTTLE_INDEX(slot)] = sFloppingFish;
         sFloppingFish.species = 0;
         sFloppingFish.lengthTenths = 0;
     }
@@ -381,8 +387,8 @@ void Fishmod_OnBottleCatch(s32 actorId, s32 slot) {
 void Fishmod_BottleFish(s32 species, f32 lengthInches, s32 look) {
     s32 i;
 
-    for (i = 0; i < 4; i++) {
-        if (gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1 + i] == ITEM_BOTTLE_EMPTY) {
+    for (i = 0; i < FISHMOD_BOTTLES; i++) {
+        if (INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) == ITEM_BOTTLE_EMPTY) {
             FISHMOD_SAVE->bottleFish[i].species = species + 1;
             FISHMOD_SAVE->bottleFish[i].lengthTenths = (u16)(lengthInches * 10.0f);
             FISHMOD_SAVE->bottleFish[i].look = look;
@@ -404,10 +410,10 @@ s32 Fishmod_ReleaseBottleFish(PlayState* play, s32 slot, Vec3f* pos, s16 yaw) {
     s32 species;
     s32 i;
 
-    if ((spawns == NULL) || (gFishmodRod == NULL) || (slot < SLOT_BOTTLE_1) || (slot > SLOT_BOTTLE_4)) {
+    if ((spawns == NULL) || (gFishmodRod == NULL) || !FISHMOD_IS_BOTTLE_SLOT(slot)) {
         return false;
     }
-    bottle = &FISHMOD_SAVE->bottleFish[slot - SLOT_BOTTLE_1];
+    bottle = &FISHMOD_SAVE->bottleFish[FISHMOD_BOTTLE_INDEX(slot)];
     // into real water a little ahead of Link (he pours it out in front of him): water boxes reach under the banks
     // in places, so check there's water above the ground, deep enough to swim in
     for (i = 0; i < 3; i++) {
@@ -752,11 +758,17 @@ void Fishmod_InitTestSave(void) {
                                                          INFTABLE_MASK(INFTABLE_SARIA_WAS_TOLD_ABOUT_MIDO) |
                                                          INFTABLE_MASK(INFTABLE_0C) | INFTABLE_MASK(INFTABLE_0E);
 
-    // three empty bottles and one with bugs, for bait and catches
-    for (i = SLOT_BOTTLE_1; i <= SLOT_BOTTLE_4; i++) {
-        inv->items[i] = ITEM_BOTTLE_EMPTY;
+    // five empty bottles and one with bugs, for bait and catches
+    Fishmod_InitSaveExtras();
+    for (i = 0; i < FISHMOD_BOTTLES; i++) {
+        INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) = ITEM_BOTTLE_EMPTY;
     }
     inv->items[SLOT_BOTTLE_4] = ITEM_BOTTLE_BUG;
+    // the rod, and the lures (placeholders)
+    INV_SLOT(SLOT_FISHING_ROD) = ITEM_FISHING_POLE;
+    INV_SLOT(SLOT_LURE_1) = ITEM_LURE_CRANKBAIT;
+    INV_SLOT(SLOT_LURE_2) = ITEM_LURE_FROG;
+    INV_SLOT(SLOT_LURE_3) = ITEM_LURE_SINKING;
 
     // the slingshot knocks down beehives for larvae
     inv->items[SLOT_SLINGSHOT] = ITEM_SLINGSHOT;
@@ -867,6 +879,75 @@ s32 Fishmod_CanUseRod(PlayState* play) {
 #include "zelda_arena.h"
 #include "tha.h"
 #include "fishmod_collision.h"
+
+/* The item page's own graphics (fishmod/tools/gen_item_page.py, include/fishmod_item_page.h) */
+
+#include "fishmod_item_page.h"
+#include "stddef.h"
+
+DECLARE_ROM_SEGMENT(fishmod_item_page)
+
+FishmodItemPage* gFishmodItemPageData;
+
+u32 Fishmod_ItemPageSize(void) {
+    return offsetof(FishmodItemPage, names); // (the names stay in ROM)
+}
+
+/**
+ * Loads the page's graphics at `dst`, after the pause menu's own in the scene's object space. That space is nearly
+ * full already (adult Link outside a dungeon leaves about 41 KB past the Link preview's coverage; these take 35 KB),
+ * so if they wouldn't fit, the page stays vanilla.
+ */
+void Fishmod_LoadItemPage(PlayState* play, void* dst) {
+    if ((uintptr_t)dst + Fishmod_ItemPageSize() > (uintptr_t)play->objectCtx.spaceEnd) {
+        gFishmodItemPageData = NULL;
+        return;
+    }
+    gFishmodItemPageData = dst;
+    DMA_REQUEST_SYNC(dst, (uintptr_t)_fishmod_item_pageSegmentRomStart, Fishmod_ItemPageSize(), "fishmod.c", __LINE__);
+}
+
+/** An item's icon while paused: the lures' come from the item page's graphics (when they're loaded). */
+void* Fishmod_PauseItemIcon(s32 item) {
+    if (FISHMOD_IS_LURE_ITEM(item) && (gFishmodItemPageData != NULL)) {
+        return gFishmodItemPageData->lureIcons[item - ITEM_LURE_CRANKBAIT];
+    }
+    return gItemIcons[item];
+}
+
+uintptr_t Fishmod_ItemIconVrom(s32 item) {
+    if (FISHMOD_IS_LURE_ITEM(item)) {
+        return (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, lureIcons) +
+               (item - ITEM_LURE_CRANKBAIT) * sizeof(gFishmodItemPageData->lureIcons[0]);
+    }
+    return 0;
+}
+
+uintptr_t Fishmod_ItemNameVrom(s32 item) {
+    s32 index;
+
+    if (item == ITEM_FISHING_POLE) {
+        index = 0;
+    } else if (FISHMOD_IS_LURE_ITEM(item)) {
+        index = 1 + item - ITEM_LURE_CRANKBAIT;
+    } else {
+        return 0;
+    }
+    return (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, names) +
+           index * sizeof(gFishmodItemPageData->names[0]);
+}
+
+/** The save block's new parts: the item page's six new slots start empty (a new file, or one from before). */
+void Fishmod_InitSaveExtras(void) {
+    s32 i;
+
+    if (!(FISHMOD_SAVE->flags & FISHMOD_SAVE_FLAG_ITEMS)) {
+        for (i = 0; i < ARRAY_COUNT(FISHMOD_SAVE->items); i++) {
+            FISHMOD_SAVE->items[i] = ITEM_NONE;
+        }
+        FISHMOD_SAVE->flags |= FISHMOD_SAVE_FLAG_ITEMS;
+    }
+}
 
 #define FISHMOD_WATERMAP(sceneId, segment) DECLARE_ROM_SEGMENT(segment)
 #include "fishmod_watermap_scenes.h"

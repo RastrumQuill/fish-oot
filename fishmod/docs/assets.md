@@ -61,3 +61,4 @@ Pillow isn't installed.
 | Asset | Source | Made by |
 |---|---|---|
 | Bait bottle icons (larvae 3/2/1), `rgba32` | `fishmod/art/bottle_larva_*.png` | `fishmod/tools/gen_bait_icons.py` (from the vanilla bottle icon) |
+| Item page background (9 tiles, `ia8`), lure icons (placeholders, `rgba32`), rod/lure names (`ia4`) | the game's `gPauseSelectItem*` tiles and message font | `fishmod/tools/gen_item_page.py` at build time (not committed) |

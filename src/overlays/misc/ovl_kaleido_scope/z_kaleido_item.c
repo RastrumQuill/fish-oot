@@ -10,6 +10,8 @@
 #include "translation.h"
 #include "play_state.h"
 #include "save.h"
+#include "fishmod.h"
+#include "fishmod_item_page.h"
 
 #include "assets/textures/parameter_static/parameter_static.h"
 
@@ -31,6 +33,29 @@ u8 gAmmoItems[] = {
     ITEM_MAGIC_BEAN, // SLOT_MAGIC_BEAN
     ITEM_NONE,
 };
+
+/*
+ * fishmod: the item page's grid, six columns by five rows (fishmod.h). The cursor moves over grid places
+ * (cursorPoint, cursorX, cursorY); each place holds an inventory slot (cursorSlot), and each slot's quad sits at its
+ * place.
+ */
+u8 gFishmodItemGridSlot[ITEM_GRID_ROWS * ITEM_GRID_COLS] = {
+    SLOT_DEKU_STICK,  SLOT_DEKU_NUT,      SLOT_BOMB,       SLOT_BOW,         SLOT_ARROW_FIRE,  SLOT_DINS_FIRE,
+    SLOT_SLINGSHOT,   SLOT_OCARINA,       SLOT_BOMBCHU,    SLOT_HOOKSHOT,    SLOT_ARROW_ICE,   SLOT_FARORES_WIND,
+    SLOT_BOOMERANG,   SLOT_LENS_OF_TRUTH, SLOT_MAGIC_BEAN, SLOT_HAMMER,      SLOT_ARROW_LIGHT, SLOT_NAYRUS_LOVE,
+    SLOT_FISHING_ROD, SLOT_LURE_1,        SLOT_LURE_2,     SLOT_LURE_3,      SLOT_TRADE_ADULT, SLOT_TRADE_CHILD,
+    SLOT_BOTTLE_1,    SLOT_BOTTLE_2,      SLOT_BOTTLE_3,   SLOT_BOTTLE_4,    SLOT_BOTTLE_5,    SLOT_BOTTLE_6,
+};
+// and back: each slot's place
+u8 gFishmodItemSlotGrid[INVENTORY_SLOTS] = {
+    0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17,
+    24, 25, 26, 27, // bottles 1-4
+    22, 23,         // trade items
+    18, 19, 20, 21, // rod, lures
+    28, 29,         // bottles 5-6
+};
+
+#define GRID_ITEM(point) INV_SLOT(gFishmodItemGridSlot[point])
 
 static s16 sEquipState = 0;
 static s16 sEquipAnimTimer = 0;
@@ -183,7 +208,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                             pauseCtx->cursorPoint[PAUSE_ITEM] -= 1;
 
                             // if there's an item there, stop there
-                            if (gSaveContext.save.info.inventory.items[pauseCtx->cursorPoint[PAUSE_ITEM]] !=
+                            if (GRID_ITEM(pauseCtx->cursorPoint[PAUSE_ITEM]) !=
                                 ITEM_NONE) {
                                 cursorMoveResult = 1;
                             }
@@ -220,7 +245,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                             pauseCtx->cursorX[PAUSE_ITEM]++;
                             pauseCtx->cursorPoint[PAUSE_ITEM] += 1;
 
-                            if (gSaveContext.save.info.inventory.items[pauseCtx->cursorPoint[PAUSE_ITEM]] !=
+                            if (GRID_ITEM(pauseCtx->cursorPoint[PAUSE_ITEM]) !=
                                 ITEM_NONE) {
                                 cursorMoveResult = 1;
                             }
@@ -252,7 +277,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                 } while (cursorMoveResult == 0);
 
                 if (cursorMoveResult == 1) {
-                    cursorItem = gSaveContext.save.info.inventory.items[pauseCtx->cursorPoint[PAUSE_ITEM]];
+                    cursorItem = GRID_ITEM(pauseCtx->cursorPoint[PAUSE_ITEM]);
                 }
 
                 PRINTF("【Ｘ cursor=%d(%) (cur_xpt=%d)(ok_fg=%d)(ccc=%d)(key_angle=%d)】  ",
@@ -268,7 +293,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
 
                 cursorPoint = cursorX = cursorY = 0;
                 while (true) {
-                    if (gSaveContext.save.info.inventory.items[cursorPoint] != ITEM_NONE) {
+                    if (GRID_ITEM(cursorPoint) != ITEM_NONE) {
                         pauseCtx->cursorPoint[PAUSE_ITEM] = cursorPoint;
                         pauseCtx->cursorX[PAUSE_ITEM] = cursorX;
                         pauseCtx->cursorY[PAUSE_ITEM] = cursorY;
@@ -299,7 +324,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                 cursorPoint = cursorX = ITEM_GRID_COLS - 1;
                 cursorY = 0;
                 while (true) {
-                    if (gSaveContext.save.info.inventory.items[cursorPoint] != ITEM_NONE) {
+                    if (GRID_ITEM(cursorPoint) != ITEM_NONE) {
                         pauseCtx->cursorPoint[PAUSE_ITEM] = cursorPoint;
                         pauseCtx->cursorX[PAUSE_ITEM] = cursorX;
                         pauseCtx->cursorY[PAUSE_ITEM] = cursorY;
@@ -335,7 +360,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                                 pauseCtx->cursorY[PAUSE_ITEM]--;
                                 pauseCtx->cursorPoint[PAUSE_ITEM] -= ITEM_GRID_COLS;
 
-                                if (gSaveContext.save.info.inventory.items[pauseCtx->cursorPoint[PAUSE_ITEM]] !=
+                                if (GRID_ITEM(pauseCtx->cursorPoint[PAUSE_ITEM]) !=
                                     ITEM_NONE) {
                                     cursorMoveResult = 1;
                                 }
@@ -350,7 +375,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                                 pauseCtx->cursorY[PAUSE_ITEM]++;
                                 pauseCtx->cursorPoint[PAUSE_ITEM] += ITEM_GRID_COLS;
 
-                                if (gSaveContext.save.info.inventory.items[pauseCtx->cursorPoint[PAUSE_ITEM]] !=
+                                if (GRID_ITEM(pauseCtx->cursorPoint[PAUSE_ITEM]) !=
                                     ITEM_NONE) {
                                     cursorMoveResult = 1;
                                 }
@@ -369,14 +394,14 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                 }
             }
 
-            cursorSlot = pauseCtx->cursorPoint[PAUSE_ITEM];
+            cursorSlot = gFishmodItemGridSlot[pauseCtx->cursorPoint[PAUSE_ITEM]];
 
             pauseCtx->cursorColorSet = 4;
 
             if (cursorMoveResult == 1) {
-                cursorItem = gSaveContext.save.info.inventory.items[pauseCtx->cursorPoint[PAUSE_ITEM]];
+                cursorItem = GRID_ITEM(pauseCtx->cursorPoint[PAUSE_ITEM]);
             } else if (cursorMoveResult != 2) {
-                cursorItem = gSaveContext.save.info.inventory.items[pauseCtx->cursorPoint[PAUSE_ITEM]];
+                cursorItem = GRID_ITEM(pauseCtx->cursorPoint[PAUSE_ITEM]);
             }
 
             pauseCtx->cursorItem[PAUSE_ITEM] = cursorItem;
@@ -472,7 +497,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
     for (i = j = 0; i < (ITEM_GRID_ROWS * ITEM_GRID_COLS); i++, j += 4) {
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
 
-        if (gSaveContext.save.info.inventory.items[i] != ITEM_NONE) {
+        if (INV_SLOT(i) != ITEM_NONE) {
             if ((pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) && (pauseCtx->pageIndex == PAUSE_ITEM) &&
                 (pauseCtx->cursorSpecialPos == 0)) {
                 if (CHECK_AGE_REQ_SLOT(i)) {
@@ -516,7 +541,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
 
             gSPVertex(POLY_OPA_DISP++, &pauseCtx->itemVtx[j + 0], 4, 0);
             KaleidoScope_DrawQuadTextureRGBA32(play->state.gfxCtx,
-                                               gItemIcons[gSaveContext.save.info.inventory.items[i]], ITEM_ICON_WIDTH,
+                                               Fishmod_PauseItemIcon(INV_SLOT(i)), ITEM_ICON_WIDTH,
                                                ITEM_ICON_HEIGHT, 0);
         }
     }
@@ -530,8 +555,8 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                       ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
 
     for (i = 0; i < 15; i++) {
-        if ((gAmmoItems[i] != ITEM_NONE) && (gSaveContext.save.info.inventory.items[i] != ITEM_NONE)) {
-            KaleidoScope_DrawAmmoCount(pauseCtx, play->state.gfxCtx, gSaveContext.save.info.inventory.items[i]);
+        if ((gAmmoItems[i] != ITEM_NONE) && (INV_SLOT(i) != ITEM_NONE)) {
+            KaleidoScope_DrawAmmoCount(pauseCtx, play->state.gfxCtx, INV_SLOT(i));
         }
     }
 

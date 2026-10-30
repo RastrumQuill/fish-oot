@@ -42,11 +42,21 @@ Notes only, not built in test5: lures, sinkers and the sinking lure (item 5), ho
 - **The item grid redone completely:** the rod, lures and sinker break the vanilla grid, so everything shrinks in
   proportion to make room. **More bottles** fill the gaps that leaves (how many isn't fixed: they're there to fill
   the voids).
-  - **Layout: leaning to mockup C** (`fishmod/tools/item_grid_mockups.py`, B the runner-up): the vanilla six
+  - **Layout: mockup C, built** (`fishmod/tools/item_grid_mockups.py`; B was the runner-up): the vanilla six
     columns plus a fifth row, icons at 80%. Rows 1-3 as vanilla; row 4 is the fishing row (rod, then three lures
-    strung on one pipe like a line, then the adult and child trade items); row 5 is a shelf of six bottles. 30 slots:
-    the cursor math gains a row, and the save needs room for the lures and two more bottles.
-    (B: 8 x 4 at 75%, rod and lures bracketed like the bow and arrows, trade items under the rod, eight bottles.)
+    strung on one pipe like a line, then the adult and child trade items); row 5 is a shelf of six bottles.
+    - **Slots:** 30. The vanilla 24 keep their numbers and place in the save; the rod (24), lures (25-27) and bottles
+      5-6 (28-29) live in the mod's save block (`FishmodSaveData.items`), and every slot goes through `INV_SLOT`.
+      Everything that handled four bottles handles six (`FISHMOD_BOTTLE_SLOT`). The grid maps places to slots
+      (`gFishmodItemGridSlot`, `z_kaleido_item.c`).
+    - **Graphics:** `fishmod/tools/gen_item_page.py` makes the page's background from the game's own tiles (old pipes
+      erased, new ones drawn from pieces of the old), placeholder lure icons, and the rod's and lures' names in the
+      game's font, into a ROM file the pause menu loads beside its own. Room is tight: the pause menu already fills
+      the scene's object space to about 41 KB of its end (adult Link outside a dungeon), and these take 35 KB, so
+      only the 9 changed tiles are stored, and the load is skipped (vanilla page) if it wouldn't fit.
+    - **Placeholders:** the three lures (Crankbait, Frog Lure, Sinking Lure, item ids `ITEM_INVALID_4-6`) go on C
+      buttons but using one only beeps; their icons are rough drawings. The test-mode save and the debug save have
+      the rod, the lures and six bottles. Nothing in the game gives lures or bottles 5-6 yet.
 - **Fish as real items:** a bottled fish shows its species and size in the inventory, and the buyer you sell bottled
   things to says what he's getting. Never just "fish" any more: size and species matter. (Selling stays a small
   extra: the economy is broken enough already. One fish at a time is fine.)

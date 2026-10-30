@@ -229,6 +229,7 @@ void Sram_InitNewSave(void) {
     gSaveContext.save.info.playerData.magicLevel = 0;
     gSaveContext.save.info.infTable[INFTABLE_INDEX_1DX] = 1;
     gSaveContext.save.info.sceneFlags[SCENE_WATER_TEMPLE].swch = 0x40000000;
+    Fishmod_InitSaveExtras(); // fishmod: the item page's new slots
 }
 
 static SavePlayerData sDebugSavePlayerData = {
@@ -414,6 +415,7 @@ void Sram_InitDebugSave(void) {
     gSaveContext.save.entranceIndex = ENTR_HYRULE_FIELD_0;
     gSaveContext.save.info.playerData.magicLevel = 0;
     gSaveContext.save.info.sceneFlags[SCENE_WATER_TEMPLE].swch = 0x40000000;
+    Fishmod_InitSaveExtras(); // fishmod: the item page's new slots
 }
 
 static s16 sDungeonEntrances[] = {
@@ -455,6 +457,7 @@ void Sram_OpenSave(SramContext* sramCtx) {
     PRINTF(T("ぽいんと＝%x(%d)\n", "Point=%x(%d)\n"), i, gSaveContext.fileNum);
 
     MemCopy(&gSaveContext, sramCtx->readBuff + i, sizeof(Save));
+    Fishmod_InitSaveExtras(); // fishmod: a file saved before the item page's new slots existed
 
     PRINTF_COLOR_YELLOW();
     PRINTF("SCENE_DATA_ID = %d   SceneNo = %d\n", gSaveContext.save.info.playerData.savedSceneId,

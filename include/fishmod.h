@@ -227,10 +227,65 @@ typedef struct FishmodSaveData {
     /* 0x00 */ u32 flags;
     /* 0x04 */ FishmodSpeciesRecord records[FISHMOD_SAVE_SPECIES_MAX];
     /* 0x84 */ u8 baitCount[FISHMOD_BAIT_SLOTS];  // the bait pouch
-    /* 0x8C */ FishmodBottleFish bottleFish[4];    // per bottle slot
-} FishmodSaveData; // size = 0x9C
+    /* 0x8C */ FishmodBottleFish bottleFish[6];    // per bottle (FISHMOD_BOTTLE_INDEX)
+    /* 0xA4 */ u8 items[6];                         // the item page's slots past the vanilla 24 (INV_SLOT)
+} FishmodSaveData; // size = 0xAA
+
+// FishmodSaveData.flags
+#define FISHMOD_SAVE_FLAG_ITEMS (1 << 0) // items[] set up (a save from before has zeros there, the Deku Stick's id)
 
 #define FISHMOD_SAVE ((FishmodSaveData*)&gSaveContext.save.info.sceneFlags[SCENE_ID_MAX])
+
+/*
+ * The item page (fishmod/docs/roadmap.md, mockup C): six columns and five rows. The vanilla 24 slots keep their
+ * numbers and their place in the save; the six new ones live in FishmodSaveData.items. Every slot is read and
+ * written through INV_SLOT(slot). The grid places slots by FISHMOD_ITEM_GRID (z_kaleido_item.c):
+ *     stick     nut       bomb      bow       fire arrow  Din's
+ *     slingshot ocarina   bombchu   hookshot  ice arrow   Farore's
+ *     boomerang lens      beans     hammer    light arrow Nayru's
+ *     ROD       LURE 1    LURE 2    LURE 3    adult trade child trade
+ *     bottle 1  bottle 2  bottle 3  bottle 4  BOTTLE 5    BOTTLE 6
+ */
+#define SLOT_FISHING_ROD 24
+#define SLOT_LURE_1 25
+#define SLOT_LURE_2 26
+#define SLOT_LURE_3 27
+#define SLOT_BOTTLE_5 28
+#define SLOT_BOTTLE_6 29
+#define INVENTORY_SLOTS 30
+#define INVENTORY_SLOTS_VANILLA 24
+
+#define INV_SLOT(slot)                                                                    \
+    (*(((slot) < INVENTORY_SLOTS_VANILLA) ? &gSaveContext.save.info.inventory.items[slot] \
+                                          : &FISHMOD_SAVE->items[(slot) - INVENTORY_SLOTS_VANILLA]))
+
+// Bottles: six, numbered 0-5 (bottles 1-4 are the vanilla slots, 5 and 6 the new ones)
+#define FISHMOD_BOTTLES 6
+#define FISHMOD_BOTTLE_SLOT(i) (((i) < 4) ? (SLOT_BOTTLE_1 + (i)) : (SLOT_BOTTLE_5 + (i) - 4))
+#define FISHMOD_IS_BOTTLE_SLOT(slot) \
+    ((((slot) >= SLOT_BOTTLE_1) && ((slot) <= SLOT_BOTTLE_4)) || (((slot) >= SLOT_BOTTLE_5) && ((slot) <= SLOT_BOTTLE_6)))
+#define FISHMOD_BOTTLE_INDEX(slot) (((slot) >= SLOT_BOTTLE_5) ? ((slot) - SLOT_BOTTLE_5 + 4) : ((slot) - SLOT_BOTTLE_1))
+
+// Lures: items of their own (placeholders for now: they go on a C button, but using one does nothing yet)
+#define ITEM_LURE_CRANKBAIT ITEM_INVALID_4
+#define ITEM_LURE_FROG ITEM_INVALID_5
+#define ITEM_LURE_SINKING ITEM_INVALID_6
+#define FISHMOD_IS_LURE_ITEM(item) (((item) >= ITEM_LURE_CRANKBAIT) && ((item) <= ITEM_LURE_SINKING))
+
+// Sets up the save block's new parts (a new file, or one saved before they existed)
+void Fishmod_InitSaveExtras(void);
+// The item page's own graphics (fishmod_item_page.h), loaded with the pause menu's: where to load them, and once
+// loaded, the page's tiles in place of vanilla ones
+struct FishmodItemPage;
+extern struct FishmodItemPage* gFishmodItemPageData;
+u32 Fishmod_ItemPageSize(void);
+void Fishmod_LoadItemPage(struct PlayState* play, void* dst);
+// The item's icon in ROM (fishmod's items whose icons aren't in RAM), or 0
+uintptr_t Fishmod_ItemIconVrom(s32 item);
+// The item's icon texture while paused (the lures' are in the item page's graphics)
+void* Fishmod_PauseItemIcon(s32 item);
+// The item's name graphic in ROM if fishmod has one of its own, or 0
+uintptr_t Fishmod_ItemNameVrom(s32 item);
 
 // Bait bottles: new bottle contents in item IDs the game never uses. Using one from a C button while holding the
 // rod baits the hook with one of what's in it.

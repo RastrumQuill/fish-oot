@@ -1526,3 +1526,11 @@ beginseg
     romalign 0x1000
     include "$(BUILD_DIR)/src/fishmod_data/fishmod_col_spot06.o"
 endseg
+
+// fishmod: the item page's graphics (fishmod/tools/gen_item_page.py), loaded with the pause menu's. Not compressed:
+// the C buttons load single lure icons out of it.
+beginseg
+    name "fishmod_item_page"
+    romalign 0x1000
+    include "$(BUILD_DIR)/src/fishmod_data/fishmod_item_page.o"
+endseg
