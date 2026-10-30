@@ -7,18 +7,18 @@ themselves: the debug harness's autoplay scripts and the benches already do (`fi
 
 ## Who does what
 
-With 2-4 cores the VM is for the hardware, not for heavy CPU work:
+Measured: the cloud container is 4 vCPUs of a shared Xeon at 2.1 GHz with 15 GB and no GPU (a Python loop that
+takes it 1.85 s should take a 5700X3D core about 1.0-1.2 s). So each VM core is worth roughly 1.5-2 cloud cores:
+a 4-core VM out-runs the cloud container, a 2-core one about matches it, and neither has a GPU (ares already runs
+here without one). The cloud's other limit is that it's reclaimed when idle, which cuts long runs short.
 
 | Work | Where | Why |
 |---|---|---|
 | Talking to the cart and the capture card | VM | the hardware is there |
-| Builds for the console | VM, incremental | a change to a few files rebuilds in a minute or two; a clean build of the whole decomp is slow on 2-4 cores (once, after setup or a flag change) |
-| Long soaks | **the console** | a test on hardware is the real thing, and it costs the VM nothing: it only grabs a frame now and then |
-| ares runs, tour captures, A/B benches, anything run several at once | cloud container | they keep several cores busy for hours; ares on 2 cores with no GPU would be slow |
+| Builds, ares runs, captures, benches | VM when it has its cores, cloud otherwise | the VM is faster and always on; but it shares the user's PC |
+| Long soaks | **the console** | the real thing, and it costs the VM almost nothing (a frame grab now and then) |
+| Many ares runs at once (A/B sets, tours) | cloud | so the user's PC stays free |
 | Asset generation (props, scatter, collision, item page) | either | quick |
-
-So the cloud session stays the main place to write code and run ares, and the VM becomes the place things are
-proven on the console, mostly with long unattended runs.
 
 ## What a test looks like
 
