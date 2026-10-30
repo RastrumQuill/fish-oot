@@ -8,6 +8,7 @@
 
 #include "dma.h"
 #include "fishmod.h"
+#include "fishmod_sram.h"
 
 #if FISHMOD_DEBUG
 
@@ -825,7 +826,7 @@ static void Lod_Save(void) {
     sLod.kinds = gFishmodLodTest.kindCount;
     sLod.threshold = LOD_THRESHOLD;
     sLod.pixels = LOD_PIXELS;
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7A40, &sLod, sizeof(sLod), OS_WRITE);
+    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BIG), &sLod, sizeof(sLod), OS_WRITE);
 }
 
 #ifdef FISHMOD_LOD_SWEEP
@@ -983,7 +984,7 @@ static void Sweep_Save(void) {
     sSweep.zones = SWEEP_ZONES;
     sSweep.part = sSweepPart;
     sSweep.parts = sSweepParts;
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sSweep, sizeof(sSweep), OS_WRITE);
+    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH), &sSweep, sizeof(sSweep), OS_WRITE);
 }
 
 static void Sweep_Place(void) {
@@ -1019,7 +1020,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
 
             DmaMgr_RequestSync(pt, 0x20, sizeof(pt));
             if (!((pt[0] == 0x464D5054) && (pt[2] > 0) && (pt[1] < pt[2]))) { // 'FMPT'
-                SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7C00, pt, 12, OS_READ);
+                SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_FAULT), pt, 12, OS_READ);
             }
             if ((pt[0] == 0x464D5054) && (pt[2] > 0) && (pt[1] < pt[2])) {
                 sSweepPart = pt[1];
@@ -1027,7 +1028,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
             }
         }
         // carry on from an earlier run (the save file kept what it measured)
-        SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sSweep, sizeof(sSweep), OS_READ);
+        SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH), &sSweep, sizeof(sSweep), OS_READ);
         if ((sSweep.magic != 0x464C5357) || (sSweep.part != sSweepPart) || (sSweep.parts != sSweepParts)) {
             bzero(&sSweep, sizeof(sSweep));
         }
@@ -1115,13 +1116,13 @@ static void Fishmod_LodUpdate(PlayState* play) {
                     u32 v = sSweepView;
 
                     sShown = true;
-                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x1000, &v, 4, OS_WRITE);
-                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x1010, sLodNoise,
+                    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_LOD_DIAG), &v, 4, OS_WRITE);
+                    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_LOD_DIAG) + 0x10, sLodNoise,
                                      SCREEN_WIDTH * SCREEN_HEIGHT / 8, OS_WRITE);
                     // and row 200 of the reference and of this frame
-                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x3800, &sLodRef[200 * SCREEN_WIDTH],
+                    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_LOD_DIAG) + 0x2800, &sLodRef[200 * SCREEN_WIDTH],
                                      SCREEN_WIDTH * 2, OS_WRITE);
-                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x3800 + SCREEN_WIDTH * 2,
+                    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_LOD_DIAG) + 0x2800 + SCREEN_WIDTH * 2,
                                      &sLodCur[200 * SCREEN_WIDTH], SCREEN_WIDTH * 2, OS_WRITE);
                 }
 #endif
@@ -1418,7 +1419,7 @@ static void Fishmod_LodUpdate(PlayState* play) {
                 sRot.magic = 0x46524F54; // 'FROT'
                 sRot.stops = stop + 1;
                 sRot.yaws = ROT_YAWS;
-                SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7A40 - 0x400, &sRot, sizeof(sRot), OS_WRITE);
+                SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_LOD_ROTATE), &sRot, sizeof(sRot), OS_WRITE);
                 sRotYaw = 0;
                 if (stop + 1 >= ROT_STOPS) {
                     gFishmodLodTest.active = false;
@@ -1569,9 +1570,9 @@ static void Fishmod_LodUpdate(PlayState* play) {
                             sMask[i >> 3] |= 1 << (i & 7);
                         }
                     }
-                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + slot * sizeof(sMask), sMask, sizeof(sMask),
+                    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH) + slot * sizeof(sMask), sMask, sizeof(sMask),
                                      OS_WRITE);
-                    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + sizeof(sMask), sLodNoise, sizeof(sMask),
+                    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH) + sizeof(sMask), sLodNoise, sizeof(sMask),
                                      OS_WRITE);
                 }
             }
@@ -1865,7 +1866,7 @@ static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
     sCrumb.mode = mode;
     sCrumb.block = block;
     sCrumb.count++;
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7000, &sCrumb, sizeof(sCrumb), OS_WRITE);
+    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_CRUMB), &sCrumb, sizeof(sCrumb), OS_WRITE);
 }
 
 static void Bench_SetMode(s32 mode) {
@@ -1891,7 +1892,7 @@ static void Bench_Save(void) {
     sBench.metrics = BENCH_METRICS;
     sBench.tests = BENCH_TESTS;
     sBench.hw = FISHMOD_HW;
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_WRITE);
+    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH), &sBench, sizeof(sBench), OS_WRITE);
 }
 
 /** The memory tests' buffer, and the sums so far from the save. False if there's no memory for it. */
@@ -1923,7 +1924,7 @@ static s32 Bench_Init(void) {
             }
         }
         // carry on from an earlier night (the save file keeps the sums)
-        SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sBench, sizeof(sBench), OS_READ);
+        SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH), &sBench, sizeof(sBench), OS_READ);
         if ((sBench.magic != 0x4642454E) || (sBench.version != BENCH_VERSION) || (sBench.hw != FISHMOD_HW)) {
             bzero(&sBench, sizeof(sBench));
         }
@@ -2423,7 +2424,7 @@ static void AreaBench_Save(void) {
     sArea.hw = FISHMOD_HW;
     sArea.spot = sAreaSpot;
     sArea.variant = sAreaVariant;
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000), &sArea, sizeof(sArea), OS_WRITE);
+    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH), &sArea, sizeof(sArea), OS_WRITE);
 }
 
 static void Fishmod_AreaBenchUpdate(PlayState* play) {
@@ -2784,7 +2785,7 @@ static void Fishmod_DebugProfile(s32 record) {
         }
         if ((sProf.frames % 60) == 0) {
 #ifndef FISHMOD_PLAYLOG // (the play log has the end of SRAM)
-            SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7E00, &sProf, sizeof(sProf), OS_WRITE);
+            SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_PROFILE), &sProf, sizeof(sProf), OS_WRITE);
 #endif
         }
     }
@@ -2848,7 +2849,7 @@ static void Fishmod_DebugTiming(void) {
             }
             if ((sStats.frames % 60) == 0) {
 #ifndef FISHMOD_PLAYLOG // (the play log has the end of SRAM)
-                SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7F00, &sStats, sizeof(sStats), OS_WRITE);
+                SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_STATS), &sStats, sizeof(sStats), OS_WRITE);
 #endif
             }
         }
@@ -2879,7 +2880,7 @@ s32 Fishmod_DebugRosterCount(void) {
  * Written to the end of SRAM, after the six save slots (0x7A30), so the saves are untouched; every 30 seconds, and the
  * frames after a write aren't counted. Read: fishmod/tools/playlog_report.py save.sav
  */
-#define PLOG_ADDR 0x7A40
+#define PLOG_ADDR FISHMOD_SRAM_BIG
 #define PLOG_WINDOW 20  // frames per sample ("second")
 #define PLOG_WORST 24
 #define PLOG_SITS 12    // under (2) x weather (3) x rod (2)
@@ -3053,7 +3054,7 @@ static void Fishmod_PlayLog(PlayState* play) {
             sPlogSinceSave = 0;
             sPlog.magic = 0x46504C47;
             sPlog.version = 1;
-            SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + PLOG_ADDR, &sPlog, sizeof(sPlog), OS_WRITE);
+            SsSram_ReadWrite(FISHMOD_SRAM_ADDR(PLOG_ADDR), &sPlog, sizeof(sPlog), OS_WRITE);
             sPlogSkip = 3; // the write's own hitch isn't the game's
         }
     }
@@ -3116,7 +3117,7 @@ static void StateHash_Update(PlayState* play) {
     }
     sHashes.magic = 0x46485348; // 'FHSH'
     sHashes.hash[sHashes.count++] = h;
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7A00, &sHashes, sizeof(sHashes), OS_WRITE);
+    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_HASHES), &sHashes, sizeof(sHashes), OS_WRITE);
 }
 #endif
 
@@ -3510,7 +3511,7 @@ static void Watchdog_Entry(void* arg) {
             // the graphics thread's stack (it's in RDRAM; anything else is left out)
             sRec.stack[i] = ((addr >= 0x80000000) && (addr < 0x80800000)) ? *(u32*)addr : 0;
         }
-        SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7B00, &sRec, sizeof(sRec), OS_WRITE);
+        SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_STALL), &sRec, sizeof(sRec), OS_WRITE);
         done = true;
     }
 }
@@ -3588,7 +3589,7 @@ void Fishmod_DebugFault(OSThread* thread, const char* exp1, const char* exp2) {
         }
         sRec.text[MIN(i, (s32)sizeof(sRec.text) - 1)] = '\0';
     }
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7C00, &sRec, sizeof(sRec), OS_WRITE);
+    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_FAULT), &sRec, sizeof(sRec), OS_WRITE);
 }
 
 void Fishmod_DebugPrintf(s32 line, const char* fmt, ...) {
@@ -3664,6 +3665,6 @@ void Fishmod_DebugColNodes(s32 sceneId, s32 used, s32 max) {
     sRec[1] = sceneId;
     sRec[2] = used;
     sRec[3] = max;
-    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7D00, sRec, sizeof(sRec), OS_WRITE);
+    SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_COLLISION), sRec, sizeof(sRec), OS_WRITE);
 }
 #endif
