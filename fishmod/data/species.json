@@ -1,8 +1,9 @@
 {
-  "_doc": "Single source of truth for fish species. fishmod/tools/gen_species.py generates include/fishmod_species_data.h (game) and fishmod/wiki/species/*.md (wiki) from this file. Lengths are inches, weights pounds. Behavior values are 0-100. 'base' picks the model: bass or loach (object_fish). 'shape' scales the model: [length, height, width]. 'tint' is the RGB primitive color the model is multiplied by. 'scenes' lists where the fish lives with a spawn weight; 'status' is 'in-game' once it actually spawns somewhere.",
+  "_doc": "Single source of truth for fish species. fishmod/tools/gen_species.py generates include/fishmod_species_data.h (game) and fishmod/wiki/species/*.md (wiki) from this file. Lengths are inches, weights pounds. Behavior values are 0-100. 'base' picks the model: bass or loach (object_fish). 'shape' scales the model: [length, height, width]. 'tint' is the RGB primitive color the model is multiplied by. 'scenes' lists where the fish lives with a spawn weight; 'status' is 'in-game' once it actually spawns somewhere. 'saveId' is the species' number in save files (its catch records, bottled fish): permanent, never reused or renumbered; a species that's dropped keeps its entry (status 'retired').",
   "species": [
     {
       "id": "GREENGILL",
+      "saveId": 0,
       "name": "Greengill",
       "origin": "Twilight Princess",
       "status": "in-game",
@@ -211,6 +212,7 @@
     },
     {
       "id": "HYRULE_MINNOW",
+      "saveId": 1,
       "name": "Hyrule Minnow",
       "origin": "Ocarina of Time (the fish you can catch in a bottle)",
       "status": "in-game",
@@ -295,6 +297,7 @@
     },
     {
       "id": "HYRULE_BASS",
+      "saveId": 2,
       "name": "Hyrule Bass",
       "origin": "Twilight Princess, Ocarina of Time (Fishing Pond)",
       "status": "in-game",
@@ -440,6 +443,7 @@
     },
     {
       "id": "ORDON_CATFISH",
+      "saveId": 3,
       "name": "Ordon Catfish",
       "origin": "Twilight Princess",
       "status": "in-game",
@@ -671,6 +675,7 @@
     },
     {
       "id": "HYLIAN_LOACH",
+      "saveId": 4,
       "name": "Hylian Loach",
       "origin": "Ocarina of Time (Fishing Pond), Twilight Princess",
       "status": "in-game",
@@ -740,6 +745,7 @@
     },
     {
       "id": "SANKE_CARP",
+      "saveId": 5,
       "name": "Sanke Carp",
       "origin": "Breath of the Wild",
       "status": "in-game",
@@ -995,6 +1001,7 @@
     },
     {
       "id": "HYLIAN_PIKE",
+      "saveId": 6,
       "name": "Hylian Pike",
       "origin": "Twilight Princess",
       "status": "planned",
@@ -1064,6 +1071,7 @@
     },
     {
       "id": "REEKFISH",
+      "saveId": 7,
       "name": "Reekfish",
       "origin": "Twilight Princess",
       "status": "planned",
@@ -1133,6 +1141,7 @@
     },
     {
       "id": "HEARTY_BASS",
+      "saveId": 8,
       "name": "Hearty Bass",
       "origin": "Breath of the Wild",
       "status": "planned",
@@ -1201,6 +1210,7 @@
     },
     {
       "id": "JABU_FRY",
+      "saveId": 9,
       "name": "Jabu-Jabu Fry",
       "origin": "Ocarina of Time (Lord Jabu-Jabu)",
       "status": "planned",

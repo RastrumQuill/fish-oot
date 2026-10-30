@@ -169,3 +169,9 @@ u8 gFishmodItemSlotGrid[INVENTORY_SLOTS] = {
     18, 19, 20, 21, // rod, lures
     28, 29,         // bottles 5-6
 };
+
+/** Where an inventory slot's item is kept: the vanilla 24 in the inventory, the item page's six new ones in the mod's
+ * save block (INV_CONTENT goes through here; INV_SLOT is the same as a macro). */
+u8* Fishmod_InvSlot(s32 slot) {
+    return &INV_SLOT(slot);
+}
