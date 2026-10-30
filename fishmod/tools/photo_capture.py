@@ -12,12 +12,11 @@ Usage: fishmod/tools/photo_capture.py <rom> [--ares PATH] [--out DIR] [--timeout
 
 import argparse
 import os
-import subprocess
 import sys
 import tempfile
 import time
 
-from PIL import Image
+from harness import Ares
 
 # Must match sPhotoSpecies / PHOTO_POSES in src/code/fishmod_debug.c
 PHOTOS = []
@@ -26,8 +25,6 @@ for sp in ["greengill", "hyrule_bass", "ordon_catfish", "hylian_loach", "sanke_c
     PHOTOS.append(sp + "_34")
 PHOTOS.append("lineup")
 
-# Game area of the ares window on the 1280x960 virtual display
-GAME_BOX = (246, 178, 246 + 750, 178 + 570)
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
@@ -46,32 +43,20 @@ def main():
     ap.add_argument("--ares", default=os.environ.get("ARES", "ares"))
     ap.add_argument("--out", default=os.path.join(ROOT, "fishmod", "wiki", "img"))
     ap.add_argument("--timeout", type=int, default=900)
-    ap.add_argument("--display", default=":99")
+    ap.add_argument("--display", default=os.environ.get("DISP", ":99"))
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
-    env = dict(os.environ, DISPLAY=args.display)
-    if subprocess.run(["xdpyinfo"], env=env, capture_output=True).returncode != 0:
-        subprocess.Popen(["Xvfb", args.display, "-screen", "0", "1280x960x24"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(2)
-
-    ares = subprocess.Popen(
-        [args.ares, "--system", "Nintendo 64", "--setting", "Audio/Driver=None", "--setting",
-         "Input/Defocus=Allow", "--no-file-prompt", args.rom],
-        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ares = Ares(args.rom, tempfile.mkdtemp(), args.ares, args.display).start()
 
     seen = {}  # photo number -> count of shots seen
     saved = set()
     last = None
     start = time.time()
-    tmp = tempfile.mkdtemp()
     try:
         while time.time() - start < args.timeout and len(saved) < len(PHOTOS):
             time.sleep(2)
-            shot = os.path.join(tmp, "shot.png")
-            subprocess.run(["import", "-window", "root", shot], env=env, check=True)
-            img = Image.open(shot).convert("RGB").crop(GAME_BOX)
+            img = ares.shot()
             n = read_marker(img)
             if n is None:
                 continue
@@ -85,7 +70,7 @@ def main():
                 print(f"saved {name}.jpg ({len(saved)}/{len(PHOTOS)})", flush=True)
             last = n
     finally:
-        ares.kill()
+        ares.stop()
 
     missing = [PHOTOS[i - 1] for i in range(1, len(PHOTOS) + 1) if i not in saved]
     if missing:

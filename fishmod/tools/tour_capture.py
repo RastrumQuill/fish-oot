@@ -7,13 +7,10 @@ Usage: fishmod/tools/tour_capture.py <rom> <outdir> [--stops N] [--ares PATH] [-
 """
 import argparse
 import os
-import subprocess
 import tempfile
 import time
 
-from PIL import Image
-
-GAME_BOX = (246, 178, 246 + 750, 178 + 570)  # the game area of the ares window on the 1280x960 virtual display
+from harness import Ares
 
 
 def main():
@@ -23,29 +20,19 @@ def main():
     ap.add_argument("--stops", type=int, default=22)
     ap.add_argument("--ares", default=os.environ.get("ARES", "ares"))
     ap.add_argument("--timeout", type=int, default=1500)
-    ap.add_argument("--display", default=":99")
+    ap.add_argument("--display", default=os.environ.get("DISP", ":99"))
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
-    env = dict(os.environ, DISPLAY=args.display)
-    if subprocess.run(["xdpyinfo"], env=env, capture_output=True).returncode != 0:
-        subprocess.Popen(["Xvfb", args.display, "-screen", "0", "1280x960x24"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(2)
-    ares = subprocess.Popen([args.ares, "--system", "Nintendo 64", "--setting", "Audio/Driver=None", "--setting",
-                             "Input/Defocus=Allow", "--no-file-prompt", args.rom],
-                            env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ares = Ares(args.rom, tempfile.mkdtemp(), args.ares, args.display).start()
     # stops already on disk are kept (a second run fills in the gaps)
     saved = {int(f[5:7]) for f in os.listdir(args.out) if f.startswith("stop_")}
     prev = None
     start = time.time()
-    tmp = tempfile.mkdtemp()
     try:
         while time.time() - start < args.timeout and len(saved) < args.stops:
             time.sleep(0.8)
-            shot = os.path.join(tmp, "shot.png")
-            subprocess.run(["import", "-window", "root", shot], env=env, check=True)
-            img = Image.open(shot).convert("RGB").crop(GAME_BOX)
+            img = ares.shot()
             r, g, b = img.getpixel((10, 10))
             n = round(r / 8)
             if g > 30 or b > 30 or r < 8 or abs(r - n * 8) > 3:
@@ -58,7 +45,7 @@ def main():
                 print(f"stop {n} ({time.time() - start:.0f} s)", flush=True)
             prev = n
     finally:
-        ares.kill()
+        ares.stop()
     print(f"saved {len(saved)} of {args.stops}")
 
 
