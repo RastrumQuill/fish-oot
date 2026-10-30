@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Generates the bait bottle icons (32x32 RGBA32, like the vanilla bottle icons) from the vanilla empty bottle: bee
 larvae suspended in honey, as in Twilight Princess, with the honey at 3/3, 2/3 and 1/3 for the three uses left.
-Writes the PNGs to fishmod/art/ (4x previews to fishmod/out/); the asset manifest (fishmod/assets/assets.json,
-fishmod/tools/assets.py) turns them into C. Needs the extracted assets and Pillow."""
+Made from the game's own icon, so generated at build time, never committed: writes the PNGs and an asset manifest
+to src/fishmod_data/ (4x previews to fishmod/out/), and the build turns them into C with fishmod/tools/assets.py
+(src/fishmod_data/fishmod_bait_icons.inc.c). Needs the extracted assets and Pillow."""
+import json
 import math
 import os
 import random
@@ -12,7 +14,9 @@ from PIL import Image
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 BOTTLE = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "textures", "icon_item_static",
                       "gItemIconBottleEmptyTex.rgba32.png")
-OUT_ART = os.path.join(ROOT, "fishmod", "art")
+OUT_ART = os.path.join(ROOT, "src", "fishmod_data", "art")
+MANIFEST = os.path.join(ROOT, "src", "fishmod_data", "bait_manifest.json")
+OUT_C = "src/fishmod_data/fishmod_bait_icons.inc.c"
 
 # The inside of the bottle's body: rows 12-25 (the glass base starts at 26). The honey's surface for each level.
 BODY_TOP = 12
@@ -125,6 +129,10 @@ def main():
         img.save(os.path.join(OUT_ART, f"bottle_larva_{count}.png"))
         os.makedirs(os.path.join(ROOT, "fishmod", "out"), exist_ok=True)
         img.resize((128, 128), Image.NEAREST).save(os.path.join(ROOT, "fishmod", "out", f"bottle_larva_{count}_x4.png"))
+    entries = [{"name": f"gFishmodBottleLarva{c}Tex", "src": f"src/fishmod_data/art/bottle_larva_{c}.png",
+                "format": "rgba32", "out": OUT_C} for c in (3, 2, 1)]
+    with open(MANIFEST, "w") as f:
+        json.dump({"textures": entries, "models": []}, f, indent=2)
 
 
 if __name__ == "__main__":

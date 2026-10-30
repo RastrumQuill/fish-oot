@@ -110,6 +110,14 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
   --profile` (`--hw` the same as `--profile hw`) writes the C header and brings F3DEX3 and the output suffix; the
   scatter's distances and budgets and gen_scatter's thinning come from it. Both profiles hold today's values (emu
   without F3DEX3), so performance tuning per profile can start from here.
+- **7: done.** The AI one function per state; the rod reaches the fish through named functions (hook, tire, pull,
+  let go) and the fish claims the rod through one; the koi patterns and the catfish curl are look flags in
+  `species.json`, texture size follows the base model; the mod has its own random numbers (it no longer reseeds the
+  game's) and each roster slot's fish comes from a stream of its own (the caught list keys by slot). Fingerprints
+  match stage 6 up to the random numbers, which change the fish's choices on purpose.
+- **8, ROM-derived art at build: done.** The species' textures and the bait bottles' icons are generated into
+  `src/fishmod_data/` by the build (`gen_textures.py`, `gen_bait_icons.py`) and no longer committed; the ROM is
+  byte-identical.
 
 ## Decisions (made)
 
