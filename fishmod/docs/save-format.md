@@ -88,4 +88,71 @@ SRAM has only `0x600` bytes free after the six slots.
 
 ## 4. The original game's save and flag bugs
 
-(see below)
+How sure: **code** = seen in the decompilation here; **SoH/Rando** = Ship of Harkinian or the OoT Randomizer fix
+it (their source read); **wiki** = from wiki or forum summaries only (TCRF, ZeldaSpeedRuns and Cloudmodding were
+blocked from this session, so worth reading directly before acting).
+
+### 4a. A flag shared by two things
+
+| Bug | What the player sees | Flag / place | Sure | Fix elsewhere |
+|---|---|---|---|---|
+| **Poacher's Saw takes the Deku Nut upgrade** | After getting the Saw, the Deku Theater (Lost Woods stage) never gives the 40-nut upgrade | `Item_Give(ITEM_POACHERS_SAW)` sets `ITEMGETINF_FOREST_STAGE_NUT_UPGRADE` (`z_parameter.c`, marked `@bug`) | code | SoH `Fixes/DekuNutUpgradeFix.cpp` (don't set it; for saves where it's set already, clear it if the nut upgrade isn't owned); Rando `Patches.py` |
+| Gerudo "caught before" is reused for the tower escape | Nothing: Zelda clears it in the collapse, and you can't save after Ganon | `EVENTCHKINF_GERUDO_CAUGHT_TOWER_FALL` | code | (none needed) |
+| Kakariko gate opens for child once the Master Sword is pulled | The guard lets child through without Zelda's Letter | `z_bg_gate_shutter.c`: `INFTABLE_76` **or** `EVENTCHKINF_OBTAINED_MASTER_SWORD` | code | a broad check, not a shared bit; Rando calls it shared |
+| Windmill "fast" state takes a saved bit | Nothing (cleared on entering the scene) | `EVENTCHKINF_65` | code | |
+
+Nothing else shared turned up: a scan of every saved flag (where each is set and read) found the others are the same
+event set from two places (the Goron pair, the carpenters), not two things on one bit. MQ-only and
+randomizer-only ones (Water Temple MQ lock, Shadow redeads, Dodongo's gossip fairy) don't touch this game.
+
+### 4b. State lost, repeatable, or checked wrong
+
+| Bug | What the player sees | Field / place | Sure | Fix elsewhere |
+|---|---|---|---|---|
+| **Gravedigging Tour heart piece lost** | Leave (or the game reloads) before picking up the piece Dampé dug up, and it's gone for good | `ITEMGETINF_1C` set when he **digs**, not when it's collected (`z_en_tk.c`) | code | SoH `GravediggingTourFix` |
+| **Gold Skulltula token counted twice** | Leave before the "you got a token" box closes (e.g. a void), and the same spider gives another token | `Item_Give(ITEM_SKULL_TOKEN)` on touch; `SET_GS_FLAGS` only when the box closes (`z_en_si.c`); `gsTokens` has no cap | code | none found |
+| **Broken Giant's Knife never cleared** | Owning Biggoron's Sword still counts the broken knife: shop and pause-menu logic see both | the `EQUIP_INV_SWORD_BROKENGIANTKNIFE` bit stays set | code | SoH `Fixes/BrokenGiantsKnife.cpp` |
+| Goron City doors stay shut | Beat the Fire Temple without talking to Link the Goron: the shop doors stay closed | `z_bg_spot18_shutter.c` checks only `INFTABLE_109` | code (SoH) | SoH `Fixes/GoronCityDoorFix.cpp` |
+| Kokiri lines don't match the story | Get Zelda's Letter before the Kokiri Emerald: Kokiri talk and act as if the Deku Tree were alive | flags unknown | SoH | SoH `Fixes/FixKokiriForestQuestState.cpp` |
+| Zora hint after King Zora moved | The Zora still talks about Ruto's Letter | | SoH | SoH `FixZoraHintDialogue` |
+| A world-map hint flag nothing sets | Kokiri Forest is never highlighted by that rule (map only) | `EVENTCHKINF_6E` read in `z_kaleido_scope.c`, never set | code | |
+| Half the scene's switch and collectible flags are temporary | Things reset on leaving a scene; each case needs checking (most are meant to) | flags 0x20-0x3F (`tempSwch`, `tempCollect`) aren't saved | code | case by case |
+| Swordless state and B button | After a sword is lost (Ganon's knock-away), save and reload can leave B empty | `infTable[INFTABLE_INDEX_1DX]`; B's enabled state isn't in the save | code + wiki | |
+
+### 4c. The save itself
+
+| Issue | Effect | Sure |
+|---|---|---|
+| Checksum is a plain 16-bit sum | weak: swapped or offsetting errors pass | code |
+| Both copies bad → the file silently becomes a new file | a damaged save is lost without a word | code |
+| `dayTime` (u16) cleared as 32 bits (`z_sram.c`, marked `@bug`) | harmless now, **breaks if the save layout moves** | code |
+| `gsTokens` uncapped (see the token bug) | the count can pass 100 | code |
+| Beans bought stored in the Hammer's ammo slot (`BEANS_BOUGHT = AMMO(ITEM_MAGIC_BEAN + 1)`) | a quirk, no bug; matters to anything that changes ammo slots (the item page kept all ammo where it was) | code |
+| Big Poe points in a high score (+100 each, reward at 1000, capped 1100); fishing packs two records and seven flags into one value | quirks, no bug found | code |
+| Ruto's Letter / bottle duplication, trade item loss, saving in cutscenes | only with glitches (Bottle Adventure, Get-Item Manipulation), not in normal play | wiki |
+
+## 5. Fixing them later: the plan (nothing done yet)
+
+- **Never move the vanilla layout.** Existing saves and the checksum keep working; everything new goes in the mod's
+  block or the spare space above.
+- **A save version.** `FishmodSaveData.flags` already marks what's been set up (bit 0, the item page). Each fix that
+  must repair an old save gets a bit: on load (`Fishmod_InitSaveExtras`, called from `Sram_OpenSave`), a save
+  without the bit is repaired once and marked. E.g. the nut upgrade: clear the stage flag if the upgrade isn't owned
+  (as SoH does).
+- **Moving a flag:** for the shared-bit cases, the second user gets a new flag in the mod's block, read and written
+  through one function, so the old bit is left to its first owner.
+- **Order bugs** (heart piece, token): set the flag when the thing is actually received, not when it appears.
+- **One table of fixes**, each with its name, what it changes, and its save bit, so the refactor's "one framework"
+  covers them and a build can list what it fixes. Fixes that change what a player sees in normal play (the Kakariko
+  gate, the Kokiri lines) are decisions, not bugs: ask before including them.
+- **Order of work:** the clear bugs first (nut upgrade, heart piece, token, the knife, Goron doors), then read TCRF's
+  bug page and the ZeldaSpeedRuns pages directly for anything missing here, then the save's own weak spots (a
+  stronger checksum would make vanilla files read as corrupt, so it would need its own marker).
+
+### References
+- The decompilation here: `include/save.h` (structs, every flag table), `src/code/z_sram.c` (slots, checksum,
+  loading).
+- Ship of Harkinian's fixes: https://github.com/HarbourMasters/Shipwright/tree/develop/soh/soh/Enhancements/Fixes
+- OoT Randomizer's patches: https://github.com/OoTRandomizer/OoT-Randomizer/blob/Dev/Patches.py
+- TCRF bug list: https://tcrf.net/Bugs:The_Legend_of_Zelda:_Ocarina_of_Time
+- Cloudmodding save format: https://wiki.cloudmodding.com/oot/Save_Format
