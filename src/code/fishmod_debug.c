@@ -2825,11 +2825,17 @@ void Fishmod_DebugBoot(void) {
 #endif
     gSaveContext.save.cutsceneIndex = 0;
 
-    // Rod on C-Left, two empty bottles on C-Down / C-Right slots.
+    // Rod on C-Left, two empty bottles on C-Down / C-Right slots; the lures, and bottles 5 and 6 (one with milk).
     gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1] = ITEM_BOTTLE_EMPTY;
     gSaveContext.save.info.inventory.items[SLOT_BOTTLE_2] = ITEM_BOTTLE_EMPTY;
+    INV_SLOT(SLOT_FISHING_ROD) = ITEM_FISHING_POLE;
+    INV_SLOT(SLOT_LURE_1) = ITEM_LURE_CRANKBAIT;
+    INV_SLOT(SLOT_LURE_2) = ITEM_LURE_FROG;
+    INV_SLOT(SLOT_LURE_3) = ITEM_LURE_SINKING;
+    INV_SLOT(SLOT_BOTTLE_5) = ITEM_BOTTLE_EMPTY;
+    INV_SLOT(SLOT_BOTTLE_6) = ITEM_BOTTLE_MILK_FULL;
     gSaveContext.save.info.equips.buttonItems[1] = ITEM_FISHING_POLE;
-    gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_NONE;
+    gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_FISHING_ROD;
     gSaveContext.save.info.equips.buttonItems[2] = ITEM_BOTTLE_EMPTY;
     gSaveContext.save.info.equips.cButtonSlots[1] = SLOT_BOTTLE_1;
     gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_EMPTY;
@@ -2864,6 +2870,9 @@ void Fishmod_DebugBoot(void) {
 #ifdef FISHMOD_SCRIPT_EMPTY_ITEMS
     // nothing on the item page (the pause-menu mockups draw their own icons on it)
     memset(gSaveContext.save.info.inventory.items, ITEM_NONE, sizeof(gSaveContext.save.info.inventory.items));
+    memset(FISHMOD_SAVE->items, ITEM_NONE, sizeof(FISHMOD_SAVE->items));
+    gSaveContext.save.info.equips.buttonItems[1] = ITEM_NONE;
+    gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_NONE;
     gSaveContext.save.info.equips.buttonItems[2] = gSaveContext.save.info.equips.buttonItems[3] = ITEM_NONE;
     gSaveContext.save.info.equips.cButtonSlots[1] = gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_NONE;
 #endif

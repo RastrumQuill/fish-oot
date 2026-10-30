@@ -706,7 +706,7 @@ void func_80083108(PlayState* play) {
 
                             Interface_LoadItemIcon1(play, 0);
                         } else {
-                            if (gSaveContext.save.info.inventory.items[SLOT_BOW] == ITEM_NONE) {
+                            if (INV_SLOT(SLOT_BOW) == ITEM_NONE) {
                                 gSaveContext.save.info.equips.buttonItems[0] = ITEM_NONE;
                             } else {
                                 Interface_LoadItemIcon1(play, 0);
@@ -824,7 +824,7 @@ void func_80083108(PlayState* play) {
                 if (player->stateFlags1 & PLAYER_STATE1_23) {
                     if ((gSaveContext.save.info.equips.buttonItems[0] != ITEM_NONE) &&
                         (gSaveContext.save.info.equips.buttonItems[0] != ITEM_BOW)) {
-                        if (gSaveContext.save.info.inventory.items[SLOT_BOW] == ITEM_NONE) {
+                        if (INV_SLOT(SLOT_BOW) == ITEM_NONE) {
                             gSaveContext.save.info.equips.buttonItems[0] = ITEM_NONE;
                         } else {
                             gSaveContext.save.info.equips.buttonItems[0] = ITEM_BOW;
@@ -1233,7 +1233,7 @@ void Inventory_SwapAgeEquipment(void) {
         if (gSaveContext.save.info.playerData.adultEquips.buttonItems[0] == ITEM_NONE) {
             gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_MASTER;
 
-            if (gSaveContext.save.info.inventory.items[SLOT_DEKU_NUT] != ITEM_NONE) {
+            if (INV_SLOT(SLOT_DEKU_NUT) != ITEM_NONE) {
                 gSaveContext.save.info.equips.buttonItems[1] = ITEM_DEKU_NUT;
                 gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_DEKU_NUT;
             } else {
@@ -1242,7 +1242,7 @@ void Inventory_SwapAgeEquipment(void) {
             }
 
             gSaveContext.save.info.equips.buttonItems[2] = ITEM_BOMB;
-            gSaveContext.save.info.equips.buttonItems[3] = gSaveContext.save.info.inventory.items[SLOT_OCARINA];
+            gSaveContext.save.info.equips.buttonItems[3] = INV_SLOT(SLOT_OCARINA);
             gSaveContext.save.info.equips.cButtonSlots[1] = SLOT_BOMB;
             gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_OCARINA;
             gSaveContext.save.info.equips.equipment = (EQUIP_VALUE_SWORD_MASTER << (EQUIP_TYPE_SWORD * 4)) |
@@ -1265,7 +1265,7 @@ void Inventory_SwapAgeEquipment(void) {
                      (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                     PRINTF("Register_Item_Pt(%d)=%d\n", i, gSaveContext.save.info.equips.cButtonSlots[i - 1]);
                     gSaveContext.save.info.equips.buttonItems[i] =
-                        gSaveContext.save.info.inventory.items[gSaveContext.save.info.equips.cButtonSlots[i - 1]];
+                        INV_SLOT(gSaveContext.save.info.equips.cButtonSlots[i - 1]);
                 }
             }
 
@@ -1299,7 +1299,7 @@ void Inventory_SwapAgeEquipment(void) {
                      (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                     PRINTF("Register_Item_Pt(%d)=%d\n", i, gSaveContext.save.info.equips.cButtonSlots[i - 1]);
                     gSaveContext.save.info.equips.buttonItems[i] =
-                        gSaveContext.save.info.inventory.items[gSaveContext.save.info.equips.cButtonSlots[i - 1]];
+                        INV_SLOT(gSaveContext.save.info.equips.cButtonSlots[i - 1]);
                 }
             }
 
@@ -1353,7 +1353,11 @@ void Interface_LoadItemIcon1(PlayState* play, u16 button) {
 
     osCreateMesgQueue(&interfaceCtx->loadQueue, &interfaceCtx->loadMsg, 1);
     DMA_REQUEST_ASYNC(&interfaceCtx->dmaRequest_160, interfaceCtx->iconItemSegment + (button * ITEM_ICON_SIZE),
-                      GET_ITEM_ICON_VROM(gSaveContext.save.info.equips.buttonItems[button]), ITEM_ICON_SIZE, 0,
+                      // fishmod: or in its own ROM file (the lures)
+                      (Fishmod_ItemIconVrom(gSaveContext.save.info.equips.buttonItems[button]) != 0)
+                          ? Fishmod_ItemIconVrom(gSaveContext.save.info.equips.buttonItems[button])
+                          : GET_ITEM_ICON_VROM(gSaveContext.save.info.equips.buttonItems[button]),
+                      ITEM_ICON_SIZE, 0,
                       &interfaceCtx->loadQueue, NULL, "../z_parameter.c", 1171);
     osRecvMesg(&interfaceCtx->loadQueue, NULL, OS_MESG_BLOCK);
 }
@@ -1361,7 +1365,8 @@ void Interface_LoadItemIcon1(PlayState* play, u16 button) {
 void Interface_LoadItemIcon2(PlayState* play, u16 button) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
 
-    if (Fishmod_ItemIcon(gSaveContext.save.info.equips.buttonItems[button]) != NULL) {
+    if ((Fishmod_ItemIcon(gSaveContext.save.info.equips.buttonItems[button]) != NULL) ||
+        (Fishmod_ItemIconVrom(gSaveContext.save.info.equips.buttonItems[button]) != 0)) {
         Interface_LoadItemIcon1(play, button);
         return;
     }
@@ -1424,7 +1429,7 @@ u8 Item_Give(PlayState* play, u8 item) {
     }
 
     PRINTF_COLOR_YELLOW();
-    PRINTF("item_get_setting=%d  pt=%d  z=%x\n", item, slot, gSaveContext.save.info.inventory.items[slot]);
+    PRINTF("item_get_setting=%d  pt=%d  z=%x\n", item, slot, INV_SLOT(slot));
     PRINTF_RST();
 
     if ((item >= ITEM_MEDALLION_FOREST) && (item <= ITEM_MEDALLION_LIGHT)) {
@@ -1591,28 +1596,28 @@ u8 Item_Give(PlayState* play, u8 item) {
         Inventory_ChangeUpgrade(UPG_WALLET, 2);
         return ITEM_NONE;
     } else if (item == ITEM_DEKU_STICK_UPGRADE_20) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             INV_CONTENT(ITEM_DEKU_STICK) = ITEM_DEKU_STICK;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 2);
         AMMO(ITEM_DEKU_STICK) = CAPACITY(UPG_DEKU_STICKS, 2);
         return ITEM_NONE;
     } else if (item == ITEM_DEKU_STICK_UPGRADE_30) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             INV_CONTENT(ITEM_DEKU_STICK) = ITEM_DEKU_STICK;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 3);
         AMMO(ITEM_DEKU_STICK) = CAPACITY(UPG_DEKU_STICKS, 3);
         return ITEM_NONE;
     } else if (item == ITEM_DEKU_NUT_UPGRADE_30) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             INV_CONTENT(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 2);
         AMMO(ITEM_DEKU_NUT) = CAPACITY(UPG_DEKU_NUTS, 2);
         return ITEM_NONE;
     } else if (item == ITEM_DEKU_NUT_UPGRADE_40) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             INV_CONTENT(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 3);
@@ -1628,7 +1633,7 @@ u8 Item_Give(PlayState* play, u8 item) {
         }
         return ITEM_NONE;
     } else if (item == ITEM_DEKU_STICK) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 1);
             AMMO(ITEM_DEKU_STICK) = 1;
         } else {
@@ -1638,7 +1643,7 @@ u8 Item_Give(PlayState* play, u8 item) {
             }
         }
     } else if ((item == ITEM_DEKU_STICKS_5) || (item == ITEM_DEKU_STICKS_10)) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 1);
             AMMO(ITEM_DEKU_STICK) = sAmmoRefillCounts[item - ITEM_DEKU_STICKS_5];
         } else {
@@ -1649,7 +1654,7 @@ u8 Item_Give(PlayState* play, u8 item) {
         }
         item = ITEM_DEKU_STICK;
     } else if (item == ITEM_DEKU_NUT) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 1);
             AMMO(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
         } else {
@@ -1659,7 +1664,7 @@ u8 Item_Give(PlayState* play, u8 item) {
             }
         }
     } else if ((item == ITEM_DEKU_NUTS_5) || (item == ITEM_DEKU_NUTS_10)) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 1);
             AMMO(ITEM_DEKU_NUT) += sAmmoRefillCounts[item - ITEM_DEKU_NUTS_5];
             PRINTF(T("デクの実 %d(%d)=%d  BS_count=%d\n", "Deku Nuts %d(%d)=%d  BS_count=%d\n"), item, ITEM_DEKU_NUTS_5,
@@ -1683,7 +1688,7 @@ u8 Item_Give(PlayState* play, u8 item) {
         }
         return ITEM_NONE;
     } else if (item == ITEM_BOMBCHU) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             INV_CONTENT(ITEM_BOMBCHU) = ITEM_BOMBCHU;
             AMMO(ITEM_BOMBCHU) = 10;
             return ITEM_NONE;
@@ -1694,7 +1699,7 @@ u8 Item_Give(PlayState* play, u8 item) {
             return ITEM_NONE;
         }
     } else if ((item == ITEM_BOMBCHUS_5) || (item == ITEM_BOMBCHUS_20)) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             INV_CONTENT(ITEM_BOMBCHU) = ITEM_BOMBCHU;
             AMMO(ITEM_BOMBCHU) += sBombchuRefillCounts[item - ITEM_BOMBCHUS_5];
             return ITEM_NONE;
@@ -1758,7 +1763,7 @@ u8 Item_Give(PlayState* play, u8 item) {
         }
         return ITEM_NONE;
     } else if (item == ITEM_MAGIC_BEAN) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_NONE) {
+        if (INV_SLOT(slot) == ITEM_NONE) {
             INV_CONTENT(item) = item;
             AMMO(ITEM_MAGIC_BEAN) = 1;
             BEANS_BOUGHT = 1;
@@ -1824,9 +1829,9 @@ u8 Item_Give(PlayState* play, u8 item) {
     } else if (item == ITEM_BOTTLE_EMPTY) {
         temp = SLOT(item);
 
-        for (i = 0; i < 4; i++) {
-            if (gSaveContext.save.info.inventory.items[temp + i] == ITEM_NONE) {
-                gSaveContext.save.info.inventory.items[temp + i] = item;
+        for (i = 0; i < FISHMOD_BOTTLES; i++) {
+            if (INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) == ITEM_NONE) {
+                INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) = item;
                 return ITEM_NONE;
             }
         }
@@ -1839,35 +1844,35 @@ u8 Item_Give(PlayState* play, u8 item) {
                 temp = SLOT(item);
             }
 
-            for (i = 0; i < 4; i++) {
-                if (gSaveContext.save.info.inventory.items[temp + i] == ITEM_BOTTLE_EMPTY) {
+            for (i = 0; i < FISHMOD_BOTTLES; i++) {
+                if (INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) == ITEM_BOTTLE_EMPTY) {
                     PRINTF(T("Item_Pt(1)=%d Item_Pt(2)=%d Item_Pt(3)=%d   空瓶=%d   中味=%d\n",
                              "Item_Pt(1)=%d Item_Pt(2)=%d Item_Pt(3)=%d   Empty Bottle=%d   Content=%d\n"),
                            gSaveContext.save.info.equips.cButtonSlots[0], gSaveContext.save.info.equips.cButtonSlots[1],
-                           gSaveContext.save.info.equips.cButtonSlots[2], temp + i, item);
+                           gSaveContext.save.info.equips.cButtonSlots[2], FISHMOD_BOTTLE_SLOT(i), item);
 
-                    if (gSaveContext.save.info.equips.cButtonSlots[0] == temp + i) {
+                    if (gSaveContext.save.info.equips.cButtonSlots[0] == FISHMOD_BOTTLE_SLOT(i)) {
                         gSaveContext.save.info.equips.buttonItems[1] = item;
                         Interface_LoadItemIcon2(play, 1);
                         gSaveContext.buttonStatus[1] = BTN_ENABLED;
-                    } else if (gSaveContext.save.info.equips.cButtonSlots[1] == temp + i) {
+                    } else if (gSaveContext.save.info.equips.cButtonSlots[1] == FISHMOD_BOTTLE_SLOT(i)) {
                         gSaveContext.save.info.equips.buttonItems[2] = item;
                         Interface_LoadItemIcon2(play, 2);
                         gSaveContext.buttonStatus[2] = BTN_ENABLED;
-                    } else if (gSaveContext.save.info.equips.cButtonSlots[2] == temp + i) {
+                    } else if (gSaveContext.save.info.equips.cButtonSlots[2] == FISHMOD_BOTTLE_SLOT(i)) {
                         gSaveContext.save.info.equips.buttonItems[3] = item;
                         Interface_LoadItemIcon1(play, 3);
                         gSaveContext.buttonStatus[3] = BTN_ENABLED;
                     }
 
-                    gSaveContext.save.info.inventory.items[temp + i] = item;
+                    INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) = item;
                     return ITEM_NONE;
                 }
             }
         } else {
-            for (i = 0; i < 4; i++) {
-                if (gSaveContext.save.info.inventory.items[temp + i] == ITEM_NONE) {
-                    gSaveContext.save.info.inventory.items[temp + i] = item;
+            for (i = 0; i < FISHMOD_BOTTLES; i++) {
+                if (INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) == ITEM_NONE) {
+                    INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) = item;
                     return ITEM_NONE;
                 }
             }
@@ -1898,7 +1903,7 @@ u8 Item_Give(PlayState* play, u8 item) {
         return ITEM_NONE;
     }
 
-    temp = gSaveContext.save.info.inventory.items[slot];
+    temp = INV_SLOT(slot);
     PRINTF("Item_Register(%d)=%d  %d\n", slot, item, temp);
     INV_CONTENT(item) = item;
 
@@ -1917,7 +1922,7 @@ u8 Item_CheckObtainability(u8 item) {
     }
 
     PRINTF_COLOR_GREEN();
-    PRINTF("item_get_non_setting=%d  pt=%d  z=%x\n", item, slot, gSaveContext.save.info.inventory.items[slot]);
+    PRINTF("item_get_non_setting=%d  pt=%d  z=%x\n", item, slot, INV_SLOT(slot));
     PRINTF_RST();
 
     if ((item >= ITEM_MEDALLION_FOREST) && (item <= ITEM_MEDALLION_LIGHT)) {
@@ -2015,14 +2020,14 @@ u8 Item_CheckObtainability(u8 item) {
                 temp = SLOT(item);
             }
 
-            for (i = 0; i < 4; i++) {
-                if (gSaveContext.save.info.inventory.items[temp + i] == ITEM_BOTTLE_EMPTY) {
+            for (i = 0; i < FISHMOD_BOTTLES; i++) {
+                if (INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) == ITEM_BOTTLE_EMPTY) {
                     return ITEM_NONE;
                 }
             }
         } else {
-            for (i = 0; i < 4; i++) {
-                if (gSaveContext.save.info.inventory.items[temp + i] == ITEM_NONE) {
+            for (i = 0; i < FISHMOD_BOTTLES; i++) {
+                if (INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) == ITEM_NONE) {
                     return ITEM_NONE;
                 }
             }
@@ -2031,7 +2036,7 @@ u8 Item_CheckObtainability(u8 item) {
         return ITEM_NONE;
     }
 
-    return gSaveContext.save.info.inventory.items[slot];
+    return INV_SLOT(slot);
 }
 
 void Inventory_DeleteItem(u16 item, u16 invSlot) {
@@ -2041,9 +2046,9 @@ void Inventory_DeleteItem(u16 item, u16 invSlot) {
         BEANS_BOUGHT = 0;
     }
 
-    gSaveContext.save.info.inventory.items[invSlot] = ITEM_NONE;
+    INV_SLOT(invSlot) = ITEM_NONE;
 
-    PRINTF("\nItem_Register(%d)\n", invSlot, gSaveContext.save.info.inventory.items[invSlot]);
+    PRINTF("\nItem_Register(%d)\n", invSlot, INV_SLOT(invSlot));
 
     for (i = 1; i < 4; i++) {
         if (gSaveContext.save.info.equips.buttonItems[i] == item) {
@@ -2056,9 +2061,9 @@ void Inventory_DeleteItem(u16 item, u16 invSlot) {
 s32 Inventory_ReplaceItem(PlayState* play, u16 oldItem, u16 newItem) {
     s16 i;
 
-    for (i = 0; i < ARRAY_COUNT(gSaveContext.save.info.inventory.items); i++) {
-        if (gSaveContext.save.info.inventory.items[i] == oldItem) {
-            gSaveContext.save.info.inventory.items[i] = newItem;
+    for (i = 0; i < INVENTORY_SLOTS; i++) {
+        if (INV_SLOT(i) == oldItem) {
+            INV_SLOT(i) = newItem;
             PRINTF(T("アイテム消去(%d)\n", "Item Purge (%d)\n"), i);
             for (i = 1; i < 4; i++) {
                 if (gSaveContext.save.info.equips.buttonItems[i] == oldItem) {
@@ -2077,8 +2082,8 @@ s32 Inventory_ReplaceItem(PlayState* play, u16 oldItem, u16 newItem) {
 s32 Inventory_HasEmptyBottle(void) {
     s32 slot;
 
-    for (slot = SLOT_BOTTLE_1; slot <= SLOT_BOTTLE_4; slot++) {
-        if (gSaveContext.save.info.inventory.items[slot] == ITEM_BOTTLE_EMPTY) {
+    for (slot = 0; slot < FISHMOD_BOTTLES; slot++) {
+        if (INV_SLOT(FISHMOD_BOTTLE_SLOT(slot)) == ITEM_BOTTLE_EMPTY) {
             return true;
         }
     }
@@ -2089,8 +2094,8 @@ s32 Inventory_HasEmptyBottle(void) {
 s32 Inventory_HasSpecificBottle(u8 bottleItem) {
     s32 slot;
 
-    for (slot = SLOT_BOTTLE_1; slot <= SLOT_BOTTLE_4; slot++) {
-        if (gSaveContext.save.info.inventory.items[slot] == bottleItem) {
+    for (slot = 0; slot < FISHMOD_BOTTLES; slot++) {
+        if (INV_SLOT(FISHMOD_BOTTLE_SLOT(slot)) == bottleItem) {
             return true;
         }
     }
@@ -2101,16 +2106,16 @@ s32 Inventory_HasSpecificBottle(u8 bottleItem) {
 void Inventory_UpdateBottleItem(PlayState* play, u8 item, u8 button) {
     PRINTF("item_no=%x,  c_no=%x,  Pt=%x  Item_Register=%x\n", item, button,
            gSaveContext.save.info.equips.cButtonSlots[button - 1],
-           gSaveContext.save.info.inventory.items[gSaveContext.save.info.equips.cButtonSlots[button - 1]]);
+           INV_SLOT(gSaveContext.save.info.equips.cButtonSlots[button - 1]));
 
     // Special case to only empty half of a Lon Lon Milk Bottle
-    if ((gSaveContext.save.info.inventory.items[gSaveContext.save.info.equips.cButtonSlots[button - 1]] ==
+    if ((INV_SLOT(gSaveContext.save.info.equips.cButtonSlots[button - 1]) ==
          ITEM_BOTTLE_MILK_FULL) &&
         (item == ITEM_BOTTLE_EMPTY)) {
         item = ITEM_BOTTLE_MILK_HALF;
     }
 
-    gSaveContext.save.info.inventory.items[gSaveContext.save.info.equips.cButtonSlots[button - 1]] = item;
+    INV_SLOT(gSaveContext.save.info.equips.cButtonSlots[button - 1]) = item;
     gSaveContext.save.info.equips.buttonItems[button] = item;
 
     Interface_LoadItemIcon1(play, button);
@@ -2120,23 +2125,24 @@ void Inventory_UpdateBottleItem(PlayState* play, u8 item, u8 button) {
 }
 
 s32 Inventory_ConsumeFairy(PlayState* play) {
-    s32 bottleSlot = SLOT(ITEM_BOTTLE_FAIRY);
     s16 i;
     s16 j;
+    s32 slot;
 
-    for (i = 0; i < 4; i++) {
-        if (gSaveContext.save.info.inventory.items[bottleSlot + i] == ITEM_BOTTLE_FAIRY) {
+    // fishmod: six bottles. A fairy on a C button is used first (as the game did), else the first one found.
+    for (i = 0; i < FISHMOD_BOTTLES; i++) {
+        slot = FISHMOD_BOTTLE_SLOT(i);
+        if (INV_SLOT(slot) == ITEM_BOTTLE_FAIRY) {
             for (j = 1; j < 4; j++) {
                 if (gSaveContext.save.info.equips.buttonItems[j] == ITEM_BOTTLE_FAIRY) {
                     gSaveContext.save.info.equips.buttonItems[j] = ITEM_BOTTLE_EMPTY;
                     Interface_LoadItemIcon1(play, j);
-                    i = 0;
-                    bottleSlot = gSaveContext.save.info.equips.cButtonSlots[j - 1];
+                    slot = gSaveContext.save.info.equips.cButtonSlots[j - 1];
                     break;
                 }
             }
-            PRINTF(T("妖精使用＝%d\n", "Fairy Usage=%d\n"), bottleSlot);
-            gSaveContext.save.info.inventory.items[bottleSlot + i] = ITEM_BOTTLE_EMPTY;
+            PRINTF(T("妖精使用＝%d\n", "Fairy Usage=%d\n"), slot);
+            INV_SLOT(slot) = ITEM_BOTTLE_EMPTY;
             return true;
         }
     }
@@ -3484,7 +3490,7 @@ void Interface_Draw(PlayState* play) {
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, pauseCtx->equipAnimAlpha);
                 gSPVertex(OVERLAY_DISP++, &pauseCtx->cursorVtx[PAUSE_CURSOR_QUAD_4 * 4], 4, 0);
 
-                gDPLoadTextureBlock(OVERLAY_DISP++, gItemIcons[pauseCtx->equipTargetItem], G_IM_FMT_RGBA, G_IM_SIZ_32b,
+                gDPLoadTextureBlock(OVERLAY_DISP++, Fishmod_PauseItemIcon(pauseCtx->equipTargetItem), G_IM_FMT_RGBA, G_IM_SIZ_32b,
                                     ITEM_ICON_WIDTH, ITEM_ICON_HEIGHT, 0, G_TX_NOMIRROR | G_TX_WRAP,
                                     G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
             } else {

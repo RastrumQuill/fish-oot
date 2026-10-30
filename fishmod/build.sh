@@ -101,6 +101,8 @@ python3 fishmod/tools/gen_scatter.py --c ${FISHMOD_UNTHINNED:+--unthinned}  # (F
 python3 fishmod/tools/gen_bedshade.py > /dev/null
 # the solid props' collision (rocks), added to the scene's at load (generated, not committed)
 python3 fishmod/tools/gen_collision.py
+# the item page's graphics, made from the game's own (generated, not committed)
+python3 fishmod/tools/gen_item_page.py
 # the water floor maps, baked from the extracted scenes and the props' collision (generated, not committed)
 python3 fishmod/tools/gen_watermap.py
 

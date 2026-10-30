@@ -14,6 +14,9 @@ extern s16 gVtxPageMapWorldQuadsHeight[];
 extern char gSlotAgeReqs[];
 extern char gEquipAgeReqs[EQUIP_TYPE_MAX][4];
 extern char gItemAgeReqs[];
+// fishmod: the item grid's places and slots (z_kaleido_item.c)
+extern u8 gFishmodItemGridSlot[];
+extern u8 gFishmodItemSlotGrid[];
 extern u8 gAreaGsFlags[];
 
 #define AGE_REQ_ADULT LINK_AGE_ADULT
@@ -163,13 +166,19 @@ typedef enum PromptQuad {
     /* 5 */ PROMPT_QUAD_MAX
 } PromptQuad;
 
-#define ITEM_GRID_ROWS 4
+// fishmod: five rows (the rod and lures, and six bottles: fishmod.h), the icons at about 80%
+#define ITEM_GRID_ROWS 5
 #define ITEM_GRID_COLS 6
 #define ITEM_GRID_CELL_WIDTH 32
 #define ITEM_GRID_CELL_HEIGHT 32
 #define ITEM_GRID_QUAD_MARGIN 2
-#define ITEM_GRID_QUAD_WIDTH (ITEM_GRID_CELL_WIDTH - (2 * ITEM_GRID_QUAD_MARGIN))
-#define ITEM_GRID_QUAD_HEIGHT (ITEM_GRID_CELL_HEIGHT - (2 * ITEM_GRID_QUAD_MARGIN))
+#define ITEM_GRID_QUAD_WIDTH 22
+#define ITEM_GRID_QUAD_HEIGHT 22
+// fishmod: cell centres on the page (vertex units; the page's texture is drawn 1:1, fishmod/tools/gen_item_page.py)
+#define FISHMOD_ITEM_COL0_X (-80)
+#define FISHMOD_ITEM_COL_PITCH 32
+#define FISHMOD_ITEM_ROW0_Y 44
+#define FISHMOD_ITEM_ROW_PITCH 25
 #define ITEM_GRID_QUAD_TEX_SIZE 32 // both width and height
 #define ITEM_GRID_QUAD_ENLARGE_OFFSET 2
 
@@ -178,21 +187,22 @@ typedef enum PromptQuad {
 #define ITEM_GRID_SELECTED_QUAD_HEIGHT (ITEM_GRID_QUAD_HEIGHT - (2 * ITEM_GRID_SELECTED_QUAD_MARGIN))
 #define ITEM_GRID_SELECTED_QUAD_TEX_SIZE 32 // both width and height
 
-#define ITEM_AMMO_DIGIT_QUAD_WIDTH 8
-#define ITEM_AMMO_DIGIT_QUAD_HEIGHT 8
+#define ITEM_AMMO_DIGIT_QUAD_WIDTH 7
+#define ITEM_AMMO_DIGIT_QUAD_HEIGHT 7
 #define ITEM_AMMO_DIGIT_QUAD_TEX_SIZE 8
 
 // Relative to the corresponding ITEM_QUAD_GRID_ quad
 #define ITEM_AMMO_TENS_QUAD_OFFSET_X 0
-#define ITEM_AMMO_TENS_QUAD_OFFSET_Y 22
+#define ITEM_AMMO_TENS_QUAD_OFFSET_Y 16
 
 // Relative to the ammo tens digit
-#define ITEM_AMMO_ONES_QUAD_OFFSET_X 6
+#define ITEM_AMMO_ONES_QUAD_OFFSET_X 5
 #define ITEM_AMMO_ONES_QUAD_OFFSET_Y 0
 
 typedef enum ItemQuad {
-    // 0 to 23 are the ITEM_GRID_ROWS*ITEM_GRID_COLS item grid
+    // 0 to 29 are the item grid's quads, one per inventory slot (fishmod: placed by FISHMOD_ITEM_GRID)
     // The values follow the `InventorySlot` enum
+    // (fishmod: the numbers in the comments below are vanilla's; with 30 grid quads each is 6 more)
     /*  0 */ ITEM_QUAD_GRID_FIRST,
     /* 23 */ ITEM_QUAD_GRID_LAST = ITEM_GRID_ROWS * ITEM_GRID_COLS - 1,
     // Markers indicating the currently equipped items

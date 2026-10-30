@@ -1,5 +1,6 @@
 #include "z_kaleido_scope.h"
 #include "fishmod.h"
+#include "fishmod_item_page.h"
 
 #include "attributes.h"
 #include "libc64/sleep.h"
@@ -774,6 +775,12 @@ char gSlotAgeReqs[] = {
     AGE_REQ_NONE,  // SLOT_BOTTLE_4
     AGE_REQ_ADULT, // SLOT_TRADE_ADULT
     AGE_REQ_CHILD, // SLOT_TRADE_CHILD
+    AGE_REQ_NONE,  // SLOT_FISHING_ROD (fishmod)
+    AGE_REQ_NONE,  // SLOT_LURE_1
+    AGE_REQ_NONE,  // SLOT_LURE_2
+    AGE_REQ_NONE,  // SLOT_LURE_3
+    AGE_REQ_NONE,  // SLOT_BOTTLE_5
+    AGE_REQ_NONE,  // SLOT_BOTTLE_6
 };
 
 char gEquipAgeReqs[4][4] = {
@@ -931,6 +938,9 @@ char gItemAgeReqs[] = {
     AGE_REQ_NONE,  // ITEM_INVALID_1 (fishmod: ITEM_BOTTLE_LARVA_*)
     AGE_REQ_NONE,  // ITEM_INVALID_2 (fishmod: ITEM_BOTTLE_LARVA_*)
     AGE_REQ_NONE,  // ITEM_INVALID_3 (fishmod: ITEM_BOTTLE_LARVA_*)
+    AGE_REQ_NONE,  // ITEM_INVALID_4 (fishmod: ITEM_LURE_CRANKBAIT)
+    AGE_REQ_NONE,  // ITEM_INVALID_5 (fishmod: ITEM_LURE_FROG)
+    AGE_REQ_NONE,  // ITEM_INVALID_6 (fishmod: ITEM_LURE_SINKING)
 };
 
 u8 gAreaGsFlags[] = {
@@ -1079,6 +1089,29 @@ void KaleidoScope_DrawQuadTextureRGBA32(GraphicsContext* gfxCtx, void* texture, 
     CLOSE_DISPS(gfxCtx, "../z_kaleido_scope_PAL.c", 758);
 }
 
+/**
+ * fishmod: the item page's background with its pipes redrawn for the 6 x 5 grid (fishmod/tools/gen_item_page.py):
+ * the language's title tiles, and the redrawn ones under them. The vanilla page if they aren't loaded.
+ */
+static void** KaleidoScope_FishmodItemPageTexs(void** vanilla) {
+    static void* sTexs[PAGE_BG_QUADS];
+    static const s8 sTileIndex[] = FISHMOD_ITEM_PAGE_TILE_INDEX;
+    s32 c;
+    s32 r;
+    s32 k;
+
+    if (gFishmodItemPageData == NULL) {
+        return vanilla;
+    }
+    for (c = 0; c < 3; c++) {
+        for (r = 0; r < 5; r++) {
+            k = (r == 0) ? -1 : sTileIndex[c * 4 + r - 1];
+            sTexs[c * 5 + r] = (k < 0) ? vanilla[c * 5 + r] : (void*)gFishmodItemPageData->pageTex[k];
+        }
+    }
+    return sTexs;
+}
+
 void KaleidoScope_SetDefaultCursor(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     s16 s;
@@ -1087,14 +1120,14 @@ void KaleidoScope_SetDefaultCursor(PlayState* play) {
     switch (pauseCtx->pageIndex) {
         case PAUSE_ITEM:
             s = pauseCtx->cursorSlot[PAUSE_ITEM];
-            if (gSaveContext.save.info.inventory.items[s] == ITEM_NONE) {
+            if (INV_SLOT(s) == ITEM_NONE) {
                 i = s + 1;
                 for (;;) {
-                    if (gSaveContext.save.info.inventory.items[i] != ITEM_NONE) {
+                    if (INV_SLOT(i) != ITEM_NONE) {
                         break;
                     }
                     i++;
-                    if (i >= 24) {
+                    if (i >= INVENTORY_SLOTS) {
                         i = 0;
                     }
                     if (i == s) {
@@ -1102,8 +1135,12 @@ void KaleidoScope_SetDefaultCursor(PlayState* play) {
                         return;
                     }
                 }
-                pauseCtx->cursorItem[PAUSE_ITEM] = gSaveContext.save.info.inventory.items[i];
+                pauseCtx->cursorItem[PAUSE_ITEM] = INV_SLOT(i);
                 pauseCtx->cursorSlot[PAUSE_ITEM] = i;
+                // fishmod: the cursor's place on the grid follows the slot
+                pauseCtx->cursorPoint[PAUSE_ITEM] = gFishmodItemSlotGrid[i];
+                pauseCtx->cursorX[PAUSE_ITEM] = gFishmodItemSlotGrid[i] % ITEM_GRID_COLS;
+                pauseCtx->cursorY[PAUSE_ITEM] = gFishmodItemSlotGrid[i] / ITEM_GRID_COLS;
             }
             break;
         case PAUSE_MAP:
@@ -1398,7 +1435,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx, "../z_kaleido_scope_PAL.c", 1173);
 
             POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->itemPageVtx,
-                                                          SELECT_ITEM_TEXS(gSaveContext.language));
+                                                          KaleidoScope_FishmodItemPageTexs(SELECT_ITEM_TEXS(gSaveContext.language)));
 
             KaleidoScope_DrawItemSelect(play);
         }
@@ -1485,7 +1522,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
                 MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx, "../z_kaleido_scope_PAL.c", 1281);
 
                 POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->itemPageVtx,
-                                                              SELECT_ITEM_TEXS(gSaveContext.language));
+                                                              KaleidoScope_FishmodItemPageTexs(SELECT_ITEM_TEXS(gSaveContext.language)));
 
                 KaleidoScope_DrawItemSelect(play);
                 break;
@@ -2240,9 +2277,14 @@ void KaleidoScope_UpdateNamePanel(PlayState* play) {
 
                 PRINTF("J_N=%d  point=%d\n", gSaveContext.language, texIndex);
 
-                DMA_REQUEST_SYNC(pauseCtx->nameSegment,
-                                 (uintptr_t)_item_name_staticSegmentRomStart + (texIndex * ITEM_NAME_TEX_SIZE),
-                                 ITEM_NAME_TEX_SIZE, "../z_kaleido_scope_PAL.c", 2120);
+                if ((pauseCtx->pageIndex == PAUSE_ITEM) && (Fishmod_ItemNameVrom(pauseCtx->namedItem) != 0)) {
+                    DMA_REQUEST_SYNC(pauseCtx->nameSegment, Fishmod_ItemNameVrom(pauseCtx->namedItem),
+                                     ITEM_NAME_TEX_SIZE, "../z_kaleido_scope_PAL.c", 2120);
+                } else {
+                    DMA_REQUEST_SYNC(pauseCtx->nameSegment,
+                                     (uintptr_t)_item_name_staticSegmentRomStart + (texIndex * ITEM_NAME_TEX_SIZE),
+                                     ITEM_NAME_TEX_SIZE, "../z_kaleido_scope_PAL.c", 2120);
+                }
             }
 
             pauseCtx->nameDisplayTimer = 0;
@@ -3055,12 +3097,15 @@ void KaleidoScope_SetVertices(PlayState* play, GraphicsContext* gfxCtx) {
     pauseCtx->itemVtx = GRAPH_ALLOC(gfxCtx, (ITEM_QUAD_MAX * 4) * sizeof(Vtx));
 
     // ITEM_QUAD_GRID_FIRST to ITEM_QUAD_GRID_LAST
+    // fishmod: one quad per inventory slot, at that slot's place on the grid (FISHMOD_ITEM_GRID)
 
-    for (k = 0, i = 0, y = (ITEM_GRID_ROWS * ITEM_GRID_CELL_HEIGHT) / 2 - 6; k < ITEM_GRID_ROWS;
-         k++, y -= ITEM_GRID_CELL_HEIGHT) {
-        for (x = 0 - (ITEM_GRID_COLS * ITEM_GRID_CELL_WIDTH) / 2, j = 0; j < ITEM_GRID_COLS;
-             j++, i += 4, x += ITEM_GRID_CELL_WIDTH) {
-            pauseCtx->itemVtx[i + 0].v.ob[0] = pauseCtx->itemVtx[i + 2].v.ob[0] = x + ITEM_GRID_QUAD_MARGIN;
+    for (k = 0, i = 0; k < ITEM_GRID_ROWS * ITEM_GRID_COLS; k++, i += 4) {
+        {
+            x = FISHMOD_ITEM_COL0_X + (gFishmodItemSlotGrid[k] % ITEM_GRID_COLS) * FISHMOD_ITEM_COL_PITCH -
+                (ITEM_GRID_QUAD_WIDTH / 2);
+            y = FISHMOD_ITEM_ROW0_Y - (gFishmodItemSlotGrid[k] / ITEM_GRID_COLS) * FISHMOD_ITEM_ROW_PITCH +
+                (ITEM_GRID_QUAD_HEIGHT / 2) + ITEM_GRID_QUAD_MARGIN; // (the margin comes off again below)
+            pauseCtx->itemVtx[i + 0].v.ob[0] = pauseCtx->itemVtx[i + 2].v.ob[0] = x;
 
             pauseCtx->itemVtx[i + 1].v.ob[0] = pauseCtx->itemVtx[i + 3].v.ob[0] =
                 pauseCtx->itemVtx[i + 0].v.ob[0] + ITEM_GRID_QUAD_WIDTH;
@@ -3581,7 +3626,11 @@ void KaleidoScope_UpdateCursorVtx(PlayState* play) {
         tlOffsetY = 1;
         rightOffsetX = 14;
         bottomOffsetY = 14;
-        if (pauseCtx->pageIndex == PAUSE_MAP) {
+        if (pauseCtx->pageIndex == PAUSE_ITEM) {
+            // fishmod: the item icons are smaller (22 across, not 28)
+            rightOffsetX = 8;
+            bottomOffsetY = 8;
+        } else if (pauseCtx->pageIndex == PAUSE_MAP) {
             if (!sInDungeonScene) {
                 tlOffsetX = -6;
                 tlOffsetY = 6;
@@ -3926,6 +3975,9 @@ void KaleidoScope_Update(PlayState* play) {
 
             sPreRenderCvg = (void*)ALIGN16((uintptr_t)pauseCtx->nameSegment +
                                            MAX(MAP_NAME_TEX1_SIZE, ITEM_NAME_TEX_SIZE) + MAP_NAME_TEX2_SIZE);
+            // fishmod: the item page's graphics, after the Link preview's coverage (the last of the pause menu's)
+            Fishmod_LoadItemPage(play, (void*)ALIGN16((uintptr_t)sPreRenderCvg +
+                                                      PAUSE_EQUIP_PLAYER_WIDTH * PAUSE_EQUIP_PLAYER_HEIGHT));
 
             PreRender_Init(&sPlayerPreRender);
             PreRender_SetValuesSave(&sPlayerPreRender, PAUSE_EQUIP_PLAYER_WIDTH, PAUSE_EQUIP_PLAYER_HEIGHT,
@@ -4454,6 +4506,9 @@ void KaleidoScope_Update(PlayState* play) {
                 DMA_REQUEST_SYNC(pauseCtx->iconItemLangSegment, (uintptr_t)_icon_item_nes_staticSegmentRomStart, size,
                                  "../z_kaleido_scope_PAL.c", UNK_LINE);
             }
+            // fishmod: the item page's graphics, past where the names and the Link preview's coverage would go
+            Fishmod_LoadItemPage(play, (void*)ALIGN16((uintptr_t)pauseCtx->iconItemLangSegment + size + 0xE00 +
+                                                      PAUSE_EQUIP_PLAYER_WIDTH * PAUSE_EQUIP_PLAYER_HEIGHT));
 #else
             if (gSaveContext.language == LANGUAGE_ENG) {
                 size = (uintptr_t)_icon_item_nes_staticSegmentRomEnd - (uintptr_t)_icon_item_nes_staticSegmentRomStart;
