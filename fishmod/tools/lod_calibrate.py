@@ -11,10 +11,13 @@ import argparse
 import os
 import re
 import struct
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sram_map import SRAM  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 KINDS_MAX = 48  # FISHMOD_LOD_KINDS
-OFF = 0x7A40
+OFF = SRAM["BIG"]
 # never drawn nearer than this (a kind that changed nothing at a stop still shows from closer than any stop looked)
 FLOOR = 300
 # the one-per-kind distances: no nearer than this (what the sampled views didn't see from some other angle)
@@ -79,7 +82,7 @@ def sweep(paths):
 
 
 def rotate(path):
-    d = open(path, "rb").read()[0x7640:0x7640 + 0x600]
+    d = open(path, "rb").read()[SRAM["LOD_ROTATE"]:SRAM["LOD_ROTATE"] + 0x600]
     magic, stops, yaws = struct.unpack(">IHH", d[:8])
     if magic != 0x46524F54:
         raise SystemExit("no rotation check results in " + path)

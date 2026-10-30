@@ -8,10 +8,14 @@ Exit status 1 if any differs.
 """
 import struct
 import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sram_map import SRAM  # noqa: E402
 
 
 def read(path):
-    data = open(path, "rb").read()[0x7A00:0x7A40]
+    addr = SRAM["HASHES"]
+    data = open(path, "rb").read()[addr:addr + 0x40]
     magic, count = struct.unpack(">II", data[:8])
     if magic != 0x46485348:
         return None
