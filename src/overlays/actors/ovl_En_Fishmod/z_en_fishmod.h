@@ -9,22 +9,13 @@
 #define EN_FISHMOD_POSE_GFX_MAX 72
 
 #define FISHMOD_FISH_COUNT 10       // fish per fishing scene
-#if FISHMOD_OPT >= 5
 #define FISHMOD_ROSTER_MAX 600      // the most a scene's roster can hold
-#else
-#define FISHMOD_ROSTER_MAX 30       // (FISHMOD_OPT 4) the most a scene's roster can hold
-#endif
 #define FISHMOD_NO_ROSTER 0xFFFF
-#if FISHMOD_OPT >= 5
 #define FISHMOD_LOD_DIST 750.0f     // farther from the camera than this: the flat far shape (textured)
 #define FISHMOD_CULL_DIST 1300.0f   // and past this not drawn at all
-#else
-#define FISHMOD_LOD_DIST 380.0f     // (FISHMOD_OPT 3) farther from the camera than this: the flat far shape
-#define FISHMOD_CULL_DIST 900.0f
-#endif
-#define FISHMOD_SMALL_RIG_LENGTH 9.0f // (FISHMOD_OPT 4) fish shorter than this (inches) always use the reduced rig
+#define FISHMOD_SMALL_RIG_LENGTH 9.0f // fish shorter than this (inches) always use the reduced rig
 
-// Fish rigs (fishmod_rig.c, FISHMOD_OPT 4)
+// Fish rigs (fishmod_rig.c)
 #define FISH_RIG_MAX_SLOTS 12
 typedef enum FishRigVariant {
     /* 0 */ FISH_RIG_FULL,    // every moving limb: head, body joints, jaw, pectoral fins
@@ -39,7 +30,7 @@ typedef enum FishRigModel {
 } FishRigModel;
 
 /**
- * A fish's mood (FISHMOD_OPT 5), 0-255 each. Hunger rises with time (faster in its active hours) and falls when it
+ * A fish's mood, 0-255 each. Hunger rises with time (faster in its active hours) and falls when it
  * feeds; fear rises when it's spooked or something disturbs the water near it, and fades. They scale what the AI
  * already does: how far it notices a bait and how keen it is, how readily it bites, how long it rests, how far it
  * strays from home cover and how easily it spooks.
@@ -56,11 +47,7 @@ typedef struct FishmodMood {
 
 // The bass's jaw (limb index, 0-based) and how far it turns to shut: the model's rest pose gapes
 #define FISHMOD_BASS_JAW_LIMB 12
-#if FISHMOD_OPT >= 5
 #define FISHMOD_BASS_JAW_SHUT 3800
-#else
-#define FISHMOD_BASS_JAW_SHUT 0
-#endif
 
 // Texture roles: each is drawn from its own segment (0x08 + role) so species can swap in patterned textures.
 typedef enum FishmodTexRole {
@@ -88,11 +75,7 @@ struct EnFishmod;
 
 typedef void (*EnFishmodActionFunc)(struct EnFishmod*, struct PlayState*);
 
-#if FISHMOD_OPT >= 3
 #define FISHMOD_THINK_MASK(this) ((this)->thinkMask)
-#else
-#define FISHMOD_THINK_MASK(this) 1
-#endif
 
 typedef struct EnFishmod {
     /* 0x000 */ Actor actor;
@@ -154,24 +137,16 @@ typedef struct EnFishmod {
     /* 0x3F8 */ u8 thinkMask;                      // the AI runs on frames where (timer & thinkMask) == 0
     /* 0x3F9 */ u8 depthPref;                      // where in its species' depth band this fish likes to be
     /* 0x3FA */ u16 rosterIndex;                   // its record in the scene's roster, FISHMOD_NO_ROSTER if none
-    /* 0x3FC */ s16 lastThink;                     // timer value when it last ran its AI (FISHMOD_OPT 4)
+    /* 0x3FC */ s16 lastThink;                     // timer value when it last ran its AI
     /* 0x3FE */ s16 startleBend;                   // the C-bend of a startle (sign: which way), 0 otherwise
-    /* 0x400 */ u8 rigReady;                       // the manager can draw it (FISHMOD_OPT 4)
-    /* 0x404 */ s32 waterCell;                     // the water grid cell waterY/floorY are for (FISHMOD_OPT 5)
-    /* 0x408 */ u8 biteStruck;                     // the strike reached the bait (after the wind-up; FISHMOD_OPT 5)
-    /* 0x409 */ FishmodMood mood;                  // hunger and fear (kept in its roster record while away; FISHMOD_OPT 5)
+    /* 0x400 */ u8 rigReady;                       // the manager can draw it
+    /* 0x404 */ s32 waterCell;                     // the water grid cell waterY/floorY are for
+    /* 0x408 */ u8 biteStruck;                     // the strike reached the bait (after the wind-up)
+    /* 0x409 */ FishmodMood mood;                  // hunger and fear (kept in its roster record while away)
     /* 0x40C */ u16 leaderIndex;                   // roster record of its school's leader, FISHMOD_NO_ROSTER if it leads
-                                                   // or is on its own (FISHMOD_OPT 5)
+                                                   // or is on its own
     /* 0x40E */ u8 look;                           // its own looks: EnFishmod_LookTable (saved with it in a bottle)
     /* 0x410 */ f32 swimGain;                      // the tail beat's size on top of swimMag (small fish's bursts)
-#if (FISHMOD_OPT >= 2) && (FISHMOD_OPT < 4)
-    // distant fish redraw their last pose every other frame (see EnFishmod_DrawPose)
-    Mtx poseMtx[EN_FISHMOD_MAX_LIMBS + 1];
-    Gfx poseGfx[EN_FISHMOD_POSE_GFX_MAX];
-    u16 poseGfxCount;
-    u16 poseMtxCount;
-    u32 poseFrame; // gameplay frame the pose was captured on
-#endif
 } EnFishmod;
 
 /* Rod controller (fishmod_rod.c) */
@@ -261,12 +236,12 @@ s32 EnFishmod_WaterFloor(struct PlayState* play, f32 x, f32 z, f32* surface, f32
 s32 EnFishmod_OpenWaterDir(struct PlayState* play, f32 x, f32 z, s16* yaw);
 s32 EnFishmod_WaterCell(struct PlayState* play, f32 x, f32 z);
 
-/* Habitat props (fishmod_scatter.c, FISHMOD_OPT 5) */
+/* Habitat props (fishmod_scatter.c) */
 void EnFishmod_ScatterLoad(struct PlayState* play);
 void EnFishmod_ScatterUnload(void);
 s32 EnFishmod_ScatterRandomCover(Vec3f* out);
 s32 EnFishmod_ScatterRandomDrawnPlant(Vec3f* eye, f32 range, Vec3f* out);
-// Underwater particles: bubbles from the weed, drifting specks (fishmod_particles.c, FISHMOD_OPT 5)
+// Underwater particles: bubbles from the weed, drifting specks (fishmod_particles.c)
 void EnFishmod_ParticlesUpdate(struct PlayState* play);
 void EnFishmod_ParticlesDraw(struct PlayState* play);
 void EnFishmod_ScatterDraw(struct PlayState* play);
@@ -301,17 +276,15 @@ typedef struct EnFishmodShared {
     Vec3f bobberPos;
     s32 bobberIn;
     s32 thinksLeft;
-    f32 light; // Fishmod_Light: 0 dark night - 1 full day (FISHMOD_OPT 5)
-    s32 raining;     // (FISHMOD_OPT 5)
-    Vec3f splashPos; // the last thing to land in the water (the bobber), and when (FISHMOD_OPT 5)
+    f32 light; // Fishmod_Light: 0 dark night - 1 full day
+    s32 raining;     //
+    Vec3f splashPos; // the last thing to land in the water (the bobber), and when
     u32 splashFrame;
 } EnFishmodShared;
 EnFishmodShared* EnFishmod_Shared(struct PlayState* play);
-#if FISHMOD_OPT >= 5
 void EnFishmod_LookTable(struct EnFishmod* this, struct PlayState* play);
 struct EnFishmod* EnFishmod_RosterFish(s32 index);
 void EnFishmod_Disturb(struct PlayState* play, Vec3f* pos, f32 radius, s32 fear);
-#endif
 void EnFishmod_ManagerEnsure(struct PlayState* play);
 void EnFishmod_ManagerInit(struct EnFishmod* this, struct PlayState* play);
 void EnFishmod_ManagerDestroy(struct EnFishmod* this, struct PlayState* play);

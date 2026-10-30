@@ -1,7 +1,7 @@
 /*
  * File: fishmod_manager.c
  * Overlay: ovl_En_Fishmod
- * Description: the fish manager (FISHMOD_OPT 4), type FISHMOD_TYPE_MANAGER: one per scene, spawned by the first
+ * Description: the fish manager, type FISHMOD_TYPE_MANAGER: one per scene, spawned by the first
  * fishmod actor that needs it.
  *
  * - Roster: the scene's fish are records (species, size, home) made from a seed of the scene and the in-game day, so
@@ -28,21 +28,16 @@
 #include "scene.h"
 #include "libc/math.h"
 
-#if FISHMOD_OPT >= 4
 
 #define ROSTER_WAKE_DIST 1400.0f  // a fish appears at its home when Link comes this close
 #define ROSTER_SLEEP_DIST 1800.0f // and is removed when he's this far away (while it's just cruising)
-#define ROSTER_CHECKS_PER_FRAME 48 // (FISHMOD_OPT 5) roster records looked at per frame
-#define ROSTER_SPAWNS_PER_FRAME 2  // (FISHMOD_OPT 5) fish woken per frame
-#define HOME_CROWD_DIST 300.0f    // (FISHMOD_OPT 5) a fish's home by cover is skipped if this close to
+#define ROSTER_CHECKS_PER_FRAME 48 // roster records looked at per frame
+#define ROSTER_SPAWNS_PER_FRAME 2  // fish woken per frame
+#define HOME_CROWD_DIST 300.0f    // a fish's home by cover is skipped if this close to
 #define HOME_CROWD_MAX 6          // this many other homes already (dense weed drew too many fish to one spot)
 #define THINK_BUDGET 16           // full AI updates per frame for fish cruising far from Link and the bobber
 #define THINK_FAR_DIST 300.0f
-#if FISHMOD_OPT >= 5
 #define LOD_FULL_DIST 300.0f      // closer than this: the full rig (and whiskers); then the reduced rig to the far shape
-#else
-#define LOD_FULL_DIST 200.0f      // closer than this: the full rig (and whiskers)
-#endif
 #define DRAW_WHISKERS 0           // catfish whiskers are off for now: too thin to see (to be redone)
 
 typedef struct FishmodRosterFish {
@@ -52,10 +47,8 @@ typedef struct FishmodRosterFish {
     u8 species;
     u8 caught;
     EnFishmod* fish;
-#if FISHMOD_OPT >= 5
     FishmodMood mood; // while the fish isn't spawned (spawned, the fish's own is the one that counts)
     u16 leader;       // the record of its school's leader (its own for a leader or a fish on its own)
-#endif
     u8 look;          // its looks: the same fish every visit (from the roster's seed)
 } FishmodRosterFish;
 
@@ -76,21 +69,17 @@ EnFishmodShared* EnFishmod_Shared(PlayState* play) {
         sShared.frame = play->gameplayFrames;
         sShared.linkPos = player->actor.world.pos;
         sShared.camPos = sShared.linkPos;
-#if FISHMOD_OPT >= 5
         // attention follows the camera, not Link (a NaN guard: a camera being set up can give one for a frame)
         if ((play->view.eye.x == play->view.eye.x) && (play->view.eye.z == play->view.eye.z) &&
             (fabsf(play->view.eye.x) < 30000.0f) && (fabsf(play->view.eye.z) < 30000.0f)) {
             sShared.camPos = play->view.eye;
         }
-#endif
         sShared.rosterFocus = sShared.camPos;
         sShared.bobberIn = EnFishmod_RodBobberInWater();
         sShared.bobberPos = gFishmodRodState.bobberPos;
         sShared.thinksLeft = THINK_BUDGET;
-#if FISHMOD_OPT >= 5
         sShared.light = Fishmod_Light(play);
         sShared.raining = (Fishmod_Weather(play) == FISHMOD_WEATHER_RAIN);
-#endif
     }
     return &sShared;
 }
@@ -107,12 +96,10 @@ static FishmodRosterFish* Manager_Record(EnFishmod* fish) {
     return &sRoster[fish->rosterIndex];
 }
 
-#if FISHMOD_OPT >= 5
 /** The spawned fish of a roster record, or NULL. */
 EnFishmod* EnFishmod_RosterFish(s32 index) {
     return ((index >= 0) && (index < sRosterCount)) ? sRoster[index].fish : NULL;
 }
-#endif
 
 f32 EnFishmod_RosterLength(s32 index) {
     return ((index >= 0) && (index < sRosterCount)) ? sRoster[index].length : 0.0f;
@@ -134,14 +121,11 @@ void EnFishmod_RosterForget(EnFishmod* fish) {
     FishmodRosterFish* rec = Manager_Record(fish);
 
     if ((rec != NULL) && (rec->fish == fish)) {
-#if FISHMOD_OPT >= 5
         rec->mood = fish->mood;
-#endif
         rec->fish = NULL;
     }
 }
 
-#if FISHMOD_OPT >= 5
 /** How many of the roster's homes so far are within HOME_CROWD_DIST of a point (across the ground). */
 static s32 Roster_Crowd(Vec3f* pos) {
     s32 n = 0;
@@ -157,7 +141,6 @@ static s32 Roster_Crowd(Vec3f* pos) {
     }
     return n;
 }
-#endif
 
 /**
  * The scene's fish for today: the same as Rod_SpawnFish chose them before (a random water box, a spot in it, a
@@ -184,11 +167,9 @@ static void Manager_BuildRoster(PlayState* play) {
     // the shared random numbers, seeded for the roster and reseeded from the clock afterwards
     Rand_Seed((u32)play->sceneId * 7919 + (u32)gSaveContext.save.totalDays * 104729 + 17);
     count = FISHMOD_FISH_COUNT;
-#if FISHMOD_OPT >= 5
     if (spawns->fish > 0) {
         count = MIN(spawns->fish, FISHMOD_ROSTER_MAX);
     }
-#endif
 #if FISHMOD_DEBUG
     if (Fishmod_DebugRosterCount() > 0) {
         count = MIN(Fishmod_DebugRosterCount(), FISHMOD_ROSTER_MAX);
@@ -230,7 +211,6 @@ static void Manager_BuildRoster(PlayState* play) {
         center.y = box->ySurface;
         center.z = box->zMin + box->zLength * 0.5f;
         radius = CLAMP_MIN(box->xLength, box->zLength) * 0.6f;
-#if FISHMOD_OPT >= 5
         // most fish live by cover (weed beds, rocks, reeds, pads), the rest out in the open water
         // (a few tries for cover that isn't crowded with homes already; else the open water)
         if (Rand_ZeroOne() < 0.75f) {
@@ -248,7 +228,6 @@ static void Manager_BuildRoster(PlayState* play) {
                 }
             }
         }
-#endif
         if (EnFishmod_FindWaterPoint(play, &center, radius, 25.0f, &rec->home, &surface, &floor)) {
             rec->species = s;
             rec->length = lo + (hi - lo) * f;
@@ -256,14 +235,11 @@ static void Manager_BuildRoster(PlayState* play) {
             rec->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, sRosterCount);
             rec->fish = NULL;
             rec->look = (u8)Rand_ZeroFloat(256.0f);
-#if FISHMOD_OPT >= 5
             // some hungry, some not (from the index, not the shared random numbers)
             rec->mood.hunger = 40 + ((sRosterCount * 97 + play->sceneId * 31) % 170);
             rec->mood.fear = 0;
             rec->leader = sRosterCount;
-#endif
             sRosterCount++;
-#if FISHMOD_OPT >= 5
             // schooling fish: the rest of its school around it, about its size (they count toward the total)
             if (species->schoolMax > 0) {
                 s32 leader = sRosterCount - 1;
@@ -287,13 +263,11 @@ static void Manager_BuildRoster(PlayState* play) {
                     n++;
                 }
             }
-#endif
         }
     }
     Rand_Seed(FISHMOD_TIME_SEED());
 }
 
-#if FISHMOD_OPT >= 5
 #define MOOD_SLICE 16 // roster records whose mood moves on each frame: 300 fish come round about once a second
 
 /** The mood that counts for a record: the fish's own while it's spawned. */
@@ -359,13 +333,11 @@ void EnFishmod_Disturb(PlayState* play, Vec3f* pos, f32 radius, s32 fear) {
         }
     }
 }
-#endif
 
 /** Spawns the fish whose homes Link is near and removes the ones he's left far behind. */
 static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
     EnFishmodShared* shared = EnFishmod_Shared(play);
     s32 i;
-#if FISHMOD_OPT >= 5
     // Staggered: a slice of the roster each frame, and only a few new fish at a time, so a big roster never costs
     // one frame a lot (arriving at the lake would otherwise spawn dozens of fish at once).
     static s32 sNext;
@@ -385,40 +357,21 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
             continue;
         }
         if ((rec->fish == NULL) && (dist < ROSTER_WAKE_DIST) && (spawns-- > 0)) {
-#else
-    for (i = 0; i < sRosterCount; i++) {
-        FishmodRosterFish* rec = &sRoster[i];
-        f32 dist = Math_Vec3f_DistXZ(&shared->rosterFocus, &rec->home);
-
-        if (rec->caught) {
-            continue;
-        }
-        if ((rec->fish == NULL) && (dist < ROSTER_WAKE_DIST)) {
-#endif
-#if FISHMOD_OPT >= 5
             // the record's index rides in the spawn roll (the params only have room for 31)
             Actor* fish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, rec->home.x, rec->home.y, rec->home.z,
                                       0, rec->yaw, i + 1, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, rec->species));
-#else
-            Actor* fish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, rec->home.x, rec->home.y, rec->home.z,
-                                      0, rec->yaw, 0, FISHMOD_PARAMS_ROSTER(rec->species, i));
-#endif
 
             if (fish != NULL) {
                 fish->room = -1;
                 rec->fish = (EnFishmod*)fish;
                 rec->fish->look = rec->look;
-#if FISHMOD_OPT >= 5
                 rec->fish->mood = rec->mood;
                 rec->fish->leaderIndex = (rec->leader != i) ? rec->leader : FISHMOD_NO_ROSTER;
-#endif
             }
         } else if ((rec->fish != NULL) && (dist > ROSTER_SLEEP_DIST) &&
                    (rec->fish->fishState == FISH_STATE_WANDER) && (gFishmodRodState.fish != rec->fish)) {
             // it swims back home while nobody's looking
-#if FISHMOD_OPT >= 5
             rec->mood = rec->fish->mood;
-#endif
             Actor_Kill(&rec->fish->actor);
             rec->fish = NULL;
         }
@@ -448,9 +401,7 @@ void EnFishmod_ManagerInit(EnFishmod* this, PlayState* play) {
     // after the fish in the actor lists, so their culling is already worked out when the manager draws them
     Actor_ChangeCategory(play, &play->actorCtx, &this->actor, ACTORCAT_MISC);
     EnFishmod_WaterGridAcquire(play);
-#if FISHMOD_OPT >= 5
     EnFishmod_ScatterLoad(play);
-#endif
     Manager_BuildRoster(play);
 }
 
@@ -462,9 +413,7 @@ void EnFishmod_ManagerDestroy(EnFishmod* this, PlayState* play) {
     }
     sRosterCount = 0;
     EnFishmod_RigFreeAll();
-#if FISHMOD_OPT >= 5
     EnFishmod_ScatterUnload();
-#endif
     EnFishmod_WaterGridRelease(play);
     if (sManager == this) {
         sManager = NULL;
@@ -480,7 +429,6 @@ void EnFishmod_ManagerUpdate(EnFishmod* this, PlayState* play) {
     if ((this->timer & 7) == 0) {
         Manager_UpdateRoster(this, play);
     }
-#if FISHMOD_OPT >= 5
     Manager_UpdateMoods();
     EnFishmod_ParticlesUpdate(play);
     // Lake Hylia's gossip stones keep vanilla's default draw range (about 1350 units), so across the lake they pop in
@@ -494,11 +442,10 @@ void EnFishmod_ManagerUpdate(EnFishmod* this, PlayState* play) {
             }
         }
     }
-#endif
 }
 
 /**
- * How far a fish is from attention: the camera (FISHMOD_OPT 5; Link before) or the bobber in the water, whichever is
+ * How far a fish is from attention: the camera or the bobber in the water, whichever is
  * nearer. The AI does less the farther away it is (the drawing's detail goes by the camera alone).
  */
 f32 EnFishmod_AttentionDist(EnFishmod* this, PlayState* play) {
@@ -556,7 +503,6 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         gFishmodPhoto.backdropFrame = play->gameplayFrames;
         EnFishmod_DrawPhotoBackdrop(play);
     }
-#if FISHMOD_OPT >= 5
     if (!gFishmodPhoto.active) {
 #if FISHMOD_DEBUG
         gFishmodScatterDrawn = 0;
@@ -572,7 +518,6 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
 #endif
         FISHMOD_PROF(FISHMOD_PROF_D_PARTICLES, EnFishmod_ParticlesDraw(play));
     }
-#endif
 #if FISHMOD_DEBUG
     if (gFishmodBench & FISHMOD_BENCH_NOFISH) {
         return; // the hardware bench, timing the rest without the fish
@@ -670,7 +615,6 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         }
     }
 
-#if FISHMOD_OPT >= 5
     // far shapes by species, so each species' pattern and palette are loaded once
     for (i = 1; i < farCount; i++) {
         EnFishmod* fish = far[i];
@@ -691,11 +635,5 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
         CLOSE_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
     }
-#else
-    for (i = 0; i < farCount; i++) {
-        FISHMOD_PROF(FISHMOD_PROF_D_BILLBOARD, EnFishmod_DrawBillboard(far[i], play));
-    }
-#endif
 }
 
-#endif

@@ -1,7 +1,7 @@
 /*
  * File: fishmod_particles.c
  * Overlay: ovl_En_Fishmod
- * Description: water particles (FISHMOD_OPT 5): now and then a few bubbles rising from the weed near the camera
+ * Description: water particles: now and then a few bubbles rising from the weed near the camera
  * (vanilla's bubble, the one Ruto's letter and Link give off, popping at the surface with vanilla's ripple, so they
  * show from above the water too), and, while the camera is under the surface, faint specks drifting round it (the
  * soft dot of vanilla's Kokiri Forest dust motes, much smaller).
@@ -29,7 +29,6 @@
 #include "assets/objects/gameplay_keep/gameplay_keep_0x4D160.h"
 #include "assets/objects/gameplay_keep/sun_textures.h"
 
-#if FISHMOD_OPT >= 5
 
 #define BUBBLE_MAX 24
 #define SPECK_MAX 60
@@ -300,4 +299,3 @@ void EnFishmod_ParticlesDraw(PlayState* play) {
     CLOSE_DISPS(gfxCtx, "../fishmod_particles.c", __LINE__);
 }
 
-#endif

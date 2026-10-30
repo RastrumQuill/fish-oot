@@ -1,7 +1,5 @@
 #include "fishmod.h"
-#if FISHMOD_OPT >= 1
 #include "ultra64/libc.h"
-#endif
 #include "libu64/debug.h"
 #include "array_count.h"
 #include "attributes.h"
@@ -1591,12 +1589,10 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
         colCtx->subdivAmount.z = 2;
     } else if (BgCheck_IsSpotScene(play) == true) {
         colCtx->memSize = 0xF000;
-#if FISHMOD_OPT >= 5
         // fishmod: Lake Hylia's rocks add polygons to its collision (fishmod/tools/gen_collision.py)
         if (play->sceneId == SCENE_LAKE_HYLIA) {
             colCtx->memSize = 0xF000 + 0x10000;
         }
-#endif
         PRINTF(T("/* BGCheck Spot用サイズ %dbyte */\n", "/* BGCheck Spot Size %dbyte */\n"), 0xF000);
         colCtx->dyna.polyNodesMax = 1000;
         colCtx->dyna.polyListMax = 512;
@@ -1604,14 +1600,12 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
         colCtx->subdivAmount.x = 16;
         colCtx->subdivAmount.y = 4;
         colCtx->subdivAmount.z = 16;
-#if FISHMOD_OPT >= 5
         // fishmod: a finer lookup grid for Lake Hylia, so each cell's list stays short with the rocks added (and
         // collision checks there get cheaper than vanilla's)
         if (play->sceneId == SCENE_LAKE_HYLIA) {
             colCtx->subdivAmount.x = 32;
             colCtx->subdivAmount.z = 32;
         }
-#endif
     } else {
         if (BgCheck_TryGetCustomMemsize(play->sceneId, &customMemSize)) {
             colCtx->memSize = customMemSize;
@@ -3963,16 +3957,8 @@ void func_800418D0(CollisionContext* colCtx, PlayState* play) {
  * Reset SSNodeList polyCheckTbl
  */
 void BgCheck_ResetPolyCheckTbl(SSNodeList* nodeList, s32 numPolys) {
-#if FISHMOD_OPT >= 1
     // fishmod: same result, cleared in large chunks instead of a byte at a time
     bzero(nodeList->polyCheckTbl, numPolys);
-#else
-    u8* t;
-
-    for (t = nodeList->polyCheckTbl; t < nodeList->polyCheckTbl + numPolys; t++) {
-        *t = 0;
-    }
-#endif
 }
 
 /**

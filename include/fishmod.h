@@ -132,18 +132,18 @@ typedef enum FishmodActorType {
     /* 0 */ FISHMOD_TYPE_ROD, // one per scene: rod, line, bobber, camera, fish spawning
     /* 1 */ FISHMOD_TYPE_FISH,
     /* 2 */ FISHMOD_TYPE_COMB, // a chunk of a broken beehive with larvae in it, scooped up with a bottle
-    /* 3 */ FISHMOD_TYPE_MANAGER // one per scene (FISHMOD_OPT 4): the fish roster, drawing all the fish
+    /* 3 */ FISHMOD_TYPE_MANAGER // one per scene: the fish roster, drawing all the fish
 } FishmodActorType;
 
 #define FISHMOD_PARAMS(type, species) (((type) << 8) | (species))
 #define FISHMOD_GET_TYPE(params) (((params) >> 8) & 3)
-// a fish from the scene's roster (FISHMOD_OPT 4): its record index, in bits 10-14
+// a fish from the scene's roster: its record index, in bits 10-14
 #define FISHMOD_PARAMS_ROSTER(species, index) (FISHMOD_PARAMS(FISHMOD_TYPE_FISH, species) | (((index) + 1) << 10))
 #define FISHMOD_GET_ROSTER(params) ((((params) >> 10) & 0x1F) - 1)
 #define FISHMOD_GET_SPECIES(params) ((params) & 0xFF)
 
 const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId);
-// Which of a scene's roster fish were kept today (FISHMOD_OPT 4): they stay gone until the day changes.
+// Which of a scene's roster fish were kept today: they stay gone until the day changes.
 s32 Fishmod_RosterIsCaught(s16 sceneId, s32 day, s32 index);
 void Fishmod_RosterSetCaught(s16 sceneId, s32 day, s32 index);
 void Fishmod_OnSceneLoad(struct PlayState* play);
@@ -489,12 +489,8 @@ extern s16 gFishmodDebugFocusYaw;
 #define FISHMOD_ZBUFFER ((u16*)gZBuffer)
 #endif
 // With the camera under water (the haze full) the skybox can't be seen: not drawn, and the frame cleared to the
-// fog's colour instead of black (FISHMOD_OPT 5)
-#if FISHMOD_OPT >= 5
+// fog's colour instead of black
 #define FISHMOD_NO_SKY() ((gFishmodHaze >= 1.0f) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_SKYUNDER))
-#else
-#define FISHMOD_NO_SKY() 0
-#endif
 
 /* Debug harness (fishmod_debug.c), only built with FISHMOD_DEBUG */
 
@@ -541,7 +537,7 @@ s32 Fishmod_WeatherRoll(s16 sceneId, s32 day);
 void Fishmod_OnEnvironmentInit(struct PlayState* play);
 s32 Fishmod_Weather(struct PlayState* play);
 f32 Fishmod_Light(struct PlayState* play);
-// Underwater haze, 0 (camera above water) to 1 (under) (FISHMOD_OPT 5)
+// Underwater haze, 0 (camera above water) to 1 (under)
 extern f32 gFishmodHaze;
 // the props' textures in 4 bits instead of 8 (half the memory read per texture load): a switch for measuring
 extern s32 gFishmodTexCompress;

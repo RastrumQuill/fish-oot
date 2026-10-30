@@ -8,7 +8,7 @@ Usage: fishmod/pc/make_pack.py NAME OUT.zip JOB [JOB ...] [--parts N] [--uncappe
              (0x20, the name field) and its starting save (SRAM 0x7C00); the LOD sweep and tuning read it; resumable
   --uncapped: ares runs as fast as it can (no sound, nothing holding it to real time)
   --parallel N: at most N ares at once for this pack (run_jobs.py --parallel still overrides it)
-e.g. fishmod/pc/make_pack.py selftest out/selftest.zip tour=fishmod/out/fish-oot-debug-tour-opt5.z64:120
+e.g. fishmod/pc/make_pack.py selftest out/selftest.zip tour=fishmod/out/fish-oot-debug-tour.z64:120
 Needs flips (as the build does) and fishmod/out/original.z64 (made by any release build).
 """
 import argparse

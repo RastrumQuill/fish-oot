@@ -4,7 +4,7 @@
 # Compare two labels with fishmod/tools/state_hash.py <dir>/<label>/<script>/r.ram ...
 #
 # Usage: fishmod/tools/regress.sh <outdir> <label> [scripts...]
-#   Needs ARES (the ares binary). Builds with the test build's settings (--opt 5 --hw --f3dex3).
+#   Needs ARES (the ares binary). Builds with the test build's settings (--hw --f3dex3).
 set -euo pipefail
 OUT="$1"; LABEL="$2"; shift 2
 SCRIPTS=("$@")
@@ -12,8 +12,8 @@ SCRIPTS=("$@")
 cd "$(dirname "$0")/../.."
 for s in "${SCRIPTS[@]}"; do
     d="$OUT/$LABEL/$s"; mkdir -p "$d"
-    fishmod/build.sh --script "$s" --opt 5 --hw --f3dex3 > "$d/build.log" 2>&1 || { echo "$s: build failed"; exit 1; }
-    cp "fishmod/out/fish-oot-debug-$s-f3dex3-opt5-hw.z64" "$d/r.z64"
+    fishmod/build.sh --script "$s" --hw --f3dex3 > "$d/build.log" 2>&1 || { echo "$s: build failed"; exit 1; }
+    cp "fishmod/out/fish-oot-debug-$s-f3dex3-hw.z64" "$d/r.z64"
 done
 git checkout -q -- fishmod/assets/habitat 2>/dev/null || true  # (the build regenerates these per profile)
 n=170

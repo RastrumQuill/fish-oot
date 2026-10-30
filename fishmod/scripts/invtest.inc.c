@@ -2,7 +2,7 @@
 // down to the lures (the name panel shows "Crankbait"), puts the crankbait on C-Down (its icon flies there and
 // shows on the button), steps left to the rod ("Fishing Rod") and down to bottle 5, unpauses and uses the lure (a
 // placeholder: an error beep), pauses again, then turns to the equipment page (Link's preview drawn as before).
-// Build: fishmod/build.sh --script invtest --opt 5 --hw --f3dex3
+// Build: fishmod/build.sh --script invtest --hw --f3dex3
 #define FISHMOD_SCRIPT_ENTRANCE ENTR_LAKE_HYLIA_0
 #define FISHMOD_SCRIPT_ADULT 1
 #define FISHMOD_SCRIPT_TIME 0x6000

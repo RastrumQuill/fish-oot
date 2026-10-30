@@ -114,7 +114,7 @@ const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId) {
  * so the fishing object can be loaded as a persistent object for the whole scene.
  */
 /*
- * Fish kept from each scene's roster today (FISHMOD_OPT 4): they don't come back until the day changes. A few scenes
+ * Fish kept from each scene's roster today: they don't come back until the day changes. A few scenes
  * are remembered; the oldest is forgotten first.
  */
 typedef struct FishmodRosterCaught {
@@ -994,7 +994,6 @@ static const FishmodWaterMapRom sPropCollisions[] = {
  * Called as the scene's collision header is read, before BgCheck builds its lookup from it.
  */
 void Fishmod_AddPropCollision(PlayState* play, CollisionHeader* colHeader) {
-#if FISHMOD_OPT >= 5
     s32 i;
 
 #if FISHMOD_DEBUG
@@ -1052,7 +1051,6 @@ void Fishmod_AddPropCollision(PlayState* play, CollisionHeader* colHeader) {
             return;
         }
     }
-#endif
 }
 
 FishmodScatterHeader* Fishmod_LoadScatter(s16 sceneId) {
@@ -1161,7 +1159,6 @@ void Fishmod_AdvanceTime(PlayState* play) {
 }
 
 /** Once a frame: a sunset or sunrise that played out (or Sun's Song) means nothing is owed any more. */
-#if FISHMOD_OPT >= 5
 /*
  * Underwater haze: with the camera under the surface, the fog comes in closer than vanilla's underwater fog (the
  * water's own lights still give its colour), easing in and out over a few frames. Only the fog: the far plane
@@ -1191,14 +1188,11 @@ static void Fishmod_UpdateHaze(PlayState* play) {
                           ? (s16)((HAZE_FOG_NEAR - env->lightSettings.fogNear) * gFishmodHaze)
                           : 0;
 }
-#endif
 
 void Fishmod_TimeUpdate(PlayState* play) {
     u16 now = gSaveContext.save.dayTime;
 
-#if FISHMOD_OPT >= 5
     Fishmod_UpdateHaze(play);
-#endif
 
     if ((now != sTimeLast) && Fishmod_TimeCrossesBarrier(sTimeLast, now)) {
         sTimeOwed = 0;

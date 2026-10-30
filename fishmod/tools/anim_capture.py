@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Records the animation studio (fishmod/build.sh --script anim --opt 4) to video clips: one per species and view
+Records the animation studio (fishmod/build.sh --script anim) to video clips: one per species and view
 (from above, three-quarter), as MP4 and GIF, at the game's 20 frames per second.
 
 Runs the ROM in ares on a virtual display and records the window with ffmpeg; duplicate frames (the display runs
