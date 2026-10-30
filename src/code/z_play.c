@@ -262,15 +262,10 @@ void func_800BC88C(PlayState* this) {
  * If a custom fog state is used at any point in drawing, the environment fog is expected to be restored afterwards.
  */
 Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
-#if FISHMOD_OPT >= 5
     // fishmod: under water the fog is complete well before the far plane (about 900 units out), so what's past it
     // (the far habitat props, distant fish) comes and goes inside solid fog instead of popping in
     return Gfx_SetFog2(gfx, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2], 0,
                        this->lightCtx.fogNear, 1000 - (s32)((1000 - FISHMOD_HAZE_FOG_FAR) * gFishmodHaze));
-#else
-    return Gfx_SetFog2(gfx, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2], 0,
-                       this->lightCtx.fogNear, 1000);
-#endif
 }
 
 void Play_Destroy(GameState* thisx) {
@@ -355,13 +350,9 @@ void Play_Init(GameState* thisx) {
     SystemArena_Display();
 #endif
 
-#if FISHMOD_OPT >= 3
     // fishmod: with the Expansion Pak (and the frame buffers moved up, see SysCfb_Init), 2 MB more for Play, which
     // all goes to the actor heap
     GameState_Realloc(&this->state, 0x1D4790 + ((osMemSize >= 0x800000) && !DEBUG_FEATURES ? 0x200000 : 0));
-#else
-    GameState_Realloc(&this->state, 0x1D4790);
-#endif
 
 #if PLATFORM_N64
     if ((B_80121220 != NULL) && (B_80121220->unk_10 != NULL)) {

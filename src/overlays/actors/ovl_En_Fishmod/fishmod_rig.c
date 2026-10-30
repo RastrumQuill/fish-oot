@@ -1,7 +1,7 @@
 /*
  * File: fishmod_rig.c
  * Overlay: ovl_En_Fishmod
- * Description: the fish renderer used from FISHMOD_OPT 4 (the fish manager draws every fish with it).
+ * Description: the fish renderer (the fish manager draws every fish with it).
  *
  * The pond models only bend at three joints, the first right behind the gills, so the whole body swings from the
  * "neck"; and they have a limb for every fin, most of them a single triangle that never moves on its own. Here each
@@ -35,7 +35,6 @@
 #include "ultra64/libc.h"
 #include "buffers.h"
 
-#if FISHMOD_OPT >= 4
 
 #define RIG_MAX_LOADS 48
 #define RIG_MAX_FINS 3
@@ -959,10 +958,8 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
         }
     }
 
-#if FISHMOD_OPT >= 5
     // its own colours and pattern (in place of the species' tints at the same segment)
     EnFishmod_LookTable(this, play);
-#endif
     OPEN_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
     gSPSegment(POLY_OPA_DISP++, RIG_SEG_MTX, mtx);
     // the bass's display lists don't set culling (EnFishmod_PatchSkeleton): a shut mouth culls back faces, an open
@@ -984,4 +981,3 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
 #endif
 }
 
-#endif

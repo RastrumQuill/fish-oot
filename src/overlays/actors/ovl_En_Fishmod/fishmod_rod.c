@@ -49,7 +49,6 @@ FishmodRod gFishmodRodState;
 
 #define ROD (&gFishmodRodState)
 
-#define FISH_COUNT FISHMOD_FISH_COUNT
 #define WINDUP_FRAMES 18
 #define LINE_MIN 28.0f
 #define BAIT_DEPTH_START 6.0f   // the bait as it lands, just under the bobber
@@ -316,78 +315,6 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
 }
 
 /* ---------------------------------------------------------------------------------------------------------------
- * Fish population
- */
-
-static void Rod_SpawnFish(EnFishmod* this, PlayState* play, s32 count) {
-    const FishmodSceneSpawns* spawns = Fishmod_GetSceneSpawns(play->sceneId);
-    WaterBox* boxes = play->colCtx.colHeader->waterBoxes;
-    s32 numBoxes = play->colCtx.colHeader->numWaterBoxes;
-    s32 totalWeight = 0;
-    s32 i;
-    s32 n;
-
-    if ((spawns == NULL) || (numBoxes == 0)) {
-        return;
-    }
-    boxes = SEGMENTED_TO_VIRTUAL(boxes);
-
-    for (i = 0; i < spawns->count; i++) {
-        totalWeight += spawns->entries[i].weight;
-    }
-
-    for (n = 0; n < count; n++) {
-        WaterBox* box = &boxes[(s32)Rand_ZeroFloat(numBoxes - 0.01f)];
-        Vec3f center;
-        Vec3f pos;
-        f32 surface;
-        f32 floor;
-        s32 roll = (s32)Rand_ZeroFloat(totalWeight - 0.01f);
-        s32 species = spawns->entries[0].species;
-
-        for (i = 0; i < spawns->count; i++) {
-            if (roll < spawns->entries[i].weight) {
-                species = spawns->entries[i].species;
-                break;
-            }
-            roll -= spawns->entries[i].weight;
-        }
-
-        center.x = box->xMin + box->xLength * 0.5f;
-        center.y = box->ySurface;
-        center.z = box->zMin + box->zLength * 0.5f;
-        if (EnFishmod_FindWaterPoint(play, &center, CLAMP_MIN(box->xLength, box->zLength) * 0.6f, 25.0f, &pos,
-                                     &surface, &floor)) {
-            Actor* fish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, pos.x, pos.y, pos.z, 0,
-                                      (s16)Rand_ZeroFloat(0xFFFF), 0, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, species));
-
-            if (fish != NULL) {
-                fish->room = -1;
-            }
-        }
-    }
-}
-
-/** Keeps the water stocked: every so often, adds a fish if some were caught. */
-static void Rod_MaintainPopulation(EnFishmod* this, PlayState* play) {
-    Actor* actor;
-    s32 count = 0;
-
-    if (gFishmodPhoto.active || ((play->gameplayFrames % 300) != 150) || (FISHMOD_OPT >= 4)) {
-        // (from FISHMOD_OPT 4 the fish manager's roster keeps the water stocked)
-        return;
-    }
-    for (actor = play->actorCtx.actorLists[ACTORCAT_NPC].head; actor != NULL; actor = actor->next) {
-        if ((actor->id == ACTOR_EN_FISHMOD) && (FISHMOD_GET_TYPE(actor->params) == FISHMOD_TYPE_FISH)) {
-            count++;
-        }
-    }
-    if (count < FISH_COUNT) {
-        Rod_SpawnFish(this, play, 1);
-    }
-}
-
-/* ---------------------------------------------------------------------------------------------------------------
  * Init / update
  */
 
@@ -400,14 +327,8 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     EnFishmod_WaterGridAcquire(play);
 
-#if FISHMOD_OPT >= 4
     // the fish manager spawns the scene's fish (its roster)
     EnFishmod_ManagerEnsure(play);
-#else
-    if (!gFishmodPhoto.active) {
-        Rod_SpawnFish(this, play, FISH_COUNT);
-    }
-#endif
 }
 
 void EnFishmod_RodDestroy(EnFishmod* this, PlayState* play) {
@@ -440,12 +361,10 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     ROD->overTimer = ROD->slackTimer = 0;
     ROD->bait = FISHMOD_BAIT_NONE; // the fish took it
     EnFishmod_FishSetState(fish, FISH_STATE_HOOKED);
-#if FISHMOD_OPT >= 5
     // it ate (the bait), and it's terrified; its thrashing scares the fish round about
     fish->mood.hunger = 30;
     fish->mood.fear = 255;
     EnFishmod_Disturb(play, &fish->actor.world.pos, 220.0f, 120);
-#endif
     Rumble_Override(0.0f, 180, 20, 10);
     Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
     EnFishmod_RodMessage(1, "Hooked!", NULL);
@@ -777,7 +696,6 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         ROD->messageTimer--;
     }
 
-    Rod_MaintainPopulation(this, play);
 
     // stop everything if the rod was put away (or Link got hit, entered water...)
     if (!holding || (player->stateFlags1 & (PLAYER_STATE1_27 | PLAYER_STATE1_DEAD))) {
@@ -909,9 +827,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->bobberPos.y = waterY;
                 ROD->dip = 6.0f;
                 ROD->splashed = true;
-#if FISHMOD_OPT >= 5
                 EnFishmod_Disturb(play, &ROD->bobberPos, 0.0f, 0);
-#endif
                 // the bait starts sinking under the bobber: A stops it at a depth (once per cast), or it stops by
                 // itself a little above the bottom
                 ROD->baitDepth = BAIT_DEPTH_START;
@@ -1035,9 +951,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                     if (decided == 1) {
                         Fishmod_BottleFish(fish->species - gFishmodSpecies, fish->lengthInches, fish->look);
                         Item_Give(play, ITEM_BOTTLE_FISH);
-#if FISHMOD_OPT >= 4
                         EnFishmod_RosterCaught(play, fish);
-#endif
                         Sfx_PlaySfxCentered(NA_SE_SY_GET_ITEM);
                         EnFishmod_RodMessage(1, "Into the bottle!", NULL);
                         // FLEE releases it from the rod (clearing ROD->fish), so use our own pointer
@@ -1223,7 +1137,6 @@ static void Rod_DrawRod(PlayState* play, Player* player) {
     Rod_AimBend(play);
     Matrix_RotateZ(ROD->bendRoll, MTXMODE_APPLY);
 
-#if FISHMOD_OPT >= 2
     // At rest the rod is nearly straight: draw its segments in pairs, the second of each pair from the first's
     // matrix times a fixed one-segment offset (the segments are 500 long, scaled 0.52 along the rod). The pair's
     // two bends are applied together, so the tip still ends up where the line is attached.
@@ -1266,7 +1179,6 @@ static void Rod_DrawRod(PlayState* play, Player* player) {
         }
         Matrix_MultVec3f(&sZero, &ROD->tipPos);
     } else
-#endif
 
     for (i = 0; i < 22; i++) {
         Matrix_RotateX(bend * sRodBendRatios[i] * 0.5f, MTXMODE_APPLY);
@@ -1385,7 +1297,6 @@ static void Rod_DrawLine(PlayState* play) {
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 90);
 
     Rod_LineShape(&end, &sag);
-#if FISHMOD_OPT >= 1
     // The whole line lies in one vertical plane, so it's one flat strip under a single matrix (the same 0.3-unit
     // wide horizontal ribbon the per-segment model drew). Vertices are relative to the rod tip in 1/32 units.
     {
@@ -1438,24 +1349,6 @@ static void Rod_DrawLine(PlayState* play) {
         gSP2Triangles(POLY_XLU_DISP++, 0, 1, 3, 0, 0, 3, 2, 0);
         (void)prev;
     }
-#else
-    prev = ROD->tipPos;
-    for (i = 1; i <= LINE_SEGMENTS; i++) {
-        if (i < LINE_SEGMENTS) {
-            Rod_LinePoint(&end, sag, (f32)i / LINE_SEGMENTS, &cur);
-#if FISHMOD_DEBUG
-            if (cur.y < ROD->lineFloor[i]) {
-                sLineDraped++;
-            }
-#endif
-            cur.y = CLAMP_MIN(cur.y, ROD->lineFloor[i]);
-        } else {
-            cur = end;
-        }
-        Rod_DrawLineSegment(play, &prev, &cur, 0.0015f);
-        prev = cur;
-    }
-#endif
 
     // leader from the bobber down to the hook
     if ((ROD->state == ROD_STATE_FLOAT) || (ROD->state == ROD_STATE_GROUND) || (ROD->state == ROD_STATE_FLYING)) {

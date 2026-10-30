@@ -301,10 +301,8 @@ BAD_RETURN(s32) Scene_CommandCollisionHeader(PlayState* play, SceneCmd* cmd) {
     colHeader->bgCamList = SEGMENTED_TO_VIRTUAL(colHeader->bgCamList);
     colHeader->waterBoxes = SEGMENTED_TO_VIRTUAL(colHeader->waterBoxes);
 
-#if FISHMOD_OPT >= 5
     // fishmod: the habitat props' collision (rocks) joins the scene's
     Fishmod_AddPropCollision(play, colHeader);
-#endif
     BgCheck_Allocate(&play->colCtx, play, colHeader);
 }
 

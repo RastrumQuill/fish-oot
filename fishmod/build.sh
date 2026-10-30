@@ -6,9 +6,8 @@
 #   --debug        build the debug harness (boots straight into Kokiri, debug text)
 #   --script NAME  (implies --debug) play fishmod/scripts/NAME.inc.c as autoplay input
 #   --f3dex3       use the F3DEX3 graphics microcode (see fishmod/f3dex3); outputs get an -f3dex3 suffix
-#   --opt N        performance test set N (1 or 2, see the Makefile); outputs get an -optN suffix
+#   --opt N        ignored (the performance levels it chose are now the only game; kept so old commands still work)
 #   --testmode     new files skip the intro and start with testing items; outputs get a -test suffix
-#   --fasttrig     polynomial sin/cos instead of the sine table; outputs get a -trig suffix
 #   --hw           the original-hardware version (fewer, cheaper pixels for the RDP); outputs get a -hw suffix
 #   --gcc LEVEL    the game's code (src/code, overlays, the mod) is compiled with GCC (boot, libultra, libc and audio stay
 #                  on IDO). The default is O2 (hwbench-4: CPU time 14-16% lower, no other change); --gcc Os is the other
@@ -29,9 +28,7 @@ FLIPS="${FLIPS:-flips}"
 DEBUG=0
 SCRIPT=""
 F3DEX3=0
-OPT=0
 TESTMODE=0
-FASTTRIG=0
 HW=0
 GCC="O2"
 MAKE_ARGS=()
@@ -40,9 +37,8 @@ while [ $# -gt 0 ]; do
         --debug) DEBUG=1 ;;
         --script) DEBUG=1; SCRIPT="$2"; shift ;;
         --f3dex3) F3DEX3=1 ;;
-        --opt) OPT="$2"; shift ;;
+        --opt) shift ;; # (ignored)
         --testmode) TESTMODE=1 ;;
-        --fasttrig) FASTTRIG=1 ;;
         --hw) HW=1 ;;
         --gcc) GCC="$2"; shift ;;
         --ido) GCC="" ;;
@@ -73,7 +69,7 @@ mkdir -p "$OUT_DIR"
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 opt=$OPT testmode=$TESTMODE fasttrig=$FASTTRIG hw=$HW gcc=$GCC"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 testmode=$TESTMODE hw=$HW gcc=$GCC"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -110,7 +106,7 @@ GCC_ARGS=()
 if [ -n "$GCC" ]; then
     GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC")
 fi
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_OPT=$OPT FISHMOD_TESTMODE=$TESTMODE FISHMOD_FASTTRIG=$FASTTRIG FISHMOD_HW=$HW \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_TESTMODE=$TESTMODE FISHMOD_HW=$HW \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -119,12 +115,6 @@ echo "$SCRIPT" > "$SCRIPT_STAMP"
 SUFFIX=""
 if [ "$F3DEX3" = 1 ]; then
     SUFFIX="-f3dex3"
-fi
-if [ "$OPT" != 0 ]; then
-    SUFFIX="$SUFFIX-opt$OPT"
-fi
-if [ "$FASTTRIG" = 1 ]; then
-    SUFFIX="$SUFFIX-trig"
 fi
 if [ "$TESTMODE" = 1 ]; then
     SUFFIX="$SUFFIX-test"

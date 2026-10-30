@@ -1,6 +1,6 @@
 // Lake Hylia tour, for feedback on the habitat: a free camera glides between stops above and below the water,
 // with a Navi-style caption at each. A: next stop, B: back, stick: look around, L: debug text on/off.
-// Build: fishmod/build.sh --script tour --opt 5
+// Build: fishmod/build.sh --script tour
 #define FISHMOD_SCRIPT_ENTRANCE ENTR_LAKE_HYLIA_0
 #define FISHMOD_SCRIPT_DAY 1        // a clear day
 #define FISHMOD_SCRIPT_TIME 0x5000  // about 7:30 in the morning

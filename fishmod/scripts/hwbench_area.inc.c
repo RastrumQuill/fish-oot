@@ -4,7 +4,7 @@
 // shipped and with the mod's fish, props, water surface and sky off. Every step of the game's update is timed, and
 // every kind of actor's updates. Two spots elsewhere on the lake for comparison. Clear midday, the clock held.
 // Sums to SRAM after every spot; read with fishmod/tools/area_report.py save.sav.
-// Build: fishmod/build.sh --script hwbench_area --opt 5 --hw --f3dex3
+// Build: fishmod/build.sh --script hwbench_area --hw --f3dex3
 #define FISHMOD_HWBENCH 1
 #define FISHMOD_BENCH_AREA 1
 #define FISHMOD_SCRIPT_ADULT 1

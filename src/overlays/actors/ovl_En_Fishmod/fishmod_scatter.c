@@ -1,7 +1,7 @@
 /*
  * File: fishmod_scatter.c
  * Overlay: ovl_En_Fishmod
- * Description: the scene's habitat props (FISHMOD_OPT 5): weed beds, reeds, lily pads, rocks and wood, placed at build
+ * Description: the scene's habitat props: weed beds, reeds, lily pads, rocks and wood, placed at build
  * time across the water by fishmod/tools/gen_scatter.py (shore-to-deep banding, the sub-biome zones, patchy density)
  * and drawn by the fish manager.
  *
@@ -29,7 +29,6 @@
 #include "ultra64/libc.h"
 #include "assets/objects/object_fish/object_fish.h"
 
-#if FISHMOD_OPT >= 5
 
 // the props' textures and display lists (fishmod/tools/gen_habitat.py -> fishmod/tools/assets.py, made at build time)
 #include "src/fishmod_data/fishmod_props.inc.c"
@@ -1399,4 +1398,3 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
 }
 
-#endif

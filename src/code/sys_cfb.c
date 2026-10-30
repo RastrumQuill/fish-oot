@@ -32,11 +32,9 @@ void SysCfb_Init(s32 n64dd) {
                    (0x4BC00 / 1024));
 #if DEBUG_FEATURES
             sSysCfbEnd = tmpFbEnd;
-#elif FISHMOD_OPT >= 3
+#else
             // fishmod: frame buffers at the top of the Expansion Pak, so the 4 MB below go to the system heap
             sSysCfbEnd = 0x80800000;
-#else
-            sSysCfbEnd = 0x80400000;
 #endif
         }
     } else if (osMemSize >= 0x400000) {

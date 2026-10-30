@@ -223,27 +223,13 @@ ifeq ($(F3DEX3),1)
   COMPARE := 0
 endif
 
-# Performance test sets (see releases/notes-perf-builds.md and fishmod/docs/roadmap.md): 1 = line strip, limb shortcuts, faster collision table clear;
-# 2 = all of 1 plus distant-fish pose caching, half-rate far fish AI, fewer rod matrices, palette textures
-FISHMOD_OPT ?= 0
-CPP_DEFINES += -DFISHMOD_OPT=$(FISHMOD_OPT)
-# 3 = all of 2 plus billboards for distant fish, deeper AI throttling, dormant far fish, Expansion Pak memory
-# 4 = all of 3 plus the fish manager (roster, one draw for all fish, AI budget), fish rigs (only moving limbs get
-#     matrices, static fins baked per species), reduced rigs for mid-distance and small fish, fixed whiskers, cheaper
-#     water lookups
+# fishmod: the mod's code is always built (it was once switched by performance levels FISHMOD_OPT 0-5; level 5 is
+# now the only game), so the ROM never matches the original
+COMPARE := 0
+
 # FISHMOD_HW=1: the original-hardware version (fewer, cheaper pixels for the RDP; see fishmod_scatter.c)
 FISHMOD_HW ?= 0
 CPP_DEFINES += -DFISHMOD_HW=$(FISHMOD_HW)
-
-# FISHMOD_FASTTRIG=1: polynomial sin/cos in place of the sine table (Math_SinS/Math_CosS, whole game)
-FISHMOD_FASTTRIG ?= 0
-CPP_DEFINES += -DFISHMOD_FASTTRIG=$(FISHMOD_FASTTRIG)
-ifneq ($(FISHMOD_FASTTRIG),0)
-  COMPARE := 0
-endif
-ifneq ($(FISHMOD_OPT),0)
-  COMPARE := 0
-endif
 
 # FISHMOD_TESTMODE=1: new files skip the intro and start with testing items (bottles, slingshot, bracelet...)
 FISHMOD_TESTMODE ?= 0
