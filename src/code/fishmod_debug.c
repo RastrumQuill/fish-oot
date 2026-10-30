@@ -9,6 +9,7 @@
 #include "dma.h"
 #include "fishmod.h"
 #include "fishmod_sram.h"
+#include "src/fishmod_data/fishmod_profile.h"
 
 #if FISHMOD_DEBUG
 
@@ -1891,7 +1892,7 @@ static void Bench_Save(void) {
     sBench.modes = BENCH_MODES;
     sBench.metrics = BENCH_METRICS;
     sBench.tests = BENCH_TESTS;
-    sBench.hw = FISHMOD_HW;
+    sBench.hw = FISHMOD_PROFILE_HW;
     SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH), &sBench, sizeof(sBench), OS_WRITE);
 }
 
@@ -1925,7 +1926,7 @@ static s32 Bench_Init(void) {
         }
         // carry on from an earlier night (the save file keeps the sums)
         SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH), &sBench, sizeof(sBench), OS_READ);
-        if ((sBench.magic != 0x4642454E) || (sBench.version != BENCH_VERSION) || (sBench.hw != FISHMOD_HW)) {
+        if ((sBench.magic != 0x4642454E) || (sBench.version != BENCH_VERSION) || (sBench.hw != FISHMOD_PROFILE_HW)) {
             bzero(&sBench, sizeof(sBench));
         }
     }
@@ -2421,7 +2422,7 @@ static void AreaBench_Save(void) {
     sArea.sects = FISHMOD_SECT_MAX;
     sArea.cats = FISHMOD_ACTOR_CATS;
     sArea.top = AREA_TOP;
-    sArea.hw = FISHMOD_HW;
+    sArea.hw = FISHMOD_PROFILE_HW;
     sArea.spot = sAreaSpot;
     sArea.variant = sAreaVariant;
     SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_BENCH), &sArea, sizeof(sArea), OS_WRITE);

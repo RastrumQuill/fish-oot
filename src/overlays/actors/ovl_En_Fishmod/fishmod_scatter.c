@@ -43,6 +43,7 @@ typedef struct FishmodBedShade {
     s8 normal[3];
 } FishmodBedShade;
 #include "src/fishmod_data/fishmod_bedshade.h"
+#include "src/fishmod_data/fishmod_profile.h"
 #include "sys_math.h" // (Math_Atan2S: without its prototype its floats were passed as doubles)
 
 typedef enum FishmodPropKind {
@@ -76,12 +77,13 @@ typedef struct FishmodPropKindInfo {
     u16 extent;  // how far it reaches from where it stands at scale 1 (up, or down for hanging ones): the view test
 } FishmodPropKindInfo;
 
-#define DIST_SMALL 800.0f
-#define DIST_MID 1200.0f
-#define DIST_FAR 1600.0f
+// (the profile's: fishmod/data/profiles.json)
+#define DIST_SMALL FISHMOD_PROFILE_DIST_SMALL
+#define DIST_MID FISHMOD_PROFILE_DIST_MID
+#define DIST_FAR FISHMOD_PROFILE_DIST_FAR
 // Props drawn per frame at most. They are drawn nearest band first (whatever their kind), so the budget runs out on
 // the far ones. Each is a matrix and three commands, in buffers of the props' own (allocated with the scene's props).
-#define PROP_BUDGET 900
+#define PROP_BUDGET FISHMOD_PROFILE_PROP_BUDGET
 // Nearest first, in bands this wide (kind by kind within a band, so one material per kind per band): the depth
 // test then throws out most hidden pixels before they're written (fishmod/tools/overdraw.py --zorder: about a
 // quarter fewer pixels written than three bands, close to a perfect nearest-first order)
@@ -99,9 +101,9 @@ typedef struct FishmodPropKindInfo {
 #define VIEW_MARGIN_TAN 0.0875f // tan 5 degrees
 #define PROP_RADIUS 90.0f
 // See-through props (the pond reeds) drawn per frame at most
-#define XLU_MAX 200
+#define XLU_MAX FISHMOD_PROFILE_XLU_MAX
 // Under water the haze hides everything past about this far, whatever the kind (the measured distances can be less)
-#define DIST_UNDER_FOG 900.0f
+#define DIST_UNDER_FOG FISHMOD_PROFILE_DIST_UNDER_FOG
 // A plant the camera is inside or right against isn't drawn: one card there is a blur across the whole screen, at
 // the RDP's full cost (closer than this times the plant's height, plus a little)
 #define NEAR_SKIP 0.6f

@@ -227,9 +227,7 @@ endif
 # now the only game), so the ROM never matches the original
 COMPARE := 0
 
-# FISHMOD_HW=1: the original-hardware version (fewer, cheaper pixels for the RDP; see fishmod_scatter.c)
-FISHMOD_HW ?= 0
-CPP_DEFINES += -DFISHMOD_HW=$(FISHMOD_HW)
+# (the build profile, hardware or emulator, is src/fishmod_data/fishmod_profile.h: fishmod/build.sh --profile)
 
 # FISHMOD_TESTMODE=1: new files skip the intro and start with testing items (bottles, slingshot, bracelet...)
 FISHMOD_TESTMODE ?= 0
