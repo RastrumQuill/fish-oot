@@ -279,6 +279,13 @@ typedef struct FishmodSaveData {
 #define ITEM_LURE_SINKING ITEM_INVALID_6
 #define FISHMOD_IS_LURE_ITEM(item) (((item) >= ITEM_LURE_CRANKBAIT) && ((item) <= ITEM_LURE_SINKING))
 
+// The mod's items (fishmod_items.c): what Link does with one from a button; whether an item is a bottle
+s32 Fishmod_ItemAction(s32 item);
+s32 Fishmod_IsBottleItem(s32 item);
+// The item page's grid: the slot at each place, and each slot's place
+extern u8 gFishmodItemGridSlot[];
+extern u8 gFishmodItemSlotGrid[];
+
 // Sets up the save block's new parts (a new file, or one saved before they existed)
 void Fishmod_InitSaveExtras(void);
 // The item page's own graphics (fishmod_item_page.h), loaded with the pause menu's: where to load them, and once

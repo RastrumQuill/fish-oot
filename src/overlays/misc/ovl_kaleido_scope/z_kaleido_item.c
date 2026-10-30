@@ -34,27 +34,6 @@ u8 gAmmoItems[] = {
     ITEM_NONE,
 };
 
-/*
- * fishmod: the item page's grid, six columns by five rows (fishmod.h). The cursor moves over grid places
- * (cursorPoint, cursorX, cursorY); each place holds an inventory slot (cursorSlot), and each slot's quad sits at its
- * place.
- */
-u8 gFishmodItemGridSlot[ITEM_GRID_ROWS * ITEM_GRID_COLS] = {
-    SLOT_DEKU_STICK,  SLOT_DEKU_NUT,      SLOT_BOMB,       SLOT_BOW,         SLOT_ARROW_FIRE,  SLOT_DINS_FIRE,
-    SLOT_SLINGSHOT,   SLOT_OCARINA,       SLOT_BOMBCHU,    SLOT_HOOKSHOT,    SLOT_ARROW_ICE,   SLOT_FARORES_WIND,
-    SLOT_BOOMERANG,   SLOT_LENS_OF_TRUTH, SLOT_MAGIC_BEAN, SLOT_HAMMER,      SLOT_ARROW_LIGHT, SLOT_NAYRUS_LOVE,
-    SLOT_FISHING_ROD, SLOT_LURE_1,        SLOT_LURE_2,     SLOT_LURE_3,      SLOT_TRADE_ADULT, SLOT_TRADE_CHILD,
-    SLOT_BOTTLE_1,    SLOT_BOTTLE_2,      SLOT_BOTTLE_3,   SLOT_BOTTLE_4,    SLOT_BOTTLE_5,    SLOT_BOTTLE_6,
-};
-// and back: each slot's place
-u8 gFishmodItemSlotGrid[INVENTORY_SLOTS] = {
-    0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17,
-    24, 25, 26, 27, // bottles 1-4
-    22, 23,         // trade items
-    18, 19, 20, 21, // rod, lures
-    28, 29,         // bottles 5-6
-};
-
 #define GRID_ITEM(point) INV_SLOT(gFishmodItemGridSlot[point])
 
 static s16 sEquipState = 0;

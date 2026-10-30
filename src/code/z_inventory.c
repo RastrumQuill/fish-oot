@@ -213,11 +213,10 @@ void* gItemIcons[] = {
     gQuestIconMagicJarBigTex,     // ITEM_MAGIC_JAR_BIG
     // icon_item_static 48x48 ia8
     gHeartPieceIcon1Tex, // ITEM_HEART_PIECE_2
-    // fishmod: bait bottles (32x32 rgba32, in RAM)
-    gFishmodBottleLarva3Tex, // ITEM_INVALID_1 = ITEM_BOTTLE_LARVA_3
-    gFishmodBottleLarva2Tex, // ITEM_INVALID_2 = ITEM_BOTTLE_LARVA_2
+    gHeartPieceIcon2Tex, // ITEM_INVALID_1
+    gHeartPieceIcon3Tex, // ITEM_INVALID_2
     // parameter_static 16x16 ia8
-    gFishmodBottleLarva1Tex,  // ITEM_INVALID_3 = ITEM_BOTTLE_LARVA_1
+    gOcarinaBtnIconCUpTex,    // ITEM_INVALID_3
     gOcarinaBtnIconCDownTex,  // ITEM_INVALID_4
     gOcarinaBtnIconCLeftTex,  // ITEM_INVALID_5
     gOcarinaBtnIconCRightTex, // ITEM_INVALID_6
@@ -282,6 +281,15 @@ u8 gItemSlots[] = {
     SLOT_TRADE_ADULT,   // ITEM_EYEBALL_FROG
     SLOT_TRADE_ADULT,   // ITEM_EYE_DROPS
     SLOT_TRADE_ADULT,   // ITEM_CLAIM_CHECK
+    // fishmod: every item up to the mod's own, so SLOT() never reads past the table
+    [ITEM_CLAIM_CHECK + 1 ... ITEM_INVALID_6] = SLOT_NONE,
+    [ITEM_FISHING_POLE] = SLOT_FISHING_ROD,
+    [ITEM_BOTTLE_LARVA_3] = SLOT_BOTTLE_1, // (like the game's bottles: the first bottle slot)
+    [ITEM_BOTTLE_LARVA_2] = SLOT_BOTTLE_1,
+    [ITEM_BOTTLE_LARVA_1] = SLOT_BOTTLE_1,
+    [ITEM_LURE_CRANKBAIT] = SLOT_LURE_1,
+    [ITEM_LURE_FROG] = SLOT_LURE_2,
+    [ITEM_LURE_SINKING] = SLOT_LURE_3,
 };
 
 void Inventory_ChangeEquipment(s16 equipment, u16 value) {
