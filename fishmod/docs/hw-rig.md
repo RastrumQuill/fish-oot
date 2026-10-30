@@ -5,6 +5,21 @@ so Claude can put a build on the console, run it, watch it and read its results 
 No controller input yet (an ESP32 pretending to be a controller comes later), so tests use ROMs that drive
 themselves: the debug harness's autoplay scripts and the benches already do (`fishmod/scripts/`).
 
+## Who does what
+
+With 2-4 cores the VM is for the hardware, not for heavy CPU work:
+
+| Work | Where | Why |
+|---|---|---|
+| Talking to the cart and the capture card | VM | the hardware is there |
+| Builds for the console | VM, incremental | a change to a few files rebuilds in a minute or two; a clean build of the whole decomp is slow on 2-4 cores (once, after setup or a flag change) |
+| Long soaks | **the console** | a test on hardware is the real thing, and it costs the VM nothing: it only grabs a frame now and then |
+| ares runs, tour captures, A/B benches, anything run several at once | cloud container | they keep several cores busy for hours; ares on 2 cores with no GPU would be slow |
+| Asset generation (props, scatter, collision, item page) | either | quick |
+
+So the cloud session stays the main place to write code and run ares, and the VM becomes the place things are
+proven on the console, mostly with long unattended runs.
+
 ## What a test looks like
 
 1. Build the ROM on the VM from this repo (the ROM never leaves the user's machines: the VM has its own copy of the
@@ -19,7 +34,12 @@ themselves: the debug harness's autoplay scripts and the benches already do (`fi
 
 ## The VM
 
-- **Size:** 4 cores, 8 GB RAM, 60 GB disk (the decomp build, a Docker image, captures).
+- **Host:** Windows on a Ryzen 7 5700X3D, shared with the user's own work: the VM gets **2-4 cores** and up to
+  16 GB RAM (8-12 GB is plenty), 100 GB disk. No GPU passthrough.
+- **Hypervisor:** one with good USB passthrough, since a video capture card has to work through it. VMware
+  Workstation Pro (free for personal use) handles USB 3 webcams well; VirtualBox can with its USB 3 controller.
+  Hyper-V and WSL2 can't pass USB through directly (WSL2 needs `usbipd`, and its kernel has no webcam driver), so
+  not those.
 - **USB passthrough:** two devices, by vendor/product id so they survive replugging:
   - the SummerCart64 (an FTDI FT232H: `0403:6014`; it shows up as `/dev/ttyUSB0`);
   - the capture card (a UVC device; `lsusb` names it).
@@ -49,7 +69,8 @@ sudo usermod -aG docker,uucp,video "$USER"   # Docker, the serial port (SC64), t
 ### The build: Docker
 
 Building the decomp natively on Arch needs MIPS cross tools that are only in the AUR, so the build runs in an Ubuntu
-container instead (the repo has a `Dockerfile`; the mod needs a little more than it installs):
+container instead (Docker, or a `distrobox` Ubuntu 24.04 box, which shares the home folder and feels native; both
+are light on CPU when idle) (the repo has a `Dockerfile`; the mod needs a little more than it installs):
 `gcc-mips-linux-gnu`, `binutils-mips-linux-gnu`, Python with `requirements.txt` plus Pillow and NumPy, and Flips for
 the `.bps`. To do: a `fishmod/docker/Dockerfile` with those, so the VM builds exactly what the cloud container does.
 
