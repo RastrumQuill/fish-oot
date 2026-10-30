@@ -11,6 +11,7 @@
 #include "inventory.h"
 #include "item.h"
 #include "play_state.h"
+#include "save.h"
 #include "player.h"
 #include "segment_symbols.h"
 #include "stddef.h"
