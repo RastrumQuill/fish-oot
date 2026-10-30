@@ -1,0 +1,21 @@
+{
+  "_doc": "Build profiles: one per kind of machine the ROM is made for. fishmod/tools/build_profile.py reads this; the build (fishmod/build.sh --profile NAME) writes it as C defines (src/fishmod_data/fishmod_profile.h) and the generators read it too, so the game and the tools agree. 'f3dex3': the F3DEX3 microcode (faster on the console; HLE emulators can't run it). 'thinning': the plant beds thinned where the console's RDP needed it (gen_scatter.py: the density cap and lake_hylia_thin.json). 'prop_budget': most props drawn in a frame; 'xlu_max': most translucent ones. 'draw': the props' draw distances by size (small, mid, far) and the furthest anything is drawn under water (under_fog). 'suffix': added to the output's name.",
+  "hw": {
+    "doc": "Original hardware (and accurate LLE emulators such as ares): the RDP is the limit.",
+    "suffix": "-hw",
+    "f3dex3": true,
+    "thinning": true,
+    "prop_budget": 900,
+    "xlu_max": 200,
+    "draw": { "small": 800, "mid": 1200, "far": 1600, "under_fog": 900 }
+  },
+  "emu": {
+    "doc": "HLE emulators (Project64, mupen64plus with GLideN64...): no F3DEX3. Otherwise the same as hw for now; the place to give emulators more once that's measured.",
+    "suffix": "",
+    "f3dex3": false,
+    "thinning": true,
+    "prop_budget": 900,
+    "xlu_max": 200,
+    "draw": { "small": 800, "mid": 1200, "far": 1600, "under_fog": 900 }
+  }
+}
