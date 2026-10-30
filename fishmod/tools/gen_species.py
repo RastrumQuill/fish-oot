@@ -101,6 +101,10 @@ def gen_header(data):
         flags = []
         if look.get("whiskers"):
             flags.append("FISHMOD_LOOK_WHISKERS")
+        if look.get("koi"):
+            flags.append("FISHMOD_LOOK_KOI")
+        if look.get("curls"):
+            flags.append("FISHMOD_LOOK_CURLS")
         out.append(f"        {' | '.join(flags) if flags else '0'},")
         band = sp["depthBand"]
         out.append(f"        0x{activity:02X}, {int(round(band[0] * 255))}, {int(round(band[1] * 255))}, "

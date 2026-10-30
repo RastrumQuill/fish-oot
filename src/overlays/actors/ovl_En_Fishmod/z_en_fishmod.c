@@ -199,22 +199,22 @@ static void EnFishmod_LookColor(EnFishmod* this, const u8* tint, u8* out) {
 }
 
 /*
- * Koi: each Sanke carp's red and black blotches sit in one of four places along and round its body (its look's top
- * two bits): the carp's own side and back patterns, and three copies shifted round (patterns repeat along the body),
- * made once.
+ * Koi (FISHMOD_LOOK_KOI): each one's red and black blotches sit in one of four places along and round its body (its
+ * look's top two bits): the species' own side and back patterns, and three copies shifted round (patterns repeat along
+ * the body), made once for the species.
  */
 #define KOI_ROLES 2
 static const u8 sKoiRoles[KOI_ROLES] = { FISHMOD_TEX_ROLE_SIDE, FISHMOD_TEX_ROLE_BACK };
 static u8 sKoiPatterns[3][KOI_ROLES][16 * 16] ALIGNED(8);
-static u8 sKoiReady;
+static s16 sKoiSpecies = -1; // the species the copies were made from
 
-static u8* EnFishmod_KoiPattern(s32 variant, s32 r) {
-    u8* src = sSpeciesTexturesCI[FISHMOD_SPECIES_SANKE_CARP][sKoiRoles[r]];
+static u8* EnFishmod_KoiPattern(s32 speciesIndex, s32 variant, s32 r) {
+    u8* src = sSpeciesTexturesCI[speciesIndex][sKoiRoles[r]];
 
     if (variant == 0) {
         return src;
     }
-    if (!sKoiReady) {
+    if (sKoiSpecies != speciesIndex) {
         static const u8 sShift[3][2] = { { 5, 9 }, { 10, 3 }, { 13, 12 } };
         s32 v;
         s32 k;
@@ -223,7 +223,7 @@ static u8* EnFishmod_KoiPattern(s32 variant, s32 r) {
 
         for (v = 0; v < 3; v++) {
             for (k = 0; k < KOI_ROLES; k++) {
-                u8* from = sSpeciesTexturesCI[FISHMOD_SPECIES_SANKE_CARP][sKoiRoles[k]];
+                u8* from = sSpeciesTexturesCI[speciesIndex][sKoiRoles[k]];
 
                 for (y = 0; y < 16; y++) {
                     for (x = 0; x < 16; x++) {
@@ -232,7 +232,7 @@ static u8* EnFishmod_KoiPattern(s32 variant, s32 r) {
                 }
             }
         }
-        sKoiReady = true;
+        sKoiSpecies = speciesIndex;
     }
     return sKoiPatterns[variant - 1][r];
 }
@@ -243,10 +243,10 @@ void EnFishmod_LookTable(EnFishmod* this, PlayState* play) {
     s32 texSet = EnFishmod_TexSet(this->species);
     s32 i;
 
-    if (this->species == &gFishmodSpecies[FISHMOD_SPECIES_SANKE_CARP]) {
+    if (this->species->lookFlags & FISHMOD_LOOK_KOI) {
         OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
         for (i = 0; i < KOI_ROLES; i++) {
-            gSPSegment(POLY_OPA_DISP++, 0x08 + sKoiRoles[i], EnFishmod_KoiPattern(this->look >> 6, i));
+            gSPSegment(POLY_OPA_DISP++, 0x08 + sKoiRoles[i], EnFishmod_KoiPattern(this->species - gFishmodSpecies, this->look >> 6, i));
         }
         CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
     }
@@ -1974,8 +1974,8 @@ static void EnFishmod_UpdateSwim(EnFishmod* this) {
         s16 turn = this->actor.shape.rot.y - this->lastYaw;
         s16 bendTarget = CLAMP(turn * 5, -0x1400, 0x1400);
 
-        if (this->species == &gFishmodSpecies[FISHMOD_SPECIES_ORDON_CATFISH]) {
-            // a catfish is all body: it curls hard into its turns, and lies curled on the bed when it rests (to its
+        if (this->species->lookFlags & FISHMOD_LOOK_CURLS) {
+            // (a catfish) all body: it curls hard into its turns, and lies curled on the bed when it rests (to its
             // own side, every time)
             bendTarget = CLAMP(turn * 9, -0x2400, 0x2400);
             if ((this->fishState == FISH_STATE_WANDER) && (this->restTimer > 0) &&
@@ -2470,7 +2470,7 @@ void EnFishmod_BillboardMaterial(EnFishmod* this, PlayState* play) {
     gDPPipeSync(POLY_OPA_DISP++);
     gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH | G_TEXTURE_GEN);
     if ((tex != NULL) && (sSpeciesPalettes[speciesIndex] != NULL)) {
-        s32 big = (speciesIndex == FISHMOD_SPECIES_ORDON_CATFISH) || (speciesIndex == FISHMOD_SPECIES_HYLIAN_LOACH);
+        s32 big = FISHMOD_BASE_TEX_SIZE(gFishmodSpecies[speciesIndex].base) == 32;
 
         gDPLoadTLUT_pal256(POLY_OPA_DISP++, sSpeciesPalettes[speciesIndex]);
         gDPSetTextureLUT(POLY_OPA_DISP++, G_TT_RGBA16);
@@ -2526,10 +2526,7 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     static const u8 sPart[6] = { FISHMOD_PART_HEAD,      FISHMOD_PART_BODY_FRONT, FISHMOD_PART_BODY_REAR,
                                  FISHMOD_PART_TAIL,      FISHMOD_PART_FIN_BELLY,  FISHMOD_PART_BODY_FRONT };
     // the pattern tiled about twice along the body and once across, like on the model
-    s32 texSize = ((this->species - gFishmodSpecies) == FISHMOD_SPECIES_ORDON_CATFISH) ||
-                          ((this->species - gFishmodSpecies) == FISHMOD_SPECIES_HYLIAN_LOACH)
-                      ? 32
-                      : 16;
+    s32 texSize = FISHMOD_BASE_TEX_SIZE(this->species->base);
     const u8* tint = this->species->tint;
     s32 i;
 

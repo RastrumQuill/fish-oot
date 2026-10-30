@@ -79,6 +79,10 @@ typedef enum FishmodPart {
 } FishmodPart;
 
 #define FISHMOD_LOOK_WHISKERS (1 << 0)
+#define FISHMOD_LOOK_KOI (1 << 1)    // red and black blotches, placed by each fish's looks (its top two bits)
+#define FISHMOD_LOOK_CURLS (1 << 2)  // all body: curls hard into its turns, and lies curled when it rests
+// the base model's textures are 32x32 (the loach's), else 16x16
+#define FISHMOD_BASE_TEX_SIZE(base) (((base) == FISHMOD_BASE_LOACH) ? 32 : 16)
 
 typedef struct FishmodSpecies {
     /* 0x00 */ const char* name;

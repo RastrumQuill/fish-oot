@@ -68,7 +68,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { 40, 100, 80, 180, 0, 0, 50, 70, 30, 60, 120 },
         { { 255, 250, 240 }, { 255, 250, 240 }, { 255, 250, 240 }, { 150, 135, 100 }, { 130, 115, 85 }, { 150, 135, 100 }, { 150, 135, 100 } },
         { { 120, 80, 155 }, { 100, 100, 125 }, { 100, 100, 100 }, { 90, 120, 100 }, { 80, 80, 100 }, { 140, 100, 140 }, { 100, 100, 100 } },
-        FISHMOD_LOOK_WHISKERS,
+        FISHMOD_LOOK_WHISKERS | FISHMOD_LOOK_CURLS,
         0xE1, 191, 255, 115, 204, 0, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_HYLIAN_LOACH */ {
@@ -100,7 +100,7 @@ const FishmodSpecies gFishmodSpecies[FISHMOD_SPECIES_MAX] = {
         { 30, 180, 70, 90, 0, 0, 30, 30, 20, 20, 50 },
         { { 255, 255, 255 }, { 255, 255, 255 }, { 255, 255, 255 }, { 255, 245, 235 }, { 240, 235, 225 }, { 255, 245, 235 }, { 255, 245, 235 } },
         { { 100, 100, 100 }, { 100, 100, 100 }, { 100, 100, 100 }, { 115, 110, 100 }, { 100, 100, 100 }, { 120, 100, 120 }, { 100, 100, 100 } },
-        0,
+        FISHMOD_LOOK_KOI,
         0x6E, 0, 128, 51, 26, 3, 0, 0, /* activity (2 bits per time of day), depth band, rise, light shyness, chronotype, school size */
     },
     /* FISHMOD_SPECIES_HYLIAN_PIKE */ {
