@@ -1382,10 +1382,7 @@ void func_80084BF4(PlayState* play, u16 flag) {
             if ((gSaveContext.save.info.equips.buttonItems[0] == ITEM_SLINGSHOT) ||
                 (gSaveContext.save.info.equips.buttonItems[0] == ITEM_BOW) ||
                 (gSaveContext.save.info.equips.buttonItems[0] == ITEM_BOMBCHU) ||
-                // fishmod: outside the Fishing Pond the rod on B is fishmod's (it keeps the real B item itself;
-                // buttonStatus[0] doesn't hold it here, and is usually 0, which is the Deku Stick)
-                ((gSaveContext.save.info.equips.buttonItems[0] == ITEM_FISHING_POLE) &&
-                 (play->sceneId == SCENE_FISHING_POND))) {
+                (gSaveContext.save.info.equips.buttonItems[0] == ITEM_FISHING_POLE)) {
                 gSaveContext.save.info.equips.buttonItems[0] = gSaveContext.buttonStatus[0];
                 Interface_LoadItemIcon1(play, 0);
             }

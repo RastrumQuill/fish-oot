@@ -95,6 +95,11 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
   the Deku Stick ammo). One SRAM map (`include/fishmod_sram.h`, read by the Python tools through `sram_map.py`); the
   records every script writes are all past the saves, and only the bench and LOD ROMs (blank-save only, as before)
   write over them. Test: `oldsave`.
+- **5, the rod everywhere: done.** The rod's controller spawns in any scene when Link takes the rod out (from the
+  start in scenes with fish) and goes again when he puts it away; casting needs only water. The rod's graphics are
+  built into the overlay from the extracted assets, so it no longer needs object_fish; only the fish and their
+  manager take that object (and scenes with fish load it). Beehive chunks (bait) now drop in any scene too. The
+  HUD's rod-on-B special case is vanilla again. Test: `rodanywhere` (Zora's Domain, no fish).
 
 ## Decisions (made)
 

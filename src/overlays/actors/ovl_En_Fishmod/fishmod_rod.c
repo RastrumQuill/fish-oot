@@ -16,7 +16,6 @@
 
 #include "z_en_fishmod.h"
 
-#include "assets/objects/object_fish/object_fish.h"
 #include "libc64/math64.h"
 #include "libc64/sprintf.h"
 #include "libu64/gfxprint.h"
@@ -327,8 +326,10 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     EnFishmod_WaterGridAcquire(play);
 
-    // the fish manager spawns the scene's fish (its roster)
-    EnFishmod_ManagerEnsure(play);
+    // the fish manager spawns the scene's fish (its roster), where there are any
+    if (Fishmod_SceneHasFish(play)) {
+        EnFishmod_ManagerEnsure(play);
+    }
 }
 
 /** The area's music comes back after the fish-on music (it only restores if the fish-on music is playing). */
@@ -736,6 +737,10 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         if (!holding) {
             // put away: the bait stays on the hook, but a bottle's request for it is dropped
             gFishmodRodInfo.baitRequest = FISHMOD_BAIT_NONE;
+            // where there are no fish the controller only lives while the rod is out (it frees its memory)
+            if (!Fishmod_SceneHasFish(play)) {
+                Actor_Kill(&this->actor);
+            }
         }
         Rod_PublishInfo();
         return;
@@ -1143,7 +1148,7 @@ static void Rod_DrawRod(PlayState* play, Player* player) {
     }
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, gFishingRodMaterialDL);
+    gSPDisplayList(POLY_OPA_DISP++, gFishmodRodMaterialDL);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 155, 0, 255);
 
     Matrix_Mult(&player->mf_9E0, MTXMODE_NEW);
@@ -1184,19 +1189,19 @@ static void Rod_DrawRod(PlayState* play, Player* player) {
                     gSPMatrix(POLY_OPA_DISP++, &sNextSegment, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
                 }
                 if (k < 5) {
-                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentBlackTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
+                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishmodRodSegmentBlackTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
                                         8, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD,
                                         G_TX_NOLOD);
                 } else if ((k < 8) || ((k % 2) == 0)) {
-                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentWhiteTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
+                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishmodRodSegmentWhiteTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
                                         8, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD,
                                         G_TX_NOLOD);
                 } else {
-                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentStripTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
+                    gDPLoadTextureBlock(POLY_OPA_DISP++, gFishmodRodSegmentStripTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16,
                                         8, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD,
                                         G_TX_NOLOD);
                 }
-                gSPDisplayList(POLY_OPA_DISP++, gFishingRodSegmentDL);
+                gSPDisplayList(POLY_OPA_DISP++, gFishmodRodSegmentDL);
             }
             Matrix_Pop();
             Matrix_Translate(0.0f, 0.0f, 1000.0f, MTXMODE_APPLY);
@@ -1212,16 +1217,16 @@ static void Rod_DrawRod(PlayState* play, Player* player) {
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
 
         if (i < 5) {
-            gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentBlackTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16, 8, 0,
+            gDPLoadTextureBlock(POLY_OPA_DISP++, gFishmodRodSegmentBlackTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16, 8, 0,
                                 G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD, G_TX_NOLOD);
         } else if ((i < 8) || ((i % 2) == 0)) {
-            gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentWhiteTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16, 8, 0,
+            gDPLoadTextureBlock(POLY_OPA_DISP++, gFishmodRodSegmentWhiteTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16, 8, 0,
                                 G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD, G_TX_NOLOD);
         } else {
-            gDPLoadTextureBlock(POLY_OPA_DISP++, gFishingRodSegmentStripTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16, 8, 0,
+            gDPLoadTextureBlock(POLY_OPA_DISP++, gFishmodRodSegmentStripTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16, 8, 0,
                                 G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 3, G_TX_NOLOD, G_TX_NOLOD);
         }
-        gSPDisplayList(POLY_OPA_DISP++, gFishingRodSegmentDL);
+        gSPDisplayList(POLY_OPA_DISP++, gFishmodRodSegmentDL);
 
         Matrix_Pop();
         Matrix_Translate(0.0f, 0.0f, 500.0f, MTXMODE_APPLY);
@@ -1247,7 +1252,7 @@ static void Rod_DrawLineSegment(PlayState* play, Vec3f* a, Vec3f* b, f32 thickne
     Matrix_RotateX(-Math_FAtan2F(dy, distXZ), MTXMODE_APPLY);
     Matrix_Scale(thickness, 1.0f, dist * 0.001f, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
-    gSPDisplayList(POLY_XLU_DISP++, gFishingLineModelDL);
+    gSPDisplayList(POLY_XLU_DISP++, gFishmodLineModelDL);
 
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
 }
@@ -1407,7 +1412,7 @@ static void Rod_DrawBobber(PlayState* play) {
         Matrix_Translate(ROD->bobberPos.x, ROD->bobberPos.y - ROD->baitDepth, ROD->bobberPos.z, MTXMODE_NEW);
         Matrix_Scale(0.004f, 0.004f, 0.004f, MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
-        gSPDisplayList(POLY_OPA_DISP++, gFishingLureHookDL);
+        gSPDisplayList(POLY_OPA_DISP++, gFishmodLureHookDL);
     }
 
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);

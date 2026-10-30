@@ -212,6 +212,14 @@ typedef struct FishmodRod {
 
 extern FishmodRod gFishmodRodState;
 
+// the rod's graphics, built into the overlay (fishmod_rod_gfx.c): it draws without object_fish
+extern u64 gFishmodRodSegmentStripTex[];
+extern u64 gFishmodRodSegmentBlackTex[];
+extern u64 gFishmodRodSegmentWhiteTex[];
+extern Gfx gFishmodRodMaterialDL[];
+extern Gfx gFishmodRodSegmentDL[];
+extern Gfx gFishmodLineModelDL[];
+extern Gfx gFishmodLureHookDL[];
 void EnFishmod_RodInit(struct EnFishmod* this, struct PlayState* play);
 void EnFishmod_RodUpdate(struct EnFishmod* this, struct PlayState* play);
 void EnFishmod_RodDraw(struct EnFishmod* this, struct PlayState* play);

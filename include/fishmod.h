@@ -129,10 +129,11 @@ extern const s32 gFishmodSceneSpawnsCount;
 /* Core hooks (fishmod.c) */
 
 typedef enum FishmodActorType {
-    /* 0 */ FISHMOD_TYPE_ROD, // one per scene: rod, line, bobber, camera, fish spawning
+    /* 0 */ FISHMOD_TYPE_ROD, // one per scene: rod, line, bobber, camera (any scene, while the rod is out)
     /* 1 */ FISHMOD_TYPE_FISH,
     /* 2 */ FISHMOD_TYPE_COMB, // a chunk of a broken beehive with larvae in it, scooped up with a bottle
-    /* 3 */ FISHMOD_TYPE_MANAGER // one per scene: the fish roster, drawing all the fish
+    /* 3 */ FISHMOD_TYPE_MANAGER, // one per scene: the fish roster, drawing all the fish
+    /* 4 */ FISHMOD_TYPE_UNUSED   // (not a params value) one that couldn't start: killed in Init, nothing to undo
 } FishmodActorType;
 
 #define FISHMOD_PARAMS(type, species) (((type) << 8) | (species))
@@ -321,6 +322,7 @@ const char* Fishmod_BaitName(s32 bait);
 // Player is about to use `item` from a button: returns true if fishmod used it (baiting the hook)
 s32 Fishmod_UseItem(struct PlayState* play, s32 item, s32 button);
 void Fishmod_ResetRodInfo(void);
+s32 Fishmod_SceneHasFish(struct PlayState* play);
 // The icon texture (in RAM) for fishmod's items, or NULL for a vanilla item
 void* Fishmod_ItemIcon(s32 item);
 // The item whose name the pause menu shows for `item`
