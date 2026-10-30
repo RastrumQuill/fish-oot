@@ -54,10 +54,18 @@ hashes before and after); stages that fix bugs or change behaviour say so and ar
    bottle outside a fishing scene, the horse.
 4. **Save.** Fixed offset (scene 110), a version byte, size asserts, records keyed by stable species ids; one SRAM map
    (C header, mirrored for the Python tools); debug records moved off the save files.
-5. **Scenes as data.** A scene record: rod allowed, spawns per water state (the drained lake), fishable water boxes,
-   attention distances, hooks for scene quirks (the Lake Hylia gossip-stone cull, the dock, bed shading, collision
-   grid size). Water lookups take (x, y, z) and the box; a fishing scene must have a baked map. Tools read the same
-   scene configs.
+5. **Water, not scenes.** Few special cases: the game treats every body of water the same.
+   - **The rod works everywhere.** Its controller comes with the rod when Link takes it out, in any scene; casting
+     needs water where the bobber lands, not a "fishing scene". Water without fish just never bites.
+   - **Fish** come from per-scene spawn tables (data); a scene without one has none. Region-specific work is only
+     optimization: a water body's fish activate when its room loads (small spots like the Lost Woods shortcut to
+     Zora's Domain), not code per scene.
+   - **Plants, props and bed shading** are generated for every body of water by the same tools; Kokiri gets them too
+     once the performance budget allows (that's a profile setting, stage 6, not a scene exception).
+   - **What's left becomes generated data, not `if (scene == ...)`:** the collision memory and grid for scenes
+     with added rock collision (from the collision generator's output), the beehive's place (a position in the
+     data instead of a wall search), longer draw ranges for props seen across water (Lake Hylia's gossip stones).
+   - Water lookups take (x, y, z) and the box; any scene with fish must have a baked water map (the build checks).
 6. **Profiles.** A hardware/emulator profile as one object: placement, thinning (hardware only), plant models, draw
    distances, budgets, F3DEX3; one generated header for C; every tool takes it; both built and checked.
 7. **Fish.** Per-state AI functions; a narrow fish/rod interface (events and a line pull); time in seconds
@@ -79,7 +87,7 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
 - **3: done.** No L swap (the rod is a C item; a B left holding the rod by an old build is given back the sword
   outside the pond). The rod publishes its state every frame and resets it when destroyed and on scene load; bait is
   taken only with the rod in hand, from the bottle on the pressed button; the fight music stops whenever the line
-  comes in without a catch. Test: `rodexit` (with `--testmode`).
+  comes in without a catch. Test: `rodexit` (with `--testmode`). L is the minimap's again in every scene.
 - **4: done.** The save block at scene 110 whatever the build, with a mark ('FM') and a version byte; a block without
   the mark is moved once from scene 101 (where every build so far kept it) on load. Size and place checked at compile
   time. Species have permanent save numbers (`saveId` in `species.json`; the generator refuses gaps and duplicates).
@@ -93,5 +101,8 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
 - **The rod is a C item only.** L no longer puts it on B; L is free for the debug gate (test builds only), and the
   D-pad can become extra C buttons later. (This also removes the B-button stash bugs at their root.)
 - **The save block moves to scene 110**, and a save from the old builds has its block moved there once on load.
+- **Few special cases** (stage 5): the rod works in every scene, every body of water gets plants and props alike
+  (Kokiri too, once performance allows); per-region code is only for optimizations such as activating a water
+  body's fish when its room loads.
 - **Dropped:** the stop and roam benches, and the 4-bit prop texture toggle. Kept: the play bench, the area bench, the
   play log.
