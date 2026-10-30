@@ -497,6 +497,7 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
             return;
         }
         thisx->objectSlot = slot;
+        Actor_SetObjectDependency(play, thisx); // segment 6 is object_fish from here on (Init runs with the profile's)
     }
 
     if (this->type == FISHMOD_TYPE_MANAGER) {
