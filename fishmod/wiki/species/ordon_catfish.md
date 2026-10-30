@@ -2,9 +2,6 @@
 
 *Rare · from Twilight Princess · In game*
 
-<img src="../img/ordon_catfish.jpg" width="49%"> <img src="../img/ordon_catfish_34.jpg" width="49%">
-
-*In-game renders at a typical size (16 in), captured in ares.*
 
 > A whiskered bottom-feeder first described by the villagers of Ordon. It lurks in the deepest, muddiest part of a pond and pulls like a stubborn goat once hooked.
 

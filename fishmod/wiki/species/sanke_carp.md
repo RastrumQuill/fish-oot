@@ -2,9 +2,6 @@
 
 *Very rare · from Breath of the Wild · In game*
 
-<img src="../img/sanke_carp.jpg" width="49%"> <img src="../img/sanke_carp_34.jpg" width="49%">
-
-*In-game renders at a typical size (15 in), captured in ares.*
 
 > An ornamental carp with red and white markings, kept in sacred waters since ancient times. The Kokiri say they swim in the forest for luck.
 

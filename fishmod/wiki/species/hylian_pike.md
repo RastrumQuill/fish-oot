@@ -2,7 +2,7 @@
 
 *Rare · from Twilight Princess · Planned (not in the game yet)*
 
-*(render pending: this fish is not in the game yet)*
+*(not in the game yet)*
 
 > A lean ambush hunter of open water, famous as the star of jumping fish. It hits fast and spends half the fight in the air.
 

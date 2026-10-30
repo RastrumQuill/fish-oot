@@ -2,7 +2,6 @@
 
 *Common · from Ocarina of Time (the fish you can catch in a bottle) · In game*
 
-*(render pending: this fish is not in the game yet)*
 
 > The little fish that darts around Hyrule's shallows, the same kind that ends up in so many bottles. Quick, curious and always hungry. Bigger fish think it makes a fine meal.
 

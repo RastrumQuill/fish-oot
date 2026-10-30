@@ -2,7 +2,7 @@
 
 *Legendary · from Ocarina of Time (Lord Jabu-Jabu) · Planned (not in the game yet)*
 
-*(render pending: this fish is not in the game yet)*
+*(not in the game yet)*
 
 > A tiny relative of Lord Jabu-Jabu, the Zoras' guardian deity. The Zoras consider it very lucky, and it is said to love eating fish.
 

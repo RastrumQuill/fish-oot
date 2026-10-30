@@ -2,9 +2,6 @@
 
 *Common · from Twilight Princess · In game*
 
-<img src="../img/greengill.jpg" width="49%"> <img src="../img/greengill_34.jpg" width="49%">
-
-*In-game renders at a typical size (7 in), captured in ares.*
 
 > A small, bright fish found in almost every pond and creek in Hyrule. It nibbles at anything that drifts by, which makes it the first catch of many young anglers.
 

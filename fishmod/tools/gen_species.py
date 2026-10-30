@@ -165,22 +165,14 @@ def bar(v):
 def gen_species_page(sp, data):
     length, weights = fmt_range(sp)
     b = sp["behavior"]
-    img = f"../img/{sp['id'].lower()}.jpg"
-    img34 = f"../img/{sp['id'].lower()}_34.jpg"
-    have_img = os.path.exists(os.path.join(WIKI, "img", sp["id"].lower() + ".jpg"))
-    have_img34 = os.path.exists(os.path.join(WIKI, "img", sp["id"].lower() + "_34.jpg"))
     lines = [f"# {sp['name']}", ""]
     status = "In game" if sp["status"] == "in-game" else "Planned (not in the game yet)"
     lines.append(f"*{RARITY_NAMES[sp['rarity']]} · from {sp['origin']} · {status}*")
     lines.append("")
-    if have_img and have_img34:
-        lines.append(f'<img src="{img}" width="49%"> <img src="{img34}" width="49%">')
-        lines.append("")
-        lines.append(f"*In-game renders at a typical size ({sp['length']['typical']} in), captured in ares.*")
-    elif have_img:
-        lines.append(f"![{sp['name']}]({img})")
-    else:
-        lines.append("*(render pending: this fish is not in the game yet)*")
+    # (renders show the game's own models, so they aren't committed: fishmod/tools/photo_capture.py makes them locally,
+    # into fishmod/wiki/img/)
+    if sp["status"] != "in-game":
+        lines.append("*(not in the game yet)*")
     lines.append("")
     lines.append(f"> {sp['flavor']}")
     lines.append("")
@@ -238,21 +230,13 @@ def gen_index(data):
     lines.append("")
     lines.append("## Fish")
     lines.append("")
-    if os.path.exists(os.path.join(WIKI, "img", "lineup.jpg")):
-        lines.append('<img src="img/lineup.jpg" width="60%">')
-        lines.append("")
-        lines.append("*Kokiri Forest fish at typical size, to scale. Top to bottom: Hyrule Minnow, Greengill, "
-                     "Hylian Loach, Hyrule Bass, Sanke Carp, Ordon Catfish.*")
-        lines.append("")
-    lines.append("| | Fish | Rarity | Length | Where | Status |")
-    lines.append("|---|---|---|---|---|---|")
+    lines.append("| Fish | Rarity | Length | Where | Status |")
+    lines.append("|---|---|---|---|---|")
     for sp in data["species"]:
-        img = os.path.join(WIKI, "img", sp["id"].lower() + ".jpg")
-        thumb = f"<img src=\"img/{sp['id'].lower()}.jpg\" width=\"120\">" if os.path.exists(img) else ""
         where = ", ".join(data["scenes"][s]["name"] for s in sp["scenes"])
         status = "in game" if sp["status"] == "in-game" else "planned"
         lines.append(
-            f"| {thumb} | [{sp['name']}](species/{sp['id'].lower()}.md) | {RARITY_NAMES[sp['rarity']]} | "
+            f"| [{sp['name']}](species/{sp['id'].lower()}.md) | {RARITY_NAMES[sp['rarity']]} | "
             f"{sp['length']['min']}–{sp['length']['max']} in | {where} | {status} |"
         )
     lines.append("")

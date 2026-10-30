@@ -13,8 +13,6 @@ emulators like [ares](https://ares-emu.net/).
 > **Status:** early. Kokiri Forest only for now; the fishing loop is being tuned there before any other area
 > gets fish. Longer-term goals are in the [roadmap](fishmod/docs/roadmap.md).
 
-<img src="fishmod/wiki/img/lineup.jpg" width="420">
-
 ## Playing
 
 1. Get the newest patch from the [releases page](https://github.com/RastrumQuill/fish-oot/releases) (or build it, below).

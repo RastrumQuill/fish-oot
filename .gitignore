@@ -42,3 +42,9 @@ fishmod/pc/results/
 fishmod/pc/ares/
 /fishmod/pc/ares_tmp
 fishmod/pc/rom_path.txt
+# made from the game's own art or levels (renders of its models, maps drawn from its collision, art beside vanilla's):
+# made locally by the tools, never committed
+fishmod/wiki/img/
+fishmod/docs/style-sheet-habitat.png
+fishmod/docs/lake-hylia-props-map.png
+fishmod/docs/lake-hylia-zones-draft.png
