@@ -112,6 +112,13 @@ Each run plays the same input, so runs compare: the fish-oot builds already driv
 other decomps would each need a small input-replay hook until the ESP32 controller can replay the same input file
 into any game unmodified. The results stream to the VM over the SC64's USB debug link (or, short runs, the save).
 
+**Hybrid, where the console can't see:** the console's numbers are the truth, but it can't say *why* time was
+lost (which accesses missed which cache). ares emulates the VR4300's caches, so it can count misses per instruction.
+Run the same build and input on both, compare the per-step times (the `FISHMOD_SECT` timers already do this on both),
+and use ares's miss counts only where its timing agrees with the console's; where they disagree, the console wins and
+the gap is itself worth knowing (ares's model is missing something there). The goal is the best result; the rig is
+there to make the best convenient, not to settle for what's easy.
+
 What the VM needs for this beyond the plan above: resetting the console between runs without a person (the open
 question below), and the converter from PC samples to LLVM's profile format.
 
