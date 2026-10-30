@@ -924,8 +924,7 @@ void func_80083108(PlayState* play) {
 
                 if (interfaceCtx->restrictions.bottles != 0) {
                     for (i = 1; i < 4; i++) {
-                        if ((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_BOTTLE_EMPTY) &&
-                            (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_BOTTLE_POE)) {
+                        if (Fishmod_IsBottleItem(gSaveContext.save.info.equips.buttonItems[i])) {
                             if (gSaveContext.buttonStatus[i] == BTN_ENABLED) {
                                 sp28 = true;
                             }
@@ -935,8 +934,7 @@ void func_80083108(PlayState* play) {
                     }
                 } else if (interfaceCtx->restrictions.bottles == 0) {
                     for (i = 1; i < 4; i++) {
-                        if ((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_BOTTLE_EMPTY) &&
-                            (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_BOTTLE_POE)) {
+                        if (Fishmod_IsBottleItem(gSaveContext.save.info.equips.buttonItems[i])) {
                             if (gSaveContext.buttonStatus[i] == BTN_DISABLED) {
                                 sp28 = true;
                             }
@@ -1069,8 +1067,7 @@ void func_80083108(PlayState* play) {
                     for (i = 1; i < 4; i++) {
                         if ((gSaveContext.save.info.equips.buttonItems[i] != ITEM_OCARINA_FAIRY) &&
                             (gSaveContext.save.info.equips.buttonItems[i] != ITEM_OCARINA_OF_TIME) &&
-                            !((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_BOTTLE_EMPTY) &&
-                              (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_BOTTLE_POE)) &&
+                            !(Fishmod_IsBottleItem(gSaveContext.save.info.equips.buttonItems[i])) &&
                             !((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_WEIRD_EGG) &&
                               (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                             if ((play->sceneId != SCENE_TREASURE_BOX_SHOP) ||
@@ -1098,8 +1095,7 @@ void func_80083108(PlayState* play) {
                             (gSaveContext.save.info.equips.buttonItems[i] != ITEM_NAYRUS_LOVE) &&
                             (gSaveContext.save.info.equips.buttonItems[i] != ITEM_OCARINA_FAIRY) &&
                             (gSaveContext.save.info.equips.buttonItems[i] != ITEM_OCARINA_OF_TIME) &&
-                            !((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_BOTTLE_EMPTY) &&
-                              (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_BOTTLE_POE)) &&
+                            !(Fishmod_IsBottleItem(gSaveContext.save.info.equips.buttonItems[i])) &&
                             !((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_WEIRD_EGG) &&
                               (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                             if (gSaveContext.buttonStatus[i] == BTN_DISABLED) {
@@ -1259,8 +1255,7 @@ void Inventory_SwapAgeEquipment(void) {
                         gSaveContext.save.info.playerData.adultEquips.cButtonSlots[i - 1];
                 }
 
-                if (((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_BOTTLE_EMPTY) &&
-                     (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_BOTTLE_POE)) ||
+                if ((Fishmod_IsBottleItem(gSaveContext.save.info.equips.buttonItems[i])) ||
                     ((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_WEIRD_EGG) &&
                      (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                     PRINTF("Register_Item_Pt(%d)=%d\n", i, gSaveContext.save.info.equips.cButtonSlots[i - 1]);
@@ -1293,8 +1288,7 @@ void Inventory_SwapAgeEquipment(void) {
                         gSaveContext.save.info.playerData.childEquips.cButtonSlots[i - 1];
                 }
 
-                if (((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_BOTTLE_EMPTY) &&
-                     (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_BOTTLE_POE)) ||
+                if ((Fishmod_IsBottleItem(gSaveContext.save.info.equips.buttonItems[i])) ||
                     ((gSaveContext.save.info.equips.buttonItems[i] >= ITEM_WEIRD_EGG) &&
                      (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                     PRINTF("Register_Item_Pt(%d)=%d\n", i, gSaveContext.save.info.equips.cButtonSlots[i - 1]);

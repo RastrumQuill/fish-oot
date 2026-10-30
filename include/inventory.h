@@ -20,6 +20,6 @@ extern u16 gUpgradeCapacities[UPG_MAX][4];
 extern u32 gGsFlagsMasks[4];
 extern u32 gGsFlagsShifts[4];
 extern void* gItemIcons[0x82];
-extern u8 gItemSlots[56];
+extern u8 gItemSlots[0x81]; // fishmod: up to ITEM_INVALID_6 (the mod's items: fishmod_items.c)
 
 #endif

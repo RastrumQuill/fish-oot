@@ -310,26 +310,6 @@ const char* Fishmod_BaitName(s32 bait) {
     return ((bait >= 0) && (bait < FISHMOD_BAIT_MAX)) ? sBaitNames[bait] : "?";
 }
 
-#include "fishmod_bait_icons.inc.c"
-
-void* Fishmod_ItemIcon(s32 item) {
-    switch (item) {
-        case ITEM_BOTTLE_LARVA_3:
-            return gFishmodBottleLarva3Tex;
-        case ITEM_BOTTLE_LARVA_2:
-            return gFishmodBottleLarva2Tex;
-        case ITEM_BOTTLE_LARVA_1:
-            return gFishmodBottleLarva1Tex;
-        default:
-            return NULL;
-    }
-}
-
-s32 Fishmod_ItemNameIndex(s32 item) {
-    // until they have name graphics of their own, bait bottles go by the bottle's name
-    return FISHMOD_IS_BAIT_ITEM(item) ? ITEM_BOTTLE_EMPTY : item;
-}
-
 /**
  * A bottle of bait (or bugs) used from a button while Link holds the rod, before casting: one goes on the hook
  * and the bottle has one less. Anything else about these bottles does nothing for now (there's no pouring
@@ -874,63 +854,6 @@ s32 Fishmod_CanUseRod(PlayState* play) {
 #include "zelda_arena.h"
 #include "tha.h"
 #include "fishmod_collision.h"
-
-/* The item page's own graphics (fishmod/tools/gen_item_page.py, include/fishmod_item_page.h) */
-
-#include "fishmod_item_page.h"
-#include "stddef.h"
-
-DECLARE_ROM_SEGMENT(fishmod_item_page)
-
-FishmodItemPage* gFishmodItemPageData;
-
-u32 Fishmod_ItemPageSize(void) {
-    return offsetof(FishmodItemPage, names); // (the names stay in ROM)
-}
-
-/**
- * Loads the page's graphics at `dst`, after the pause menu's own in the scene's object space. That space is nearly
- * full already (adult Link outside a dungeon leaves about 41 KB past the Link preview's coverage; these take 35 KB),
- * so if they wouldn't fit, the page stays vanilla.
- */
-void Fishmod_LoadItemPage(PlayState* play, void* dst) {
-    if ((uintptr_t)dst + Fishmod_ItemPageSize() > (uintptr_t)play->objectCtx.spaceEnd) {
-        gFishmodItemPageData = NULL;
-        return;
-    }
-    gFishmodItemPageData = dst;
-    DMA_REQUEST_SYNC(dst, (uintptr_t)_fishmod_item_pageSegmentRomStart, Fishmod_ItemPageSize(), "fishmod.c", __LINE__);
-}
-
-/** An item's icon while paused: the lures' come from the item page's graphics (when they're loaded). */
-void* Fishmod_PauseItemIcon(s32 item) {
-    if (FISHMOD_IS_LURE_ITEM(item) && (gFishmodItemPageData != NULL)) {
-        return gFishmodItemPageData->lureIcons[item - ITEM_LURE_CRANKBAIT];
-    }
-    return gItemIcons[item];
-}
-
-uintptr_t Fishmod_ItemIconVrom(s32 item) {
-    if (FISHMOD_IS_LURE_ITEM(item)) {
-        return (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, lureIcons) +
-               (item - ITEM_LURE_CRANKBAIT) * sizeof(gFishmodItemPageData->lureIcons[0]);
-    }
-    return 0;
-}
-
-uintptr_t Fishmod_ItemNameVrom(s32 item) {
-    s32 index;
-
-    if (item == ITEM_FISHING_POLE) {
-        index = 0;
-    } else if (FISHMOD_IS_LURE_ITEM(item)) {
-        index = 1 + item - ITEM_LURE_CRANKBAIT;
-    } else {
-        return 0;
-    }
-    return (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, names) +
-           index * sizeof(gFishmodItemPageData->names[0]);
-}
 
 /** The save block's new parts: the item page's six new slots start empty (a new file, or one from before). */
 void Fishmod_InitSaveExtras(void) {

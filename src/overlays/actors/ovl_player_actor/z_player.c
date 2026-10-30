@@ -2392,6 +2392,8 @@ s8 Player_ItemToItemAction(s32 item) {
         return PLAYER_IA_SWORD_CS;
     } else if (item == ITEM_FISHING_POLE) {
         return PLAYER_IA_FISHING_POLE;
+    } else if (item >= ITEM_INVALID_1) {
+        return Fishmod_ItemAction(item); // fishmod: its items (past the end of sItemActions)
     } else {
         return sItemActions[item];
     }

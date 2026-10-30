@@ -14,9 +14,6 @@ extern s16 gVtxPageMapWorldQuadsHeight[];
 extern char gSlotAgeReqs[];
 extern char gEquipAgeReqs[EQUIP_TYPE_MAX][4];
 extern char gItemAgeReqs[];
-// fishmod: the item grid's places and slots (z_kaleido_item.c)
-extern u8 gFishmodItemGridSlot[];
-extern u8 gFishmodItemSlotGrid[];
 extern u8 gAreaGsFlags[];
 
 #define AGE_REQ_ADULT LINK_AGE_ADULT
