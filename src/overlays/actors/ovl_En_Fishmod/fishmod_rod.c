@@ -331,14 +331,44 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     EnFishmod_ManagerEnsure(play);
 }
 
-void EnFishmod_RodDestroy(EnFishmod* this, PlayState* play) {
-    Rod_CameraStop(play);
-    EnFishmod_WaterGridRelease(play);
-}
-
 /** The area's music comes back after the fish-on music (it only restores if the fish-on music is playing). */
 static void Rod_StopFightMusic(void) {
     func_800F5B58();
+}
+
+/** The line comes in without a catch (the rod put away, Link hurt, the rod gone): the fish swims off. */
+static void Rod_DropLine(PlayState* play) {
+    if (ROD->state == ROD_STATE_FIGHT) {
+        Rod_StopFightMusic();
+    }
+    if (ROD->fish != NULL) {
+        EnFishmod_FishSetState(ROD->fish, FISH_STATE_FLEE);
+    }
+    ROD->fish = NULL;
+    ROD->biting = false;
+    ROD->tension = 0.0f;
+    Rod_CameraStop(play);
+}
+
+void EnFishmod_RodDestroy(EnFishmod* this, PlayState* play) {
+    if (ROD->state >= ROD_STATE_FLYING) {
+        Rod_DropLine(play);
+    } else {
+        Rod_CameraStop(play);
+    }
+    Fishmod_ResetRodInfo();
+    EnFishmod_WaterGridRelease(play);
+}
+
+/** What the rest of the game sees of the rod (gFishmodRodInfo), every frame whatever the rod is doing. */
+static void Rod_PublishInfo(void) {
+    gFishmodRodInfo.state = ROD->state;
+    gFishmodRodInfo.biting = ROD->biting;
+    gFishmodRodInfo.nibbling = (ROD->fish != NULL) && (ROD->fish->fishState == FISH_STATE_NIBBLE);
+    gFishmodRodInfo.tension = ROD->tension;
+    gFishmodRodInfo.castPower = ROD->castPower;
+    gFishmodRodInfo.choice = ROD->choice;
+    gFishmodRodInfo.bait = ROD->bait;
 }
 
 static void Rod_EndCast(PlayState* play, Player* player) {
@@ -700,14 +730,14 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
     // stop everything if the rod was put away (or Link got hit, entered water...)
     if (!holding || (player->stateFlags1 & (PLAYER_STATE1_27 | PLAYER_STATE1_DEAD))) {
         if (ROD->state >= ROD_STATE_FLYING) {
-            if (ROD->fish != NULL) {
-                EnFishmod_FishSetState(ROD->fish, FISH_STATE_FLEE);
-            }
-            ROD->fish = NULL;
-            ROD->biting = false;
-            Rod_CameraStop(play);
+            Rod_DropLine(play);
         }
         ROD->state = holding ? ROD_STATE_HELD : ROD_STATE_NONE;
+        if (!holding) {
+            // put away: the bait stays on the hook, but a bottle's request for it is dropped
+            gFishmodRodInfo.baitRequest = FISHMOD_BAIT_NONE;
+        }
+        Rod_PublishInfo();
         return;
     }
 
@@ -1006,13 +1036,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         Rod_UpdateLineFloor(play);
     }
 
-    gFishmodRodInfo.state = ROD->state;
-    gFishmodRodInfo.biting = ROD->biting;
-    gFishmodRodInfo.nibbling = (ROD->fish != NULL) && (ROD->fish->fishState == FISH_STATE_NIBBLE);
-    gFishmodRodInfo.tension = ROD->tension;
-    gFishmodRodInfo.castPower = ROD->castPower;
-    gFishmodRodInfo.choice = ROD->choice;
-    gFishmodRodInfo.bait = ROD->bait;
+    Rod_PublishInfo();
 
 #if FISHMOD_DEBUG
     {

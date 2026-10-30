@@ -72,6 +72,15 @@ hashes before and after); stages that fix bugs or change behaviour say so and ar
 
 Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets), then 5-8, each in its own commits.
 
+## Progress
+
+- **1, 1b: done.** Fingerprints match the base in all three scenarios (bait, lakecast, invtest).
+- **2: done.** `src/code/fishmod_items.c`; fingerprints match 1b.
+- **3: done.** No L swap (the rod is a C item; a B left holding the rod by an old build is given back the sword
+  outside the pond). The rod publishes its state every frame and resets it when destroyed and on scene load; bait is
+  taken only with the rod in hand, from the bottle on the pressed button; the fight music stops whenever the line
+  comes in without a catch. Test: `rodexit` (with `--testmode`).
+
 ## Decisions (made)
 
 - **The rod is a C item only.** L no longer puts it on B; L is free for the debug gate (test builds only), and the

@@ -47,10 +47,6 @@ Actor* gFishmodRod = NULL;
 static u8 sRainSoundPending; // start the rain's sound once the scene's music has started (see the weather)
 Vec3f gFishmodHivePos; // where the scene's added beehive went (debug display)
 
-// The rod rides on B while fishing (like in the Fishing Pond); L puts it there and back.
-static u8 sRodOnB = false;
-static u8 sSavedBItem = ITEM_NONE;
-
 #if FISHMOD_TESTMODE
 static void Fishmod_TestSetAge(s32 adult);
 static s8 sTestPendingAge = -1; // the age the next scene loads with (set by the test warps)
@@ -79,21 +75,6 @@ static u8 Fishmod_SwordBItem(void) {
     }
 }
 
-static void Fishmod_RestoreB(PlayState* play) {
-    if (gSaveContext.save.info.equips.buttonItems[0] == ITEM_FISHING_POLE) {
-        u8 item = sSavedBItem;
-
-        if ((item == ITEM_NONE) || (item == ITEM_FISHING_POLE)) {
-            // lost track (e.g. after a reset): give back the equipped sword
-            item = Fishmod_SwordBItem();
-        }
-        gSaveContext.save.info.equips.buttonItems[0] = item;
-        if (play != NULL && item != ITEM_NONE) {
-            Interface_LoadItemIcon1(play, 0);
-        }
-    }
-    sRodOnB = false;
-}
 FishmodPhoto gFishmodPhoto;
 FishmodStudio gFishmodStudio;
 FishmodRodInfo gFishmodRodInfo;
@@ -153,11 +134,7 @@ void Fishmod_RosterSetCaught(s16 sceneId, s32 day, s32 index) {
 
 void Fishmod_OnSceneLoad(PlayState* play) {
     gFishmodRod = NULL;
-
-    // never carry the rod-on-B swap into another scene
-    if (play->sceneId != SCENE_FISHING_POND) {
-        Fishmod_RestoreB(NULL);
-    }
+    Fishmod_ResetRodInfo();
 
     if ((Fishmod_GetSceneSpawns(play->sceneId) == NULL)
 #if FISHMOD_DEBUG
@@ -231,8 +208,10 @@ void Fishmod_PlayUpdate(PlayState* play) {
         Environment_PlayStormNatureAmbience(play);
     }
 
-    // Repair files saved with the old rod bug that left a Deku Stick on B (vanilla never puts it there)
-    if (gSaveContext.save.info.equips.buttonItems[0] == ITEM_DEKU_STICK) {
+    // Repair files saved by old builds: one bug left a Deku Stick on B (vanilla never puts it there), and L used to
+    // put the rod on B (only the Fishing Pond's rental does that now, and vanilla gives the sword back after it)
+    if ((gSaveContext.save.info.equips.buttonItems[0] == ITEM_DEKU_STICK) ||
+        ((gSaveContext.save.info.equips.buttonItems[0] == ITEM_FISHING_POLE) && (play->sceneId != SCENE_FISHING_POND))) {
         gSaveContext.save.info.equips.buttonItems[0] = Fishmod_SwordBItem();
         if (gSaveContext.save.info.equips.buttonItems[0] != ITEM_NONE) {
             Interface_LoadItemIcon1(play, 0);
@@ -265,24 +244,6 @@ void Fishmod_PlayUpdate(PlayState* play) {
     }
 #endif
 
-    // L: rod on B / back to the sword
-    if ((Fishmod_GetSceneSpawns(play->sceneId) != NULL) && (gFishmodRod != NULL) &&
-        CHECK_BTN_ALL(play->state.input[0].press.button, BTN_L) && (play->pauseCtx.state == 0) &&
-        (Message_GetState(&play->msgCtx) == TEXT_STATE_NONE) && !Play_InCsMode(play)) {
-        if (!sRodOnB) {
-            if (gSaveContext.save.info.equips.buttonItems[0] != ITEM_FISHING_POLE) {
-                sSavedBItem = gSaveContext.save.info.equips.buttonItems[0];
-                gSaveContext.save.info.equips.buttonItems[0] = ITEM_FISHING_POLE;
-                Interface_LoadItemIcon1(play, 0);
-            }
-            sRodOnB = true;
-            Sfx_PlaySfxCentered(NA_SE_SY_CAMERA_ZOOM_UP);
-        } else {
-            Fishmod_RestoreB(play);
-            Sfx_PlaySfxCentered(NA_SE_SY_CAMERA_ZOOM_DOWN);
-        }
-    }
-
     if ((gFishmodRod != NULL) || (Fishmod_GetSceneSpawns(play->sceneId) == NULL) || (GET_PLAYER(play) == NULL)) {
         return;
     }
@@ -310,12 +271,32 @@ const char* Fishmod_BaitName(s32 bait) {
     return ((bait >= 0) && (bait < FISHMOD_BAIT_MAX)) ? sBaitNames[bait] : "?";
 }
 
+/** Forget the rod's state (a new scene, or the rod gone): nothing held, nothing on the hook. */
+void Fishmod_ResetRodInfo(void) {
+    gFishmodRodInfo.state = 0;
+    gFishmodRodInfo.biting = false;
+    gFishmodRodInfo.nibbling = false;
+    gFishmodRodInfo.tension = 0.0f;
+    gFishmodRodInfo.castPower = 0.0f;
+    gFishmodRodInfo.choice = 0;
+    gFishmodRodInfo.notice = NULL;
+    gFishmodRodInfo.bait = FISHMOD_BAIT_NONE;
+    gFishmodRodInfo.baitRequest = FISHMOD_BAIT_NONE;
+}
+
+/** Link has the rod out in a fishing scene (its actor is there and he's holding it). */
+static s32 Fishmod_RodHeld(PlayState* play) {
+    Player* player = GET_PLAYER(play);
+
+    return (gFishmodRod != NULL) && (player != NULL) && (player->heldItemAction == PLAYER_IA_FISHING_POLE);
+}
+
 /**
  * A bottle of bait (or bugs) used from a button while Link holds the rod, before casting: one goes on the hook
- * and the bottle has one less. Anything else about these bottles does nothing for now (there's no pouring
- * larvae out). Returns true if it handled the item.
+ * and the bottle that was pressed has one less. Anything else about these bottles does nothing for now (there's no
+ * pouring larvae out). Returns true if it handled the item.
  */
-s32 Fishmod_UseItem(PlayState* play, s32 item) {
+s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
     static u8 sNextLarva[] = { ITEM_BOTTLE_LARVA_2, ITEM_BOTTLE_LARVA_1, ITEM_BOTTLE_EMPTY };
     s32 bait;
     s32 next;
@@ -328,20 +309,24 @@ s32 Fishmod_UseItem(PlayState* play, s32 item) {
     if (FISHMOD_IS_BAIT_ITEM(item)) {
         bait = FISHMOD_BAIT_BEE_LARVA;
         next = sNextLarva[item - ITEM_BOTTLE_LARVA_3];
-    } else if ((item == ITEM_BOTTLE_BUG) && (gFishmodRodInfo.state != 0)) {
+    } else if ((item == ITEM_BOTTLE_BUG) && Fishmod_RodHeld(play)) {
         bait = FISHMOD_BAIT_BUG;
         next = ITEM_BOTTLE_EMPTY;
     } else {
         return false;
     }
     // only onto a bare hook, with the rod held and not cast
-    if ((gFishmodRodInfo.state != 1) || (gFishmodRodInfo.bait != FISHMOD_BAIT_NONE) ||
+    if (!Fishmod_RodHeld(play) || (gFishmodRodInfo.state != 1) || (gFishmodRodInfo.bait != FISHMOD_BAIT_NONE) ||
         (gFishmodRodInfo.baitRequest != FISHMOD_BAIT_NONE)) {
         Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
         return true;
     }
     gFishmodRodInfo.baitRequest = bait;
-    Inventory_ReplaceItem(play, item, next);
+    if ((button >= 1) && (button <= 3)) {
+        Inventory_UpdateBottleItem(play, next, button); // the bottle on the button that was pressed
+    } else {
+        Inventory_ReplaceItem(play, item, next);
+    }
     Sfx_PlaySfxCentered(NA_SE_PL_PUT_OUT_ITEM);
     return true;
 }
@@ -715,12 +700,7 @@ static void Fishmod_TestSetAge(s32 adult) {
         Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_KOKIRI);
         sword = ITEM_SWORD_KOKIRI;
     }
-    // (with the rod on B, the sword waits where the rod keeps it)
-    if (sRodOnB) {
-        sSavedBItem = sword;
-    } else {
-        gSaveContext.save.info.equips.buttonItems[0] = sword;
-    }
+    gSaveContext.save.info.equips.buttonItems[0] = sword;
 }
 
 void Fishmod_InitTestSave(void) {
