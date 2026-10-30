@@ -104,7 +104,8 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
   `fishmod_collision_scenes.h` (BgCheck applies them for any scene listed); the gossip stones' longer draw range in
   their own Init (every scene); the bed shading says which scene and which water level it was made for, and the dry
   check follows the scene's water levels (a lake refilling) instead of Lake Hylia's flag; beehive spots are a table;
-  the dropped per-zone draw distances removed (game and tool).
+  the dropped per-zone draw distances removed (game and tool). Fingerprints match stage 4 in all three scenarios (with the fix for
+  the fish's Init: the actor now asks for gameplay_keep, so a fish points segment 6 at object_fish itself).
 
 ## Decisions (made)
 
