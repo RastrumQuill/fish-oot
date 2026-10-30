@@ -118,6 +118,18 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
 - **8, ROM-derived art at build: done.** The species' textures and the bait bottles' icons are generated into
   `src/fishmod_data/` by the build (`gen_textures.py`, `gen_bait_icons.py`) and no longer committed; the ROM is
   byte-identical.
+- **8, test controls behind L: done.** Test mode's warps and RDP readout need L held (the D-pad stays the game's);
+  `testwarp` checks them.
+- **Parity with the build before the refactor (b17be94), checked.** Ten scripts built at both: journal, hive chunk,
+  lake, new file, load file and pause give the same state fingerprints; angler, release, rain and schools (scripts
+  that never start the fingerprints) look the same in screenshots (the same casts, bites and catches; the released
+  carp's size and looks). Navi's C-Up call shows up in either build, at whatever moment her timer comes round. The
+  emulator and console test builds both build and patch. Since then only the fish's own random numbers change their
+  choices (stage 7); runs still replay exactly.
+
+**Left (for later, after the performance and build 5 work):** `fishmod_debug.c` split by job, scripts as data, one
+capture/ares harness module, the habitat tools as a package, debug state (`gFishmodPhoto`) out of release code, and
+one set of notes (stage 9).
 
 ## Decisions (made)
 
