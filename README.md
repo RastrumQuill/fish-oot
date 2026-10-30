@@ -28,8 +28,9 @@ emulators like [ares](https://ares-emu.net/).
 
 | | |
 |---|---|
-| **L** (in Kokiri Forest) | Put the fishing rod on B / back to your sword |
-| **B** (hold, release) | Take out the rod; hold to charge a cast, release to throw. The stick aims |
+| **The rod's C button** | Take out the rod (put it on a C button from the item page) |
+| **The rod's C button** (hold, release) | Hold to charge a cast, release to throw. The stick aims |
+| **A bait bottle's C button** (rod out, not cast) | Put bait on the hook |
 | **A** (while the bobber flies) | Brake the line for a shorter cast |
 | **Stick flick** | Twitch the bobber to draw fish in |
 | **B** | Set the hook when the bobber is pulled under (not on the little nibbles!) |

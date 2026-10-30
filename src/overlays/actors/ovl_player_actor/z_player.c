@@ -3538,7 +3538,7 @@ void Player_UseItem(PlayState* play, Player* this, s32 item) {
     s32 nextAnimType;
 
     // fishmod: a bait bottle (or bugs) used while holding the rod baits the hook
-    if (Fishmod_UseItem(play, item)) {
+    if (Fishmod_UseItem(play, item, this->heldItemButton)) {
         return;
     }
 

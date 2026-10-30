@@ -312,7 +312,8 @@ extern u64 gFishmodBottleLarva2Tex[];
 extern u64 gFishmodBottleLarva1Tex[];
 const char* Fishmod_BaitName(s32 bait);
 // Player is about to use `item` from a button: returns true if fishmod used it (baiting the hook)
-s32 Fishmod_UseItem(struct PlayState* play, s32 item);
+s32 Fishmod_UseItem(struct PlayState* play, s32 item, s32 button);
+void Fishmod_ResetRodInfo(void);
 // The icon texture (in RAM) for fishmod's items, or NULL for a vanilla item
 void* Fishmod_ItemIcon(s32 item);
 // The item whose name the pause menu shows for `item`
