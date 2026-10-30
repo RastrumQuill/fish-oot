@@ -3256,10 +3256,62 @@ static void Watchdog_Start(void);
 static volatile u32 sWatchdogBeat;
 #endif
 
+#ifdef FISHMOD_SCRIPT
+/*
+ * State fingerprints for refactoring: every 200 frames after the script starts, a hash of every actor (id, params,
+ * position, rotation) to SRAM 0x7A00 ('FHSH', count, 14 hashes). A script run is deterministic in ares (fixed seed,
+ * scripted input), so two builds that should behave the same must write the same hashes
+ * (fishmod/tools/state_hash.py compares them).
+ */
+typedef struct FishmodStateHashes {
+    u32 magic;
+    u32 count;
+    u32 hash[14];
+} FishmodStateHashes;
+
+static void StateHash_Update(PlayState* play) {
+    static FishmodStateHashes sHashes;
+    static s32 sFrames;
+    u32 h = 2166136261u;
+    s32 cat;
+
+    if (!sScriptActive || (sHashes.count >= ARRAY_COUNT(sHashes.hash))) {
+        return;
+    }
+    if ((++sFrames % 200) != 0) {
+        return;
+    }
+    for (cat = 0; cat < ACTORCAT_MAX; cat++) {
+        Actor* actor;
+
+        for (actor = play->actorCtx.actorLists[cat].head; actor != NULL; actor = actor->next) {
+            u32 w[6];
+            s32 k;
+
+            w[0] = ((u32)actor->id << 16) | (u16)actor->params;
+            bcopy(&actor->world.pos.x, &w[1], sizeof(f32));
+            bcopy(&actor->world.pos.y, &w[2], sizeof(f32));
+            bcopy(&actor->world.pos.z, &w[3], sizeof(f32));
+            w[4] = ((u32)(u16)actor->shape.rot.x << 16) | (u16)actor->shape.rot.y;
+            w[5] = (u32)(u16)actor->shape.rot.z;
+            for (k = 0; k < 6; k++) {
+                h = (h ^ w[k]) * 16777619u;
+            }
+        }
+    }
+    sHashes.magic = 0x46485348; // 'FHSH'
+    sHashes.hash[sHashes.count++] = h;
+    SsSram_ReadWrite(OS_K1_TO_PHYSICAL(0xA8000000) + 0x7A00, &sHashes, sizeof(sHashes), OS_WRITE);
+}
+#endif
+
 void Fishmod_DebugPlayUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     sPlayFrames++;
+#ifdef FISHMOD_SCRIPT
+    StateHash_Update(play);
+#endif
 #ifdef FISHMOD_SCRIPT_WALK_TO
     if ((player != NULL) && sPlacedPlayer && (sPlayFrames > 60)) {
         static const Vec3f sTo = FISHMOD_SCRIPT_WALK_TO;
