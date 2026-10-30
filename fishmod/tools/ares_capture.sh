@@ -20,6 +20,16 @@ if ! xdpyinfo -display "$DISP" >/dev/null 2>&1; then
     sleep 2
 fi
 
+# A run of another ares (e.g. the system's /usr/bin/ares) rewrites the shared settings: no audio driver line (ares
+# then quits at once, a black capture) and Defocus: Pause (a headless window never has focus). Put both back.
+SETTINGS="$HOME/.local/share/ares/settings.bml"
+if [ -f "$SETTINGS" ]; then
+    sed -i 's/^  Defocus: Pause$/  Defocus: Allow/' "$SETTINGS"
+    if ! awk '/^Audio$/{a=1;next} a&&/^  Driver:/{f=1} /^[A-Z]/{a=0} END{exit !f}' "$SETTINGS"; then
+        sed -i '/^Audio$/a\  Driver: None' "$SETTINGS"
+    fi
+fi
+
 DISPLAY="$DISP" "$ARES" --system "Nintendo 64" --setting Audio/Driver=None --setting Input/Defocus=Allow \
     --no-file-prompt "$ROM" >"$OUT/ares.log" 2>&1 &
 PID=$!
