@@ -20,17 +20,18 @@ if ! xdpyinfo -display "$DISP" >/dev/null 2>&1; then
     sleep 2
 fi
 
-# A run of another ares (e.g. the system's /usr/bin/ares) rewrites the shared settings: no audio driver line (ares
-# then quits at once, a black capture) and Defocus: Pause (a headless window never has focus). Put both back.
-SETTINGS="$HOME/.local/share/ares/settings.bml"
-if [ -f "$SETTINGS" ]; then
-    sed -i 's/^  Defocus: Pause$/  Defocus: Allow/' "$SETTINGS"
-    if ! awk '/^Audio$/{a=1;next} a&&/^  Driver:/{f=1} /^[A-Z]/{a=0} END{exit !f}' "$SETTINGS"; then
-        sed -i '/^Audio$/a\  Driver: None' "$SETTINGS"
-    fi
+# Each run gets its own copy of the settings: runs side by side don't race on the shared file, and a run of another
+# ares (e.g. the system's /usr/bin/ares, which rewrites it) can't break them. The copy gets the two settings such a run
+# resets: an audio driver line (without it the N64 build quits at once: a black capture, no save) and Defocus: Allow
+# (a headless window never has focus).
+SETTINGS="$OUT/settings.bml"
+cp "$HOME/.local/share/ares/settings.bml" "$SETTINGS" 2>/dev/null || : > "$SETTINGS"
+sed -i 's/^  Defocus: Pause$/  Defocus: Allow/' "$SETTINGS"
+if ! awk '/^Audio$/{a=1;next} a&&/^  Driver:/{f=1} /^[A-Z]/{a=0} END{exit !f}' "$SETTINGS"; then
+    sed -i '/^Audio$/a\  Driver: None' "$SETTINGS"
 fi
 
-DISPLAY="$DISP" "$ARES" --system "Nintendo 64" --setting Audio/Driver=None --setting Input/Defocus=Allow \
+DISPLAY="$DISP" "$ARES" --settings-file "$SETTINGS" --system "Nintendo 64" --setting Audio/Driver=None --setting Input/Defocus=Allow \
     --no-file-prompt "$ROM" >"$OUT/ares.log" 2>&1 &
 PID=$!
 trap 'kill $PID 2>/dev/null || true' EXIT
