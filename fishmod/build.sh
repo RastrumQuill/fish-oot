@@ -5,10 +5,13 @@
 # Usage: fishmod/build.sh [--debug] [--script NAME] [--f3dex3] [extra make args]
 #   --debug        build the debug harness (boots straight into Kokiri, debug text)
 #   --script NAME  (implies --debug) play fishmod/scripts/NAME.inc.c as autoplay input
-#   --f3dex3       use the F3DEX3 graphics microcode (see fishmod/f3dex3); outputs get an -f3dex3 suffix
+#   --f3dex3       use the F3DEX3 graphics microcode (see fishmod/f3dex3) whatever the profile says; outputs get an
+#                  -f3dex3 suffix
 #   --opt N        ignored (the performance levels it chose are now the only game; kept so old commands still work)
 #   --testmode     new files skip the intro and start with testing items; outputs get a -test suffix
-#   --hw           the original-hardware version (fewer, cheaper pixels for the RDP); outputs get a -hw suffix
+#   --profile NAME the machine it's made for (fishmod/data/profiles.json): emu (the default: HLE emulators) or hw
+#                  (the original hardware: F3DEX3, the RDP's limits); outputs get the profile's suffix (-hw)
+#   --hw           the same as --profile hw
 #   --gcc LEVEL    the game's code (src/code, overlays, the mod) is compiled with GCC (boot, libultra, libc and audio stay
 #                  on IDO). The default is O2 (hwbench-4: CPU time 14-16% lower, no other change); --gcc Os is the other
 #                  level. Outputs get a -gccOs suffix for Os only
@@ -29,7 +32,7 @@ DEBUG=0
 SCRIPT=""
 F3DEX3=0
 TESTMODE=0
-HW=0
+PROFILE=emu
 GCC="O2"
 MAKE_ARGS=()
 while [ $# -gt 0 ]; do
@@ -39,7 +42,8 @@ while [ $# -gt 0 ]; do
         --f3dex3) F3DEX3=1 ;;
         --opt) shift ;; # (ignored)
         --testmode) TESTMODE=1 ;;
-        --hw) HW=1 ;;
+        --hw) PROFILE=hw ;;
+        --profile) PROFILE="$2"; shift ;;
         --gcc) GCC="$2"; shift ;;
         --ido) GCC="" ;;
         *) MAKE_ARGS+=("$1") ;;
@@ -66,10 +70,22 @@ fi
 
 mkdir -p "$OUT_DIR"
 
+# the profile: its C header (rewritten only when it changes), and the settings it brings
+python3 fishmod/tools/build_profile.py "$PROFILE" > /dev/null
+export FISHMOD_PROFILE="$PROFILE"
+if [ "$(python3 fishmod/tools/build_profile.py "$PROFILE" --get f3dex3)" = 1 ]; then
+    F3DEX3=1
+fi
+PROFILE_SUFFIX="$(python3 fishmod/tools/build_profile.py "$PROFILE" --get suffix)"
+HW=0
+if [ "$PROFILE" = hw ]; then
+    HW=1
+fi
+
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 testmode=$TESTMODE hw=$HW gcc=$GCC"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 testmode=$TESTMODE profile=$PROFILE gcc=$GCC"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -106,7 +122,7 @@ GCC_ARGS=()
 if [ -n "$GCC" ]; then
     GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC")
 fi
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_TESTMODE=$TESTMODE FISHMOD_HW=$HW \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_TESTMODE=$TESTMODE \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -119,9 +135,7 @@ fi
 if [ "$TESTMODE" = 1 ]; then
     SUFFIX="$SUFFIX-test"
 fi
-if [ "$HW" = 1 ]; then
-    SUFFIX="$SUFFIX-hw"
-fi
+SUFFIX="$SUFFIX$PROFILE_SUFFIX"
 if [ -z "$GCC" ]; then
     SUFFIX="$SUFFIX-ido"
 elif [ "$GCC" != "O2" ]; then

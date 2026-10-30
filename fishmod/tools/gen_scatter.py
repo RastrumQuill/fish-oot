@@ -17,6 +17,9 @@ import json
 import math
 import os
 import random
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_profile  # noqa: E402
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -790,7 +793,8 @@ def main():
     ap.add_argument("--unthinned", action="store_true", help="without the density cap and thin_beds.py's list (A/B)")
     args = ap.parse_args()
     inst = accents(rocks_reworked(place(args.scene)))
-    if not args.unthinned:
+    # the profile's thinning (fishmod/data/profiles.json; --unthinned: none, for A/B)
+    if not args.unthinned and build_profile.load()["thinning"]:
         inst = thinned(density_capped(inst))
     counts = {}
     for it in inst:
