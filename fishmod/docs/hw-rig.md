@@ -93,9 +93,31 @@ session asks to attach to it (the user approves on their device).
   ROM at `baseroms/ntsc-1.2/baserom.z64` (git-ignored), and run `claude remote-control` in it, inside `tmux` so it
   survives the terminal closing (or as a systemd user service that starts at boot).
 
+## Profiling on the console (for the LLVM side project)
+
+The compiler profile comes from real hardware, collected by the VM with nobody touching the console. The N64's CPU
+(VR4300) has no performance counters: it can't count cache misses. What it can do is tell time exactly (its `Count`
+register) and be interrupted, which gives two kinds of profile:
+
+- **Where the time goes (sampling).** A profiling build sets the `Compare` timer to fire every few thousand cycles;
+  the exception handler (libultra's, which the decomps have as source) records the interrupted PC into a buffer
+  before handling the interrupt as usual. Time lost to cache misses and RDRAM waits lands on the instructions that
+  waited, so this shows the misses even without a counter for them. Mapped through the build's debug line tables, it
+  becomes LLVM's sample profile (text format, written by our own converter).
+- **How often each branch goes each way (instrumented).** A build with LLVM's `-fprofile-instr-generate` counts
+  edges in RAM. Counts don't depend on timing, so the counters' own cost doesn't spoil them: that's the profile LLVM's
+  optimizer uses for layout, inlining and hot/cold splitting.
+
+Each run plays the same input, so runs compare: the fish-oot builds already drive themselves (autoplay scripts);
+other decomps would each need a small input-replay hook until the ESP32 controller can replay the same input file
+into any game unmodified. The results stream to the VM over the SC64's USB debug link (or, short runs, the save).
+
+What the VM needs for this beyond the plan above: resetting the console between runs without a person (the open
+question below), and the converter from PC samples to LLVM's profile format.
+
 ## Open questions
 
-- **Rebooting the console.** After an upload, the N64 has to be reset to boot the new ROM. Whether the SC64 can do
+- **Rebooting the console** (needed for unattended runs, the profiling above most of all). After an upload, the N64 has to be reset to boot the new ROM. Whether the SC64 can do
   that from USB isn't confirmed yet (check `sc64deployer --help` and its docs on the VM). If it can't, the options are
   pressing reset by hand for now, a USB relay or smart plug on the N64's power, or later the ESP32 wired to the reset
   line.
