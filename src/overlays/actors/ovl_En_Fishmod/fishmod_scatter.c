@@ -11,6 +11,7 @@
  */
 
 #include "z_en_fishmod.h"
+#include "segmented_address.h"
 #include "fishmod.h"
 #include "fishmod_scatter.h"
 
