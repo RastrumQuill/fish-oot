@@ -5,7 +5,7 @@ and jobs.json saying how long each runs.
 Usage: fishmod/pc/make_pack.py NAME OUT.zip JOB [JOB ...] [--parts N] [--uncapped]
   JOB = name=path/to/built.z64:seconds[:resume]
   --parts N: each JOB becomes N jobs on the one patch, each told its part ('FMPT', part, parts) in its ROM's header
-             (0x20, the name field) and its starting save (SRAM 0x7C00); the LOD sweep and tuning read it; resumable
+             (0x20, the name field) and its starting save (SRAM FAULT, 0x7C00); the LOD sweep and tuning read it; resumable
   --uncapped: ares runs as fast as it can (no sound, nothing holding it to real time)
   --parallel N: at most N ares at once for this pack (run_jobs.py --parallel still overrides it)
 e.g. fishmod/pc/make_pack.py selftest out/selftest.zip tour=fishmod/out/fish-oot-debug-tour.z64:120
@@ -18,6 +18,9 @@ import struct
 import subprocess
 import tempfile
 import zipfile
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+from sram_map import SRAM  # noqa: E402
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -51,7 +54,7 @@ def main():
                 for p in range(args.parts):
                     sram = struct.pack(">III", 0x464D5054, p, args.parts).hex()
                     spec["jobs"].append({"name": f"{jname}{p:02d}", "patch": jname + ".bps", "seconds": seconds,
-                                         "resume": True, "sram": {"0x7C00": sram}, "rom_poke": {"0x20": sram}})
+                                         "resume": True, "sram": {f"0x{SRAM['FAULT']:04X}": sram}, "rom_poke": {"0x20": sram}})
             else:
                 spec["jobs"].append({"name": jname, "patch": jname + ".bps", "seconds": seconds, "resume": resume})
         z.writestr("jobs.json", json.dumps(spec, indent=1))

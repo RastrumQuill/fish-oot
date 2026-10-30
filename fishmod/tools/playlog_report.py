@@ -6,8 +6,12 @@ Usage: fishmod/tools/playlog_report.py save.sav [--md out.md]
 """
 import argparse
 import struct
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sram_map import SRAM  # noqa: E402
 
-ADDR = 0x7A40
+ADDR = SRAM["BIG"]
 SITS = 12
 WORST = 24
 WEATHER = ["clear", "overcast", "rain"]

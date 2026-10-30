@@ -9,13 +9,15 @@ import os
 import re
 import struct
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sram_map import SRAM  # noqa: E402
 
 NAMES = ["RSP gfx", "RDP", "CPU update", "CPU draw", "fish update", "fish draw", "rod update", "rod draw", "frame", "RSP audio"]
 
 
 def read(path):
     data = open(path, "rb").read()
-    off = 0x7F00
+    off = SRAM["STATS"]
     magic, frames = struct.unpack(">II", data[off:off + 8])
     if magic != 0x464D5354 or frames == 0:
         return None
@@ -70,7 +72,7 @@ PROF = [
 
 def prof(path):
     data = open(path, "rb").read()
-    off = 0x7E00
+    off = SRAM["PROFILE"]
     magic, frames = struct.unpack(">II", data[off:off + 8])
     if magic != 0x464D5052 or frames == 0:
         print(f"{path}: no profile")

@@ -2643,7 +2643,9 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_EMPTY;
     gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_BOTTLE_2;
 #ifdef FISHMOD_SCRIPT_BUGS
-    // bugs in the C-Right bottle
+    // bugs in both C bottles
+    gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1] = ITEM_BOTTLE_BUG;
+    gSaveContext.save.info.equips.buttonItems[2] = ITEM_BOTTLE_BUG;
     gSaveContext.save.info.inventory.items[SLOT_BOTTLE_2] = ITEM_BOTTLE_BUG;
     gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_BUG;
 #endif

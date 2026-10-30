@@ -11,6 +11,9 @@ Usage: fishmod/tools/hwbench_report.py save.sav [--vs other.sav] [--md out.md]
 import argparse
 import os
 import struct
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sram_map import SRAM  # noqa: E402
 
 MODES_V = {
     1: ["base", "tex4", "cold", "noprops", "nofish"],
@@ -71,24 +74,25 @@ STOP_NAMES = [
 def read(path):
     d = open(path, "rb").read()
     magic, version, stops, modes, metrics, tests, hw = struct.unpack(">IBBBBBB", d[:10])
-    if len(d) >= 0x7010 and d[0x7000:0x7004] == b"FBCR":
-        laps, = struct.unpack(">I", d[0x7004:0x7008])
-        cstop, cmode, cblock = d[0x7008], d[0x7009], d[0x700A]
-        count, = struct.unpack(">I", d[0x700C:0x7010])
+    C, S, F = SRAM["CRUMB"], SRAM["STALL"], SRAM["FAULT"]
+    if len(d) >= C + 0x10 and d[C:C + 0x4] == b"FBCR":
+        laps, = struct.unpack(">I", d[C + 0x4:C + 0x8])
+        cstop, cmode, cblock = d[C + 0x8], d[C + 0x9], d[C + 0xA]
+        count, = struct.unpack(">I", d[C + 0xC:C + 0x10])
         names = MODES_V.get(version, MODES_V[max(MODES_V)])
         print(f"(last breadcrumb: lap {laps + 1}, stop {cstop + 1}, mode {names[cmode] if cmode < len(names) else cmode}, "
               f"block {cblock}; {count} written)")
-    if d[0x7B00:0x7B04] == b"FSTL":
-        beat, pc, ra, sp, sr = struct.unpack(">5I", d[0x7B04:0x7B18])
-        bench = struct.unpack(">6I", d[0x7B18:0x7B30])
-        stack = struct.unpack(">48I", d[0x7B30:0x7BF0])
+    if d[S:S + 0x4] == b"FSTL":
+        beat, pc, ra, sp, sr = struct.unpack(">5I", d[S + 0x4:S + 0x18])
+        bench = struct.unpack(">6I", d[S + 0x18:S + 0x30])
+        stack = struct.unpack(">48I", d[S + 0x30:S + 0xF0])
         print(f"(STALL: no frame for 10 s after play frame {beat}; graphics thread pc {pc:08x} ra {ra:08x} sp {sp:08x}; "
               f"bench lap {bench[0] + 1} leg {bench[1] + 1} block {bench[2]} state {bench[3]} frame {bench[4]})")
         print("(its stack: " + " ".join(f"{w:08x}" for w in stack) + ")")
-    if d[0x7C00:0x7C04] == b"FFLT":
-        kind, thread, pc, cause, bad, ra, sp = struct.unpack(">7I", d[0x7C04:0x7C20])
-        bench = struct.unpack(">6I", d[0x7C20:0x7C38])
-        text = d[0x7C38:0x7C78].split(b"\0")[0].decode("ascii", "replace")
+    if d[F:F + 0x4] == b"FFLT":
+        kind, thread, pc, cause, bad, ra, sp = struct.unpack(">7I", d[F + 0x4:F + 0x20])
+        bench = struct.unpack(">6I", d[F + 0x20:F + 0x38])
+        text = d[F + 0x38:F + 0x78].split(b"\0")[0].decode("ascii", "replace")
         print(f"({'CRASH' if kind == 1 else 'HANG'} on thread {thread}: pc {pc:08x} cause {cause:08x} "
               f"badvaddr {bad:08x} ra {ra:08x} sp {sp:08x} {text}; bench lap {bench[0] + 1} leg {bench[1] + 1} "
               f"block {bench[2]} state {bench[3]} frame {bench[4]}, play frame {bench[5]})")

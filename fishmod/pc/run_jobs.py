@@ -28,6 +28,8 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bps  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+from sram_map import SRAM  # noqa: E402
 
 ARES_GUESSES = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "ares", "ares.exe"),  # (install_ares.py)
                 r"C:\ares\ares.exe", r"C:\Program Files\ares\ares.exe", os.path.expandvars(r"%LOCALAPPDATA%\ares\ares.exe")]
@@ -82,10 +84,11 @@ def close_gracefully(proc, wait=30):
 
 
 def health(ram):
-    """The debug builds keep running totals at SRAM 0x7F00 ('FMST'): how many frames ran (the game was running)."""
-    if len(ram) < 0x7F10 or ram[0x7F00:0x7F04] != b"FMST":
+    """The debug builds keep running totals at SRAM (STATS, 'FMST'): how many frames ran (the game was running)."""
+    st = SRAM["STATS"]
+    if len(ram) < st + 0x10 or ram[st:st + 4] != b"FMST":
         return None
-    return struct.unpack(">I", ram[0x7F04:0x7F08])[0] + 600  # (it starts counting after the first 600 frames)
+    return struct.unpack(">I", ram[st + 4:st + 8])[0] + 600  # (it starts counting after the first 600 frames)
 
 
 def find_save(job_dir, name, saves_dir, since):
