@@ -153,7 +153,7 @@ def rock_stretch(x, z):
     h ^= h >> 15
     h = (h * 0x2C1B3C6D) & m
     h ^= h >> 12
-    return (0.75 + (h & 0xFF) * (0.6 / 255.0), 0.7 + ((h >> 8) & 0xFF) * (0.45 / 255.0),
+    return (0.75 + (h & 0xFF) * (0.6 / 255.0), 0.5 + ((h >> 8) & 0xFF) * (0.3 / 255.0),
             0.75 + ((h >> 16) & 0xFF) * (0.6 / 255.0))
 
 
@@ -487,6 +487,137 @@ def spot_hash(x, z, salt=0):
     return (h & 0xFFFF) / 65536.0
 
 
+# The rocks, reworked after placing (their own random numbers: every other prop stays where it was, and so does
+# thin_beds.py's list): fewer, bigger, flatter. A cluster of rocks becomes one broad rock covering it, a share of the
+# small loose ones go, and none may hang over a drop (OoT's collision lets Link walk through an overhang), nor reach
+# the surface. Plants inside a rock that grew are taken out.
+ROCK_TOP = 56          # the vanilla rock's top at scale 1, before its stretch
+ROCK_MERGE = 20        # rocks this close to a bigger one (edge to edge) join it
+ROCK_SCALE_MAX = 3.2   # (the scale is kept in 64ths of a byte)
+ROCK_SMALL = 0.45      # a lone rock smaller than this is a pebble: a share of them go
+ROCK_SMALL_KEEP = 0.6
+ROCK_BURY = 0.8        # the bumps under a rock (beyond its slope) may bury at most this share of its height
+ROCK_SLOPE_MAX = math.radians(28)  # a rock rests on a slope up to this; steeper and it would have rolled
+ROCK_JITTER = math.radians(5)      # and lies a little askew
+
+
+def rock_reach(x, z, sc):
+    st = rock_stretch(int(x), int(z))
+    return ROCK_RADIUS * max(st[0], st[2]) * sc
+
+
+def rock_fit(r, floor_at, surface_at):
+    """Settle a rock on the bed where it stands: tilted to the bed's slope (up to ROCK_SLOPE_MAX, a little jitter),
+    then lowered to the lowest bump under it, so its edge never hangs over a drop (OoT lets Link walk through an
+    overhang); smaller until it stays under the surface and the bumps don't bury most of it. None where nothing fits
+    (the top of a drop-off, a wall)."""
+    x, z = r["x"], r["z"]
+    ps = surface_at(x, z)
+    if ps is None:
+        return None
+    pf = floor_at(x, z, ps)
+    if pf is None:
+        return None
+    st = rock_stretch(int(x), int(z))
+    trnd = random.Random(int(x) * 100003 + int(z))
+    jitter = (trnd.uniform(-ROCK_JITTER, ROCK_JITTER), trnd.uniform(-ROCK_JITTER, ROCK_JITTER))
+    yaw = r["yaw"]
+    c, s_ = math.cos(yaw), math.sin(yaw)
+    sc = r["scale"]
+    while sc >= 0.35:
+        reach = rock_reach(x, z, sc) * 0.85
+        y, tilt = lie_on_bed(floor_at, x, z, ps, pf, yaw, reach, reach)
+        if max(abs(tilt[0]), abs(tilt[1])) > ROCK_SLOPE_MAX:
+            sc *= 0.85
+            continue  # too steep to rest on
+        tilt = (tilt[0] + jitter[0], tilt[1] + jitter[1])
+        res = []
+        for ang in range(0, 360, 30):
+            a = math.radians(ang)
+            lx, lz = math.cos(a) * reach, math.sin(a) * reach
+            fy = floor_at(x + lx * c + lz * s_, z - lx * s_ + lz * c, ps)
+            if fy is None:
+                res = None
+                break
+            res.append(fy - (y + lx * math.tan(tilt[1]) - lz * math.tan(tilt[0])))
+        if res is not None:
+            height = ROCK_TOP * st[1] * sc
+            y += min(min(res), 0.0) - 1  # down to the lowest bump: nothing under its edge falls away
+            relief = max(res) - min(min(res), 0.0)
+            if y + height + reach * math.sin(max(abs(tilt[0]), abs(tilt[1]))) <= ps - 2 and relief <= ROCK_BURY * height:
+                return dict(r, y=y, scale=sc, tilt=tilt)
+        sc *= 0.85
+    return None
+
+
+def rocks_reworked(instances):
+    surface_at, floor_at = BED
+    rocks = [p for p in instances if p["kind"] in ROCK_KINDS]
+    rest = [p for p in instances if p["kind"] not in ROCK_KINDS]
+    rocks.sort(key=lambda p: -p["scale"])
+    used = [False] * len(rocks)
+    merged = []
+    for i, r in enumerate(rocks):
+        if used[i]:
+            continue
+        used[i] = True
+        group = [r]
+        # the rocks touching this one (the biggest left), not the ones touching those: one broad rock, not a reef
+        for j, o in enumerate(rocks):
+            if not used[j] and math.hypot(o["x"] - r["x"], o["z"] - r["z"]) < (
+                    rock_reach(r["x"], r["z"], r["scale"]) + rock_reach(o["x"], o["z"], o["scale"]) + ROCK_MERGE):
+                used[j] = True
+                group.append(o)
+        if len(group) == 1:
+            hrnd = random.Random(int(r["x"]) * 7919 + int(r["z"]))
+            if r["scale"] < ROCK_SMALL and hrnd.random() > ROCK_SMALL_KEEP:
+                continue  # a lone pebble: most go
+            merged.append(dict(r, merged=False))
+            continue
+        # one broad, flat rock over the group: at its middle (weighted by size), covering about as much ground
+        wsum = sum(g["scale"] ** 2 for g in group)
+        cx = sum(g["x"] * g["scale"] ** 2 for g in group) / wsum
+        cz = sum(g["z"] * g["scale"] ** 2 for g in group) / wsum
+        spread = max(math.hypot(g["x"] - cx, g["z"] - cz) + rock_reach(g["x"], g["z"], g["scale"]) for g in group)
+        st = rock_stretch(int(cx), int(cz))
+        # about as much ground as the group covered, and no less than its rocks' area together
+        sc = max(spread * 0.8 / (ROCK_RADIUS * max(st[0], st[2])), math.sqrt(wsum))
+        sc = min(ROCK_SCALE_MAX, sc)
+        biggest = group[0]
+        merged.append(dict(biggest, kind="boulder", x=cx, z=cz, scale=max(sc, biggest["scale"]), merged=True,
+                           group=group))
+    out_rocks = []
+    for r in merged:
+        f = rock_fit(r, floor_at, surface_at)
+        if r.get("merged") and (f is None or f["scale"] < r["scale"] * 0.7):
+            # the bed there won't take one broad rock: the cluster's own rocks, each settled where it stood
+            for g in r["group"]:
+                gf = rock_fit(dict(g, merged=False), floor_at, surface_at)
+                if gf is not None:
+                    out_rocks.append(gf)
+            continue
+        if f is not None:
+            f.pop("group", None)
+            out_rocks.append(f)
+    # plants inside a rock go (only those under a rock that grew or moved: the rest stood as they always have)
+    keep = []
+    for p in rest:
+        inside = False
+        if p["kind"] not in FLOATING:
+            for r in out_rocks:
+                if r.get("merged") and math.hypot(p["x"] - r["x"], p["z"] - r["z"]) < rock_reach(r["x"], r["z"], r["scale"]) * 0.75:
+                    inside = True
+                    break
+        if not inside:
+            keep.append(p)
+    print(f"rocks: {len(rocks)} placed, {len(out_rocks)} after the rework "
+          f"({sum(1 for r in out_rocks if r.get('merged'))} broad ones from clusters); "
+          f"{len(rest) - len(keep)} plants inside them gone")
+    for r in out_rocks:
+        r.pop("merged", None)
+    return keep + out_rocks
+
+
 def accents(instances):
     grid = {}
     for p in instances:
@@ -655,7 +786,7 @@ def main():
     ap.add_argument("--c", action="store_true", help="write the game's data (src/fishmod_data/)")
     ap.add_argument("--unthinned", action="store_true", help="without the density cap and thin_beds.py's list (A/B)")
     args = ap.parse_args()
-    inst = accents(place(args.scene))
+    inst = accents(rocks_reworked(place(args.scene)))
     if not args.unthinned:
         inst = thinned(density_capped(inst))
     counts = {}

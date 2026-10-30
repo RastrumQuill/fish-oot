@@ -105,6 +105,7 @@ def bed_surface_type(d):
     return max(counts, key=counts.get) if counts else 0
 
 
+ROCK_STEP = 20  # how far above the bed a rock may reach and still need only its top (Link steps up that far)
 BRIDGE_SURFACE = 23  # Lake Hylia's bridges' surface type (SURFACE_MATERIAL_BRIDGE: wooden footsteps)
 
 
@@ -161,8 +162,15 @@ def main():
         bed_type_rock = bed_surface_type(d)
         tris = []
         buried = 0
+        low_rocks = 0
         for r in rocks:
             world = [tuple(int(round(c)) for c in v) for v in place(r, pts)]
+            # a low rock (no taller above the bed than Link steps up without climbing) needs only its top: he steps up
+            # onto it as onto any low ledge. Its sides are walls he'd only ever brush with his feet, and walls are
+            # what every actor's every move is checked against.
+            bed = finder.floor(r["x"], r["z"], r["y"] + 200)
+            low = bed is not None and max(v[1] for v in world) - bed < ROCK_STEP
+            low_rocks += low
             for a, b, c in faces:
                 f = (world[a], world[b], world[c])
                 n = cross(sub(f[1], f[0]), sub(f[2], f[0]))
@@ -174,6 +182,8 @@ def main():
                 if all(bd is not None and v[1] < bd - 2 for v, bd in zip(f, beds)):
                     buried += 1
                     continue  # wholly under the lake bed
+                if low and n[1] < 0.5:
+                    continue  # (a low rock's side)
                 tris.append((f, n, bed_type_rock))
 
         rock_tris = len(tris)
@@ -215,7 +225,7 @@ def main():
             json.dump([[list(v) for v in f] for f, _, _ in tris[:rock_tris]], fo)
         if report or True:
             print(f"{scene}: dock {len(dock_polys)} triangles")
-            print(f"{scene}: {len(rocks)} rocks, {rock_tris} triangles ({buried} under the bed dropped); "
+            print(f"{scene}: {len(rocks)} rocks ({low_rocks} low: tops only), {rock_tris} triangles ({buried} under the bed dropped); "
                   f"{len(polys)} triangles, {len(verts)} vertices in all")
 
 

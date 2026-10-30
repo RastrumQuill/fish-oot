@@ -893,6 +893,11 @@ $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CC_CHECK := @:
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: PREPROCESS :=
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CFLAGS := $(GCC_CODE_CFLAGS)
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: MIPS_VERSION := -mips3
+# fishmod's own files get a syntax check after all, for one thing: calling a function with no prototype in view (in
+# C90 it passes floats as doubles: Math_Atan2S got garbage that way)
+$(BUILD_DIR)/src/code/fishmod%.o $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/%.o: CC_CHECK := gcc -nostdinc -fno-builtin \
+  -fsyntax-only -funsigned-char -std=gnu90 -D_LANGUAGE_C $(CPP_DEFINES) $(MIPS_BUILTIN_DEFS) $(GBI_DEFINES) $(INC) -m32 \
+  -Werror=implicit-function-declaration
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations
 $(BUILD_DIR)/src/overlays/%.o: CFLAGS += -mno-explicit-relocs -mno-split-addresses
 # GCC's objects are marked MIPS III, IDO's MIPS II: the VR4300 runs both, so the linker isn't to refuse the mix
