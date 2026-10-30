@@ -509,7 +509,7 @@ void Play_Init(GameState* thisx) {
     gTransitionTileState = TRANS_TILE_OFF;
     this->transitionMode = TRANS_MODE_OFF;
     FrameAdvance_Init(&this->frameAdvCtx);
-    Rand_Seed((u32)osGetTime());
+    Rand_Seed(FISHMOD_TIME_SEED()); // fishmod: fixed in scripted debug runs
     Matrix_Init(&this->state);
     this->state.main = Play_Main;
     this->state.destroy = Play_Destroy;

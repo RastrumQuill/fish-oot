@@ -246,6 +246,13 @@ typedef struct FishmodSaveData {
  *     ROD       LURE 1    LURE 2    LURE 3    adult trade child trade
  *     bottle 1  bottle 2  bottle 3  bottle 4  BOTTLE 5    BOTTLE 6
  */
+// A seed from the clock, except in scripted debug runs, which must replay exactly (fishmod/tools/state_hash.py)
+#ifdef FISHMOD_SCRIPT
+#define FISHMOD_TIME_SEED() ((u32)0x46495348)
+#else
+#define FISHMOD_TIME_SEED() ((u32)osGetTime())
+#endif
+
 #define SLOT_FISHING_ROD 24
 #define SLOT_LURE_1 25
 #define SLOT_LURE_2 26

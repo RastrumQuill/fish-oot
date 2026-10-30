@@ -290,7 +290,7 @@ static void Manager_BuildRoster(PlayState* play) {
 #endif
         }
     }
-    Rand_Seed((u32)osGetTime());
+    Rand_Seed(FISHMOD_TIME_SEED());
 }
 
 #if FISHMOD_OPT >= 5

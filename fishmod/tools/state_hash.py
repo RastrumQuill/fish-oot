@@ -31,11 +31,12 @@ def main():
             continue
         n = min(len(base), len(h))
         first = next((i for i in range(n) if base[i] != h[i]), None)
-        if first is None and len(base) == len(h):
-            print(f"{p}: same as {base_path} ({n} fingerprints)")
+        if first is None and n > 0:
+            # (runs last a fixed wall time, so one may get further than the other: the frames both reached count)
+            print(f"{p}: same as {base_path} ({n} fingerprints in common, of {len(h)} and {len(base)})")
         else:
             bad = True
-            where = f"from frame {(first + 1) * 200}" if first is not None else "in length"
+            where = f"from frame {(first + 1) * 200}" if first is not None else "(no fingerprints in common)"
             print(f"{p}: DIFFERS from {base_path} {where} ({len(h)} vs {len(base)} fingerprints)")
     if len(runs) == 1 and base is not None:
         for i, v in enumerate(base):
