@@ -1,7 +1,7 @@
 # Lake Hylia plan
 
 Status: planning. Kokiri Forest stays the place to polish mechanics; Lake Hylia is the big-water area and the
-performance benchmark. Test-mode builds warp between the two (D-pad Up: Kokiri, D-pad Down: Lake Hylia) so a
+performance benchmark. Test-mode builds warp between the two (hold L, then D-pad Up: Kokiri, D-pad Down: Lake Hylia) so a
 small and a big body of water can be compared. Until this plan is built, Lake Hylia has a provisional table of
 the Kokiri species.
 

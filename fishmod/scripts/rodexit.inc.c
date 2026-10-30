@@ -4,9 +4,9 @@
 //  1. rod out, the slingshot (the rod goes away), then the bugs: they mustn't go on the hook (old builds took them as
 //     bait once the rod had been held). With the slingshot in hand the game doesn't pour them out either (vanilla),
 //     so the bottle stays full and the rod, taken out again, says "No bait";
-//  2. D-pad Down to Lake Hylia with the rod out (the rod goes with the scene), then the bugs: Link lets them go (the
+//  2. L + D-pad Down to Lake Hylia with the rod out (the rod goes with the scene), then the bugs: Link lets them go (the
 //     C-Right bottle goes empty);
-//  3. back to Kokiri (D-pad Up).
+//  3. back to Kokiri (L + D-pad Up).
 #define FISHMOD_SCRIPT_BUGS 1
 
 static Vec3f sScriptStartPos = { 900.0f, 0.0f, -100.0f };
@@ -21,10 +21,10 @@ static FishmodAutoplayStep sScriptSteps[] = {
     { 140, 0, 0, 0, true },
     { 1, BTN_CLEFT, 0, 0, true },   // rod out
     { 60, 0, 0, 0, true },
-    { 1, BTN_DDOWN, 0, 0, true },   // to Lake Hylia
+    { 1, BTN_L | BTN_DDOWN, 0, 0, true },   // to Lake Hylia
     { 300, 0, 0, 0, true },
     { 1, BTN_CRIGHT, 0, 0, true },  // bugs: let them go
     { 100, 0, 0, 0, true },
-    { 1, BTN_DUP, 0, 0, true },     // back to Kokiri
+    { 1, BTN_L | BTN_DUP, 0, 0, true },     // back to Kokiri
     { 300, 0, 0, 0, true },
 };

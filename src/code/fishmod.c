@@ -39,7 +39,7 @@
 #include "ultra64/rcp.h"
 
 #if FISHMOD_TESTMODE
-static s32 sFpsDetail = 1; // D-pad Left: the RDP readout on or off
+static s32 sFpsDetail = 1; // L + D-pad Left: the RDP readout on or off
 #endif
 
 s32 Object_LoadPersistent(ObjectContext* objectCtx, s16 objectId);
@@ -278,14 +278,15 @@ void Fishmod_PlayUpdate(PlayState* play) {
     }
 
 #if FISHMOD_TESTMODE
-    // test mode: D-pad Up warps to Kokiri Forest (small water) as child Link, D-pad Down to Lake Hylia (big water)
-    // as adult Link with the lake full, in the Iron Boots
+    // test mode: L + D-pad Up warps to Kokiri Forest (small water) as child Link, L + D-pad Down to Lake Hylia (big
+    // water) as adult Link with the lake full, in the Iron Boots
     if ((play->pauseCtx.state == 0) && (Message_GetState(&play->msgCtx) == TEXT_STATE_NONE) &&
         !Play_InCsMode(play) && (play->transitionTrigger == TRANS_TRIGGER_OFF)) {
-        u16 press = play->state.input[0].press.button;
+        // (behind L, so the D-pad stays free for the game: hold L and press the D-pad)
+        u16 press = CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_L) ? play->state.input[0].press.button : 0;
         s16 entrance = -1;
 
-        // D-pad Left: the RDP readout
+        // L + D-pad Left: the RDP readout
         if (CHECK_BTN_ALL(press, BTN_DLEFT)) {
             sFpsDetail ^= 1;
         }
