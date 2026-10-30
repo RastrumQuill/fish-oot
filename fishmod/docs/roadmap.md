@@ -42,6 +42,11 @@ Notes only, not built in test5: lures, sinkers and the sinking lure (item 5), ho
 - **The item grid redone completely:** the rod, lures and sinker break the vanilla grid, so everything shrinks in
   proportion to make room. **More bottles** fill the gaps that leaves (how many isn't fixed: they're there to fill
   the voids).
+  - **Layout: leaning to mockup C** (`fishmod/tools/item_grid_mockups.py`, B the runner-up): the vanilla six
+    columns plus a fifth row, icons at 80%. Rows 1-3 as vanilla; row 4 is the fishing row (rod, then three lures
+    strung on one pipe like a line, then the adult and child trade items); row 5 is a shelf of six bottles. 30 slots:
+    the cursor math gains a row, and the save needs room for the lures and two more bottles.
+    (B: 8 x 4 at 75%, rod and lures bracketed like the bow and arrows, trade items under the rod, eight bottles.)
 - **Fish as real items:** a bottled fish shows its species and size in the inventory, and the buyer you sell bottled
   things to says what he's getting. Never just "fish" any more: size and species matter. (Selling stays a small
   extra: the economy is broken enough already. One fish at a time is fine.)
