@@ -142,9 +142,49 @@ s32 Fishmod_SceneHasFish(PlayState* play) {
         ;
 }
 
+FishmodRng gFishmodRng;
+FishmodRng* gFishmodRngNow = &gFishmodRng;
+
+void Fishmod_RandSeed(FishmodRng* rng, u32 seed) {
+    // (a few rounds of mixing, so nearby seeds give unrelated streams)
+    seed ^= seed >> 16;
+    seed *= 0x7FEB352D;
+    seed ^= seed >> 15;
+    seed *= 0x846CA68B;
+    seed ^= seed >> 16;
+    rng->state = (seed != 0) ? seed : 0x2545F491;
+}
+
+/** The next number: xorshift32. */
+u32 Fishmod_RandNext(FishmodRng* rng) {
+    u32 x = rng->state;
+
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    rng->state = x;
+    return x;
+}
+
+/** [0, 1) */
+f32 Fishmod_RandZeroOne(FishmodRng* rng) {
+    return (Fishmod_RandNext(rng) >> 8) * (1.0f / 16777216.0f);
+}
+
+/** [0, f) */
+f32 Fishmod_RandZeroFloat(FishmodRng* rng, f32 f) {
+    return Fishmod_RandZeroOne(rng) * f;
+}
+
+/** [-f/2, f/2) */
+f32 Fishmod_RandCenteredFloat(FishmodRng* rng, f32 f) {
+    return (Fishmod_RandZeroOne(rng) - 0.5f) * f;
+}
+
 void Fishmod_OnSceneLoad(PlayState* play) {
     gFishmodRod = NULL;
     Fishmod_ResetRodInfo();
+    Fishmod_RandSeed(&gFishmodRng, FISHMOD_TIME_SEED() + play->sceneId);
 
     if (!Fishmod_SceneHasFish(play)) {
         return;
@@ -432,7 +472,7 @@ s32 Fishmod_ReleaseBottleFish(PlayState* play, s32 slot, Vec3f* pos, s16 yaw) {
         gFishmodSpawnLength = bottle->lengthTenths * 0.1f;
         gFishmodSpawnLook = bottle->look;
     } else {
-        species = spawns->entries[(s32)Rand_ZeroFloat(spawns->count - 0.01f)].species;
+        species = spawns->entries[(s32)Fishmod_RandZeroFloat(gFishmodRngNow, spawns->count - 0.01f)].species;
         gFishmodSpawnLength = 0.0f;
     }
     bottle->species = 0;

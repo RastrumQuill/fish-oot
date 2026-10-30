@@ -49,7 +49,8 @@ typedef struct FishmodRosterFish {
     EnFishmod* fish;
     FishmodMood mood; // while the fish isn't spawned (spawned, the fish's own is the one that counts)
     u16 leader;       // the record of its school's leader (its own for a leader or a fish on its own)
-    u8 look;          // its looks: the same fish every visit (from the roster's seed)
+    u8 look;          // its looks: the same fish every visit (from its slot's stream)
+    u16 slot;         // which of the day's fish it is: what the caught list keys it by
 } FishmodRosterFish;
 
 static FishmodRosterFish sRoster[FISHMOD_ROSTER_MAX];
@@ -112,7 +113,7 @@ void EnFishmod_RosterCaught(PlayState* play, EnFishmod* fish) {
     if (rec != NULL) {
         rec->caught = true;
         rec->fish = NULL;
-        Fishmod_RosterSetCaught(play->sceneId, gSaveContext.save.totalDays, fish->rosterIndex);
+        Fishmod_RosterSetCaught(play->sceneId, gSaveContext.save.totalDays, rec->slot);
     }
 }
 
@@ -146,7 +147,13 @@ static s32 Roster_Crowd(Vec3f* pos) {
  * The scene's fish for today: the same as Rod_SpawnFish chose them before (a random water box, a spot in it, a
  * species by weight, a size), but from a seed of the scene and the day so they're the same every visit.
  */
+/** The seed of a roster slot's stream: the scene, the in-game day and the slot. */
+static u32 Roster_Seed(PlayState* play, s32 slot) {
+    return (u32)play->sceneId * 7919 + (u32)gSaveContext.save.totalDays * 104729 + (u32)slot * 2654435761u + 17;
+}
+
 static void Manager_BuildRoster(PlayState* play) {
+    FishmodRng rng;
     const FishmodSceneSpawns* spawns = Fishmod_GetSceneSpawns(play->sceneId);
     WaterBox* boxes;
     s32 numBoxes = play->colCtx.colHeader->numWaterBoxes;
@@ -164,8 +171,6 @@ static void Manager_BuildRoster(PlayState* play) {
         totalWeight += spawns->entries[i].weight;
     }
 
-    // the shared random numbers, seeded for the roster and reseeded from the clock afterwards
-    Rand_Seed((u32)play->sceneId * 7919 + (u32)gSaveContext.save.totalDays * 104729 + 17);
     count = FISHMOD_FISH_COUNT;
     if (spawns->fish > 0) {
         count = MIN(spawns->fish, FISHMOD_ROSTER_MAX);
@@ -175,15 +180,18 @@ static void Manager_BuildRoster(PlayState* play) {
         count = MIN(Fishmod_DebugRosterCount(), FISHMOD_ROSTER_MAX);
     }
 #endif
+    // each slot's fish from a stream of its own (the scene, the day, the slot): the same fish every visit that day,
+    // whatever happens to the others
+    gFishmodRngNow = &rng;
     for (n = 0; n < count; n++) {
-        WaterBox* box = &boxes[(s32)Rand_ZeroFloat(numBoxes - 0.01f)];
+        WaterBox* box;
         FishmodRosterFish* rec = &sRoster[sRosterCount];
         const FishmodSpecies* species;
         Vec3f center;
         f32 radius;
         f32 surface;
         f32 floor;
-        s32 roll = (s32)Rand_ZeroFloat(totalWeight - 0.01f);
+        s32 roll;
         s32 s = spawns->entries[0].species;
         f32 lo;
         f32 hi;
@@ -191,6 +199,9 @@ static void Manager_BuildRoster(PlayState* play) {
         f32 u;
         f32 f;
 
+        Fishmod_RandSeed(&rng, Roster_Seed(play, n));
+        box = &boxes[(s32)Fishmod_RandZeroFloat(gFishmodRngNow, numBoxes - 0.01f)];
+        roll = (s32)Fishmod_RandZeroFloat(gFishmodRngNow, totalWeight - 0.01f);
         for (i = 0; i < spawns->count; i++) {
             if (roll < spawns->entries[i].weight) {
                 s = spawns->entries[i].species;
@@ -204,7 +215,7 @@ static void Manager_BuildRoster(PlayState* play) {
         lo = species->lengthMin;
         hi = species->lengthMax;
         mode = (species->lengthTypical - lo) / (hi - lo);
-        u = Rand_ZeroOne();
+        u = Fishmod_RandZeroOne(gFishmodRngNow);
         f = (u < mode) ? sqrtf(u * mode) : 1.0f - sqrtf((1.0f - u) * (1.0f - mode));
 
         center.x = box->xMin + box->xLength * 0.5f;
@@ -213,7 +224,7 @@ static void Manager_BuildRoster(PlayState* play) {
         radius = CLAMP_MIN(box->xLength, box->zLength) * 0.6f;
         // most fish live by cover (weed beds, rocks, reeds, pads), the rest out in the open water
         // (a few tries for cover that isn't crowded with homes already; else the open water)
-        if (Rand_ZeroOne() < 0.75f) {
+        if (Fishmod_RandZeroOne(gFishmodRngNow) < 0.75f) {
             Vec3f cover;
             s32 tries;
 
@@ -230,11 +241,12 @@ static void Manager_BuildRoster(PlayState* play) {
         }
         if (EnFishmod_FindWaterPoint(play, &center, radius, 25.0f, &rec->home, &surface, &floor)) {
             rec->species = s;
+            rec->slot = n;
             rec->length = lo + (hi - lo) * f;
-            rec->yaw = (s16)Rand_ZeroFloat(0xFFFF);
-            rec->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, sRosterCount);
+            rec->yaw = (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 0xFFFF);
+            rec->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, n);
             rec->fish = NULL;
-            rec->look = (u8)Rand_ZeroFloat(256.0f);
+            rec->look = (u8)Fishmod_RandZeroFloat(gFishmodRngNow, 256.0f);
             // some hungry, some not (from the index, not the shared random numbers)
             rec->mood.hunger = 40 + ((sRosterCount * 97 + play->sceneId * 31) % 170);
             rec->mood.fear = 0;
@@ -244,19 +256,21 @@ static void Manager_BuildRoster(PlayState* play) {
             if (species->schoolMax > 0) {
                 s32 leader = sRosterCount - 1;
                 s32 more = species->schoolMin - 1 +
-                           (s32)Rand_ZeroFloat(species->schoolMax - species->schoolMin + 0.99f);
+                           (s32)Fishmod_RandZeroFloat(gFishmodRngNow, species->schoolMax - species->schoolMin + 0.99f);
 
                 while ((more-- > 0) && (n + 1 < count) && (sRosterCount < FISHMOD_ROSTER_MAX)) {
                     FishmodRosterFish* mate = &sRoster[sRosterCount];
 
                     *mate = sRoster[leader];
+                    Fishmod_RandSeed(&rng, Roster_Seed(play, n + 1)); // (its own slot's stream)
                     if (!EnFishmod_FindWaterPoint(play, &sRoster[leader].home, 30.0f, 15.0f, &mate->home, &surface,
                                                   &floor)) {
                         continue;
                     }
-                    mate->length = CLAMP(sRoster[leader].length * (0.8f + Rand_ZeroOne() * 0.4f), lo, hi);
-                    mate->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, sRosterCount);
-                    mate->look = (u8)Rand_ZeroFloat(256.0f);
+                    mate->length = CLAMP(sRoster[leader].length * (0.8f + Fishmod_RandZeroOne(gFishmodRngNow) * 0.4f), lo, hi);
+                    mate->slot = n + 1;
+                    mate->caught = Fishmod_RosterIsCaught(play->sceneId, gSaveContext.save.totalDays, n + 1);
+                    mate->look = (u8)Fishmod_RandZeroFloat(gFishmodRngNow, 256.0f);
                     mate->mood.hunger = 40 + ((sRosterCount * 97 + play->sceneId * 31) % 170);
                     mate->leader = leader;
                     sRosterCount++;
@@ -265,7 +279,7 @@ static void Manager_BuildRoster(PlayState* play) {
             }
         }
     }
-    Rand_Seed(FISHMOD_TIME_SEED());
+    gFishmodRngNow = &gFishmodRng;
 }
 
 #define MOOD_SLICE 16 // roster records whose mood moves on each frame: 300 fish come round about once a second

@@ -559,14 +559,14 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         f32 lo = this->species->lengthMin;
         f32 hi = this->species->lengthMax;
         f32 mode = (this->species->lengthTypical - lo) / (hi - lo);
-        f32 u = Rand_ZeroOne();
+        f32 u = Fishmod_RandZeroOne(gFishmodRngNow);
         f32 f = (u < mode) ? sqrtf(u * mode) : 1.0f - sqrtf((1.0f - u) * (1.0f - mode));
 
         EnFishmod_SetLength(this, lo + (hi - lo) * f);
         this->fishState = FISH_STATE_WANDER;
         this->stateTimer = 0;
         // its looks (a roster fish gets its own from the manager)
-        this->look = (u8)Rand_ZeroFloat(256.0f);
+        this->look = (u8)Fishmod_RandZeroFloat(gFishmodRngNow, 256.0f);
         if (gFishmodSpawnLength > 0.0f) {
             // poured back from a bottle: its own size and looks, and off it goes
             EnFishmod_SetLength(this, gFishmodSpawnLength);
@@ -612,9 +612,9 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
     this->stamina = this->staminaMax;
     this->swimPhaseStep = 0.25f;
     this->swimMag = 1500.0f;
-    this->swimPhase = Rand_ZeroFloat(6.28f);
+    this->swimPhase = Fishmod_RandZeroFloat(gFishmodRngNow, 6.28f);
     this->swimGain = 1.0f;
-    this->depthPref = (u8)Rand_ZeroFloat(255.9f);
+    this->depthPref = (u8)Fishmod_RandZeroFloat(gFishmodRngNow, 255.9f);
     this->waterCell = -2;
     EnFishmod_WaterGridAcquire(play);
     this->actor.world.rot.y = this->actor.shape.rot.y;
@@ -662,8 +662,8 @@ s32 EnFishmod_FindWaterPoint(PlayState* play, Vec3f* center, f32 radius, f32 min
         f32 surface;
         f32 floor;
 
-        probe.x = center->x + Rand_CenteredFloat(2.0f * radius);
-        probe.z = center->z + Rand_CenteredFloat(2.0f * radius);
+        probe.x = center->x + Fishmod_RandCenteredFloat(gFishmodRngNow, 2.0f * radius);
+        probe.z = center->z + Fishmod_RandCenteredFloat(gFishmodRngNow, 2.0f * radius);
         if (!EnFishmod_WaterFloor(play, probe.x, probe.z, &surface, &floor, true)) {
             continue;
         }
@@ -672,7 +672,7 @@ s32 EnFishmod_FindWaterPoint(PlayState* play, Vec3f* center, f32 radius, f32 min
         }
         out->x = probe.x;
         out->z = probe.z;
-        out->y = floor + (surface - floor) * (0.3f + Rand_ZeroFloat(0.4f));
+        out->y = floor + (surface - floor) * (0.3f + Fishmod_RandZeroFloat(gFishmodRngNow, 0.4f));
         *outSurface = surface;
         *outFloor = floor;
         return true;
@@ -848,7 +848,7 @@ static void EnFishmod_PickWanderTarget(EnFishmod* this, PlayState* play) {
                                  CLAMP_MIN(12.0f, this->halfHeight * 2.0f + this->halfLength * 0.5f), &point,
                                  &surface, &floor)) {
         point.y = EnFishmod_DepthY(this, play, surface, floor);
-        if ((Rand_ZeroOne() < forage) && (point.y - floor < 80.0f)) {
+        if ((Fishmod_RandZeroOne(gFishmodRngNow) < forage) && (point.y - floor < 80.0f)) {
             // down to pick at the bottom, if it's near
             point.y = floor + this->halfHeight + 1.0f;
         }
@@ -856,7 +856,7 @@ static void EnFishmod_PickWanderTarget(EnFishmod* this, PlayState* play) {
     } else {
         this->target = this->actor.home.pos;
     }
-    this->stateTimer = 60 + (s16)Rand_ZeroFloat(120.0f);
+    this->stateTimer = 60 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 120.0f);
 }
 
 void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
@@ -874,7 +874,7 @@ void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
             this->stateTimer = 0;
             break;
         case FISH_STATE_INSPECT:
-            this->stateTimer = 30 + (s16)Rand_ZeroFloat(60.0f);
+            this->stateTimer = 30 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 60.0f);
             break;
         case FISH_STATE_NIBBLE:
             this->stateTimer = 12;
@@ -888,9 +888,9 @@ void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
             break;
         case FISH_STATE_FLEE:
             this->stateTimer = 50;
-            this->cooldown = 300 + (s16)Rand_ZeroFloat(300.0f);
+            this->cooldown = 300 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 300.0f);
             this->jumping = false;
-            this->startle = (Rand_ZeroOne() < 0.5f) ? 8 : -8;
+            this->startle = (Fishmod_RandZeroOne(gFishmodRngNow) < 0.5f) ? 8 : -8;
             this->restTimer = 0;
             break;
     }
@@ -1449,7 +1449,7 @@ static void Fish_Wander(EnFishmod* this, PlayState* play, FishAI* ai) {
             // the more active its time of day, the shorter its rests (about 1.5 to 12 seconds); hungry fish
             // rest less (they're out looking), frightened ones more (lying low)
             this->restTimer =
-                (30 + (s16)Rand_ZeroFloat(220.0f - EnFishmod_Activity(this) * 55.0f)) *
+                (30 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 220.0f - EnFishmod_Activity(this) * 55.0f)) *
                 (1.25f - 0.5f * MOOD_HUNGER(this) + 0.6f * MOOD_FEAR(this));
             if ((this->stateTimer != 0) && (this->target.y < this->floorY + this->halfHeight + 3.0f)) {
                 // reached the bottom it went down to: it picks at it and finds something
@@ -1496,7 +1496,7 @@ static void Fish_Wander(EnFishmod* this, PlayState* play, FishAI* ai) {
             notice = 0.0f;
         }
         if ((bobberDist < notice) &&
-            (Rand_ZeroOne() < b->curiosity * 0.0015f * EnFishmod_BaitAppeal(this) * keen) &&
+            (Fishmod_RandZeroOne(gFishmodRngNow) < b->curiosity * 0.0015f * EnFishmod_BaitAppeal(this) * keen) &&
             EnFishmod_OpenWaterTo(this, play, &rod->bobberPos)) {
             this->fishState = FISH_STATE_APPROACH;
             this->stateTimer = 200;
@@ -1581,7 +1581,7 @@ static void Fish_Inspect(EnFishmod* this, PlayState* play, FishAI* ai) {
     // reeling the bobber away too fast is suspicious to wary fish
     // (the bobber has moved away from the spot the fish is holding)
     if ((Math_Vec3f_DistXZ(&this->actor.world.pos, &hover) > 12.0f) &&
-        (Rand_ZeroOne() < b->wariness * 0.002f)) {
+        (Fishmod_RandZeroOne(gFishmodRngNow) < b->wariness * 0.002f)) {
         this->cooldown = 200;
         EnFishmod_FishSetState(this, FISH_STATE_WANDER);
         return;
@@ -1589,7 +1589,7 @@ static void Fish_Inspect(EnFishmod* this, PlayState* play, FishAI* ai) {
     if (this->stateTimer == 0) {
         if (this->nibblesLeft > 0) {
             EnFishmod_FishSetState(this, FISH_STATE_NIBBLE);
-        } else if (Rand_ZeroOne() <
+        } else if (Fishmod_RandZeroOne(gFishmodRngNow) <
                    (b->aggression * 0.012f * (0.6f + this->interest) * (0.5f + MOOD_HUNGER(this)))) {
             this->fishState = FISH_STATE_BITE;
             // a wind-up first: it draws back, then strikes (the bite comes when it reaches the bait)
@@ -1597,11 +1597,11 @@ static void Fish_Inspect(EnFishmod* this, PlayState* play, FishAI* ai) {
             this->biteStruck = false;
         } else {
             // lost interest
-            this->cooldown = 500 + (s16)Rand_ZeroFloat(300.0f);
+            this->cooldown = 500 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 300.0f);
             // a refusal the player can see: a sharp turn and a short dart away
             EnFishmod_FishSetState(this, FISH_STATE_FLEE);
             this->stateTimer = 22;
-            this->cooldown = 500 + (s16)Rand_ZeroFloat(300.0f);
+            this->cooldown = 500 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 300.0f);
         }
     }
 }
@@ -1632,7 +1632,7 @@ static void Fish_Nibble(EnFishmod* this, PlayState* play, FishAI* ai) {
         this->nibblesLeft--;
         this->jawRot = 0;
         this->fishState = FISH_STATE_INSPECT;
-        this->stateTimer = 15 + (s16)Rand_ZeroFloat(35.0f);
+        this->stateTimer = 15 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 35.0f);
     }
 }
 
@@ -1689,21 +1689,21 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
     if (--this->runTimer <= 0) {
         s16 awayYaw = Math_Vec3f_Yaw(&player->actor.world.pos, &this->actor.world.pos);
         f32 fresh = this->stamina / this->staminaMax;
-        f32 roll = Rand_ZeroOne();
+        f32 roll = Fishmod_RandZeroOne(gFishmodRngNow);
         s16 yaw;
 
         if ((fresh > 0.5f) && (roll < 0.15f)) {
             this->runKind = FISH_RUN_CHARGE;
-            yaw = awayYaw + 0x8000 + (s16)Rand_CenteredFloat(0x3000);
+            yaw = awayYaw + 0x8000 + (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x3000);
         } else if (roll < 0.55f) {
             this->runKind = FISH_RUN_ACROSS;
-            yaw = awayYaw + ((Rand_ZeroOne() < 0.5f) ? 0x3800 : -0x3800) + (s16)Rand_CenteredFloat(0x1000);
+            yaw = awayYaw + ((Fishmod_RandZeroOne(gFishmodRngNow) < 0.5f) ? 0x3800 : -0x3800) + (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x1000);
         } else {
             this->runKind = FISH_RUN_AWAY;
-            yaw = awayYaw + (s16)Rand_CenteredFloat(0x3000);
+            yaw = awayYaw + (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x3000);
         }
         this->runYaw = EnFishmod_OpenWaterYaw(this, play, yaw);
-        this->runTimer = 40 + (s16)Rand_ZeroFloat(70.0f);
+        this->runTimer = 40 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 70.0f);
         this->stateTimer = (s16)((12.0f + b->strength * 0.3f) * (0.3f + 0.7f * fresh));
         if (this->runKind == FISH_RUN_CHARGE) {
             this->stateTimer = this->stateTimer * 2 / 3;
@@ -1760,7 +1760,7 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
 
             // leap
             if ((gFishmodRodState.tension > 45.0f) && (this->stamina > this->staminaMax * 0.2f) &&
-                (Rand_ZeroOne() < b->jumpiness * 0.0004f)) {
+                (Fishmod_RandZeroOne(gFishmodRngNow) < b->jumpiness * 0.0004f)) {
                 Vec3f splash = this->actor.world.pos;
 
                 this->jumping = true;
