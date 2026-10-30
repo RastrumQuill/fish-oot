@@ -72,11 +72,10 @@ hashes before and after); stages that fix bugs or change behaviour say so and ar
 
 Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets), then 5-8, each in its own commits.
 
-## Decisions for the user
+## Decisions (made)
 
-- **L and the D-pad.** L now puts the rod on B; the roadmap wants debug behind holding L, and the D-pad as more C
-  buttons (but the test build's D-pad warps are there now). Options: rod only as a C item (L free for debug), or rod
-  on L and debug behind another combination.
-- **The save offset.** Fixing it at scene 110 moves the mod's block in release builds (it's at 101 now): records and
-  bottled fish in saves from the test builds so far would be lost (or a one-time move on load keeps them).
-- **Drop the stop and roam benches** (the play bench supersedes them) and the 4-bit texture toggle (no gain measured)?
+- **The rod is a C item only.** L no longer puts it on B; L is free for the debug gate (test builds only), and the
+  D-pad can become extra C buttons later. (This also removes the B-button stash bugs at their root.)
+- **The save block moves to scene 110**, and a save from the old builds has its block moved there once on load.
+- **Dropped:** the stop and roam benches, and the 4-bit prop texture toggle. Kept: the play bench, the area bench, the
+  play log.
