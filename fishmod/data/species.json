@@ -1,5 +1,5 @@
 {
-  "_doc": "Single source of truth for fish species. fishmod/tools/gen_species.py generates include/fishmod_species_data.h (game) and fishmod/wiki/species/*.md (wiki) from this file. Lengths are inches, weights pounds. Behavior values are 0-100. 'base' picks the model: bass or loach (object_fish). 'shape' scales the model: [length, height, width]. 'tint' is the RGB primitive color the model is multiplied by. 'scenes' lists where the fish lives with a spawn weight; 'status' is 'in-game' once it actually spawns somewhere. 'saveId' is the species' number in save files (its catch records, bottled fish): permanent, never reused or renumbered; a species that's dropped keeps its entry (status 'retired').",
+  "_doc": "Single source of truth for fish species. fishmod/tools/gen_species.py generates include/fishmod_species_data.h (game) and fishmod/wiki/species/*.md (wiki) from this file. Lengths are inches, weights pounds. Behavior values are 0-100. 'base' picks the model: bass or loach (object_fish). 'shape' scales the model: [length, height, width]. 'tint' is the RGB primitive color the model is multiplied by. 'scenes' lists where the fish lives with a spawn weight; 'status' is 'in-game' once it actually spawns somewhere. 'look': 'whiskers', 'koi' (red and black blotches placed by each fish's looks), 'curls' (curls hard into its turns and lies curled when it rests), the parts' tints and scales and the textures. 'saveId' is the species' number in save files (its catch records, bottled fish): permanent, never reused or renumbered; a species that's dropped keeps its entry (status 'retired').",
   "species": [
     {
       "id": "GREENGILL",
@@ -508,6 +508,7 @@
       "flavor": "A whiskered bottom-feeder first described by the villagers of Ordon. It lurks in the deepest, muddiest part of a pond and pulls like a stubborn goat once hooked.",
       "tips": "Fish the deepest water after dark. It takes its time and nibbles several times before the real bite, then fights long but never jumps.",
       "look": {
+        "curls": true,
         "whiskers": true,
         "parts": {
           "head": {
@@ -811,6 +812,7 @@
       "flavor": "An ornamental carp with red and white markings, kept in sacred waters since ancient times. The Kokiri say they swim in the forest for luck.",
       "tips": "Cruises near the surface on bright days. Curious, but picky: sweet bee larvae work best.",
       "look": {
+        "koi": true,
         "parts": {
           "head": {
             "tint": [
