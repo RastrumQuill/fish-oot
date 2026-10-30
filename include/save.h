@@ -469,7 +469,9 @@ typedef enum LinkAge {
 #define IS_NIGHT (gSaveContext.save.nightFlag == 1)
 
 #define SLOT(item) gItemSlots[item]
-#define INV_CONTENT(item) gSaveContext.save.info.inventory.items[SLOT(item)]
+// fishmod: the item page's slots past the vanilla 24 are kept in the mod's save block (INV_SLOT in fishmod.h)
+u8* Fishmod_InvSlot(s32 slot);
+#define INV_CONTENT(item) (*Fishmod_InvSlot(SLOT(item)))
 #define AMMO(item) gSaveContext.save.info.inventory.ammo[SLOT(item)]
 #define BEANS_BOUGHT AMMO(ITEM_MAGIC_BEAN + 1)
 

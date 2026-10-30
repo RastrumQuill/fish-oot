@@ -5,6 +5,7 @@
  */
 
 #include "fishmod.h"
+#include "assert.h"
 #include "fishmod_species_data.h"
 
 #include "array_count.h"
@@ -835,11 +836,37 @@ s32 Fishmod_CanUseRod(PlayState* play) {
 #include "tha.h"
 #include "fishmod_collision.h"
 
-/** The save block's new parts: the item page's six new slots start empty (a new file, or one from before). */
+// the save block fits in the unused scene flags, past every scene of any build (including the old block's place)
+static_assert(FISHMOD_SAVE_OLD_SCENE >= SCENE_ID_MAX, "a scene of this build would write over the old save block");
+static_assert(FISHMOD_SAVE_SCENE >= SCENE_ID_MAX, "a scene would write over the save block");
+static_assert((FISHMOD_SAVE_SCENE - FISHMOD_SAVE_OLD_SCENE) * sizeof(SavedSceneFlags) >= sizeof(FishmodSaveData),
+              "the old and new save blocks overlap (the move would need memmove)");
+static_assert(FISHMOD_SAVE_SCENE * sizeof(SavedSceneFlags) + sizeof(FishmodSaveData) <=
+                  sizeof(gSaveContext.save.info.sceneFlags),
+              "the save block doesn't fit in the scene flags");
+static_assert(sizeof(FishmodSaveData) == 0xAA, "the save block's layout changed: bump FISHMOD_SAVE_VERSION");
+static_assert(FISHMOD_SPECIES_MAX <= FISHMOD_SAVE_SPECIES_MAX, "more species than the save keeps records for");
+
+/**
+ * Bring a loaded (or new) file's save block up to this build: moved from where old builds kept it, then the
+ * item page's six new slots set up empty (a new file, or one from before them).
+ */
 void Fishmod_InitSaveExtras(void) {
+    FishmodSaveData* save = FISHMOD_SAVE;
     s32 i;
 
-    if (!(FISHMOD_SAVE->flags & FISHMOD_SAVE_FLAG_ITEMS)) {
+    if (save->magic != FISHMOD_SAVE_MAGIC) {
+        // a save from before the move, or a new file (whose old place is zeros too): no scene of this build has
+        // flags at the old place, so whatever is there is fishmod's
+        FishmodSaveData* old = (FishmodSaveData*)&gSaveContext.save.info.sceneFlags[FISHMOD_SAVE_OLD_SCENE];
+
+        bcopy(old, save, sizeof(FishmodSaveData));
+        bzero(old, sizeof(FishmodSaveData));
+        save->magic = FISHMOD_SAVE_MAGIC;
+        save->version = FISHMOD_SAVE_VERSION;
+    }
+
+    if (!(save->flags & FISHMOD_SAVE_FLAG_ITEMS)) {
         for (i = 0; i < ARRAY_COUNT(FISHMOD_SAVE->items); i++) {
             FISHMOD_SAVE->items[i] = ITEM_NONE;
         }

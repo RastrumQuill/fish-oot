@@ -80,6 +80,13 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
   outside the pond). The rod publishes its state every frame and resets it when destroyed and on scene load; bait is
   taken only with the rod in hand, from the bottle on the pressed button; the fight music stops whenever the line
   comes in without a catch. Test: `rodexit` (with `--testmode`).
+- **4: done.** The save block at scene 110 whatever the build, with a mark ('FM') and a version byte; a block without
+  the mark is moved once from scene 101 (where every build so far kept it) on load. Size and place checked at compile
+  time. Species have permanent save numbers (`saveId` in `species.json`; the generator refuses gaps and duplicates).
+  `INV_CONTENT` goes through the mod's slot lookup (giving the rod or a lure wrote past the vanilla 24 slots, into
+  the Deku Stick ammo). One SRAM map (`include/fishmod_sram.h`, read by the Python tools through `sram_map.py`); the
+  records every script writes are all past the saves, and only the bench and LOD ROMs (blank-save only, as before)
+  write over them. Test: `oldsave`.
 
 ## Decisions (made)
 

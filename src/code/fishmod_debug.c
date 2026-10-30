@@ -2643,9 +2643,10 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_EMPTY;
     gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_BOTTLE_2;
 #ifdef FISHMOD_SCRIPT_BUGS
-    // bugs in both C bottles
-    gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1] = ITEM_BOTTLE_BUG;
-    gSaveContext.save.info.equips.buttonItems[2] = ITEM_BOTTLE_BUG;
+    // the slingshot on C-Down (switching to it puts the rod away), bugs in the C-Right bottle
+    gSaveContext.save.info.inventory.items[SLOT_SLINGSHOT] = ITEM_SLINGSHOT;
+    gSaveContext.save.info.equips.buttonItems[2] = ITEM_SLINGSHOT;
+    gSaveContext.save.info.equips.cButtonSlots[1] = SLOT_SLINGSHOT;
     gSaveContext.save.info.inventory.items[SLOT_BOTTLE_2] = ITEM_BOTTLE_BUG;
     gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_BUG;
 #endif
@@ -2665,6 +2666,18 @@ void Fishmod_DebugBoot(void) {
     FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_BASS].bestTenths = 168;
     FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].count = 12;
     FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].bestTenths = 41;
+#endif
+#ifdef FISHMOD_SCRIPT_OLD_SAVE
+    // a file from an old build: the save block at the old place, without the mark; loading it moves it
+    {
+        FishmodSaveData* old = (FishmodSaveData*)&gSaveContext.save.info.sceneFlags[FISHMOD_SAVE_OLD_SCENE];
+
+        bcopy(FISHMOD_SAVE, old, sizeof(FishmodSaveData));
+        bzero(FISHMOD_SAVE, sizeof(FishmodSaveData));
+        old->magic = 0;
+        old->version = 0;
+        Fishmod_InitSaveExtras();
+    }
 #endif
 #ifdef FISHMOD_SCRIPT_ADULT
     // adult Link with the Iron Boots and Zora Tunic on (the debug save owns them), for walking the bottom of deep water

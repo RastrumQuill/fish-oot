@@ -203,10 +203,15 @@ typedef struct FishmodRodInfo {
 extern FishmodRodInfo gFishmodRodInfo;
 
 /*
- * Saved fishing data. The save file has scene flags for 124 scenes but the game only has SCENE_ID_MAX (110),
- * so the last 14 entries (392 bytes) are never used by anything; fishmod keeps its data there. Old saves
- * read as all zeros, which means "nothing caught yet".
+ * Saved fishing data. The save file has scene flags for 124 scenes; this build has 101 scenes (the debug ROM's test
+ * maps make 110), so the entries from 110 on are never used by anything: fishmod keeps its data at scene 110
+ * (fixed, whatever the build has). Builds before that kept it at scene 101, where it's moved from once on load
+ * (Fishmod_InitSaveExtras). A new file reads as all zeros, which means "nothing caught yet".
  */
+#define FISHMOD_SAVE_SCENE 110
+#define FISHMOD_SAVE_OLD_SCENE 101 // where builds before the move kept it
+#define FISHMOD_SAVE_MAGIC 0x464D  // 'FM': the block has been set up (moved, or begun) by this build or a later one
+#define FISHMOD_SAVE_VERSION 1
 #define FISHMOD_SAVE_SPECIES_MAX 32
 
 typedef struct FishmodSpeciesRecord {
@@ -224,7 +229,9 @@ typedef struct FishmodBottleFish {
 #define FISHMOD_BAIT_SLOTS 8 // the save's (unused) bait pouch; not tied to FISHMOD_BAIT_MAX
 
 typedef struct FishmodSaveData {
-    /* 0x00 */ u32 flags;
+    /* 0x00 */ u16 magic;   // FISHMOD_SAVE_MAGIC (zero in saves from before the move)
+    /* 0x02 */ u8 version;  // FISHMOD_SAVE_VERSION it was last brought up to
+    /* 0x03 */ u8 flags;    // (a u32 before: its low byte, so old flags read the same)
     /* 0x04 */ FishmodSpeciesRecord records[FISHMOD_SAVE_SPECIES_MAX];
     /* 0x84 */ u8 baitCount[FISHMOD_BAIT_SLOTS];  // the bait pouch
     /* 0x8C */ FishmodBottleFish bottleFish[6];    // per bottle (FISHMOD_BOTTLE_INDEX)
@@ -234,7 +241,7 @@ typedef struct FishmodSaveData {
 // FishmodSaveData.flags
 #define FISHMOD_SAVE_FLAG_ITEMS (1 << 0) // items[] set up (a save from before has zeros there, the Deku Stick's id)
 
-#define FISHMOD_SAVE ((FishmodSaveData*)&gSaveContext.save.info.sceneFlags[SCENE_ID_MAX])
+#define FISHMOD_SAVE ((FishmodSaveData*)&gSaveContext.save.info.sceneFlags[FISHMOD_SAVE_SCENE])
 
 /*
  * The item page (fishmod/docs/roadmap.md, mockup C): six columns and five rows. The vanilla 24 slots keep their

@@ -23,9 +23,10 @@ fixing them without breaking existing saves.
 - **Checksum:** a plain 16-bit sum of the `Save` words, stored in the save (`checksum`). Saving writes the file and
   then its backup with the same contents. On boot (`Sram_VerifyAndLoadAllSaves`) a file whose sum is wrong is
   replaced by its backup if the backup's sum is right, else it becomes a new file.
-- **The mod's debug builds use the unused tail** (`0x7A40` play log, `0x7B00` stall record, `0x7C00` fault record,
-  `0x7D00`-`0x7F00` collision/profile/stats records). The benches write their results at `0x0000`, over the header
-  and file 1: bench ROMs must never be run on a cart with a real save on it (they're debug-only).
+- **The mod's debug builds use the unused tail** (fingerprints, play log, stall, fault, collision, profile and stats
+  records), all listed in one map, `include/fishmod_sram.h` (the Python tools read it through
+  `fishmod/tools/sram_map.py`). The benches and the LOD jobs write their results over the saves, from `0x0000`: those
+  ROMs must never be run on a cart with a real save on it (they're debug-only).
 
 ## 2. The save (`Save`, 0x1354 bytes)
 
@@ -69,17 +70,22 @@ flags (0x20-0x3F, reset when you leave the scene), the respawn points (except Fa
 
 ## 3. What the mod stores, and where there's room
 
-The mod's block, `FishmodSaveData` (`include/fishmod.h`, 0xAA bytes), sits in the scene-flag entries past the last
-real scene (`sceneFlags[SCENE_ID_MAX]` on, 14 entries = 392 bytes that nothing in the game reads or writes; checked:
-every vanilla index into `sceneFlags` is a scene id or a dungeon map index). It's inside `Save`, so the checksum and
-the backup cover it. It holds: flags (bit 0: the item page's new slots are set up), the species records, the bait
-pouch, six bottled fish, and the item page's six new slots.
+The mod's block, `FishmodSaveData` (`include/fishmod.h`, 0xAA bytes), sits in the scene-flag entries past every
+scene: `sceneFlags[110]` on, a fixed place whatever the build (this NTSC 1.2 build has 101 scenes, the debug ROM's
+test maps make 110), 14 entries = 392 bytes that nothing in the game reads or writes (checked: every vanilla index
+into `sceneFlags` is a scene id or a dungeon map index). Builds before the refactor kept it at `sceneFlags[101]`
+(`SCENE_ID_MAX` of this build); on load, a block without its mark ('FM') is moved from there once
+(`Fishmod_InitSaveExtras`). It's inside `Save`, so the checksum and the backup cover it. It holds: the mark, a
+version, flags (bit 0: the item page's new slots are set up), the species records (by each species' permanent
+`saveId` in `fishmod/data/species.json`), the bait pouch, six bottled fish (also by `saveId`), and the item page's six
+new slots.
 
 Room left, all inside the checksummed `Save`:
 
 | Where | Bytes | Notes |
 |---|---|---|
 | `sceneFlags[110..123]` after the mod's block | 222 | the easiest: already the mod's |
+| `sceneFlags[101..109]` (the old place, cleared by the move) | 252 | free again |
 | `sceneFlags[*].unk` | 110 × 4 = 440 | one unused word per scene, never read or written (good for per-scene extras) |
 | the named gaps (`0x0E8C`, `0x0EB4`, `0x0F34`, `0x0F3C`, `0x12A1`, `0x1346`, `playerData` padding) | 16+4+4+4+36+2+19 = 85 | |
 
@@ -135,7 +141,7 @@ randomizer-only ones (Water Temple MQ lock, Shadow redeads, Dodongo's gossip fai
 
 - **Never move the vanilla layout.** Existing saves and the checksum keep working; everything new goes in the mod's
   block or the spare space above.
-- **A save version.** `FishmodSaveData.flags` already marks what's been set up (bit 0, the item page). Each fix that
+- **A save version.** `FishmodSaveData` has a version byte, and its flags mark what's been set up (bit 0, the item page). Each fix that
   must repair an old save gets a bit: on load (`Fishmod_InitSaveExtras`, called from `Sram_OpenSave`), a save
   without the bit is repaired once and marked. E.g. the nut upgrade: clear the stage flag if the upgrade isn't owned
   (as SoH does).
