@@ -2861,6 +2861,12 @@ void Fishmod_DebugBoot(void) {
     Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HYLIAN);
     SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA); // the lake full, as the test build has it
 #endif
+#ifdef FISHMOD_SCRIPT_EMPTY_ITEMS
+    // nothing on the item page (the pause-menu mockups draw their own icons on it)
+    memset(gSaveContext.save.info.inventory.items, ITEM_NONE, sizeof(gSaveContext.save.info.inventory.items));
+    gSaveContext.save.info.equips.buttonItems[2] = gSaveContext.save.info.equips.buttonItems[3] = ITEM_NONE;
+    gSaveContext.save.info.equips.cButtonSlots[1] = gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_NONE;
+#endif
     gSaveContext.respawnFlag = 0;
     gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = ENTR_LOAD_OPENING;
     gSaveContext.seqId = (u8)NA_BGM_DISABLED;
@@ -3773,6 +3779,9 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
     }
 #ifdef FISHMOD_PLAYLOG
     return; // played as the test build: the frame counter only
+#endif
+#ifdef FISHMOD_SCRIPT_NOTEXT
+    return; // clean screenshots (the pause-menu mockups)
 #endif
 #if defined(FISHMOD_BENCH_PLAY) || defined(FISHMOD_BENCH_AREA)
     if (!sTourDebugText) {
