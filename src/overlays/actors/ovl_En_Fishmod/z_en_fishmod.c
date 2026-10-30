@@ -45,7 +45,7 @@ ActorProfile En_Fishmod_Profile = {
     /**/ ACTOR_EN_FISHMOD,
     /**/ ACTORCAT_NPC,
     /**/ FLAGS,
-    /**/ OBJECT_FISH,
+    /**/ OBJECT_GAMEPLAY_KEEP, // the fish and the manager take object_fish themselves (EnFishmod_Init)
     /**/ sizeof(EnFishmod),
     /**/ EnFishmod_Init,
     /**/ EnFishmod_Destroy,
@@ -486,6 +486,19 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
 
     this->type = FISHMOD_GET_TYPE(thisx->params);
 
+    // The rod and the beehive chunk work in any scene; the fish and their manager draw from object_fish, which only
+    // scenes with fish load.
+    if ((this->type == FISHMOD_TYPE_FISH) || (this->type == FISHMOD_TYPE_MANAGER)) {
+        s32 slot = Object_GetSlot(&play->objectCtx, OBJECT_FISH);
+
+        if (slot < 0) {
+            this->type = FISHMOD_TYPE_UNUSED;
+            Actor_Kill(thisx);
+            return;
+        }
+        thisx->objectSlot = slot;
+    }
+
     if (this->type == FISHMOD_TYPE_MANAGER) {
         EnFishmod_ManagerInit(this, play);
         return;
@@ -610,7 +623,7 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
 void EnFishmod_Destroy(Actor* thisx, PlayState* play) {
     EnFishmod* this = (EnFishmod*)thisx;
 
-    if (this->type == FISHMOD_TYPE_COMB) {
+    if ((this->type == FISHMOD_TYPE_COMB) || (this->type == FISHMOD_TYPE_UNUSED)) {
         return;
     }
     if (this->type == FISHMOD_TYPE_MANAGER) {

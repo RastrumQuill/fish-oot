@@ -133,15 +133,20 @@ void Fishmod_RosterSetCaught(s16 sceneId, s32 day, s32 index) {
     entry->day = day;
 }
 
+/** The scene has fish (a spawn table; or a debug job wants them): their object, the manager, the roster. */
+s32 Fishmod_SceneHasFish(PlayState* play) {
+    return (Fishmod_GetSceneSpawns(play->sceneId) != NULL)
+#if FISHMOD_DEBUG
+           || Fishmod_DebugWantsFish()
+#endif
+        ;
+}
+
 void Fishmod_OnSceneLoad(PlayState* play) {
     gFishmodRod = NULL;
     Fishmod_ResetRodInfo();
 
-    if ((Fishmod_GetSceneSpawns(play->sceneId) == NULL)
-#if FISHMOD_DEBUG
-        && !Fishmod_DebugWantsFish()
-#endif
-    ) {
+    if (!Fishmod_SceneHasFish(play)) {
         return;
     }
 
@@ -245,7 +250,13 @@ void Fishmod_PlayUpdate(PlayState* play) {
     }
 #endif
 
-    if ((gFishmodRod != NULL) || (Fishmod_GetSceneSpawns(play->sceneId) == NULL) || (GET_PLAYER(play) == NULL)) {
+    // The rod's controller: from the start in a scene with fish (it brings the manager and the scene's extras), and
+    // in any other scene once Link takes the rod out (it goes again when he puts it away). Not in the Fishing Pond,
+    // whose own fishing actor runs the rod there.
+    if ((gFishmodRod != NULL) || (GET_PLAYER(play) == NULL) || (play->sceneId == SCENE_FISHING_POND)) {
+        return;
+    }
+    if (!Fishmod_SceneHasFish(play) && (GET_PLAYER(play)->heldItemAction != PLAYER_IA_FISHING_POLE)) {
         return;
     }
 
@@ -254,7 +265,9 @@ void Fishmod_PlayUpdate(PlayState* play) {
     if (rod != NULL) {
         rod->room = -1; // persists through room changes
         gFishmodRod = rod;
-        Fishmod_SpawnSceneExtras(play);
+        if (Fishmod_SceneHasFish(play)) {
+            Fishmod_SpawnSceneExtras(play);
+        }
     }
 }
 
@@ -824,8 +837,9 @@ void Fishmod_DrawFps(Gfx** gfxP) {
 }
 #endif
 
+/** Link can cast: the rod's controller is there (any scene but the Fishing Pond, whose own actor runs the rod). */
 s32 Fishmod_CanUseRod(PlayState* play) {
-    return (gFishmodRod != NULL) && (Fishmod_GetSceneSpawns(play->sceneId) != NULL);
+    return gFishmodRod != NULL;
 }
 
 /* Baked water floor maps (fishmod/tools/gen_watermap.py) */
