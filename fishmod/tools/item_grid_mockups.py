@@ -49,7 +49,7 @@ TEXTURE_ITEMS = {
     "bottle_red": "gItemIconBottlePotionRedTex.rgba32.png",
     "bottle_blue_fire": "gItemIconBottleBlueFireTex.rgba32.png",
     "bottle_milk": "gItemIconBottleMilkFullTex.rgba32.png",
-    "bottle_larva": os.path.join(ROOT, "fishmod/art/bottle_larva_3.png"),
+    "bottle_larva": os.path.join(ROOT, "src/fishmod_data/art/bottle_larva_3.png"),
 }
 NAMES = {"rod": "Fishing Rod", "lure_crank": "Crankbait", "lure_frog": "Frog Lure", "lure_sink": "Sinking Lure"}
 

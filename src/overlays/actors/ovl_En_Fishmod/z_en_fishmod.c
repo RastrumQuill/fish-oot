@@ -102,7 +102,7 @@ static u8 sSmallLimbParts[] = {
     FISHMOD_PART_TAIL,      // 5 tail fin
 };
 
-#include "fishmod_textures.inc.c"
+#include "src/fishmod_data/fishmod_textures.inc.c" // (generated at build: gen_textures.py)
 
 // Pond textures for each role (back, belly, head, side, fin); must match BASE_TEXTURES in gen_textures.py
 static void* sTextureRoles[3][FISHMOD_TEX_ROLE_MAX] = {

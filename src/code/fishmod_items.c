@@ -16,7 +16,7 @@
 #include "segment_symbols.h"
 #include "stddef.h"
 
-#include "fishmod_bait_icons.inc.c"
+#include "src/fishmod_data/fishmod_bait_icons.inc.c" // (generated at build: gen_bait_icons.py)
 
 DECLARE_ROM_SEGMENT(fishmod_item_page)
 

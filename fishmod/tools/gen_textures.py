@@ -3,7 +3,7 @@
 Generates per-species fish textures from the Fishing Pond textures and the "textures" section of each
 species' "look" in fishmod/data/species.json.
 
-  src/overlays/actors/ovl_En_Fishmod/fishmod_textures.inc.c   texture data + per-species table (C)
+  src/fishmod_data/fishmod_textures.inc.c                     texture data + per-species table (C; made at build)
   fishmod/out/textures_preview.png                           all generated textures, enlarged
 
 Each texture role (back, belly, head, side, fin) maps to one texture of the base model. A species lists
@@ -36,7 +36,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DATA = os.path.join(ROOT, "fishmod", "data", "species.json")
 OBJ = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "objects", "object_fish")
 KEEP = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "objects", "gameplay_keep")
-OUT_C = os.path.join(ROOT, "src", "overlays", "actors", "ovl_En_Fishmod", "fishmod_textures.inc.c")
+OUT_C = os.path.join(ROOT, "src", "fishmod_data", "fishmod_textures.inc.c")  # (from the game's textures: not committed)
 OUT_PREVIEW = os.path.join(ROOT, "fishmod", "out", "textures_preview.png")
 
 # role -> (texture symbol) per base model; must match sTextureRoles in z_en_fishmod.c
