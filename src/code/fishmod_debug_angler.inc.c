@@ -1,7 +1,7 @@
 // Part of fishmod_debug.c (#included there, sharing its statics): the auto-angler (FISHMOD_AUTO_ANGLER).
 #ifdef FISHMOD_AUTO_ANGLER
     // after the script: play the fishing game from the rod's state (for testing the whole loop)
-    if (!sScriptActive && sPlacedPlayer && (sScriptStepIndex >= (s32)ARRAY_COUNT(sScriptSteps))) {
+    if (!sScriptActive && sPlacedPlayer && (sScriptStepIndex >= sScript.numSteps)) {
         static s32 sAnglerTimer;
         static s32 sAnglerLastState;
         static s32 sAnglerLastBiting;

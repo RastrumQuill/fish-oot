@@ -383,7 +383,7 @@ static const u16 sPbTimes[4] = { CLOCK_TIME(6, 30), CLOCK_TIME(12, 0), CLOCK_TIM
 static const u8 sPbOrder[BENCH_CONDS] = { 0, 5, 2, 7, 4, 1, 6, 3 };
 
 
-/** Rain on or off without loading the scene again (the day's own weather is clear: FISHMOD_SCRIPT_DAY). */
+/** Rain on or off without loading the scene again (the day's own weather is clear: the script's day). */
 static void PlayBench_SetRain(PlayState* play, s32 rain) {
     EnvironmentContext* envCtx = &play->envCtx;
 
@@ -831,7 +831,7 @@ static void Fishmod_AreaBenchUpdate(PlayState* play) {
     sAreaButton = 0;
     sAreaActive = true;
     gSaveContext.save.info.playerData.health = gSaveContext.save.info.playerData.healthCapacity;
-    gSaveContext.save.dayTime = FISHMOD_SCRIPT_TIME;
+    gSaveContext.save.dayTime = sScript.dayTime;
     {
         Actor* actor = play->actorCtx.actorLists[ACTORCAT_NPC].head;
 

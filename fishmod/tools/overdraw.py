@@ -15,6 +15,10 @@ import os
 import re
 
 import numpy as np
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import prop_kinds as pk  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 W, H = 320, 240
@@ -29,15 +33,13 @@ DIST_UNDER_FOG = 900.0  # under water nothing further is drawn
 SURFACE_Y = -1313.0     # Lake Hylia's full lake
 # the big plant cards and their heights at scale 1 (gen_scatter.py HEIGHT): what FISHMOD_HW skips with the camera
 # inside
-THIN = {"GRASS_TUFT": 16, "RIBBON_WEED": 80, "TALL_WEED": 190, "BROADLEAF": 40, "BUSH_WEED": 42, "KELP_FROND": 260,
-        "VINE_STRAND": 150, "BIG_PONDWEED": 52, "FAN_WEED": 44}
+THIN = {k.upper(): pk.HEIGHT[k] for k in pk.flagged("card")}
 VIEW_COS = 0.68
 PROP_RADIUS = 90.0
 BAND_NEAR, BAND_MID = 550.0, 1100.0
-SMALL = {"GRASS_TUFT", "LEAF_LITTER"}
-MID = {"POND_REED", "PEBBLE_PATCH", "RIBBON_WEED", "BROADLEAF", "BUSH_WEED", "BRANCH", "LILY_FLOWER", "LILY_CENTRE",
-       "RUSH_TUFT", "MARIGOLD", "VINE_STRAND", "BIG_PONDWEED"}
-XLU = {"POND_REED"}
+SMALL = {k.upper() for k in pk.GAME if pk.BY_NAME[k]["dist"] == "small"}
+MID = {k.upper() for k in pk.GAME if pk.BY_NAME[k]["dist"] == "mid"}
+XLU = {k.upper() for k in pk.flagged("xlu")}
 VANILLA = {"POND_REED": "gFishingReedModelDL", "LILY_PAD": "gFishingLilyPadModelDL", "ROCK": "gFishingRockModelDL"}
 
 
@@ -47,10 +49,7 @@ def read(p):
 
 
 def kinds():
-    t = read("src/fishmod_data/fishmod_props_kinds.h")
-    block = t[t.index("#define FISHMOD_PROP_KINDS(X)"):]
-    block = block[:block.index("\n\n")] if "\n\n" in block else block
-    return re.findall(r"X\((\w+), (\w+)\)", block)
+    return [(k.upper(), k) for k in pk.GAME]
 
 
 VTX = re.compile(r"VTX\(\s*(-?\w+),\s*(-?\w+),\s*(-?\w+),")

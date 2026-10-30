@@ -89,6 +89,134 @@ static FishmodAutoplayStep sScriptSteps[] = {
 };
 #endif
 
+/*
+ * The script as data: where Link starts, the save he starts from, what the harness does for him, and the input steps.
+ * A script (fishmod/scripts/*.inc.c) sets these with FISHMOD_SCRIPT_* defines, so a variant can include a base and
+ * change a few; the defines are read here only, everything else reads sScript. (The defines that pick a job, such as
+ * FISHMOD_PHOTO or FISHMOD_HWBENCH, still choose which job's code is built.)
+ */
+typedef enum FishmodScriptFlag {
+    FISHMOD_SCRIPT_F_ADULT = 1 << 0,       // adult, Iron Boots and Zora Tunic, the lake full
+    FISHMOD_SCRIPT_F_BUGS = 1 << 1,        // the slingshot on C-Down, bugs in the C-Right bottle
+    FISHMOD_SCRIPT_F_EMPTY_ITEMS = 1 << 2, // nothing on the item page
+    FISHMOD_SCRIPT_F_OLD_SAVE = 1 << 3,    // the save block where old builds kept it
+    FISHMOD_SCRIPT_F_NORMAL_BOOT = 1 << 4, // played from power-on (title, file select); Link isn't moved
+    FISHMOD_SCRIPT_F_NOTEXT = 1 << 5,      // no debug text (clean screenshots)
+    FISHMOD_SCRIPT_F_NO_PROPCOL = 1 << 6,  // the props' collision left out
+    FISHMOD_SCRIPT_F_ALTEDGE = 1 << 7,     // the props' other edge mode from the start
+    FISHMOD_SCRIPT_F_HIVE = 1 << 8,        // a beehive in front of Link
+    FISHMOD_SCRIPT_F_WALK = 1 << 9,        // Link walks to walkTo (from frame 60)
+    FISHMOD_SCRIPT_F_PROBE = 1 << 10,      // and reports his height near walkProbe
+    FISHMOD_SCRIPT_F_RELEASE = 1 << 11     // a fish with known looks poured from a bottle at releaseAt
+} FishmodScriptFlag;
+
+typedef struct FishmodScript {
+    Vec3f startPos;
+    s16 startYaw;
+    u16 entrance;
+    u16 dayTime;
+    s16 day;
+    s16 roster; // fish in the scene's roster (0: the scene's own count)
+    u16 flags;  // FishmodScriptFlag
+    Vec3f walkTo;
+    Vec3f walkProbe;
+    Vec3f releaseAt;
+    FishmodAutoplayStep* steps;
+    s32 numSteps;
+} FishmodScript;
+
+#ifndef FISHMOD_SCRIPT_ENTRANCE
+#define FISHMOD_SCRIPT_ENTRANCE ENTR_KOKIRI_FOREST_0
+#endif
+#ifndef FISHMOD_SCRIPT_TIME
+#define FISHMOD_SCRIPT_TIME CLOCK_TIME(10, 0)
+#endif
+#ifndef FISHMOD_SCRIPT_DAY
+#define FISHMOD_SCRIPT_DAY 1 // a clear day at Kokiri Forest and Lake Hylia (the weather is rolled per spot per day)
+#endif
+#ifndef FISHMOD_SCRIPT_ROSTER
+#define FISHMOD_SCRIPT_ROSTER 0
+#endif
+#ifdef FISHMOD_SCRIPT_ADULT
+#define SF_ADULT FISHMOD_SCRIPT_F_ADULT
+#else
+#define SF_ADULT 0
+#endif
+#ifdef FISHMOD_SCRIPT_BUGS
+#define SF_BUGS FISHMOD_SCRIPT_F_BUGS
+#else
+#define SF_BUGS 0
+#endif
+#ifdef FISHMOD_SCRIPT_EMPTY_ITEMS
+#define SF_EMPTY_ITEMS FISHMOD_SCRIPT_F_EMPTY_ITEMS
+#else
+#define SF_EMPTY_ITEMS 0
+#endif
+#ifdef FISHMOD_SCRIPT_OLD_SAVE
+#define SF_OLD_SAVE FISHMOD_SCRIPT_F_OLD_SAVE
+#else
+#define SF_OLD_SAVE 0
+#endif
+#ifdef FISHMOD_SCRIPT_NORMAL_BOOT
+#define SF_NORMAL_BOOT FISHMOD_SCRIPT_F_NORMAL_BOOT
+#else
+#define SF_NORMAL_BOOT 0
+#endif
+#ifdef FISHMOD_SCRIPT_NOTEXT
+#define SF_NOTEXT FISHMOD_SCRIPT_F_NOTEXT
+#else
+#define SF_NOTEXT 0
+#endif
+#ifdef FISHMOD_SCRIPT_NO_PROPCOL
+#define SF_NO_PROPCOL FISHMOD_SCRIPT_F_NO_PROPCOL
+#else
+#define SF_NO_PROPCOL 0
+#endif
+#ifdef FISHMOD_SCRIPT_ALTEDGE
+#define SF_ALTEDGE FISHMOD_SCRIPT_F_ALTEDGE
+#else
+#define SF_ALTEDGE 0
+#endif
+#ifdef FISHMOD_SCRIPT_TEST_HIVE
+#define SF_HIVE FISHMOD_SCRIPT_F_HIVE
+#else
+#define SF_HIVE 0
+#endif
+#ifdef FISHMOD_SCRIPT_WALK_TO
+#define SF_WALK FISHMOD_SCRIPT_F_WALK
+#else
+#define SF_WALK 0
+#define FISHMOD_SCRIPT_WALK_TO { 0.0f, 0.0f, 0.0f }
+#endif
+#ifdef FISHMOD_SCRIPT_WALK_PROBE
+#define SF_PROBE FISHMOD_SCRIPT_F_PROBE
+#else
+#define SF_PROBE 0
+#define FISHMOD_SCRIPT_WALK_PROBE { 0.0f, 0.0f, 0.0f }
+#endif
+#ifdef FISHMOD_SCRIPT_TEST_RELEASE
+#define SF_RELEASE FISHMOD_SCRIPT_F_RELEASE
+#else
+#define SF_RELEASE 0
+#define FISHMOD_SCRIPT_TEST_RELEASE { 0.0f, 0.0f, 0.0f }
+#endif
+
+static FishmodScript sScript = {
+    { 0.0f, 0.0f, 0.0f }, // (sScriptStartPos: copied in at boot)
+    0,
+    FISHMOD_SCRIPT_ENTRANCE,
+    FISHMOD_SCRIPT_TIME,
+    FISHMOD_SCRIPT_DAY,
+    FISHMOD_SCRIPT_ROSTER,
+    SF_ADULT | SF_BUGS | SF_EMPTY_ITEMS | SF_OLD_SAVE | SF_NORMAL_BOOT | SF_NOTEXT | SF_NO_PROPCOL | SF_ALTEDGE |
+        SF_HIVE | SF_WALK | SF_PROBE | SF_RELEASE,
+    FISHMOD_SCRIPT_WALK_TO,
+    FISHMOD_SCRIPT_WALK_PROBE,
+    FISHMOD_SCRIPT_TEST_RELEASE,
+    sScriptSteps,
+    ARRAY_COUNT(sScriptSteps),
+};
+
 #include "fishmod_debug_photo.inc.c" // the photo booth for the wiki renders (FISHMOD_PHOTO)
 
 #include "fishmod_debug_studio.inc.c" // the animation studio (FISHMOD_ANIM_STUDIO)
@@ -428,23 +556,16 @@ static char sDebugLines[FISHMOD_DEBUG_LINES][FISHMOD_DEBUG_LINE_LEN];
 s32 gFishmodNoPropCol;
 
 void Fishmod_DebugBoot(void) {
-#ifdef FISHMOD_SCRIPT_NO_PROPCOL
-    gFishmodNoPropCol = true;
-#endif
+    sScript.startPos = sScriptStartPos;
+    sScript.startYaw = sScriptStartYaw;
+    gFishmodNoPropCol = (sScript.flags & FISHMOD_SCRIPT_F_NO_PROPCOL) != 0;
     gSaveContext.save.linkAge = LINK_AGE_CHILD;
     gSaveContext.fileNum = 0xFF;
     Sram_InitDebugSave();
     SET_EVENTCHKINF(EVENTCHKINF_B1); // Lake Hylia's intro cutscene seen: it would take the camera from the tour
 
-    gSaveContext.save.dayTime = CLOCK_TIME(10, 0);
-#ifdef FISHMOD_SCRIPT_TIME
-    gSaveContext.save.dayTime = FISHMOD_SCRIPT_TIME;
-#endif
-    // day 1: a clear day at Kokiri Forest and Lake Hylia (the weather is rolled per spot per day)
-    gSaveContext.save.totalDays = 1;
-#ifdef FISHMOD_SCRIPT_DAY
-    gSaveContext.save.totalDays = FISHMOD_SCRIPT_DAY;
-#endif
+    gSaveContext.save.dayTime = sScript.dayTime;
+    gSaveContext.save.totalDays = sScript.day;
     gSaveContext.save.cutsceneIndex = 0;
 
     // Rod on C-Left, two empty bottles on C-Down / C-Right slots; the lures, and bottles 5 and 6 (one with milk).
@@ -462,22 +583,18 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.save.info.equips.cButtonSlots[1] = SLOT_BOTTLE_1;
     gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_EMPTY;
     gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_BOTTLE_2;
-#ifdef FISHMOD_SCRIPT_BUGS
-    // the slingshot on C-Down (switching to it puts the rod away), bugs in the C-Right bottle
-    gSaveContext.save.info.inventory.items[SLOT_SLINGSHOT] = ITEM_SLINGSHOT;
-    gSaveContext.save.info.equips.buttonItems[2] = ITEM_SLINGSHOT;
-    gSaveContext.save.info.equips.cButtonSlots[1] = SLOT_SLINGSHOT;
-    gSaveContext.save.info.inventory.items[SLOT_BOTTLE_2] = ITEM_BOTTLE_BUG;
-    gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_BUG;
-#endif
+    if (sScript.flags & FISHMOD_SCRIPT_F_BUGS) {
+        // the slingshot on C-Down (switching to it puts the rod away), bugs in the C-Right bottle
+        gSaveContext.save.info.inventory.items[SLOT_SLINGSHOT] = ITEM_SLINGSHOT;
+        gSaveContext.save.info.equips.buttonItems[2] = ITEM_SLINGSHOT;
+        gSaveContext.save.info.equips.cButtonSlots[1] = SLOT_SLINGSHOT;
+        gSaveContext.save.info.inventory.items[SLOT_BOTTLE_2] = ITEM_BOTTLE_BUG;
+        gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_BUG;
+    }
 
     gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
         gSaveContext.buttonStatus[3] = gSaveContext.buttonStatus[4] = BTN_ENABLED;
-#ifdef FISHMOD_SCRIPT_ENTRANCE
-    gSaveContext.save.entranceIndex = FISHMOD_SCRIPT_ENTRANCE;
-#else
-    gSaveContext.save.entranceIndex = ENTR_KOKIRI_FOREST_0;
-#endif
+    gSaveContext.save.entranceIndex = sScript.entrance;
 #ifdef FISHMOD_JOURNAL_TEST
     // a few catches for the journal pages
     FISHMOD_SAVE->records[FISHMOD_SPECIES_GREENGILL].count = 7;
@@ -487,37 +604,37 @@ void Fishmod_DebugBoot(void) {
     FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].count = 12;
     FISHMOD_SAVE->records[FISHMOD_SPECIES_HYRULE_MINNOW].bestTenths = 41;
 #endif
-#ifdef FISHMOD_SCRIPT_OLD_SAVE
-    // a file from an old build: the save block at the old place, without the mark; loading it moves it
-    {
-        FishmodSaveData* old = (FishmodSaveData*)&gSaveContext.save.info.sceneFlags[FISHMOD_SAVE_OLD_SCENE];
+    if (sScript.flags & FISHMOD_SCRIPT_F_OLD_SAVE) {
+        // a file from an old build: the save block at the old place, without the mark; loading it moves it
+        {
+            FishmodSaveData* old = (FishmodSaveData*)&gSaveContext.save.info.sceneFlags[FISHMOD_SAVE_OLD_SCENE];
 
-        bcopy(FISHMOD_SAVE, old, sizeof(FishmodSaveData));
-        bzero(FISHMOD_SAVE, sizeof(FishmodSaveData));
-        old->magic = 0;
-        old->version = 0;
-        Fishmod_InitSaveExtras();
+            bcopy(FISHMOD_SAVE, old, sizeof(FishmodSaveData));
+            bzero(FISHMOD_SAVE, sizeof(FishmodSaveData));
+            old->magic = 0;
+            old->version = 0;
+            Fishmod_InitSaveExtras();
+        }
     }
-#endif
-#ifdef FISHMOD_SCRIPT_ADULT
-    // adult Link with the Iron Boots and Zora Tunic on (the debug save owns them), for walking the bottom of deep water
-    gSaveContext.save.linkAge = LINK_AGE_ADULT;
-    gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_MASTER;
-    Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_MASTER);
-    Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_IRON);
-    Inventory_ChangeEquipment(EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_ZORA); // no drowning
-    Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HYLIAN);
-    SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA); // the lake full, as the test build has it
-#endif
-#ifdef FISHMOD_SCRIPT_EMPTY_ITEMS
-    // nothing on the item page (the pause-menu mockups draw their own icons on it)
-    memset(gSaveContext.save.info.inventory.items, ITEM_NONE, sizeof(gSaveContext.save.info.inventory.items));
-    memset(FISHMOD_SAVE->items, ITEM_NONE, sizeof(FISHMOD_SAVE->items));
-    gSaveContext.save.info.equips.buttonItems[1] = ITEM_NONE;
-    gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_NONE;
-    gSaveContext.save.info.equips.buttonItems[2] = gSaveContext.save.info.equips.buttonItems[3] = ITEM_NONE;
-    gSaveContext.save.info.equips.cButtonSlots[1] = gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_NONE;
-#endif
+    if (sScript.flags & FISHMOD_SCRIPT_F_ADULT) {
+        // adult Link with the Iron Boots and Zora Tunic on (the debug save owns them), for walking the bottom of deep water
+        gSaveContext.save.linkAge = LINK_AGE_ADULT;
+        gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_MASTER;
+        Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_MASTER);
+        Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_IRON);
+        Inventory_ChangeEquipment(EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_ZORA); // no drowning
+        Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HYLIAN);
+        SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA); // the lake full, as the test build has it
+    }
+    if (sScript.flags & FISHMOD_SCRIPT_F_EMPTY_ITEMS) {
+        // nothing on the item page (the pause-menu mockups draw their own icons on it)
+        memset(gSaveContext.save.info.inventory.items, ITEM_NONE, sizeof(gSaveContext.save.info.inventory.items));
+        memset(FISHMOD_SAVE->items, ITEM_NONE, sizeof(FISHMOD_SAVE->items));
+        gSaveContext.save.info.equips.buttonItems[1] = ITEM_NONE;
+        gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_NONE;
+        gSaveContext.save.info.equips.buttonItems[2] = gSaveContext.save.info.equips.buttonItems[3] = ITEM_NONE;
+        gSaveContext.save.info.equips.cButtonSlots[1] = gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_NONE;
+    }
     gSaveContext.respawnFlag = 0;
     gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = ENTR_LOAD_OPENING;
     gSaveContext.seqId = (u8)NA_BGM_DISABLED;
@@ -525,9 +642,9 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.showTitleCard = false;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
 
-#ifdef FISHMOD_SCRIPT_ALTEDGE
-    gFishmodBench |= FISHMOD_BENCH_ALTEDGE; // the props' other edge mode from the start
-#endif
+    if (sScript.flags & FISHMOD_SCRIPT_F_ALTEDGE) {
+        gFishmodBench |= FISHMOD_BENCH_ALTEDGE; // the props' other edge mode from the start
+    }
     sScriptStepIndex = 0;
     sScriptStepFrame = 0;
     sScriptActive = false;
@@ -541,16 +658,15 @@ s32 Fishmod_DebugWantsFish(void) {
 }
 
 s32 Fishmod_DebugNormalBoot(void) {
-#ifdef FISHMOD_SCRIPT_NORMAL_BOOT
+    if (!(sScript.flags & FISHMOD_SCRIPT_F_NORMAL_BOOT)) {
+        return false;
+    }
     // the script plays from power-on: through the title and file select, and Link is never moved
     sScriptStepIndex = 0;
     sScriptStepFrame = 0;
     sScriptActive = true;
     sPlacedPlayer = true;
     return true;
-#else
-    return false;
-#endif
 }
 
 OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
@@ -684,21 +800,15 @@ static void Fishmod_DebugTiming(void) {
 }
 
 s32 Fishmod_DebugRosterCount(void) {
-#ifdef FISHMOD_SCRIPT_ROSTER
-    return FISHMOD_SCRIPT_ROSTER;
-#else
-    return 0;
-#endif
+    return sScript.roster;
 }
 
 #include "fishmod_debug_playlog.inc.c" // the play log (FISHMOD_PLAYLOG)
 
-#ifdef FISHMOD_SCRIPT_WALK_TO
 // the script's walk: Link is steered (by the camera, as the stick works) toward a point, from frame 60 until there
 static s8 sWalkStickX;
 static s8 sWalkStickY;
 static s32 sWalking;
-#endif
 #ifdef FISHMOD_HWBENCH
 static void Watchdog_Start(void);
 static volatile u32 sWatchdogBeat;
@@ -760,28 +870,24 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #ifdef FISHMOD_SCRIPT
     StateHash_Update(play);
 #endif
-#ifdef FISHMOD_SCRIPT_WALK_TO
-    if ((player != NULL) && sPlacedPlayer && (sPlayFrames > 60)) {
-        static const Vec3f sTo = FISHMOD_SCRIPT_WALK_TO;
-        f32 dx = sTo.x - player->actor.world.pos.x;
-        f32 dz = sTo.z - player->actor.world.pos.z;
+    if ((sScript.flags & FISHMOD_SCRIPT_F_WALK) && (player != NULL) && sPlacedPlayer && (sPlayFrames > 60)) {
+        f32 dx = sScript.walkTo.x - player->actor.world.pos.x;
+        f32 dz = sScript.walkTo.z - player->actor.world.pos.z;
 
         sWalking = (SQ(dx) + SQ(dz)) > SQ(30.0f);
-#ifdef FISHMOD_SCRIPT_WALK_PROBE
-        {
+        if (sScript.flags & FISHMOD_SCRIPT_F_PROBE) {
             // his highest point while near the probe (a rock's middle): does he step up onto it?
-            static const Vec3f sProbe = FISHMOD_SCRIPT_WALK_PROBE;
+            Vec3f* probe = &sScript.walkProbe;
             static f32 sTop = -32000.0f;
             static f32 sLow = 32000.0f;
 
-            if (SQ(player->actor.world.pos.x - sProbe.x) + SQ(player->actor.world.pos.z - sProbe.z) < SQ(30.0f)) {
+            if (SQ(player->actor.world.pos.x - probe->x) + SQ(player->actor.world.pos.z - probe->z) < SQ(30.0f)) {
                 sTop = MAX(sTop, player->actor.world.pos.y);
             } else {
                 sLow = MIN(sLow, player->actor.world.pos.y);
             }
             Fishmod_DebugPrintf(4, "walk probe: highest near %d, lowest off %d", (s32)sTop, (s32)sLow);
         }
-#endif
         if (sWalking) {
             s16 rel = Math_Atan2S(dz, dx) - Camera_GetInputDirYaw(GET_ACTIVE_CAM(play));
 
@@ -789,7 +895,6 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             sWalkStickY = (s8)(Math_CosS(rel) * 60);
         }
     }
-#endif
 #ifdef FISHMOD_HWBENCH
     sWatchdogBeat = sPlayFrames;
     Watchdog_Start();
@@ -802,34 +907,30 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     // Wait for the scene transition to finish, then place Link at the test spot and start the script.
     if (!sPlacedPlayer && (player != NULL) && (sPlayFrames > 20) && (play->transitionTrigger == TRANS_TRIGGER_OFF) &&
         (play->transitionMode == TRANS_MODE_OFF)) {
-        player->actor.world.pos = player->actor.prevPos = player->actor.home.pos = sScriptStartPos;
-        player->actor.shape.rot.y = player->actor.world.rot.y = player->yaw = sScriptStartYaw;
+        player->actor.world.pos = player->actor.prevPos = player->actor.home.pos = sScript.startPos;
+        player->actor.shape.rot.y = player->actor.world.rot.y = player->yaw = sScript.startYaw;
         sPlacedPlayer = true;
 #ifdef FISHMOD_SCRIPT
         sScriptActive = true;
         // the same random numbers every run, so benchmark runs of different builds start alike
         Rand_Seed(0x46495348);
 #endif
-#ifdef FISHMOD_SCRIPT_TEST_RELEASE
-        {
+        if (sScript.flags & FISHMOD_SCRIPT_F_RELEASE) {
             // a fish with known looks in the first bottle, poured into the water ahead (the fish that appears
             // reports its looks: they must match)
-            Vec3f at = FISHMOD_SCRIPT_TEST_RELEASE;
-
             FISHMOD_SAVE->bottleFish[0].species = FISHMOD_SPECIES_SANKE_CARP + 1;
             FISHMOD_SAVE->bottleFish[0].lengthTenths = 180;
             FISHMOD_SAVE->bottleFish[0].look = 0xAB;
             gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1] = ITEM_BOTTLE_FISH;
-            Fishmod_ReleaseBottleFish(play, SLOT_BOTTLE_1, &at, player->actor.shape.rot.y);
+            Fishmod_ReleaseBottleFish(play, SLOT_BOTTLE_1, &sScript.releaseAt, player->actor.shape.rot.y);
         }
-#endif
-#ifdef FISHMOD_SCRIPT_TEST_HIVE
-        // a beehive just in front of Link, low enough for the sword
-        Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_COMB,
-                    player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 28.0f,
-                    player->actor.world.pos.y + 18.0f,
-                    player->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * 28.0f, 0, 0, 0, 0xFF02);
-#endif
+        if (sScript.flags & FISHMOD_SCRIPT_F_HIVE) {
+            // a beehive just in front of Link, low enough for the sword
+            Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_COMB,
+                        player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 28.0f,
+                        player->actor.world.pos.y + 18.0f,
+                        player->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * 28.0f, 0, 0, 0, 0xFF02);
+        }
     }
 
 #ifdef FISHMOD_VIEW
@@ -865,7 +966,7 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #endif
 
     Fishmod_DebugPrintf(0, "F%d S%d/%d c%d l%d t%02d:%02d s%d", sPlayFrames, sScriptStepIndex,
-                        (s32)ARRAY_COUNT(sScriptSteps), gFishmodRodInfo.caught, gFishmodRodInfo.lost,
+                        sScript.numSteps, gFishmodRodInfo.caught, gFishmodRodInfo.lost,
                         (s32)gSaveContext.save.dayTime * 24 / 0x10000,
                         (s32)gSaveContext.save.dayTime * 24 * 60 / 0x10000 % 60, gTimeSpeed);
     if (player != NULL) {
@@ -884,7 +985,6 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     FishmodAutoplayStep* step;
     u16 buttonDiff;
 
-#ifdef FISHMOD_SCRIPT_WALK_TO
     if (sWalking) {
         input->prev = input->cur;
         input->cur.button = 0;
@@ -895,7 +995,6 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
         input->press.stick_x = input->press.stick_y = 0;
         return;
     }
-#endif
 #ifdef FISHMOD_BENCH_PLAY
     if (PlayBench_Input(input)) {
         return;
@@ -926,12 +1025,12 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
         return;
     }
 
-    if (sScriptStepIndex >= (s32)ARRAY_COUNT(sScriptSteps)) {
+    if (sScriptStepIndex >= sScript.numSteps) {
         sScriptActive = false;
         return;
     }
 
-    step = &sScriptSteps[sScriptStepIndex];
+    step = &sScript.steps[sScriptStepIndex];
     if (step->untilPause != 0) {
         if ((gameState->main == Play_Main) && (((PlayState*)gameState)->pauseCtx.state == step->untilPause - 1)) {
             sScriptStepFrame = 0;
@@ -945,8 +1044,7 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
         input->rel.button = input->prev.button & buttonDiff;
         return;
     }
-#ifdef FISHMOD_SCRIPT_NORMAL_BOOT
-    {
+    if (sScript.flags & FISHMOD_SCRIPT_F_NORMAL_BOOT) {
         // what the last scripted button press met: which step, and the pause menu's state then
         static u16 sLastButton;
         static s32 sLastStep;
@@ -960,12 +1058,11 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
                                                         : -1;
         }
         Fishmod_DebugPrintf(3, "step %d/%d btn %04X@%d pause %d now %d", sScriptStepIndex,
-                            (s32)ARRAY_COUNT(sScriptSteps), sLastButton, sLastStep, sLastPause,
+                            sScript.numSteps, sLastButton, sLastStep, sLastPause,
                             (gameState->main == Play_Main) ? ((PlayState*)gameState)->pauseCtx.state * 100 +
                                                                  ((PlayState*)gameState)->pauseCtx.mainState
                                                            : -1);
     }
-#endif
 
     input->prev = input->cur;
     input->cur.button = step->button;
@@ -1172,9 +1269,9 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
 #ifdef FISHMOD_PLAYLOG
     return; // played as the test build: the frame counter only
 #endif
-#ifdef FISHMOD_SCRIPT_NOTEXT
-    return; // clean screenshots (the pause-menu mockups)
-#endif
+    if (sScript.flags & FISHMOD_SCRIPT_F_NOTEXT) {
+        return; // clean screenshots (the pause-menu mockups)
+    }
 #if defined(FISHMOD_BENCH_PLAY) || defined(FISHMOD_BENCH_AREA)
     if (!sTourDebugText) {
         return; // the bench as played: nothing over the frames being timed until it's done

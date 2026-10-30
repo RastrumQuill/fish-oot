@@ -77,6 +77,13 @@ typedef struct FishmodPropKindInfo {
     u16 extent;  // how far it reaches from where it stands at scale 1 (up, or down for hanging ones): the view test
 } FishmodPropKindInfo;
 
+// the flags in each kind's settings (FISHMOD_PROP_KIND_INFO, from fishmod/data/prop_kinds.json)
+#define PROPF_PLANT (1 << 0)
+#define PROPF_FLOATING (1 << 1)
+#define PROPF_XLU (1 << 2)
+#define PROPF_FACE_CAM (1 << 3)
+#define PROPF_CARD (1 << 4)
+
 // (the profile's: fishmod/data/profiles.json)
 #define DIST_SMALL FISHMOD_PROFILE_DIST_SMALL
 #define DIST_MID FISHMOD_PROFILE_DIST_MID
@@ -198,6 +205,10 @@ static s32 sEdgeNear; // the props being drawn are within PROP_EDGE_RA_DIST
 #endif
 
 static FishmodPropKindInfo sKinds[FISHMOD_PROP_KIND_MAX];
+// each kind's own draw distance with the camera under water, 0: as above it (fishmod/data/prop_kinds.json)
+#define X(id, dist, distUnder, flags, swayAmount, rate, cardHeight, reach) (distUnder),
+static const f32 sDistUnderOwn[FISHMOD_PROP_KIND_MAX] = { FISHMOD_PROP_KIND_INFO(X) };
+#undef X
 static f32 sDistFar[2]; // the furthest any kind is drawn: above water, under it (how far the chunks are looked at)
 static f32 sExtentMax; // the furthest any prop reaches from where it stands (the chunks' view test)
 
@@ -242,95 +253,27 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_##id].impDist = (dist);
     FISHMOD_PROP_KINDS_IMP(X)
 #undef X
+    // each kind's settings (fishmod/data/prop_kinds.json); swaying: weed slowly with the water's movement, reeds above
+    // it faster in the wind (the shear moves a point by its height, so tall kinds get less of it: every tip moves about
+    // the same few units)
+#define X(id, dist, distUnder, flags, swayAmount, rate, cardHeight, reach)              \
+    sKinds[FISHMOD_PROP_##id].drawDist = (dist);                                        \
+    sKinds[FISHMOD_PROP_##id].plant = ((flags) & PROPF_PLANT) != 0;                     \
+    sKinds[FISHMOD_PROP_##id].floating = ((flags) & PROPF_FLOATING) != 0;               \
+    sKinds[FISHMOD_PROP_##id].xlu = ((flags) & PROPF_XLU) != 0;                         \
+    sKinds[FISHMOD_PROP_##id].faceCam = ((flags) & PROPF_FACE_CAM) != 0;                \
+    sKinds[FISHMOD_PROP_##id].card = ((flags) & PROPF_CARD) != 0;                       \
+    sKinds[FISHMOD_PROP_##id].sway = (swayAmount);                                      \
+    sKinds[FISHMOD_PROP_##id].swayRate = (rate);                                        \
+    sKinds[FISHMOD_PROP_##id].height = (cardHeight);                                    \
+    sKinds[FISHMOD_PROP_##id].extent = ((reach) != 0) ? (reach) : ((cardHeight) != 0) ? (cardHeight) : 150;
+    FISHMOD_PROP_KIND_INFO(X)
 #undef X
     {
-        s32 i;
-
-        for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
-            sKinds[i].drawDist = DIST_FAR;
-            sKinds[i].plant = true;
-        }
-    }
-    sKinds[FISHMOD_PROP_POND_REED].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_POND_REED].xlu = true;
-    sKinds[FISHMOD_PROP_GRASS_TUFT].drawDist = DIST_SMALL;
-    sKinds[FISHMOD_PROP_LEAF_LITTER].drawDist = DIST_SMALL;
-    sKinds[FISHMOD_PROP_PEBBLE_PATCH].drawDist = DIST_MID;
-    // moss mats: low on the bed, faint shapes past this, and each costs about as much to issue as a few hundred
-    // scanlines (hwbench-5h): near ones only
-    sKinds[FISHMOD_PROP_MOSS_PATCH].drawDist = 600.0f;
-    sKinds[FISHMOD_PROP_RIBBON_WEED].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_BROADLEAF].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_BUSH_WEED].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_BRANCH].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_LILY_FLOWER].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_LILY_CENTRE].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_RUSH_TUFT].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_MARIGOLD].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_VINE_STRAND].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_BIG_PONDWEED].drawDist = DIST_MID;
-    sKinds[FISHMOD_PROP_SPATTERDOCK].floating = true;
-    sKinds[FISHMOD_PROP_VINE_CURTAIN].floating = true;
-    sKinds[FISHMOD_PROP_LILY_PAD].floating = true;
-    sKinds[FISHMOD_PROP_FLOAT_LEAVES].floating = true;
-    sKinds[FISHMOD_PROP_LILY_FLOWER].floating = true;
-    sKinds[FISHMOD_PROP_LILY_CENTRE].floating = true;
-    // swaying: weed slowly with the water's movement, reeds above it faster in the wind. The shear moves a point by
-    // its height, so tall kinds get less of it: every tip moves about the same few units.
-#define SWAY(id, amount, rate)                \
-    sKinds[FISHMOD_PROP_##id].sway = (amount); \
-    sKinds[FISHMOD_PROP_##id].swayRate = (rate)
-    SWAY(RIBBON_WEED, 70, 44);
-    SWAY(TALL_WEED, 32, 36);
-    SWAY(KELP_FROND, 30, 32);
-    sKinds[FISHMOD_PROP_KELP_FROND].faceCam = true;
-    SWAY(VINE_STRAND, 40, 40);
-    SWAY(BIG_PONDWEED, 60, 40);
-    SWAY(FAN_WEED, 70, 44);
-    SWAY(BROADLEAF, 50, 48);
-    SWAY(BUSH_WEED, 40, 44);
-    SWAY(GRASS_TUFT, 50, 52);
-    SWAY(REED_CLUMP, 20, 80);
-    SWAY(CATTAILS, 18, 80);
-    SWAY(RUSH_TUFT, 45, 84);
-    SWAY(IRIS, 35, 76);
-    SWAY(POND_REED, 18, 72);
-#undef SWAY
-    {
-        // the big plant cards and their heights (gen_scatter.py HEIGHT)
-        static const struct {
-            u8 kind;
-            u16 height;
-        } sCards[] = {
-            { FISHMOD_PROP_GRASS_TUFT, 16 },  { FISHMOD_PROP_RIBBON_WEED, 80 },  { FISHMOD_PROP_TALL_WEED, 140 },
-            { FISHMOD_PROP_BROADLEAF, 40 },   { FISHMOD_PROP_BUSH_WEED, 42 },    { FISHMOD_PROP_KELP_FROND, 180 },
-            { FISHMOD_PROP_VINE_STRAND, 150 }, { FISHMOD_PROP_BIG_PONDWEED, 52 }, { FISHMOD_PROP_FAN_WEED, 44 },
-        };
-        s32 i;
-
-        for (i = 0; i < ARRAY_COUNT(sCards); i++) {
-            sKinds[sCards[i].kind].card = true;
-            sKinds[sCards[i].kind].height = sCards[i].height;
-        }
-    }
-    sKinds[FISHMOD_PROP_DOCK_DECK].plant = false;
-    sKinds[FISHMOD_PROP_DOCK_POSTS].plant = false;
-    sKinds[FISHMOD_PROP_ROCK].plant = false;
-    sKinds[FISHMOD_PROP_PEBBLE_PATCH].plant = false;
-    sKinds[FISHMOD_PROP_MOSS_PATCH].plant = false;
-    sKinds[FISHMOD_PROP_SUNKEN_LOG].plant = false;
-    sKinds[FISHMOD_PROP_BRANCH].plant = false;
-    sKinds[FISHMOD_PROP_OLD_POSTS].plant = false;
-    {
         // how far each reaches from where it stands (the view test's room for its size): the cards their height,
-        // the rest a generous default (reeds, the pond's tall reed, rocks, logs, hanging vines)
+        // the rest a generous default (reeds, rocks, logs, hanging vines) or their own (the pond's tall reed)
         s32 i;
 
-        for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
-            sKinds[i].extent = (sKinds[i].height != 0) ? sKinds[i].height : 150;
-        }
-        sKinds[FISHMOD_PROP_POND_REED].extent = 240;
-        sKinds[FISHMOD_PROP_CATTAILS].extent = 120;
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
             sExtentMax = MAX(sExtentMax, sKinds[i].extent * 1.6f); // (the largest scale)
         }
@@ -342,10 +285,9 @@ static void Scatter_InitKinds(void) {
         // (fishmod_lod.h, made by fishmod/tools/lod_calibrate.py from the game's own frames): only ever nearer, so
         // the frame is the same and cheaper
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
-            sKinds[i].drawDistUnder = MIN(sKinds[i].drawDist, DIST_UNDER_FOG);
+            // (or a kind's own, e.g. moss: nearer still in the haze)
+            sKinds[i].drawDistUnder = (sDistUnderOwn[i] > 0.0f) ? sDistUnderOwn[i] : MIN(sKinds[i].drawDist, DIST_UNDER_FOG);
         }
-        // (moss: nearer still in the haze)
-        sKinds[FISHMOD_PROP_MOSS_PATCH].drawDistUnder = 500.0f;
 #define X(id, above, under)                                    \
     if ((above) > 0) {                                         \
         sKinds[FISHMOD_PROP_##id].drawDist = MIN(sKinds[FISHMOD_PROP_##id].drawDist, (above)); \

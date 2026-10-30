@@ -16,6 +16,10 @@ import json
 import math
 import os
 import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import prop_kinds as pk  # noqa: E402
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -29,8 +33,7 @@ def load(n):
 
 sb = load("scatter_budget")
 gs = sb.load("gen_scatter")
-KINDS = re.findall(r"X\(\w+, (\w+)\)", open(os.path.join(ROOT, "src/fishmod_data/fishmod_props_kinds.h")).read()
-                   .split("#define FISHMOD_PROP_KINDS_GENERATED")[0])
+KINDS = pk.GAME
 HEIGHT = dict(gs.HEIGHT)
 # flat kinds: about how tall they look from the low under-water camera (a dome or decal seen at a slant)
 HEIGHT.update({"moss_patch": 20, "pebble_patch": 20, "leaf_litter": 12})
@@ -47,8 +50,8 @@ def read_placement(path):
 
 
 def hw4():
-    """Per stop: base, nonear, nofar, noprops RDP ms from the GCC save in docs/hwbench-4.md."""
-    t = open(os.path.join(ROOT, "fishmod/docs/hwbench-4.md")).read()
+    """Per stop: base, nonear, nofar, noprops RDP ms from the GCC save in docs/history/hwbench-4.md."""
+    t = open(os.path.join(ROOT, "fishmod/docs/history/hwbench-4.md")).read()
     g = t.split("## GCC")[1].split("\n## ")[0]
     rows = {}
     for line in g.splitlines():

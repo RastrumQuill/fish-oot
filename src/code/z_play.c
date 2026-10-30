@@ -1349,7 +1349,7 @@ void Play_Draw(PlayState* this) {
         }
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || (R_PLAY_DRAW_ROOM_FLAGS != 0)) {
-            if ((VREG(94) == 0) && !gFishmodPhoto.active) {
+            if ((VREG(94) == 0) && !FISHMOD_PHOTO_ON) {
                 s32 roomDrawFlags;
 
                 if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY)) {

@@ -163,7 +163,7 @@ static void Manager_BuildRoster(PlayState* play) {
     s32 n;
 
     sRosterCount = 0;
-    if ((spawns == NULL) || (numBoxes == 0) || gFishmodPhoto.active) {
+    if ((spawns == NULL) || (numBoxes == 0) || FISHMOD_PHOTO_ON) {
         return;
     }
     boxes = SEGMENTED_TO_VIRTUAL(play->colCtx.colHeader->waterBoxes);
@@ -465,7 +465,7 @@ f32 EnFishmod_AttentionDist(EnFishmod* this, PlayState* play) {
 s32 EnFishmod_ThinkAllowed(EnFishmod* this, PlayState* play) {
     EnFishmodShared* shared = EnFishmod_Shared(play);
 
-    if ((this->fishState != FISH_STATE_WANDER) || gFishmodPhoto.active ||
+    if ((this->fishState != FISH_STATE_WANDER) || FISHMOD_PHOTO_ON ||
         (Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->camPos) < THINK_FAR_DIST) ||
         (shared->bobberIn && (Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->bobberPos) < THINK_FAR_DIST))) {
         return true;
@@ -502,11 +502,11 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
     OSTime profStart;
 #endif
 
-    if (gFishmodPhoto.active && (gFishmodPhoto.backdropFrame != play->gameplayFrames)) {
+    if (FISHMOD_PHOTO_ON && (gFishmodPhoto.backdropFrame != play->gameplayFrames)) {
         gFishmodPhoto.backdropFrame = play->gameplayFrames;
         EnFishmod_DrawPhotoBackdrop(play);
     }
-    if (!gFishmodPhoto.active) {
+    if (!FISHMOD_PHOTO_ON) {
 #if FISHMOD_DEBUG
         gFishmodScatterDrawn = 0;
         if (!(gFishmodBench & FISHMOD_BENCH_NOPROPS))
@@ -539,7 +539,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
             continue;
         }
         dist = Math_Vec3f_DistXYZ(&actor->world.pos, &play->view.eye);
-        close = gFishmodPhoto.active || (fish->fishState == FISH_STATE_CAUGHT);
+        close = FISHMOD_PHOTO_ON || (fish->fishState == FISH_STATE_CAUGHT);
         if (!close && (dist > FISHMOD_LOD_DIST)) {
             if (farCount < DRAW_MAX) {
                 far[farCount++] = fish;
@@ -551,7 +551,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
             item->variant = (close || ((dist < LOD_FULL_DIST) && (fish->lengthInches >= FISHMOD_SMALL_RIG_LENGTH)))
                                 ? FISH_RIG_FULL
                                 : FISH_RIG_REDUCED;
-            if (gFishmodStudio.active) {
+            if (FISHMOD_STUDIO_ON) {
                 // the animation studio picks the rig per fish
                 s32 k;
 
@@ -602,7 +602,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
             lastVariant = full[i].variant;
         }
         EnFishmod_RigDraw(fish, play, full[i].variant,
-                          full[i].whiskers || gFishmodPhoto.active || (fish->fishState == FISH_STATE_CAUGHT));
+                          full[i].whiskers || FISHMOD_PHOTO_ON || (fish->fishState == FISH_STATE_CAUGHT));
     }
     if (fullCount != 0) {
         EnFishmod_RigRestoreSegments(play);
@@ -613,7 +613,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
             FISHMOD_PROF(FISHMOD_PROF_D_WHISKERS, EnFishmod_DrawWhiskersRigid(full[i].fish, play));
         }
         // the camera frames the fish (in the animation studio, the middle one of the row)
-        if (gFishmodPhoto.active && (!gFishmodStudio.active || (&full[i].fish->actor == gFishmodStudio.fish[1]))) {
+        if (FISHMOD_PHOTO_ON && (!FISHMOD_STUDIO_ON || (&full[i].fish->actor == gFishmodStudio.fish[1]))) {
             EnFishmod_PhotoBounds(full[i].fish);
         }
     }

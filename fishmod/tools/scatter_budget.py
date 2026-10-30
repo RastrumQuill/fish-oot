@@ -12,6 +12,10 @@ import json
 import math
 import os
 import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import prop_kinds as pk  # noqa: E402
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -35,13 +39,9 @@ def stops():
 def distances():
     """Per kind: (above, under) draw distance, as fishmod_scatter.c ends up with them (under: the tuned, at most)."""
     sc = open(os.path.join(ROOT, "src/overlays/actors/ovl_En_Fishmod/fishmod_scatter.c")).read()
-    defaults = {k: 1600.0 for k in []}
-    small = re.findall(r"sKinds\[FISHMOD_PROP_(\w+)\]\.drawDist = DIST_SMALL", sc)
-    mid = re.findall(r"sKinds\[FISHMOD_PROP_(\w+)\]\.drawDist = DIST_MID", sc)
     lod = dict((k, (int(a), int(u))) for k, a, u in
                re.findall(r"X\((\w+), (-?\d+), (-?\d+)\)", open(os.path.join(ROOT, "include/fishmod_lod.h")).read()))
-    kinds = re.findall(r"X\((\w+), \w+\)", open(os.path.join(ROOT, "src/fishmod_data/fishmod_props_kinds.h")).read()
-                       .split("#define FISHMOD_PROP_KINDS_GENERATED")[0])
+    kinds = [k.upper() for k in pk.GAME]
     tuned = {}
     th = os.path.join(ROOT, "include/fishmod_lod_tune.h")
     if os.path.exists(th):
@@ -54,7 +54,8 @@ def distances():
                 tuned[name.upper()] = min(tuned[name.upper()], 900)  # (UNDER_CUT_TALL)
     out = {}
     for k in kinds:
-        a = 800.0 if k in small else 1200.0 if k in mid else 1600.0
+        d = pk.BY_NAME[k.lower()]["dist"]
+        a = {"small": 800.0, "mid": 1200.0, "far": 1600.0}.get(d, d)  # (the hardware profile's)
         if k in lod and lod[k][0] > 0:
             a = min(a, lod[k][0])
         u = min(a, 900.0)

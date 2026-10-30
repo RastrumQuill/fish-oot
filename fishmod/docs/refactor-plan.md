@@ -127,9 +127,26 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
   emulator and console test builds both build and patch. Since then only the fish's own random numbers change their
   choices (stage 7); runs still replay exactly.
 
-**Left (for later, after the performance and build 5 work):** `fishmod_debug.c` split by job, scripts as data, one
-capture/ares harness module, the habitat tools as a package, debug state (`gFishmodPhoto`) out of release code, and
-one set of notes (stage 9).
+- **8, the rest: done.**
+  - `fishmod_debug.c` is split by job: the photo booth, the animation studio, the LOD jobs, the benches, the play log
+    and the auto-angler each have their own `fishmod_debug_*.inc.c`, included in place. The ROM is byte-identical.
+  - Scripts are data. A script's `FISHMOD_SCRIPT_*` settings (start, entrance, time, day, roster, adult, walk,
+    release, hive, ...) are read in one place into a descriptor (`FishmodScript sScript`); the harness reads the
+    descriptor, not the defines. Variants still include a base and change a few settings. The defines that pick a
+    job (`FISHMOD_PHOTO`, `FISHMOD_HWBENCH`, ...) still choose which job's code is built.
+  - One ares harness (`fishmod/tools/harness.py`): the virtual display, the per-run settings copy, the launch, the
+    game-view screenshot and the stop. `ares_capture.sh` wraps it; the photo and tour captures use it.
+  - One kinds table (`fishmod/data/prop_kinds.json`, read through `prop_kinds.py`). gen_habitat and gen_scatter take
+    their per-kind constants from it, and gen_habitat writes the game's per-kind settings from it
+    (`FISHMOD_PROP_KIND_INFO`), replacing the hand-set lines in `fishmod_scatter.c`. The analysis tools stop parsing
+    the generated header and the C. This fixed two drifted copies: `overdraw.py` had old heights for the tall weed and
+    kelp, and `scatter_budget.py` drew moss out to the far distance. The generated data is unchanged.
+  - The photo and studio state is read through `FISHMOD_PHOTO_ON` / `FISHMOD_STUDIO_ON`, which are 0 in a release
+    build, so what's under them is compiled out.
+  - Checks: a compile of every debug job and of each script setting; the state fingerprints match (bait, lakecast,
+    invtest); both release profiles build.
+- **9: done.** One index of current notes (`fishmod/docs/README.md`). The finished bench reports and the
+  optimization plan moved to `docs/history/`.
 
 ## Decisions (made)
 

@@ -190,6 +190,16 @@ typedef struct FishmodStudio {
 
 extern FishmodStudio gFishmodStudio;
 
+// Whether the photo booth / animation studio is running, for the game's own code: in a release build always off, so
+// what's under it is compiled out
+#if FISHMOD_DEBUG
+#define FISHMOD_PHOTO_ON (gFishmodPhoto.active)
+#define FISHMOD_STUDIO_ON (gFishmodStudio.active)
+#else
+#define FISHMOD_PHOTO_ON 0
+#define FISHMOD_STUDIO_ON 0
+#endif
+
 // Rod status published every frame by the fishing controller (for the debug auto-angler and the HUD)
 typedef struct FishmodRodInfo {
     /* 0x00 */ u8 state;  // FishmodRodState

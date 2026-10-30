@@ -19,6 +19,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import prop_kinds as pk  # noqa: E402
+
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DATA = os.path.join(ROOT, "src", "fishmod_data")
 ROCK_VTX = os.path.join(ROOT, "extracted", "ntsc-1.2", "assets", "objects", "object_fish", "gFishingRockModelVtx.inc.c")
@@ -39,8 +42,7 @@ def rock_points():
 
 
 def props(base):
-    kinds = re.findall(r"X\(\w+, (\w+)\)", open(os.path.join(DATA, "fishmod_props_kinds.h")).read()
-                       .split("#define FISHMOD_PROP_KINDS_GENERATED")[0])
+    kinds = pk.GAME
     src = open(os.path.join(DATA, f"fishmod_sc_{base}.c")).read()
     out = []
     for m in re.findall(r"\{ (-?\d+), (-?\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+), (-?\d+), (-?\d+) \}", src):

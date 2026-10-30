@@ -20,6 +20,7 @@ import random
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_profile  # noqa: E402
+import prop_kinds as pk  # noqa: E402
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -116,14 +117,12 @@ RULES = {
 }
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
 # meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
-HEIGHT = {"grass_tuft": 16, "ribbon_weed": 80, "tall_weed": 140, "broadleaf": 40, "bush_weed": 42, "kelp_frond": 180,
-          "vine_strand": 150, "big_pondweed": 52, "bank_roots": 70, "fan_weed": 44,
-          "old_posts": 60, "branch": 30, "sunken_log": 30, "rock": 20, "boulder": 20}
+HEIGHT = pk.HEIGHT
 # How far apart a clump's plants are scattered (the rest: 14): tight, so a clump reads as one plant mass
-CLUSTER_SPREAD = {"grass_tuft": 11.0, "ribbon_weed": 12.0, "broadleaf": 12.0, "bush_weed": 15.0, "big_pondweed": 13.0}
+CLUSTER_SPREAD = pk.field("cluster_spread")
 # The bed plants are lushest where the camera spends its time, the shallows by the shores, and thin out toward the
 # deep middle, which is mostly seen far off through the surface: their chance, by depth below the surface
-BED_KINDS = {"grass_tuft", "ribbon_weed", "broadleaf", "bush_weed", "big_pondweed", "vine_strand"}
+BED_KINDS = pk.flagged("bed")
 
 
 def depth_lushness(depth):
@@ -135,16 +134,15 @@ def depth_lushness(depth):
 
 
 # how far a prop spreads from its middle (patches spread wider): the bed is checked all round it
-FOOTPRINT = {"grass_tuft": 40, "ribbon_weed": 32, "bush_weed": 50, "tall_weed": 42, "broadleaf": 22,
-             "big_pondweed": 30, "kelp_frond": 15, "vine_strand": 12, "fan_weed": 22, "bank_roots": 35}
+FOOTPRINT = pk.field("footprint")
 # props that lie along the bed, tilted to its slope: half their length (along the model's x) and half their width
-TILTED = {"sunken_log": (150, 15), "branch": (70, 6)}
+TILTED = pk.field("tilted")
 # short plants that lean with the slope they grow on (their footprint's edges on the bed), up to SLOPE_MAX
-SLOPED = ("grass_tuft",)
+SLOPED = pk.flagged("sloped")
 SLOPE_MAX = math.radians(25)
 # Rocks (all one vanilla model) get variety for free: stretched along each axis by a hash of where they stand (the
 # game computes the same, fishmod_scatter.c Scatter_RockStretch: no per-prop data) and tilted a little at random
-ROCK_KINDS = ("rock", "boulder")
+ROCK_KINDS = pk.flagged("rock")
 ROCK_TILT = math.radians(12)
 ROCK_RADIUS = 66  # the vanilla rock's reach from its middle at scale 1
 
@@ -177,13 +175,13 @@ def lie_on_bed(floor_at, x, z, surface, here, yaw, half_len, half_wid):
             (max(-clamp, min(clamp, tx)), max(-clamp, min(clamp, tz))))
 
 
-FLAT_KINDS = {"pebble_patch", "leaf_litter"}  # flat on the bed
-FLOATING = {"lily_pad", "float_leaves", "spatterdock", "vine_curtain"}  # sit on the surface, not the bed
+FLAT_KINDS = pk.flagged("flat")  # flat on the bed
+FLOATING = pk.flagged("on_surface")  # sit on the surface, not the bed
 # Leaves floating on the surface lie side by side, not on top of each other: each one's round footprint (radius,
 # and its centre's offset in the model: vanilla's lily pad sits off its origin) at scale 1, and how far apart a
 # cluster's leaves are scattered. Two may touch, overlapping a little at the edges, no more.
-FLOAT_SPACE = {"lily_pad": (58.0, -32.0, -6.0), "spatterdock": (31.0, 0.0, 0.0), "float_leaves": (35.0, 0.0, 0.0)}
-FLOAT_SPREAD = {"lily_pad": 45.0, "spatterdock": 32.0, "float_leaves": 32.0}
+FLOAT_SPACE = pk.field("float_space")
+FLOAT_SPREAD = pk.field("float_spread")
 FLOAT_OVERLAP = 0.95
 
 
@@ -474,7 +472,7 @@ def place_moss(seed, rnd_state, surface_at, floor_at, zones, excluded, boxes):
     return out
 
 
-# Tall plants as accents (step 3 of the frame-rate plan, fishmod/docs/opt-plan-hw.md): the console pays per scanline
+# Tall plants as accents (step 3 of the frame-rate plan, fishmod/docs/history/opt-plan-hw.md): the console pays per scanline
 # per card, so the tall kinds are kept to a third, and the eelgrass keeps its beds' edges while the middles turn to
 # low plants (grass, broadleaf), with the moss between. Decided after placement, by a hash of where each prop stands,
 # so the rest of the layout stays exactly as placed.
@@ -718,7 +716,7 @@ def write_c(scene, instances):
     """The scene's props for the game: src/fishmod_data/fishmod_sc_<scene folder>.c (generated at build time from
     the extracted scene, not committed)."""
     gh = load_tool("gen_habitat")
-    kinds = [k for k, _, _ in gh.PROP_KINDS] + gh.VANILLA_KINDS
+    kinds = pk.GAME
     folder = SCENES[scene]
     base = os.path.basename(folder)
     d = os.path.join(gw.SCENES, folder)

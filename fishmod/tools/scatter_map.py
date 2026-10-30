@@ -11,6 +11,9 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import prop_kinds as pk  # noqa: E402
+
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 spec = importlib.util.spec_from_file_location("zone_map", os.path.join(ROOT, "fishmod", "tools", "zone_map.py"))
 zm = importlib.util.module_from_spec(spec)
@@ -31,8 +34,7 @@ COLOURS = {
 
 def main():
     out_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "fishmod", "docs", "lake-hylia-props-map.png")
-    kinds = re.findall(r"X\(\w+, (\w+)\)", open(os.path.join(ROOT, "src", "fishmod_data",
-                                                                  "fishmod_props_kinds.h")).read().split("#define FISHMOD_PROP_KINDS_GENERATED")[0])
+    kinds = pk.GAME
     src = open(os.path.join(ROOT, "src", "fishmod_data", "fishmod_sc_spot06.c")).read()
     props = [tuple(map(int, m)) for m in re.findall(r"\{ (-?\d+), (-?\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+), -?\d+, -?\d+ \}", src)]
     folder, (x0, x1, z0, z1), landmarks = zm.SCENES["SCENE_LAKE_HYLIA"]

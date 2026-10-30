@@ -11,6 +11,10 @@ import glob
 import os
 import re
 import struct
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import prop_kinds as pk  # noqa: E402
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 KINDS_MAX = 48
@@ -21,9 +25,7 @@ STEPS = 60
 
 
 def kinds():
-    t = open(os.path.join(ROOT, "src/fishmod_data/fishmod_props_kinds.h")).read()
-    block = t[t.index("#define FISHMOD_PROP_KINDS(X)"):]
-    return re.findall(r"X\((\w+), \w+\)", block.split("\n\n")[0])
+    return [k.upper() for k in pk.GAME]
 
 
 def read(path):

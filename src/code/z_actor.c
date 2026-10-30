@@ -2967,7 +2967,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
             if (!DEBUG_FEATURES || (HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(71) == 0)) {
                 if ((actor->init == NULL) && (actor->draw != NULL) &&
                     (actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) &&
-                    (!gFishmodPhoto.active || (actor->id == ACTOR_EN_FISHMOD))) {
+                    (!FISHMOD_PHOTO_ON || (actor->id == ACTOR_EN_FISHMOD))) {
                     if ((actor->flags & ACTOR_FLAG_REACT_TO_LENS) &&
                         ((play->roomCtx.curRoom.lensMode == LENS_MODE_SHOW_ACTORS) || play->actorCtx.lensActive ||
                          (actor->room != play->roomCtx.curRoom.num))) {
@@ -2996,11 +2996,11 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         }
     }
 
-    if ((!DEBUG_FEATURES || (HREG(64) != 1) || (HREG(73) != 0)) && !gFishmodPhoto.active) {
+    if ((!DEBUG_FEATURES || (HREG(64) != 1) || (HREG(73) != 0)) && !FISHMOD_PHOTO_ON) {
         Effect_DrawAll(play->state.gfxCtx);
     }
 
-    if ((!DEBUG_FEATURES || (HREG(64) != 1) || (HREG(74) != 0)) && !gFishmodPhoto.active) {
+    if ((!DEBUG_FEATURES || (HREG(64) != 1) || (HREG(74) != 0)) && !FISHMOD_PHOTO_ON) {
         EffectSs_DrawAll(play);
     }
 
@@ -3015,7 +3015,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
 
     Actor_DrawFaroresWindPointer(play);
 
-    if ((IREG(32) == 0) && !gFishmodPhoto.active) {
+    if ((IREG(32) == 0) && !FISHMOD_PHOTO_ON) {
         Lights_DrawGlow(play);
     }
 

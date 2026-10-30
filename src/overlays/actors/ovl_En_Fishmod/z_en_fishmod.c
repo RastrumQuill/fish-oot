@@ -548,12 +548,12 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
     }
     EnFishmod_InitLimbData(this, SEGMENTED_TO_VIRTUAL(skel));
 
-    if (gFishmodPhoto.active) {
-        EnFishmod_SetLength(this, (gFishmodStudio.active && (gFishmodStudio.spawnLength > 0.0f))
+    if (FISHMOD_PHOTO_ON) {
+        EnFishmod_SetLength(this, (FISHMOD_STUDIO_ON && (gFishmodStudio.spawnLength > 0.0f))
                                       ? gFishmodStudio.spawnLength
                                       : this->species->lengthTypical);
         this->fishState = FISH_STATE_PHOTO;
-        this->look = gFishmodStudio.active ? gFishmodStudio.spawnLook : FISHMOD_LOOK_NEUTRAL;
+        this->look = FISHMOD_STUDIO_ON ? gFishmodStudio.spawnLook : FISHMOD_LOOK_NEUTRAL;
     } else {
         // length: triangular distribution between min and max, peaking at the typical size
         f32 lo = this->species->lengthMin;
@@ -596,7 +596,7 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
 
         thisx->world.rot.z = thisx->shape.rot.z = 0;
 
-        if (!gFishmodPhoto.active && (index >= 0) && (EnFishmod_RosterLength(index) > 0.0f)) {
+        if (!FISHMOD_PHOTO_ON && (index >= 0) && (EnFishmod_RosterLength(index) > 0.0f)) {
             // one of the scene's roster fish: its own size, every time it appears
             this->rosterIndex = index;
             EnFishmod_SetLength(this, EnFishmod_RosterLength(this->rosterIndex));
@@ -1873,7 +1873,7 @@ static void Fish_Flee(EnFishmod* this, PlayState* play, FishAI* ai) {
 
 static void Fish_Photo(EnFishmod* this, PlayState* play, FishAI* ai) {
     this->actor.world.pos = this->actor.home.pos;
-    if (gFishmodStudio.active) {
+    if (FISHMOD_STUDIO_ON) {
         // the animation studio moves it
         this->actor.shape.rot.y = gFishmodStudio.yaw;
         this->actor.shape.rot.x = gFishmodStudio.pitch;
@@ -2079,7 +2079,7 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     // Away from attention (the camera or the bobber, whichever is nearer) a fish does
     // less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200 every 8th (gliding on in
     // between), and past 1600 it goes dormant: it holds still (and is out of drawing range) until attention comes.
-    if ((this->fishState == FISH_STATE_WANDER) && !gFishmodPhoto.active) {
+    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON) {
         f32 attnDist = EnFishmod_AttentionDist(this, play);
 
         if (attnDist > 1600.0f) {
@@ -2090,7 +2090,7 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         this->thinkMask = 0;
     }
     // away from attention, a wandering fish thinks every other frame and glides on in between
-    if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !gFishmodPhoto.active &&
+    if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !FISHMOD_PHOTO_ON &&
         (EnFishmod_AttentionDist(this, play) > 500.0f)) {
         FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
         return;
@@ -2763,7 +2763,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
         return;
     }
     // far from the camera, a flat shape in the fish's colour instead of the textured skeleton
-    if ((this->type == FISHMOD_TYPE_FISH) && !gFishmodPhoto.active && (this->fishState != FISH_STATE_CAUGHT) &&
+    if ((this->type == FISHMOD_TYPE_FISH) && !FISHMOD_PHOTO_ON && (this->fishState != FISH_STATE_CAUGHT) &&
         (Math_Vec3f_DistXYZ(&this->actor.world.pos, &play->view.eye) > FISHMOD_LOD_DIST)) {
         EnFishmod_BillboardMaterial(this, play);
         FISHMOD_PROF(FISHMOD_PROF_D_BILLBOARD, EnFishmod_DrawBillboard(this, play));
@@ -2786,7 +2786,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
         return;
     }
 
-    if (gFishmodPhoto.active && (gFishmodPhoto.backdropFrame != play->gameplayFrames)) {
+    if (FISHMOD_PHOTO_ON && (gFishmodPhoto.backdropFrame != play->gameplayFrames)) {
         gFishmodPhoto.backdropFrame = play->gameplayFrames;
         EnFishmod_DrawPhotoBackdrop(play);
     }
@@ -2882,7 +2882,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
                      (EnFishmod_UpdateWhiskers(this), EnFishmod_DrawWhiskers(this, play)));
     }
 
-    if (gFishmodPhoto.active) {
+    if (FISHMOD_PHOTO_ON) {
         f32 dx = this->boundsMax.x - this->boundsMin.x;
         f32 dy = this->boundsMax.y - this->boundsMin.y;
         f32 dz = this->boundsMax.z - this->boundsMin.z;
