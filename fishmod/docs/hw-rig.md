@@ -15,9 +15,11 @@ here without one). The cloud's other limit is that it's reclaimed when idle, whi
 | Work | Where | Why |
 |---|---|---|
 | Talking to the cart and the capture card | VM | the hardware is there |
-| Builds, ares runs, captures, benches | VM when it has its cores, cloud otherwise | the VM is faster and always on; but it shares the user's PC |
+| Builds, open-ended ares runs, hardware tests | VM when it has its cores, cloud otherwise | the VM is faster and always on; but it shares the user's PC |
 | Long soaks | **the console** | the real thing, and it costs the VM almost nothing (a frame grab now and then) |
 | Many ares runs at once (A/B sets, tours) | cloud | so the user's PC stays free |
+| Tests that take a fixed time (a 30-minute bench, a tour, a capture set) | cloud | they finish inside the container's life, and run alongside the VM's work |
+| Anything when the VM is busy or the user needs their PC | cloud | the fallback |
 | Asset generation (props, scatter, collision, item page) | either | quick |
 
 ## What a test looks like
