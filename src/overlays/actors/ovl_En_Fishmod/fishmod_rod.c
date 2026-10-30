@@ -133,6 +133,15 @@ s32 EnFishmod_RodBobberInWater(void) {
     return (ROD->state == ROD_STATE_FLOAT);
 }
 
+/** A fish comes to the bait: it's the rod's fish unless another already is. Returns true if it's this one. */
+s32 EnFishmod_RodClaim(EnFishmod* fish) {
+    if ((ROD->fish == NULL) || (ROD->fish == fish)) {
+        ROD->fish = fish;
+        return true;
+    }
+    return false;
+}
+
 void EnFishmod_RodNibble(EnFishmod* fish) {
     if (ROD->state != ROD_STATE_FLOAT) {
         return;
@@ -391,10 +400,8 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     ROD->tension = 35.0f;
     ROD->overTimer = ROD->slackTimer = 0;
     ROD->bait = FISHMOD_BAIT_NONE; // the fish took it
-    EnFishmod_FishSetState(fish, FISH_STATE_HOOKED);
-    // it ate (the bait), and it's terrified; its thrashing scares the fish round about
-    fish->mood.hunger = 30;
-    fish->mood.fear = 255;
+    EnFishmod_FishHook(fish);
+    // its thrashing scares the fish round about
     EnFishmod_Disturb(play, &fish->actor.world.pos, 220.0f, 120);
     Rumble_Override(0.0f, 180, 20, 10);
     Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
@@ -490,7 +497,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         next.x = ROD->tipPos.x + toFish.x * (ROD->lineOut / dist);
         next.z = ROD->tipPos.z + toFish.z * (ROD->lineOut / dist);
         tensionTarget = 30.0f + taut * 8.0f + b->strength * 0.35f * (0.3f + staminaFrac * 0.7f);
-        fish->stamina -= (0.4f + b->strength * 0.01f) * (opposing ? 2.5f : 1.0f);
+        EnFishmod_FishTire(fish, (0.4f + b->strength * 0.01f) * (opposing ? 2.5f : 1.0f));
         if (opposing) {
             tensionTarget -= 12.0f;
         }
@@ -512,7 +519,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
 
     ROD->lineOut = CLAMP(ROD->lineOut, LINE_MIN, LINE_MAX);
 
-    fish->target = next;
+    EnFishmod_FishPullTo(fish, &next);
 
     // snap
     if (ROD->tension >= 100.0f) {
@@ -1004,9 +1011,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                                                       fish->halfHeight * 2.0f + 4.0f, &spot, &surface, &floor)) {
                             spot = fish->actor.home.pos;
                         }
-                        fish->actor.world.pos = spot;
-                        fish->actor.shape.rot.z = 0;
-                        EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
+                        EnFishmod_FishLetGo(fish, &spot);
                         Rod_Splash(play, &ROD->bobberPos, true);
                         Actor_PlaySfx(&this->actor, NA_SE_EV_DIVE_INTO_WATER_L);
                         EnFishmod_RodMessage(0, "Released.", NULL);

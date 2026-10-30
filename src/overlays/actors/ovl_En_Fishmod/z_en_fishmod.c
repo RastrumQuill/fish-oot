@@ -1382,11 +1382,519 @@ static void EnFishmod_CombUpdate(EnFishmod* this, PlayState* play) {
     Actor_OfferGetItem(&this->actor, play, GI_MAX, 60.0f, 30.0f);
 }
 
+/*
+ * What the rod does to a fish: the rod's side of the fight goes through these (fishmod_rod.c doesn't write the fish's
+ * fields itself).
+ */
+
+/** Hooked: it ate the bait, and it's terrified. */
+void EnFishmod_FishHook(EnFishmod* this) {
+    EnFishmod_FishSetState(this, FISH_STATE_HOOKED);
+    this->mood.hunger = 30;
+    this->mood.fear = 255;
+}
+
+/** Fighting the line wears it out. */
+void EnFishmod_FishTire(EnFishmod* this, f32 amount) {
+    this->stamina -= amount;
+}
+
+/** Where the line lets it go this frame (it swims for it). */
+void EnFishmod_FishPullTo(EnFishmod* this, Vec3f* pos) {
+    this->target = *pos;
+}
+
+/** Let go back into the water at `spot`: it swims off. */
+void EnFishmod_FishLetGo(EnFishmod* this, Vec3f* spot) {
+    this->actor.world.pos = *spot;
+    this->actor.shape.rot.z = 0;
+    EnFishmod_FishSetState(this, FISH_STATE_FLEE);
+}
+
+/** What every state of the fish's AI looks at, worked out once a frame (EnFishmod_FishAI). */
+typedef struct FishAI {
+    FishmodRod* rod;
+    const FishmodBehavior* b;
+    f32 bobberDist; // from the bobber, across
+    Vec3f below;    // where the bait hangs
+} FishAI;
+
+static void Fish_Wander(EnFishmod* this, PlayState* play, FishAI* ai) {
+    FishmodRod* rod = ai->rod;
+    const FishmodBehavior* b = ai->b;
+    f32 bobberDist = ai->bobberDist;
+    Vec3f below = ai->below;
+    // Fish don't roam about at random: they hold station near home for a while (resting, fins
+    // working), then make a short cruise somewhere nearby (sometimes down to pick at the bottom), and
+    // settle again. Fish out of their active time of day rest longer.
+    if (EnFishmod_SchoolFollow(this, play)) {
+        // with its school
+        if (this->fishState != FISH_STATE_WANDER) {
+            return;
+        }
+    } else
+    if (this->restTimer > 0) {
+        this->restTimer--;
+        // holding the spot it stopped at (the target was set there), gliding to a stop
+        EnFishmod_SwimToward(this, play, &this->target, 0.15f, 0x100);
+        // still alive while it rests: fins working, a slow hover up and down
+        this->swimPhaseStep = 0.1f;
+        this->swimMag = 650.0f;
+        this->target.y += Math_SinS((s16)(this->timer * 0x300 + this->actor.params * 0x1234)) * 0.08f;
+        if (this->restTimer == 0) {
+            EnFishmod_PickWanderTarget(this, play);
+        }
+    } else {
+        if ((this->stateTimer == 0) || (Math_Vec3f_DistXYZ(&this->actor.world.pos, &this->target) < 8.0f)) {
+            // the more active its time of day, the shorter its rests (about 1.5 to 12 seconds); hungry fish
+            // rest less (they're out looking), frightened ones more (lying low)
+            this->restTimer =
+                (30 + (s16)Rand_ZeroFloat(220.0f - EnFishmod_Activity(this) * 55.0f)) *
+                (1.25f - 0.5f * MOOD_HUNGER(this) + 0.6f * MOOD_FEAR(this));
+            if ((this->stateTimer != 0) && (this->target.y < this->floorY + this->halfHeight + 3.0f)) {
+                // reached the bottom it went down to: it picks at it and finds something
+                this->mood.hunger = CLAMP_MIN(this->mood.hunger - 30, 0);
+            }
+            this->target = this->actor.world.pos;
+        }
+        EnFishmod_SwimToward(this, play, &this->target, 0.4f + b->speed * 0.008f, 0x200);
+        this->swimPhaseStep = 0.15f + this->speed * 0.12f;
+        this->swimMag = 1300.0f;
+    }
+
+    EnFishmod_CheckSpook(this, play);
+    // Only one fish goes to look at a time (not while another is at the bobber), and not often: a bobber
+    // is something new in the water, not food falling from the sky.
+    if ((this->fishState == FISH_STATE_WANDER) && (this->cooldown == 0) && EnFishmod_RodBobberInWater() &&
+        (rod->fish == NULL) && (((play->gameplayFrames + this->actor.params) % 10) == 0)) {
+        f32 notice = 30.0f + b->curiosity * 1.0f;
+        f32 keen = (0.3f + 1.4f * MOOD_HUNGER(this)) * (1.0f - MOOD_FEAR(this));
+        EnFishmodShared* shared = EnFishmod_Shared(play);
+
+        // hungry fish look further; frightened ones don't come out at all
+        notice *= 0.6f + 0.8f * MOOD_HUNGER(this);
+        if (this->mood.fear > 140) {
+            notice = 0.0f;
+        }
+        // a plop nearby: the hungry come to see what fell in (felt all round, seen or not)
+        if ((play->gameplayFrames - shared->splashFrame < 60) && (this->mood.hunger > 150) &&
+            (Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->splashPos) < notice + 60.0f)) {
+            keen *= 3.0f;
+            notice += 60.0f;
+        }
+        if (rod->twitchTimer > 0) {
+            // a twitch is felt all round too
+            notice += 30.0f;
+        } else if (!EnFishmod_CanSee(this, play, &rod->bobberPos, notice + 20.0f) &&
+                   (bobberDist > this->halfLength + 25.0f)) {
+            // otherwise it has to see it (or have it right beside it)
+            notice = 0.0f;
+        }
+        // it has to be able to see the bait: not too far above or below it either (deep fish need the bait
+        // brought down to them, or to have come up to feed)
+        if (ABS(FISHMOD_ROD_BAIT_Y(rod) - this->actor.world.pos.y) > notice * 1.2f) {
+            notice = 0.0f;
+        }
+        if ((bobberDist < notice) &&
+            (Rand_ZeroOne() < b->curiosity * 0.0015f * EnFishmod_BaitAppeal(this) * keen) &&
+            EnFishmod_OpenWaterTo(this, play, &rod->bobberPos)) {
+            this->fishState = FISH_STATE_APPROACH;
+            this->stateTimer = 200;
+            // it noticed: a flick of the tail toward the bobber (the player sees it take interest)
+            this->startle = ((s16)(Math_Vec3f_Yaw(&this->actor.world.pos, &rod->bobberPos) -
+                                   this->actor.shape.rot.y) > 0) ? 6 : -6;
+            // a fish deep below has further to come: time for the climb too
+            this->stateTimer += (s16)CLAMP(ABS(rod->waterY - this->actor.world.pos.y) * 2.5f, 0, 1000);
+        }
+    }
+}
+
+static void Fish_Approach(EnFishmod* this, PlayState* play, FishAI* ai) {
+    FishmodRod* rod = ai->rod;
+    const FishmodBehavior* b = ai->b;
+    f32 bobberDist = ai->bobberDist;
+    Vec3f below = ai->below;
+    if (!EnFishmod_RodBobberInWater() || (this->stateTimer == 0)) {
+        // gave up (couldn't get there): don't come straight back
+        this->cooldown = 150;
+        EnFishmod_FishSetState(this, FISH_STATE_WANDER);
+        return;
+    }
+    {
+        Vec3f station;
+
+        // come in nose first: aim for the spot a body length short of the bobber
+        this->runYaw = Math_Vec3f_Yaw(&this->actor.world.pos, &rod->bobberPos);
+        EnFishmod_BobberStation(this, 0.9f, below.y, &station);
+        EnFishmod_SwimToward(this, play, &station, 0.7f + b->speed * 0.01f, 0x400);
+    }
+    this->swimPhaseStep = 0.2f + this->speed * 0.15f;
+    EnFishmod_CheckSpook(this, play);
+    if ((this->fishState == FISH_STATE_APPROACH) && (bobberDist < 14.0f + this->halfLength)) {
+        if (EnFishmod_RodClaim(this)) {
+            this->nibblesLeft = b->nibbles;
+            // a hungry fish doesn't fuss as long
+            if ((this->mood.hunger > 190) && (this->nibblesLeft > 0)) {
+                this->nibblesLeft--;
+            }
+            this->interest = 0.0f;
+            EnFishmod_FishSetState(this, FISH_STATE_INSPECT);
+        } else {
+            // someone else got there first: hang around a bit
+            this->cooldown = 60;
+            EnFishmod_FishSetState(this, FISH_STATE_WANDER);
+        }
+    }
+}
+
+static void Fish_Inspect(EnFishmod* this, PlayState* play, FishAI* ai) {
+    FishmodRod* rod = ai->rod;
+    const FishmodBehavior* b = ai->b;
+    Vec3f below = ai->below;
+    Vec3f hover = below;
+
+    if (!EnFishmod_RodBobberInWater() || (rod->fish != this)) {
+        EnFishmod_FishSetState(this, FISH_STATE_WANDER);
+        return;
+    }
+    // hold station under the bobber, nose toward it, swaying a little
+    EnFishmod_BobberStation(this, 0.9f, below.y, &hover);
+    hover.x += Math_CosS(this->runYaw) * Math_SinS(this->timer * 0x200) * 2.0f;
+    hover.z -= Math_SinS(this->runYaw) * Math_SinS(this->timer * 0x200) * 2.0f;
+    // now and then it backs off a little without turning, then comes back in (vanilla's pond fish do
+    // this: it reads as the fish making up its mind)
+    if (((this->timer + this->depthPref) % 90) < 22) {
+        this->actor.world.pos.x -= Math_SinS(this->runYaw) * 0.3f;
+        this->actor.world.pos.z -= Math_CosS(this->runYaw) * 0.3f;
+        this->speed = 0.0f;
+    } else {
+        EnFishmod_SwimToward(this, play, &hover, 0.25f, 0x200);
+    }
+    Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
+    this->swimPhaseStep = 0.12f;
+    EnFishmod_CheckSpook(this, play);
+    if (this->fishState != FISH_STATE_INSPECT) {
+        return;
+    }
+
+    this->interest += 0.01f * EnFishmod_BaitAppeal(this);
+    // reeling the bobber away too fast is suspicious to wary fish
+    // (the bobber has moved away from the spot the fish is holding)
+    if ((Math_Vec3f_DistXZ(&this->actor.world.pos, &hover) > 12.0f) &&
+        (Rand_ZeroOne() < b->wariness * 0.002f)) {
+        this->cooldown = 200;
+        EnFishmod_FishSetState(this, FISH_STATE_WANDER);
+        return;
+    }
+    if (this->stateTimer == 0) {
+        if (this->nibblesLeft > 0) {
+            EnFishmod_FishSetState(this, FISH_STATE_NIBBLE);
+        } else if (Rand_ZeroOne() <
+                   (b->aggression * 0.012f * (0.6f + this->interest) * (0.5f + MOOD_HUNGER(this)))) {
+            this->fishState = FISH_STATE_BITE;
+            // a wind-up first: it draws back, then strikes (the bite comes when it reaches the bait)
+            this->stateTimer = 14;
+            this->biteStruck = false;
+        } else {
+            // lost interest
+            this->cooldown = 500 + (s16)Rand_ZeroFloat(300.0f);
+            // a refusal the player can see: a sharp turn and a short dart away
+            EnFishmod_FishSetState(this, FISH_STATE_FLEE);
+            this->stateTimer = 22;
+            this->cooldown = 500 + (s16)Rand_ZeroFloat(300.0f);
+        }
+    }
+}
+
+static void Fish_Nibble(EnFishmod* this, PlayState* play, FishAI* ai) {
+    FishmodRod* rod = ai->rod;
+    Vec3f below = ai->below;
+    Vec3f peck = rod->bobberPos;
+
+    if (!EnFishmod_RodBobberInWater() || (rod->fish != this)) {
+        EnFishmod_FishSetState(this, FISH_STATE_WANDER);
+        return;
+    }
+    // dart forward to peck, then back off, without turning
+    if (this->stateTimer > 6) {
+        EnFishmod_BobberStation(this, 0.45f, FISHMOD_ROD_BAIT_Y(rod), &peck);
+    } else {
+        EnFishmod_BobberStation(this, 0.9f, below.y, &peck);
+    }
+    EnFishmod_SwimToward(this, play, &peck, 0.8f, 0x200);
+    Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
+    this->swimPhaseStep = 0.35f;
+    this->jawRot = (this->stateTimer > 4) ? 4000 : 0;
+    if (this->stateTimer == 6) {
+        EnFishmod_RodNibble(this);
+    }
+    if (this->stateTimer == 0) {
+        this->nibblesLeft--;
+        this->jawRot = 0;
+        this->fishState = FISH_STATE_INSPECT;
+        this->stateTimer = 15 + (s16)Rand_ZeroFloat(35.0f);
+    }
+}
+
+static void Fish_Bite(EnFishmod* this, PlayState* play, FishAI* ai) {
+    FishmodRod* rod = ai->rod;
+    Vec3f mouth = rod->bobberPos;
+
+    if (!EnFishmod_RodBobberInWater() || (rod->fish != this)) {
+        EnFishmod_FishSetState(this, FISH_STATE_WANDER);
+        return;
+    }
+    if (!this->biteStruck) {
+        if (this->stateTimer > 7) {
+            // drawing back
+            this->actor.world.pos.x -= Math_SinS(this->runYaw) * 0.45f;
+            this->actor.world.pos.z -= Math_CosS(this->runYaw) * 0.45f;
+            this->swimPhaseStep = 0.3f;
+            Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
+            return;
+        }
+        // the strike: fast, straight at it
+        EnFishmod_BobberStation(this, 0.5f, FISHMOD_BAIT_MOUTH_Y(rod), &mouth);
+        EnFishmod_SwimToward(this, play, &mouth, 2.4f, 0x600);
+        this->swimPhaseStep = 0.7f;
+        this->jawRot = 6000;
+        if ((this->stateTimer == 0) ||
+            (Math_Vec3f_DistXZ(&this->actor.world.pos, &mouth) < 3.0f + this->halfLength * 0.2f)) {
+            this->biteStruck = true;
+            EnFishmod_RodBite(this);
+        }
+        return;
+    }
+    // takes the bait and pulls the bobber down
+    EnFishmod_BobberStation(this, 0.5f, FISHMOD_BAIT_MOUTH_Y(rod), &mouth);
+    EnFishmod_SwimToward(this, play, &mouth, 1.0f, 0x200);
+    Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
+    this->actor.shape.rot.x = 0x1000;
+    this->swimPhaseStep = 0.45f;
+    this->jawRot = 6000;
+}
+
+static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
+    FishmodRod* rod = ai->rod;
+    const FishmodBehavior* b = ai->b;
+    Player* player = GET_PLAYER(play);
+    Vec3f next;
+
+    this->jawRot = 3000;
+    // Now and then it makes a run: away from Link, veering left or right, toward open water, with a burst
+    // of speed at the start (stateTimer counts the burst down; the rod pulls harder while it lasts).
+    // Runs come in three kinds so the fight has a rhythm: off away from Link, a sweep across the line
+    // (left or right, swinging the rod over), or, while still fresh, a charge back toward Link that throws
+    // slack into the line.
+    if (--this->runTimer <= 0) {
+        s16 awayYaw = Math_Vec3f_Yaw(&player->actor.world.pos, &this->actor.world.pos);
+        f32 fresh = this->stamina / this->staminaMax;
+        f32 roll = Rand_ZeroOne();
+        s16 yaw;
+
+        if ((fresh > 0.5f) && (roll < 0.15f)) {
+            this->runKind = FISH_RUN_CHARGE;
+            yaw = awayYaw + 0x8000 + (s16)Rand_CenteredFloat(0x3000);
+        } else if (roll < 0.55f) {
+            this->runKind = FISH_RUN_ACROSS;
+            yaw = awayYaw + ((Rand_ZeroOne() < 0.5f) ? 0x3800 : -0x3800) + (s16)Rand_CenteredFloat(0x1000);
+        } else {
+            this->runKind = FISH_RUN_AWAY;
+            yaw = awayYaw + (s16)Rand_CenteredFloat(0x3000);
+        }
+        this->runYaw = EnFishmod_OpenWaterYaw(this, play, yaw);
+        this->runTimer = 40 + (s16)Rand_ZeroFloat(70.0f);
+        this->stateTimer = (s16)((12.0f + b->strength * 0.3f) * (0.3f + 0.7f * fresh));
+        if (this->runKind == FISH_RUN_CHARGE) {
+            this->stateTimer = this->stateTimer * 2 / 3;
+        }
+    }
+
+    // rod has computed where the line lets it go
+    next = this->target;
+    if (this->jumping) {
+        f32 surface;
+        f32 floor;
+
+        if (!EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) || (floor > surface - 4.0f)) {
+            // don't leap out over the bank
+            next.x = this->actor.world.pos.x;
+            next.z = this->actor.world.pos.z;
+        }
+        this->vel.y -= 0.7f;
+        next.y = this->actor.world.pos.y + this->vel.y;
+        if (next.y < this->waterY - 2.0f) {
+            this->jumping = false;
+            next.y = EnFishmod_ClampY(this, this->waterY - 4.0f);
+            {
+                Vec3f splash = next;
+
+                splash.y = this->waterY;
+                EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 250);
+                EffectSsGRipple_Spawn(play, &splash, 80, 400, 0);
+            }
+            Actor_PlaySfx(&this->actor, NA_SE_EV_DIVE_INTO_WATER_L);
+        }
+        this->actor.shape.rot.x = -(s16)(this->vel.y * 1500.0f);
+        this->actor.world.pos = next;
+    } else {
+        f32 surface;
+        f32 floor;
+        s32 fits = EnFishmod_ProbeWater(this, play, &next, this->runYaw);
+        // the line drags it toward Link, even through water too shallow to swim in
+        s32 reeledIn = Math_Vec3f_DistXZ(&next, &player->actor.world.pos) <
+                       Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
+
+        if (fits) {
+            // up near the surface while it runs, sounding deep while it holds against the line
+            f32 depthY = (this->stateTimer > 0)
+                             ? this->waterY - 8.0f
+                             : CLAMP_MIN(this->waterY - 8.0f - (this->waterY - this->floorY) * 0.5f,
+                                         this->floorY + this->halfHeight + 2.0f);
+
+            next.y = this->actor.world.pos.y;
+            Math_ApproachF(&next.y, depthY, 0.1f, 1.0f);
+            next.y = EnFishmod_ClampY(this, next.y);
+            this->actor.world.pos = next;
+            this->actor.shape.rot.x = 0;
+
+            // leap
+            if ((gFishmodRodState.tension > 45.0f) && (this->stamina > this->staminaMax * 0.2f) &&
+                (Rand_ZeroOne() < b->jumpiness * 0.0004f)) {
+                Vec3f splash = this->actor.world.pos;
+
+                this->jumping = true;
+                this->vel.y = 6.0f + b->strength * 0.04f;
+                splash.y = this->waterY;
+                EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
+                Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
+            }
+        } else if (reeledIn && EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) &&
+                   (surface - floor > 1.0f)) {
+            // thrashing in the shallows, belly on the bottom
+            this->waterY = surface;
+            this->floorY = floor;
+            this->waterCell = -2;
+            next.y = CLAMP_MIN(floor + this->halfHeight, (floor + surface) * 0.5f);
+            this->actor.world.pos = next;
+            this->actor.shape.rot.x = 0;
+        } else if (reeledIn) {
+            this->beached = true;
+        } else {
+            // can't go that way: shore. Turn for open water.
+            this->runYaw = EnFishmod_OpenWaterYaw(this, play, this->runYaw + 0x4000);
+            this->runTimer = 20;
+        }
+    }
+
+    if (this->stateTimer > 0) {
+        // running: hard, fast tail beats
+        Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 3, 0x1000, 0x100);
+        this->swimPhaseStep = 0.55f + (this->stamina / this->staminaMax) * 0.3f;
+        this->swimMag = 2600.0f;
+        this->actor.shape.rot.z = 0;
+    } else {
+        // holding against the line: head shakes and rolls, weaker as it tires
+        f32 fight = 0.3f + 0.7f * (this->stamina / this->staminaMax);
+
+        Math_SmoothStepToS(&this->actor.shape.rot.y,
+                           this->runYaw + (s16)(Math_SinS(this->timer * 0x1400) * 0x700 * fight), 3, 0x1000,
+                           0x100);
+        this->actor.shape.rot.z = Math_SinS(this->timer * 0x1C00) * 0xA00 * fight;
+        this->swimPhaseStep = 0.35f + (this->stamina / this->staminaMax) * 0.3f;
+        this->swimMag = 1800.0f;
+    }
+
+    // splashy fight at the surface
+    if (((this->timer % 12) == 0) && !this->jumping) {
+        Vec3f ripple = this->actor.world.pos;
+
+        ripple.y = this->waterY;
+        EffectSsGRipple_Spawn(play, &ripple, 40, 200, 0);
+    }
+}
+
+static void Fish_Caught(EnFishmod* this, PlayState* play, FishAI* ai) {
+    Player* player = GET_PLAYER(play);
+    // Hanging by the mouth from Link's right hand: move the fish so its head (measured on the last
+    // draw, so it's right for every species and size) ends up at the hand.
+    Vec3f* hand = &player->bodyPartsPos[PLAYER_BODYPART_R_HAND];
+    Vec3f off;
+
+    off.x = hand->x - this->headPos.x;
+    off.y = hand->y - 2.0f - this->headPos.y;
+    off.z = hand->z - this->headPos.z;
+    // a big fish held by a small Link rests its tail on the ground rather than going into it
+    off.y = CLAMP_MIN(off.y, player->actor.world.pos.y + 1.0f - this->boundsMin.y);
+    if ((SQ(off.x) + SQ(off.y) + SQ(off.z)) > SQ(80.0f)) {
+        // just landed: start with the body hanging under the hand
+        this->actor.world.pos = *hand;
+        this->actor.world.pos.y -= this->halfLength;
+    } else {
+        this->actor.world.pos.x += off.x * 0.6f;
+        this->actor.world.pos.y += off.y * 0.6f;
+        this->actor.world.pos.z += off.z * 0.6f;
+    }
+    // head up, swinging and twisting on the line
+    this->actor.shape.rot.y = player->actor.shape.rot.y + 0x4000 + (s16)(Math_SinS(this->timer * 0x900) * 0x1800);
+    this->actor.shape.rot.x = -0x4000 + (s16)(Math_SinS(this->timer * 0x700) * 0x500);
+    this->actor.shape.rot.z = 0;
+    this->swimPhaseStep = 0.6f;
+    this->swimMag = 2500.0f;
+}
+
+static void Fish_Flee(EnFishmod* this, PlayState* play, FishAI* ai) {
+    FishmodRod* rod = ai->rod;
+    const FishmodBehavior* b = ai->b;
+    Vec3f away;
+
+    // pick a way out once (away from the bobber, toward open water), and again only if the shore is
+    // in the way
+    if (this->stateTimer == 49) {
+        this->runYaw = EnFishmod_OpenWaterYaw(
+            this, play,
+            this->fleeFromLink ? this->runYaw : Math_Vec3f_Yaw(&rod->bobberPos, &this->actor.world.pos));
+        this->fleeFromLink = false;
+    }
+    away.x = this->actor.world.pos.x + Math_SinS(this->runYaw) * 60.0f;
+    away.y = this->actor.world.pos.y - 5.0f;
+    away.z = this->actor.world.pos.z + Math_CosS(this->runYaw) * 60.0f;
+    if (!EnFishmod_SwimToward(this, play, &away, 2.0f + b->speed * 0.02f, 0x800)) {
+        this->runYaw = EnFishmod_OpenWaterYaw(this, play, this->runYaw);
+    }
+    this->swimPhaseStep = 0.6f;
+    this->swimMag = 1800.0f;
+    this->jawRot = 0;
+    this->actor.shape.rot.z = 0;
+    if (this->stateTimer == 0) {
+        EnFishmod_FishSetState(this, FISH_STATE_WANDER);
+    }
+}
+
+static void Fish_Photo(EnFishmod* this, PlayState* play, FishAI* ai) {
+    this->actor.world.pos = this->actor.home.pos;
+    if (gFishmodStudio.active) {
+        // the animation studio moves it
+        this->actor.shape.rot.y = gFishmodStudio.yaw;
+        this->actor.shape.rot.x = gFishmodStudio.pitch;
+        this->actor.shape.rot.z = gFishmodStudio.roll;
+        this->swimMag = gFishmodStudio.swimMag;
+        this->swimPhaseStep = gFishmodStudio.swimPhaseStep;
+        this->jawRot = gFishmodStudio.jawRot;
+        if (gFishmodStudio.startle != 0) {
+            this->startle = gFishmodStudio.startle;
+        }
+        return;
+    }
+    this->actor.shape.rot.y = gFishmodPhoto.yaw;
+    this->actor.shape.rot.x = gFishmodPhoto.pitch;
+    // a gentle, nearly straight pose for portraits
+    this->swimMag = 250.0f;
+    this->swimPhaseStep = 0.08f;
+}
+
 void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
-    FishmodRod* rod = &gFishmodRodState;
-    const FishmodBehavior* b = &this->species->behavior;
-    f32 bobberDist = Math_Vec3f_DistXZ(&this->actor.world.pos, &rod->bobberPos);
-    Vec3f below;
+    FishAI ai;
 
     if (this->cooldown > 0) {
         this->cooldown--;
@@ -1395,9 +1903,12 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
         this->stateTimer--;
     }
 
-    below = rod->bobberPos;
+    ai.rod = &gFishmodRodState;
+    ai.b = &this->species->behavior;
+    ai.bobberDist = Math_Vec3f_DistXZ(&this->actor.world.pos, &ai.rod->bobberPos);
+    ai.below = ai.rod->bobberPos;
     // where the bait hangs: the float depth set on this cast
-    below.y = FISHMOD_ROD_BAIT_Y(rod) - 2.0f;
+    ai.below.y = FISHMOD_ROD_BAIT_Y(ai.rod) - 2.0f;
 
     if (EnFishmod_Unstick(this, play)) {
         return;
@@ -1405,466 +1916,31 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
 
     switch (this->fishState) {
         case FISH_STATE_WANDER:
-            // Fish don't roam about at random: they hold station near home for a while (resting, fins
-            // working), then make a short cruise somewhere nearby (sometimes down to pick at the bottom), and
-            // settle again. Fish out of their active time of day rest longer.
-            if (EnFishmod_SchoolFollow(this, play)) {
-                // with its school
-                if (this->fishState != FISH_STATE_WANDER) {
-                    break;
-                }
-            } else
-            if (this->restTimer > 0) {
-                this->restTimer--;
-                // holding the spot it stopped at (the target was set there), gliding to a stop
-                EnFishmod_SwimToward(this, play, &this->target, 0.15f, 0x100);
-                // still alive while it rests: fins working, a slow hover up and down
-                this->swimPhaseStep = 0.1f;
-                this->swimMag = 650.0f;
-                this->target.y += Math_SinS((s16)(this->timer * 0x300 + this->actor.params * 0x1234)) * 0.08f;
-                if (this->restTimer == 0) {
-                    EnFishmod_PickWanderTarget(this, play);
-                }
-            } else {
-                if ((this->stateTimer == 0) || (Math_Vec3f_DistXYZ(&this->actor.world.pos, &this->target) < 8.0f)) {
-                    // the more active its time of day, the shorter its rests (about 1.5 to 12 seconds); hungry fish
-                    // rest less (they're out looking), frightened ones more (lying low)
-                    this->restTimer =
-                        (30 + (s16)Rand_ZeroFloat(220.0f - EnFishmod_Activity(this) * 55.0f)) *
-                        (1.25f - 0.5f * MOOD_HUNGER(this) + 0.6f * MOOD_FEAR(this));
-                    if ((this->stateTimer != 0) && (this->target.y < this->floorY + this->halfHeight + 3.0f)) {
-                        // reached the bottom it went down to: it picks at it and finds something
-                        this->mood.hunger = CLAMP_MIN(this->mood.hunger - 30, 0);
-                    }
-                    this->target = this->actor.world.pos;
-                }
-                EnFishmod_SwimToward(this, play, &this->target, 0.4f + b->speed * 0.008f, 0x200);
-                this->swimPhaseStep = 0.15f + this->speed * 0.12f;
-                this->swimMag = 1300.0f;
-            }
-
-            EnFishmod_CheckSpook(this, play);
-            // Only one fish goes to look at a time (not while another is at the bobber), and not often: a bobber
-            // is something new in the water, not food falling from the sky.
-            if ((this->fishState == FISH_STATE_WANDER) && (this->cooldown == 0) && EnFishmod_RodBobberInWater() &&
-                (rod->fish == NULL) && (((play->gameplayFrames + this->actor.params) % 10) == 0)) {
-                f32 notice = 30.0f + b->curiosity * 1.0f;
-                f32 keen = (0.3f + 1.4f * MOOD_HUNGER(this)) * (1.0f - MOOD_FEAR(this));
-                EnFishmodShared* shared = EnFishmod_Shared(play);
-
-                // hungry fish look further; frightened ones don't come out at all
-                notice *= 0.6f + 0.8f * MOOD_HUNGER(this);
-                if (this->mood.fear > 140) {
-                    notice = 0.0f;
-                }
-                // a plop nearby: the hungry come to see what fell in (felt all round, seen or not)
-                if ((play->gameplayFrames - shared->splashFrame < 60) && (this->mood.hunger > 150) &&
-                    (Math_Vec3f_DistXZ(&this->actor.world.pos, &shared->splashPos) < notice + 60.0f)) {
-                    keen *= 3.0f;
-                    notice += 60.0f;
-                }
-                if (rod->twitchTimer > 0) {
-                    // a twitch is felt all round too
-                    notice += 30.0f;
-                } else if (!EnFishmod_CanSee(this, play, &rod->bobberPos, notice + 20.0f) &&
-                           (bobberDist > this->halfLength + 25.0f)) {
-                    // otherwise it has to see it (or have it right beside it)
-                    notice = 0.0f;
-                }
-                // it has to be able to see the bait: not too far above or below it either (deep fish need the bait
-                // brought down to them, or to have come up to feed)
-                if (ABS(FISHMOD_ROD_BAIT_Y(rod) - this->actor.world.pos.y) > notice * 1.2f) {
-                    notice = 0.0f;
-                }
-                if ((bobberDist < notice) &&
-                    (Rand_ZeroOne() < b->curiosity * 0.0015f * EnFishmod_BaitAppeal(this) * keen) &&
-                    EnFishmod_OpenWaterTo(this, play, &rod->bobberPos)) {
-                    this->fishState = FISH_STATE_APPROACH;
-                    this->stateTimer = 200;
-                    // it noticed: a flick of the tail toward the bobber (the player sees it take interest)
-                    this->startle = ((s16)(Math_Vec3f_Yaw(&this->actor.world.pos, &rod->bobberPos) -
-                                           this->actor.shape.rot.y) > 0) ? 6 : -6;
-                    // a fish deep below has further to come: time for the climb too
-                    this->stateTimer += (s16)CLAMP(ABS(rod->waterY - this->actor.world.pos.y) * 2.5f, 0, 1000);
-                }
-            }
+            Fish_Wander(this, play, &ai);
             break;
-
         case FISH_STATE_APPROACH:
-            if (!EnFishmod_RodBobberInWater() || (this->stateTimer == 0)) {
-                // gave up (couldn't get there): don't come straight back
-                this->cooldown = 150;
-                EnFishmod_FishSetState(this, FISH_STATE_WANDER);
-                break;
-            }
-            {
-                Vec3f station;
-
-                // come in nose first: aim for the spot a body length short of the bobber
-                this->runYaw = Math_Vec3f_Yaw(&this->actor.world.pos, &rod->bobberPos);
-                EnFishmod_BobberStation(this, 0.9f, below.y, &station);
-                EnFishmod_SwimToward(this, play, &station, 0.7f + b->speed * 0.01f, 0x400);
-            }
-            this->swimPhaseStep = 0.2f + this->speed * 0.15f;
-            EnFishmod_CheckSpook(this, play);
-            if ((this->fishState == FISH_STATE_APPROACH) && (bobberDist < 14.0f + this->halfLength)) {
-                if ((rod->fish == NULL) || (rod->fish == this)) {
-                    rod->fish = this;
-                    this->nibblesLeft = b->nibbles;
-                    // a hungry fish doesn't fuss as long
-                    if ((this->mood.hunger > 190) && (this->nibblesLeft > 0)) {
-                        this->nibblesLeft--;
-                    }
-                    this->interest = 0.0f;
-                    EnFishmod_FishSetState(this, FISH_STATE_INSPECT);
-                } else {
-                    // someone else got there first: hang around a bit
-                    this->cooldown = 60;
-                    EnFishmod_FishSetState(this, FISH_STATE_WANDER);
-                }
-            }
+            Fish_Approach(this, play, &ai);
             break;
-
-        case FISH_STATE_INSPECT: {
-            Vec3f hover = below;
-
-            if (!EnFishmod_RodBobberInWater() || (rod->fish != this)) {
-                EnFishmod_FishSetState(this, FISH_STATE_WANDER);
-                break;
-            }
-            // hold station under the bobber, nose toward it, swaying a little
-            EnFishmod_BobberStation(this, 0.9f, below.y, &hover);
-            hover.x += Math_CosS(this->runYaw) * Math_SinS(this->timer * 0x200) * 2.0f;
-            hover.z -= Math_SinS(this->runYaw) * Math_SinS(this->timer * 0x200) * 2.0f;
-            // now and then it backs off a little without turning, then comes back in (vanilla's pond fish do
-            // this: it reads as the fish making up its mind)
-            if (((this->timer + this->depthPref) % 90) < 22) {
-                this->actor.world.pos.x -= Math_SinS(this->runYaw) * 0.3f;
-                this->actor.world.pos.z -= Math_CosS(this->runYaw) * 0.3f;
-                this->speed = 0.0f;
-            } else {
-                EnFishmod_SwimToward(this, play, &hover, 0.25f, 0x200);
-            }
-            Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
-            this->swimPhaseStep = 0.12f;
-            EnFishmod_CheckSpook(this, play);
-            if (this->fishState != FISH_STATE_INSPECT) {
-                break;
-            }
-
-            this->interest += 0.01f * EnFishmod_BaitAppeal(this);
-            // reeling the bobber away too fast is suspicious to wary fish
-            // (the bobber has moved away from the spot the fish is holding)
-            if ((Math_Vec3f_DistXZ(&this->actor.world.pos, &hover) > 12.0f) &&
-                (Rand_ZeroOne() < b->wariness * 0.002f)) {
-                this->cooldown = 200;
-                EnFishmod_FishSetState(this, FISH_STATE_WANDER);
-                break;
-            }
-            if (this->stateTimer == 0) {
-                if (this->nibblesLeft > 0) {
-                    EnFishmod_FishSetState(this, FISH_STATE_NIBBLE);
-                } else if (Rand_ZeroOne() <
-                           (b->aggression * 0.012f * (0.6f + this->interest) * (0.5f + MOOD_HUNGER(this)))) {
-                    this->fishState = FISH_STATE_BITE;
-                    // a wind-up first: it draws back, then strikes (the bite comes when it reaches the bait)
-                    this->stateTimer = 14;
-                    this->biteStruck = false;
-                } else {
-                    // lost interest
-                    this->cooldown = 500 + (s16)Rand_ZeroFloat(300.0f);
-                    // a refusal the player can see: a sharp turn and a short dart away
-                    EnFishmod_FishSetState(this, FISH_STATE_FLEE);
-                    this->stateTimer = 22;
-                    this->cooldown = 500 + (s16)Rand_ZeroFloat(300.0f);
-                }
-            }
+        case FISH_STATE_INSPECT:
+            Fish_Inspect(this, play, &ai);
             break;
-        }
-
-        case FISH_STATE_NIBBLE: {
-            Vec3f peck = rod->bobberPos;
-
-            if (!EnFishmod_RodBobberInWater() || (rod->fish != this)) {
-                EnFishmod_FishSetState(this, FISH_STATE_WANDER);
-                break;
-            }
-            // dart forward to peck, then back off, without turning
-            if (this->stateTimer > 6) {
-                EnFishmod_BobberStation(this, 0.45f, FISHMOD_ROD_BAIT_Y(rod), &peck);
-            } else {
-                EnFishmod_BobberStation(this, 0.9f, below.y, &peck);
-            }
-            EnFishmod_SwimToward(this, play, &peck, 0.8f, 0x200);
-            Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
-            this->swimPhaseStep = 0.35f;
-            this->jawRot = (this->stateTimer > 4) ? 4000 : 0;
-            if (this->stateTimer == 6) {
-                EnFishmod_RodNibble(this);
-            }
-            if (this->stateTimer == 0) {
-                this->nibblesLeft--;
-                this->jawRot = 0;
-                this->fishState = FISH_STATE_INSPECT;
-                this->stateTimer = 15 + (s16)Rand_ZeroFloat(35.0f);
-            }
+        case FISH_STATE_NIBBLE:
+            Fish_Nibble(this, play, &ai);
             break;
-        }
-
-        case FISH_STATE_BITE: {
-            Vec3f mouth = rod->bobberPos;
-
-            if (!EnFishmod_RodBobberInWater() || (rod->fish != this)) {
-                EnFishmod_FishSetState(this, FISH_STATE_WANDER);
-                break;
-            }
-            if (!this->biteStruck) {
-                if (this->stateTimer > 7) {
-                    // drawing back
-                    this->actor.world.pos.x -= Math_SinS(this->runYaw) * 0.45f;
-                    this->actor.world.pos.z -= Math_CosS(this->runYaw) * 0.45f;
-                    this->swimPhaseStep = 0.3f;
-                    Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
-                    break;
-                }
-                // the strike: fast, straight at it
-                EnFishmod_BobberStation(this, 0.5f, FISHMOD_BAIT_MOUTH_Y(rod), &mouth);
-                EnFishmod_SwimToward(this, play, &mouth, 2.4f, 0x600);
-                this->swimPhaseStep = 0.7f;
-                this->jawRot = 6000;
-                if ((this->stateTimer == 0) ||
-                    (Math_Vec3f_DistXZ(&this->actor.world.pos, &mouth) < 3.0f + this->halfLength * 0.2f)) {
-                    this->biteStruck = true;
-                    EnFishmod_RodBite(this);
-                }
-                break;
-            }
-            // takes the bait and pulls the bobber down
-            EnFishmod_BobberStation(this, 0.5f, FISHMOD_BAIT_MOUTH_Y(rod), &mouth);
-            EnFishmod_SwimToward(this, play, &mouth, 1.0f, 0x200);
-            Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 8, 0x100, 0x20);
-            this->actor.shape.rot.x = 0x1000;
-            this->swimPhaseStep = 0.45f;
-            this->jawRot = 6000;
+        case FISH_STATE_BITE:
+            Fish_Bite(this, play, &ai);
             break;
-        }
-
-        case FISH_STATE_HOOKED: {
-            Player* player = GET_PLAYER(play);
-            Vec3f next;
-
-            this->jawRot = 3000;
-            // Now and then it makes a run: away from Link, veering left or right, toward open water, with a burst
-            // of speed at the start (stateTimer counts the burst down; the rod pulls harder while it lasts).
-            // Runs come in three kinds so the fight has a rhythm: off away from Link, a sweep across the line
-            // (left or right, swinging the rod over), or, while still fresh, a charge back toward Link that throws
-            // slack into the line.
-            if (--this->runTimer <= 0) {
-                s16 awayYaw = Math_Vec3f_Yaw(&player->actor.world.pos, &this->actor.world.pos);
-                f32 fresh = this->stamina / this->staminaMax;
-                f32 roll = Rand_ZeroOne();
-                s16 yaw;
-
-                if ((fresh > 0.5f) && (roll < 0.15f)) {
-                    this->runKind = FISH_RUN_CHARGE;
-                    yaw = awayYaw + 0x8000 + (s16)Rand_CenteredFloat(0x3000);
-                } else if (roll < 0.55f) {
-                    this->runKind = FISH_RUN_ACROSS;
-                    yaw = awayYaw + ((Rand_ZeroOne() < 0.5f) ? 0x3800 : -0x3800) + (s16)Rand_CenteredFloat(0x1000);
-                } else {
-                    this->runKind = FISH_RUN_AWAY;
-                    yaw = awayYaw + (s16)Rand_CenteredFloat(0x3000);
-                }
-                this->runYaw = EnFishmod_OpenWaterYaw(this, play, yaw);
-                this->runTimer = 40 + (s16)Rand_ZeroFloat(70.0f);
-                this->stateTimer = (s16)((12.0f + b->strength * 0.3f) * (0.3f + 0.7f * fresh));
-                if (this->runKind == FISH_RUN_CHARGE) {
-                    this->stateTimer = this->stateTimer * 2 / 3;
-                }
-            }
-
-            // rod has computed where the line lets it go
-            next = this->target;
-            if (this->jumping) {
-                f32 surface;
-                f32 floor;
-
-                if (!EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) || (floor > surface - 4.0f)) {
-                    // don't leap out over the bank
-                    next.x = this->actor.world.pos.x;
-                    next.z = this->actor.world.pos.z;
-                }
-                this->vel.y -= 0.7f;
-                next.y = this->actor.world.pos.y + this->vel.y;
-                if (next.y < this->waterY - 2.0f) {
-                    this->jumping = false;
-                    next.y = EnFishmod_ClampY(this, this->waterY - 4.0f);
-                    {
-                        Vec3f splash = next;
-
-                        splash.y = this->waterY;
-                        EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 250);
-                        EffectSsGRipple_Spawn(play, &splash, 80, 400, 0);
-                    }
-                    Actor_PlaySfx(&this->actor, NA_SE_EV_DIVE_INTO_WATER_L);
-                }
-                this->actor.shape.rot.x = -(s16)(this->vel.y * 1500.0f);
-                this->actor.world.pos = next;
-            } else {
-                f32 surface;
-                f32 floor;
-                s32 fits = EnFishmod_ProbeWater(this, play, &next, this->runYaw);
-                // the line drags it toward Link, even through water too shallow to swim in
-                s32 reeledIn = Math_Vec3f_DistXZ(&next, &player->actor.world.pos) <
-                               Math_Vec3f_DistXZ(&this->actor.world.pos, &player->actor.world.pos);
-
-                if (fits) {
-                    // up near the surface while it runs, sounding deep while it holds against the line
-                    f32 depthY = (this->stateTimer > 0)
-                                     ? this->waterY - 8.0f
-                                     : CLAMP_MIN(this->waterY - 8.0f - (this->waterY - this->floorY) * 0.5f,
-                                                 this->floorY + this->halfHeight + 2.0f);
-
-                    next.y = this->actor.world.pos.y;
-                    Math_ApproachF(&next.y, depthY, 0.1f, 1.0f);
-                    next.y = EnFishmod_ClampY(this, next.y);
-                    this->actor.world.pos = next;
-                    this->actor.shape.rot.x = 0;
-
-                    // leap
-                    if ((gFishmodRodState.tension > 45.0f) && (this->stamina > this->staminaMax * 0.2f) &&
-                        (Rand_ZeroOne() < b->jumpiness * 0.0004f)) {
-                        Vec3f splash = this->actor.world.pos;
-
-                        this->jumping = true;
-                        this->vel.y = 6.0f + b->strength * 0.04f;
-                        splash.y = this->waterY;
-                        EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
-                        Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
-                    }
-                } else if (reeledIn && EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) &&
-                           (surface - floor > 1.0f)) {
-                    // thrashing in the shallows, belly on the bottom
-                    this->waterY = surface;
-                    this->floorY = floor;
-                    this->waterCell = -2;
-                    next.y = CLAMP_MIN(floor + this->halfHeight, (floor + surface) * 0.5f);
-                    this->actor.world.pos = next;
-                    this->actor.shape.rot.x = 0;
-                } else if (reeledIn) {
-                    this->beached = true;
-                } else {
-                    // can't go that way: shore. Turn for open water.
-                    this->runYaw = EnFishmod_OpenWaterYaw(this, play, this->runYaw + 0x4000);
-                    this->runTimer = 20;
-                }
-            }
-
-            if (this->stateTimer > 0) {
-                // running: hard, fast tail beats
-                Math_SmoothStepToS(&this->actor.shape.rot.y, this->runYaw, 3, 0x1000, 0x100);
-                this->swimPhaseStep = 0.55f + (this->stamina / this->staminaMax) * 0.3f;
-                this->swimMag = 2600.0f;
-                this->actor.shape.rot.z = 0;
-            } else {
-                // holding against the line: head shakes and rolls, weaker as it tires
-                f32 fight = 0.3f + 0.7f * (this->stamina / this->staminaMax);
-
-                Math_SmoothStepToS(&this->actor.shape.rot.y,
-                                   this->runYaw + (s16)(Math_SinS(this->timer * 0x1400) * 0x700 * fight), 3, 0x1000,
-                                   0x100);
-                this->actor.shape.rot.z = Math_SinS(this->timer * 0x1C00) * 0xA00 * fight;
-                this->swimPhaseStep = 0.35f + (this->stamina / this->staminaMax) * 0.3f;
-                this->swimMag = 1800.0f;
-            }
-
-            // splashy fight at the surface
-            if (((this->timer % 12) == 0) && !this->jumping) {
-                Vec3f ripple = this->actor.world.pos;
-
-                ripple.y = this->waterY;
-                EffectSsGRipple_Spawn(play, &ripple, 40, 200, 0);
-            }
+        case FISH_STATE_HOOKED:
+            Fish_Hooked(this, play, &ai);
             break;
-        }
-
-        case FISH_STATE_CAUGHT: {
-            Player* player = GET_PLAYER(play);
-            // Hanging by the mouth from Link's right hand: move the fish so its head (measured on the last
-            // draw, so it's right for every species and size) ends up at the hand.
-            Vec3f* hand = &player->bodyPartsPos[PLAYER_BODYPART_R_HAND];
-            Vec3f off;
-
-            off.x = hand->x - this->headPos.x;
-            off.y = hand->y - 2.0f - this->headPos.y;
-            off.z = hand->z - this->headPos.z;
-            // a big fish held by a small Link rests its tail on the ground rather than going into it
-            off.y = CLAMP_MIN(off.y, player->actor.world.pos.y + 1.0f - this->boundsMin.y);
-            if ((SQ(off.x) + SQ(off.y) + SQ(off.z)) > SQ(80.0f)) {
-                // just landed: start with the body hanging under the hand
-                this->actor.world.pos = *hand;
-                this->actor.world.pos.y -= this->halfLength;
-            } else {
-                this->actor.world.pos.x += off.x * 0.6f;
-                this->actor.world.pos.y += off.y * 0.6f;
-                this->actor.world.pos.z += off.z * 0.6f;
-            }
-            // head up, swinging and twisting on the line
-            this->actor.shape.rot.y = player->actor.shape.rot.y + 0x4000 + (s16)(Math_SinS(this->timer * 0x900) * 0x1800);
-            this->actor.shape.rot.x = -0x4000 + (s16)(Math_SinS(this->timer * 0x700) * 0x500);
-            this->actor.shape.rot.z = 0;
-            this->swimPhaseStep = 0.6f;
-            this->swimMag = 2500.0f;
+        case FISH_STATE_CAUGHT:
+            Fish_Caught(this, play, &ai);
             break;
-        }
-
-        case FISH_STATE_FLEE: {
-            Vec3f away;
-
-            // pick a way out once (away from the bobber, toward open water), and again only if the shore is
-            // in the way
-            if (this->stateTimer == 49) {
-                this->runYaw = EnFishmod_OpenWaterYaw(
-                    this, play,
-                    this->fleeFromLink ? this->runYaw : Math_Vec3f_Yaw(&rod->bobberPos, &this->actor.world.pos));
-                this->fleeFromLink = false;
-            }
-            away.x = this->actor.world.pos.x + Math_SinS(this->runYaw) * 60.0f;
-            away.y = this->actor.world.pos.y - 5.0f;
-            away.z = this->actor.world.pos.z + Math_CosS(this->runYaw) * 60.0f;
-            if (!EnFishmod_SwimToward(this, play, &away, 2.0f + b->speed * 0.02f, 0x800)) {
-                this->runYaw = EnFishmod_OpenWaterYaw(this, play, this->runYaw);
-            }
-            this->swimPhaseStep = 0.6f;
-            this->swimMag = 1800.0f;
-            this->jawRot = 0;
-            this->actor.shape.rot.z = 0;
-            if (this->stateTimer == 0) {
-                EnFishmod_FishSetState(this, FISH_STATE_WANDER);
-            }
+        case FISH_STATE_FLEE:
+            Fish_Flee(this, play, &ai);
             break;
-        }
-
         case FISH_STATE_PHOTO:
-            this->actor.world.pos = this->actor.home.pos;
-            if (gFishmodStudio.active) {
-                // the animation studio moves it
-                this->actor.shape.rot.y = gFishmodStudio.yaw;
-                this->actor.shape.rot.x = gFishmodStudio.pitch;
-                this->actor.shape.rot.z = gFishmodStudio.roll;
-                this->swimMag = gFishmodStudio.swimMag;
-                this->swimPhaseStep = gFishmodStudio.swimPhaseStep;
-                this->jawRot = gFishmodStudio.jawRot;
-                if (gFishmodStudio.startle != 0) {
-                    this->startle = gFishmodStudio.startle;
-                }
-                break;
-            }
-            this->actor.shape.rot.y = gFishmodPhoto.yaw;
-            this->actor.shape.rot.x = gFishmodPhoto.pitch;
-            // a gentle, nearly straight pose for portraits
-            this->swimMag = 250.0f;
-            this->swimPhaseStep = 0.08f;
+            Fish_Photo(this, play, &ai);
             break;
     }
 }
