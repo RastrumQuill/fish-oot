@@ -113,6 +113,9 @@ void EnGs_Init(Actor* thisx, PlayState* play) {
     EnGs* this = (EnGs*)thisx;
 
     Actor_ProcessInitChain(thisx, sInitChain);
+    // fishmod: vanilla's default draw range (about 1350 units) makes the stones pop in and out across open water (a
+    // simple model: a longer range costs little)
+    thisx->cullingVolumeDistance = 4000.0f;
     Collider_InitCylinder(play, &this->collider);
     Collider_SetCylinder(play, &this->collider, thisx, &sCylinderInit);
     CollisionCheck_SetInfo2(&thisx->colChkInfo, &sDamageTable, &sColChkInfoInit);

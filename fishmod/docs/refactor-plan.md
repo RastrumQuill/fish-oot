@@ -100,6 +100,11 @@ Stage 1 first (it shrinks everything after it), then 2-4 (bugs the player meets)
   built into the overlay from the extracted assets, so it no longer needs object_fish; only the fish and their
   manager take that object (and scenes with fish load it). Beehive chunks (bait) now drop in any scene too. The
   HUD's rod-on-B special case is vanilla again. Test: `rodanywhere` (Zora's Domain, no fish).
+- **5, Lake Hylia's special cases as data: done.** Collision memory and grid per scene in
+  `fishmod_collision_scenes.h` (BgCheck applies them for any scene listed); the gossip stones' longer draw range in
+  their own Init (every scene); the bed shading says which scene and which water level it was made for, and the dry
+  check follows the scene's water levels (a lake refilling) instead of Lake Hylia's flag; beehive spots are a table;
+  the dropped per-zone draw distances removed (game and tool).
 
 ## Decisions (made)
 

@@ -99,7 +99,7 @@ def rotate(path):
 
 def write_global(merged):
     """The sweep's furthest need per kind (over every zone) into include/fishmod_lod.h, keeping the larger of that
-    and what it has (the tour stops'); the zone tables emptied. Distances that change with where the camera is make
+    and what it has (the tour stops'). (Per-zone distances were tried and dropped: distances that change with where the camera is make
     props pop as the camera moves or turns; one per kind can't."""
     path = os.path.join(ROOT, "include/fishmod_lod.h")
     text = open(path).read()
@@ -120,56 +120,7 @@ def write_global(merged):
     head = text[:text.index("#define FISHMOD_LOD_DISTANCES(X)")]
     with open(path, "w") as f:
         f.write(head + "#define FISHMOD_LOD_DISTANCES(X) \\\n" + "\n".join(lines) + "\n\n#endif\n")
-    with open(os.path.join(ROOT, "include/fishmod_lod_zones.h"), "w") as f:
-        f.write("#ifndef FISHMOD_LOD_ZONES_H\n#define FISHMOD_LOD_ZONES_H\n\n/*\n * Draw distances per zone: none. "
-                "They changed with where the camera was, so props popped as it moved or turned; fishmod_lod.h has one\n"
-                " * distance per kind instead (the furthest any view needed). fishmod/tools/lod_calibrate.py --sweep "
-                "--write would make them again.\n */\n#define FISHMOD_LOD_ZONE_COUNT 0\n\n#endif\n")
-    print("wrote include/fishmod_lod.h (and emptied include/fishmod_lod_zones.h)")
-
-
-ZONE_CELL = 200
-
-
-def write_zones(merged):
-    """include/fishmod_lod_zones.h: which zone the camera is in (a grid over the lake, from the zone map) and each
-    kind's distance there, above and under water (hundreds of units; 0: not measured there, the global one used)."""
-    import importlib.util
-    import json
-
-    spec = importlib.util.spec_from_file_location("gen_scatter", os.path.join(ROOT, "fishmod/tools/gen_scatter.py"))
-    gs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gs)
-    zones = json.load(open(os.path.join(ROOT, "fishmod/data/lake_hylia_zones.json")))["zones"]
-    x0, z0, x1, z1 = -4800, 2200, 2400, 9400
-    w, h = (x1 - x0) // ZONE_CELL, (z1 - z0) // ZONE_CELL
-    grid = []
-    for iz in range(h):
-        for ix in range(w):
-            x, z = x0 + (ix + 0.5) * ZONE_CELL, z0 + (iz + 0.5) * ZONE_CELL
-            best = max(((gs.in_zone(zn, x, z), zn["id"]) for zn in zones), default=(0, 0))
-            grid.append(best[1] if best[0] > 0 else 0)
-    names = kinds()
-    with open(os.path.join(ROOT, "include/fishmod_lod_zones.h"), "w") as f:
-        f.write("#ifndef FISHMOD_LOD_ZONES_H\n#define FISHMOD_LOD_ZONES_H\n\n")
-        f.write("/*\n * Draw distances per zone of Lake Hylia, from the LOD sweep (fishmod/scripts/lod_sweep.inc.c: ~1100 views\n"
-                " * over the lake, each checked on the game's own frames). Made by fishmod/tools/lod_calibrate.py --sweep\n"
-                " * --write. The zone is the camera's (fishmod/data/lake_hylia_zones.json on a grid); distances are in\n"
-                " * hundreds of units, [zone][under water][kind], 0 where the kind was never in sight from that zone.\n */\n")
-        f.write(f"#define FISHMOD_LOD_ZONE_X0 {x0}\n#define FISHMOD_LOD_ZONE_Z0 {z0}\n#define FISHMOD_LOD_ZONE_CELL {ZONE_CELL}\n")
-        f.write(f"#define FISHMOD_LOD_ZONE_W {w}\n#define FISHMOD_LOD_ZONE_H {h}\n#define FISHMOD_LOD_ZONE_COUNT {SWEEP_ZONES}\n")
-        f.write(f"#define FISHMOD_LOD_ZONE_KINDS {len(names)}\n\n")
-        f.write("static const u8 sLodZoneGrid[FISHMOD_LOD_ZONE_W * FISHMOD_LOD_ZONE_H] = {\n")
-        for iz in range(h):
-            f.write("    " + ", ".join(str(v) for v in grid[iz * w:(iz + 1) * w]) + ",\n")
-        f.write("};\n\nstatic const u8 sLodZoneDist[FISHMOD_LOD_ZONE_COUNT][2][FISHMOD_LOD_ZONE_KINDS] = {\n")
-        for zn in range(SWEEP_ZONES):
-            f.write("    {\n")
-            for u in range(2):
-                f.write("        { " + ", ".join(str(merged[zn][u][k]) for k in range(len(names))) + " },\n")
-            f.write("    },\n")
-        f.write("};\n\n#endif\n")
-    print("wrote include/fishmod_lod_zones.h")
+    print("wrote include/fishmod_lod.h")
 
 
 def main():
@@ -188,10 +139,8 @@ def main():
         return
     if args.sweep:
         merged = sweep(args.sweep)
-        if args.write_global:
+        if args.write_global or args.write:
             write_global(merged)
-        elif args.write:
-            write_zones(merged)
         return
     nk, stops, thr, pix, above, under, noise, verify, uflag, log = read(args.save)
     names = kinds()

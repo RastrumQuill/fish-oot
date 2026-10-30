@@ -156,17 +156,31 @@ void Fishmod_OnSceneLoad(PlayState* play) {
 }
 
 /**
- * Things fishmod adds to a scene besides the fish. Kokiri Forest gets a beehive (for bee larva bait) on a wall in
- * sight of the moat, found by looking for the nearest wall around a spot by the water.
+ * Beehives fishmod adds for bee larva bait: per scene, a spot by the water; the hive goes on the nearest wall around it
+ * (within 400 units), hanging toward the water.
  */
+typedef struct FishmodHiveSpot {
+    s16 sceneId;
+    Vec3f lookFrom;
+} FishmodHiveSpot;
+
+static const FishmodHiveSpot sHiveSpots[] = {
+    { SCENE_KOKIRI_FOREST, { 960.0f, 75.0f, -60.0f } }, // in sight of the moat
+};
+
 static void Fishmod_SpawnSceneExtras(PlayState* play) {
-    if (play->sceneId == SCENE_KOKIRI_FOREST) {
-        static Vec3f sHiveLookFrom = { 960.0f, 75.0f, -60.0f };
+    s32 n;
+
+    for (n = 0; n < ARRAY_COUNT(sHiveSpots); n++) {
+        Vec3f from = sHiveSpots[n].lookFrom;
         Vec3f best;
         f32 bestDist = 400.0f;
         s16 bestYaw = 0;
         s32 i;
 
+        if (sHiveSpots[n].sceneId != play->sceneId) {
+            continue;
+        }
         for (i = 0; i < 16; i++) {
             s16 yaw = i * 0x1000;
             Vec3f to;
@@ -174,12 +188,11 @@ static void Fishmod_SpawnSceneExtras(PlayState* play) {
             CollisionPoly* poly;
             s32 bgId;
 
-            to.x = sHiveLookFrom.x + Math_SinS(yaw) * 400.0f;
-            to.y = sHiveLookFrom.y;
-            to.z = sHiveLookFrom.z + Math_CosS(yaw) * 400.0f;
-            if (BgCheck_EntityLineTest1(&play->colCtx, &sHiveLookFrom, &to, &hit, &poly, true, false, false, true,
-                                        &bgId)) {
-                f32 dist = Math_Vec3f_DistXZ(&sHiveLookFrom, &hit);
+            to.x = from.x + Math_SinS(yaw) * 400.0f;
+            to.y = from.y;
+            to.z = from.z + Math_CosS(yaw) * 400.0f;
+            if (BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &hit, &poly, true, false, false, true, &bgId)) {
+                f32 dist = Math_Vec3f_DistXZ(&from, &hit);
 
                 if ((dist > 60.0f) && (dist < bestDist)) {
                     bestDist = dist;
@@ -916,16 +929,47 @@ static const FishmodWaterMapRom sScatters[] = {
 #undef FISHMOD_SCATTER
 };
 
-#define FISHMOD_COLLISION(sceneId, segment) DECLARE_ROM_SEGMENT(segment)
+#define FISHMOD_COLLISION(sceneId, segment, extraMem, gridCells) DECLARE_ROM_SEGMENT(segment)
 #include "fishmod_collision_scenes.h"
 #undef FISHMOD_COLLISION
 
 static const FishmodWaterMapRom sPropCollisions[] = {
-#define FISHMOD_COLLISION(sceneId, segment) \
+#define FISHMOD_COLLISION(sceneId, segment, extraMem, gridCells) \
     { sceneId, (uintptr_t)_##segment##SegmentRomStart, (uintptr_t)_##segment##SegmentRomEnd },
 #include "fishmod_collision_scenes.h"
 #undef FISHMOD_COLLISION
 };
+
+typedef struct FishmodCollisionSize {
+    s16 sceneId;
+    u8 gridCells;
+    u32 extraMem;
+} FishmodCollisionSize;
+
+static const FishmodCollisionSize sPropCollisionSizes[] = {
+#define FISHMOD_COLLISION(sceneId, segment, extraMem, gridCells) { sceneId, gridCells, extraMem },
+#include "fishmod_collision_scenes.h"
+#undef FISHMOD_COLLISION
+};
+
+/**
+ * BgCheck's sizes for a scene with prop collision (fishmod_collision_scenes.h): more memory for the props' polygons,
+ * and a finer lookup grid across x and z. Called once BgCheck has chosen the scene's own.
+ */
+void Fishmod_SizeCollision(s16 sceneId, u32* memSize, Vec3i* subdivAmount) {
+    s32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sPropCollisionSizes); i++) {
+        if (sPropCollisionSizes[i].sceneId == sceneId) {
+            *memSize += sPropCollisionSizes[i].extraMem;
+            if (sPropCollisionSizes[i].gridCells != 0) {
+                subdivAmount->x = sPropCollisionSizes[i].gridCells;
+                subdivAmount->z = sPropCollisionSizes[i].gridCells;
+            }
+            return;
+        }
+    }
+}
 
 /**
  * Adds the scene's prop collision (its rocks, as chunky hulls) to the scene's own: new vertex and polygon lists,
