@@ -95,8 +95,22 @@ static s32 Occ_Corner(OccLine* h, OccLine* s, f32* u, f32* v) {
     return true;
 }
 
+/** Not a NaN or an infinity (by its bits: -ffast-math assumes neither, so a compare could be folded away). */
+static s32 Occ_Finite(f32 f) {
+    union {
+        f32 f;
+        u32 u;
+    } bits;
+
+    bits.f = f;
+    return (bits.u & 0x7F800000) != 0x7F800000;
+}
+
 static s16 Occ_Frac(f32 f) {
     f *= 32768.0f;
+    if (!Occ_Finite(f)) {
+        return 0; // (converting one traps on the console)
+    }
     return (s16)CLAMP(f, -32768.0f, 32767.0f);
 }
 
@@ -257,7 +271,7 @@ static f32 Occ_Make(const OccCandidate* c, MtxF* vp, f32* vpScale, f32* vpTrans,
         }
         s = 0.99f / m;
         // hidden when 0.5 (kx X + ky Y + kz Z) >= kc: kc = -0.5 d
-        if (fabsf(d * s * 0.5f) > 32000.0f) {
+        if (!Occ_Finite(d * s) || (fabsf(d * s * 0.5f) > 32000.0f)) {
             return 0.0f;
         }
         out->o.kx = Occ_Frac(nx * s);
@@ -267,7 +281,7 @@ static f32 Occ_Make(const OccCandidate* c, MtxF* vp, f32* vpScale, f32* vpTrans,
     }
     // the four lines as coefficients (the bounds' b must fit, or the region would grow when clamped)
     for (i = 0; i < 4; i++) {
-        if (fabsf(ln[i].b) * 0.5f > 32000.0f) {
+        if (!Occ_Finite(ln[i].b) || (fabsf(ln[i].b) * 0.5f > 32000.0f)) {
             return 0.0f;
         }
     }

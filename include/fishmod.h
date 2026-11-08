@@ -230,7 +230,7 @@ extern FishmodRodInfo gFishmodRodInfo;
 #define FISHMOD_SAVE_SCENE 110
 #define FISHMOD_SAVE_OLD_SCENE 101 // where builds before the move kept it
 #define FISHMOD_SAVE_MAGIC 0x464D  // 'FM': the block has been set up (moved, or begun) by this build or a later one
-#define FISHMOD_SAVE_VERSION 1
+#define FISHMOD_SAVE_VERSION 2 // 2: the D-pad's buttons
 #define FISHMOD_SAVE_SPECIES_MAX 32
 
 typedef struct FishmodSpeciesRecord {
@@ -255,10 +255,13 @@ typedef struct FishmodSaveData {
     /* 0x84 */ u8 baitCount[FISHMOD_BAIT_SLOTS];  // the bait pouch
     /* 0x8C */ FishmodBottleFish bottleFish[6];    // per bottle (FISHMOD_BOTTLE_INDEX)
     /* 0xA4 */ u8 items[6];                         // the item page's slots past the vanilla 24 (INV_SLOT)
-} FishmodSaveData; // size = 0xAA
+    /* 0xAA */ u8 dpad[4];                          // the D-pad's buttons (up, down, left, right): a slot as the C
+                                                    // buttons keep one, FISHMOD_SLOT_EQUIP + n, or SLOT_NONE
+} FishmodSaveData; // size = 0xAE
 
 // FishmodSaveData.flags
 #define FISHMOD_SAVE_FLAG_ITEMS (1 << 0) // items[] set up (a save from before has zeros there, the Deku Stick's id)
+#define FISHMOD_SAVE_FLAG_DPAD (1 << 1)  // dpad[] set up (version 2)
 
 #define FISHMOD_SAVE ((FishmodSaveData*)&gSaveContext.save.info.sceneFlags[FISHMOD_SAVE_SCENE])
 
@@ -305,9 +308,15 @@ f32 Fishmod_RandCenteredFloat(FishmodRng* rng, f32 f);
 #define INVENTORY_SLOTS 30
 #define INVENTORY_SLOTS_VANILLA 24
 
-#define INV_SLOT(slot)                                                                    \
-    (*(((slot) < INVENTORY_SLOTS_VANILLA) ? &gSaveContext.save.info.inventory.items[slot] \
-                                          : &FISHMOD_SAVE->items[(slot) - INVENTORY_SLOTS_VANILLA]))
+// Every item slot's byte, through Fishmod_InvSlot: a slot past the inventory (SLOT_NONE, or an equipment button's
+// mark, FISHMOD_SLOT_EQUIP) gets a spare byte that reads as no item, so code that looks a button's slot up is safe
+#define INV_SLOT(slot) (*Fishmod_InvSlot(slot))
+u8* Fishmod_InvSlot(s32 slot);
+
+// A C or D-pad button can hold a piece of equipment (a sword, shield, tunic or boots): its slot is this mark plus the
+// equipment item's place after ITEM_SWORD_KOKIRI (fishmod_items.c: pressing it equips it)
+#define FISHMOD_SLOT_EQUIP 0x80
+#define FISHMOD_IS_EQUIP_SLOT(slot) (((slot) >= FISHMOD_SLOT_EQUIP) && ((slot) < SLOT_NONE))
 
 // Bottles: six, numbered 0-5 (bottles 1-4 are the vanilla slots, 5 and 6 the new ones)
 #define FISHMOD_BOTTLES 6

@@ -70,7 +70,7 @@ flags (0x20-0x3F, reset when you leave the scene), the respawn points (except Fa
 
 ## 3. What the mod stores, and where there's room
 
-The mod's block, `FishmodSaveData` (`include/fishmod.h`, 0xAA bytes), sits in the scene-flag entries past every
+The mod's block, `FishmodSaveData` (`include/fishmod.h`, 0xAE bytes; version 2), sits in the scene-flag entries past every
 scene: `sceneFlags[110]` on, a fixed place whatever the build (this NTSC 1.2 build has 101 scenes, the debug ROM's
 test maps make 110), 14 entries = 392 bytes that nothing in the game reads or writes (checked: every vanilla index
 into `sceneFlags` is a scene id or a dungeon map index). Builds before the refactor kept it at `sceneFlags[101]`
@@ -78,13 +78,13 @@ into `sceneFlags` is a scene id or a dungeon map index). Builds before the refac
 (`Fishmod_InitSaveExtras`). It's inside `Save`, so the checksum and the backup cover it. It holds: the mark, a
 version, flags (bit 0: the item page's new slots are set up), the species records (by each species' permanent
 `saveId` in `fishmod/data/species.json`), the bait pouch, six bottled fish (also by `saveId`), and the item page's six
-new slots.
+new slots, and the four D-pad buttons' slots (version 2, flag bit 1: set up).
 
 Room left, all inside the checksummed `Save`:
 
 | Where | Bytes | Notes |
 |---|---|---|
-| `sceneFlags[110..123]` after the mod's block | 222 | the easiest: already the mod's |
+| `sceneFlags[110..123]` after the mod's block | 218 | the easiest: already the mod's |
 | `sceneFlags[101..109]` (the old place, cleared by the move) | 252 | free again |
 | `sceneFlags[*].unk` | 110 × 4 = 440 | one unused word per scene, never read or written (good for per-scene extras) |
 | the named gaps (`0x0E8C`, `0x0EB4`, `0x0F34`, `0x0F3C`, `0x12A1`, `0x1346`, `playerData` padding) | 16+4+4+4+36+2+19 = 85 | |

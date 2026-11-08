@@ -104,6 +104,15 @@ def read(path):
         dpos = struct.unpack(">3i", d[F + 0x7C:F + 0x88])
         if d[F + 0x78:F + 0x88] != b"\xff" * 16 and did != -1:
             print(f"(the actor being drawn: id {did:#06x} params {dparams & 0xFFFF:#06x} at {dpos})")
+    G = SRAM.get("CODEGUARD")
+    if G is not None and d[G:G + 0x4] == b"FCOD":
+        frame, = struct.unpack(">I", d[G + 0x4:G + 0x8])
+        bench = struct.unpack(">6I", d[G + 0x8:G + 0x20])
+        addr, was, now = struct.unpack(">3I", d[G + 0x20:G + 0x2C])
+        words = struct.unpack(">64I", d[G + 0x2C:G + 0x12C])
+        print(f"(CODE CHANGED: the block at {addr:08x} (checksum {was:08x} -> {now:08x}) at play frame {frame}; bench "
+              f"lap {bench[0] + 1} leg {bench[1] + 1} block {bench[2]} state {bench[3]} frame {bench[4]})")
+        print("(its words now: " + " ".join(f"{w:08x}" for w in words) + ")")
     if magic != 0x4642454E:
         raise SystemExit(f"no bench results in {path}")
     laps, visits = struct.unpack(">II", d[12:20])

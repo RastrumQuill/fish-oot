@@ -174,5 +174,15 @@ u8 gFishmodItemSlotGrid[INVENTORY_SLOTS] = {
 /** Where an inventory slot's item is kept: the vanilla 24 in the inventory, the item page's six new ones in the mod's
  * save block (INV_CONTENT goes through here; INV_SLOT is the same as a macro). */
 u8* Fishmod_InvSlot(s32 slot) {
-    return &INV_SLOT(slot);
+    static u8 sSpare;
+
+    if ((u32)slot < INVENTORY_SLOTS_VANILLA) {
+        return &gSaveContext.save.info.inventory.items[slot];
+    }
+    if ((u32)slot < INVENTORY_SLOTS) {
+        return &FISHMOD_SAVE->items[slot - INVENTORY_SLOTS_VANILLA];
+    }
+    // past the inventory (no slot, or an equipment button's mark): a spare byte reading as no item
+    sSpare = ITEM_NONE;
+    return &sSpare;
 }

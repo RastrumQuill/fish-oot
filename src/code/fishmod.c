@@ -938,7 +938,7 @@ static_assert((FISHMOD_SAVE_SCENE - FISHMOD_SAVE_OLD_SCENE) * sizeof(SavedSceneF
 static_assert(FISHMOD_SAVE_SCENE * sizeof(SavedSceneFlags) + sizeof(FishmodSaveData) <=
                   sizeof(gSaveContext.save.info.sceneFlags),
               "the save block doesn't fit in the scene flags");
-static_assert(sizeof(FishmodSaveData) == 0xAA, "the save block's layout changed: bump FISHMOD_SAVE_VERSION");
+static_assert(sizeof(FishmodSaveData) == 0xAE, "the save block's layout changed: bump FISHMOD_SAVE_VERSION");
 static_assert(FISHMOD_SPECIES_MAX <= FISHMOD_SAVE_SPECIES_MAX, "more species than the save keeps records for");
 
 /**
@@ -966,6 +966,14 @@ void Fishmod_InitSaveExtras(void) {
         }
         FISHMOD_SAVE->flags |= FISHMOD_SAVE_FLAG_ITEMS;
     }
+    if (!(save->flags & FISHMOD_SAVE_FLAG_DPAD)) {
+        // the D-pad's buttons, empty (a new file, or one from before them)
+        for (i = 0; i < ARRAY_COUNT(FISHMOD_SAVE->dpad); i++) {
+            FISHMOD_SAVE->dpad[i] = SLOT_NONE;
+        }
+        FISHMOD_SAVE->flags |= FISHMOD_SAVE_FLAG_DPAD;
+    }
+    save->version = FISHMOD_SAVE_VERSION;
 }
 
 #define FISHMOD_WATERMAP(sceneId, segment) DECLARE_ROM_SEGMENT(segment)

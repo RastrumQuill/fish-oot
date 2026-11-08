@@ -43,6 +43,8 @@
 #include "ultra64/convert.h"
 #include "bgcheck.h"
 #include "segmented_address.h"
+#include "segment_symbols.h"
+#include "fault.h"
 #include "libc64/qrand.h"
 #include "gfx_setupdl.h"
 #include "sfx.h"
@@ -821,6 +823,7 @@ static s8 sWalkStickY;
 static s32 sWalking;
 #ifdef FISHMOD_HWBENCH
 static void Watchdog_Start(void);
+static void CodeGuard_Update(void);
 static volatile u32 sWatchdogBeat;
 #endif
 
@@ -908,6 +911,7 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #ifdef FISHMOD_HWBENCH
     sWatchdogBeat = sPlayFrames;
     Watchdog_Start();
+    CodeGuard_Update();
 #endif
     Fishmod_DebugTiming();
 #ifdef FISHMOD_PCPROF
@@ -1122,6 +1126,93 @@ static OSMesgQueue sWatchdogQueue;
 static OSMesg sWatchdogMsg;
 static OSTimer sWatchdogTimer;
 static volatile u32 sWatchdogBeat; // play frames, counted by Fishmod_DebugPlayUpdate
+
+/**
+ * The code guard (the four-way bench crashed on the console with the game's own code overwritten in RAM, at physical
+ * 0x19EE0, and not in ares). Two checks:
+ * - a CPU watchpoint on that address: a store there stops the game at once ("Watchpoint" on the crash screen, its
+ *   PC the store);
+ * - checksums of the code's text in 256-byte blocks, CODEGUARD_STEP bytes checked a frame (all of it every few
+ *   seconds): a change made by anything else (the RSP's or the RDP's writes, a DMA) is caught the next time round.
+ *   The changed block's contents, the frame and the bench's place go to SRAM ('FCOD', hwbench_report.py prints it),
+ *   then the game stops with a message.
+ */
+#define CODEGUARD_BLOCK 256
+#define CODEGUARD_STEP 0x2000
+#define CODEGUARD_WATCH 0x19EE0 // (physical; WatchLo: the doubleword, W = stores)
+
+extern u8 _codeSegmentDataStart[]; // (the text's end)
+
+static u32 sCodeGuardSum[0x110000 / CODEGUARD_BLOCK];
+static u32 sCodeGuardBlocks;
+static u32 sCodeGuardNext;
+
+static u32 CodeGuard_Sum(const u32* w) {
+    u32 h = 0;
+    s32 i;
+
+    for (i = 0; i < CODEGUARD_BLOCK / 4; i++) {
+        h = ((h << 5) | (h >> 27)) ^ w[i];
+    }
+    return h;
+}
+
+static void CodeGuard_Update(void) {
+    static struct {
+        u32 magic; // 'FCOD'
+        u32 frame;
+        u32 bench[6]; // as the fault record
+        u32 addr;     // the block that changed
+        u32 was;      // its checksum at the start
+        u32 now;
+        u32 words[CODEGUARD_BLOCK / 4];
+    } sRec;
+    u32 start = (u32)_codeSegmentStart; // (its text comes first)
+    s32 n;
+
+    if (sCodeGuardBlocks == 0) {
+        u32 b;
+
+        sCodeGuardBlocks = MIN(((u32)_codeSegmentDataStart - start) / CODEGUARD_BLOCK, ARRAY_COUNT(sCodeGuardSum));
+        for (b = 0; b < sCodeGuardBlocks; b++) {
+            sCodeGuardSum[b] = CodeGuard_Sum((const u32*)(start + b * CODEGUARD_BLOCK));
+        }
+        {
+            u32 watch = (CODEGUARD_WATCH & ~7) | 1;
+
+            // (WatchHi: the address's upper bits, 0; then WatchLo. setwatchlo.s isn't linked: mtc0 here)
+            __asm__ volatile("mtc0 $0, $19\n\tmtc0 %0, $18\n\tnop\n\tnop" : : "r"(watch));
+        }
+        return;
+    }
+    for (n = 0; n < CODEGUARD_STEP / CODEGUARD_BLOCK; n++) {
+        u32 b = sCodeGuardNext;
+        u32 now = CodeGuard_Sum((const u32*)(start + b * CODEGUARD_BLOCK));
+
+        sCodeGuardNext = (b + 1 < sCodeGuardBlocks) ? b + 1 : 0;
+        if (now != sCodeGuardSum[b]) {
+            static char sMsg[40];
+
+            sRec.magic = 0x46434F44;
+            sRec.frame = sPlayFrames;
+#ifdef FISHMOD_BENCH_PLAY
+            sRec.bench[0] = sBench.laps;
+            sRec.bench[1] = sPbLeg;
+            sRec.bench[2] = sPbBlock;
+            sRec.bench[3] = sPbState;
+            sRec.bench[4] = sPbFrame;
+#endif
+            sRec.bench[5] = sPlayFrames;
+            sRec.addr = start + b * CODEGUARD_BLOCK;
+            sRec.was = sCodeGuardSum[b];
+            sRec.now = now;
+            bcopy((void*)sRec.addr, sRec.words, CODEGUARD_BLOCK);
+            SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_CODEGUARD), &sRec, sizeof(sRec), OS_WRITE);
+            sprintf(sMsg, "code changed at %08X", (u32)sRec.addr);
+            Fault_AddHungupAndCrashImpl(sMsg, "(code guard; SRAM FCOD)");
+        }
+    }
+}
 
 static void Watchdog_Entry(void* arg) {
     static struct {
