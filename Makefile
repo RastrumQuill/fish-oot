@@ -883,8 +883,9 @@ $(BUILD_DIR)/src/code/fishmod%.o $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod
   -fsyntax-only -funsigned-char -std=gnu90 -D_LANGUAGE_C $(CPP_DEFINES) $(MIPS_BUILTIN_DEFS) $(GBI_DEFINES) $(INC) -m32 \
   -Werror=implicit-function-declaration
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations
-# debug builds carry line tables, for the PC-sampling profile (n64prof) to map samples to source lines; GCC's code
-# is the same with them
+# debug builds carry line tables, for the PC-sampling profile (n64prof) to map samples to source lines. Not quite
+# free: in the overlays (-mno-explicit-relocs) the assembler can't fill some branch delay slots across the line
+# markers, so a few functions grow; a profile must be read with the ELF of the build it was taken from
 ifeq ($(FISHMOD_DEBUG),1)
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS += -g
 endif

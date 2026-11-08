@@ -138,17 +138,22 @@ unsigned int n64prof_serialize(void* out, unsigned int outSize, const unsigned i
         }
         room -= hist[floorBit];
     }
-    room = max;
-    for (b = 31; (b >= floorBit) && (room > 0); b--) {
-        for (i = 0; (i <= sMask) && (room > 0); i++) {
-            unsigned int c = sTable[i].count;
+    /* one pass: every bucket above floorBit's power of two, and floorBit's own while they fit */
+    for (i = 0; (i <= sMask) && (saved < max); i++) {
+        unsigned int c = sTable[i].count;
+        int top;
 
-            if ((c != 0) && (TopBit(c) == b)) {
-                dst[saved] = sTable[i];
-                saved++;
+        if (c == 0) {
+            continue;
+        }
+        top = TopBit(c);
+        if ((top > floorBit) || ((top == floorBit) && (room > 0))) {
+            if (top == floorBit) {
                 room--;
-                counted += c;
             }
+            dst[saved] = sTable[i];
+            saved++;
+            counted += c;
         }
     }
     hdr->magic = N64PROF_MAGIC;

@@ -56,4 +56,8 @@ line, so one taken from a GCC build serves an LLVM build of the same source.
 
 A 0x40-byte header (`N64ProfHeader` in `n64prof.h`: magic `N64P`, version, samples taken, dropped, not in this
 dump, entries, interval, unmapped, bucket size, dump count, six words for the program), then `entries` pairs of
-(bucket address, count), hottest first by powers of two.
+(bucket address, count), in no order: the hottest buckets that fit.
+
+Read a dump with the ELF of the same build. Line tables (`-g`) can change code slightly (GCC on MIPS: with the
+assembler scheduling, it can't fill some delay slots across line markers), so a dump from a build without them
+doesn't match an ELF with them.

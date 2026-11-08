@@ -28,7 +28,7 @@ typedef struct N64ProfHeader {
     /* 0x08 */ unsigned int total;    /* samples taken */
     /* 0x0C */ unsigned int dropped;  /* not counted: the table was full */
     /* 0x10 */ unsigned int unsaved;  /* counted, in buckets too cold to fit in this dump */
-    /* 0x14 */ unsigned int entries;  /* N64ProfEntry records that follow, hottest first by powers of two */
+    /* 0x14 */ unsigned int entries;  /* N64ProfEntry records that follow (in no order) */
     /* 0x18 */ unsigned int interval; /* CPU count cycles (half the CPU clock) between samples, on average */
     /* 0x1C */ unsigned int unmapped; /* outside every range given and above n64prof_init's staticEnd */
     /* 0x20 */ unsigned int bucketShift; /* log2 of the bucket size in bytes */
