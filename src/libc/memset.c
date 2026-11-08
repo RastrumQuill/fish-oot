@@ -12,10 +12,34 @@
  * @return dest
  */
 void* memset(void* dest, int val, size_t len) {
-    char* ptr = dest;
+    unsigned char* ptr = dest;
+    unsigned int word;
 
-    while (len--) {
+    // fishmod: a word at a time (the console profile found the byte loop at 2% of the CPU). Bytes until the address is
+    // a word's, then 16 bytes a pass, then what's left.
+    while ((len != 0) && (((unsigned int)ptr & 3) != 0)) {
         *ptr++ = val;
+        len--;
+    }
+    word = (unsigned char)val;
+    word |= word << 8;
+    word |= word << 16;
+    while (len >= 16) {
+        ((unsigned int*)ptr)[0] = word;
+        ((unsigned int*)ptr)[1] = word;
+        ((unsigned int*)ptr)[2] = word;
+        ((unsigned int*)ptr)[3] = word;
+        ptr += 16;
+        len -= 16;
+    }
+    while (len >= 4) {
+        *(unsigned int*)ptr = word;
+        ptr += 4;
+        len -= 4;
+    }
+    while (len != 0) {
+        *ptr++ = val;
+        len--;
     }
     return dest;
 }

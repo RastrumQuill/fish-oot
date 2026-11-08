@@ -543,74 +543,47 @@ void Matrix_SetTranslateRotateYXZ(f32 translateX, f32 translateY, f32 translateZ
     }
 }
 
+/**
+ * fishmod: the same result as the original (each value times 0x10000, its integer halves in the first 32 bytes and its
+ * fractions in the last 32), made faster for the console (where the profile found it 40 times dearer than in ares):
+ * - the destination's four data cache lines are claimed without being read from RDRAM first (Create Dirty Exclusive;
+ *   all 64 bytes are written below), when it's a whole set of lines in cached memory;
+ * - two values at a time, written as whole words (16 stores, not 32 halves).
+ *
+ * (ares can't time this: its recompiler takes interrupts between blocks, so straight-line code like this gets few
+ * samples there. The console is the measure.)
+ */
 Mtx* Matrix_MtxFToMtx(MtxF* src, Mtx* dest) {
-    s32 temp;
-    u16* m1 = (u16*)&dest->m[0][0];
-    u16* m2 = (u16*)&dest->m[2][0];
+    f32* f = &src->mf[0][0];
+    u32* d = (u32*)dest;
 
-    temp = src->xx * 0x10000;
-    m1[0] = (temp >> 0x10);
-    m1[16 + 0] = temp & 0xFFFF;
-
-    temp = src->yx * 0x10000;
-    m1[1] = (temp >> 0x10);
-    m1[16 + 1] = temp & 0xFFFF;
-
-    temp = src->zx * 0x10000;
-    m1[2] = (temp >> 0x10);
-    m1[16 + 2] = temp & 0xFFFF;
-
-    temp = src->wx * 0x10000;
-    m1[3] = (temp >> 0x10);
-    m1[16 + 3] = temp & 0xFFFF;
-
-    temp = src->xy * 0x10000;
-    m1[4] = (temp >> 0x10);
-    m1[16 + 4] = temp & 0xFFFF;
-
-    temp = src->yy * 0x10000;
-    m1[5] = (temp >> 0x10);
-    m1[16 + 5] = temp & 0xFFFF;
-
-    temp = src->zy * 0x10000;
-    m1[6] = (temp >> 0x10);
-    m1[16 + 6] = temp & 0xFFFF;
-
-    temp = src->wy * 0x10000;
-    m1[7] = (temp >> 0x10);
-    m1[16 + 7] = temp & 0xFFFF;
-
-    temp = src->xz * 0x10000;
-    m1[8] = (temp >> 0x10);
-    m1[16 + 8] = temp & 0xFFFF;
-
-    temp = src->yz * 0x10000;
-    m1[9] = (temp >> 0x10);
-    m2[9] = temp & 0xFFFF;
-
-    temp = src->zz * 0x10000;
-    m1[10] = (temp >> 0x10);
-    m2[10] = temp & 0xFFFF;
-
-    temp = src->wz * 0x10000;
-    m1[11] = (temp >> 0x10);
-    m2[11] = temp & 0xFFFF;
-
-    temp = src->xw * 0x10000;
-    m1[12] = (temp >> 0x10);
-    m2[12] = temp & 0xFFFF;
-
-    temp = src->yw * 0x10000;
-    m1[13] = (temp >> 0x10);
-    m2[13] = temp & 0xFFFF;
-
-    temp = src->zw * 0x10000;
-    m1[14] = (temp >> 0x10);
-    m2[14] = temp & 0xFFFF;
-
-    temp = src->ww * 0x10000;
-    m1[15] = (temp >> 0x10);
-    m2[15] = temp & 0xFFFF;
+    if ((((uintptr_t)dest & 0xF) == 0) && ((uintptr_t)dest >= 0x80000000) && ((uintptr_t)dest < 0xA0000000)) {
+        __asm__ volatile("cache 0x0D, 0(%0)\n\t"
+                         "cache 0x0D, 16(%0)\n\t"
+                         "cache 0x0D, 32(%0)\n\t"
+                         "cache 0x0D, 48(%0)"
+                         :
+                         : "r"(dest)
+                         : "memory");
+    }
+    // (unrolled: one straight run, no loop counting)
+#define MTXF_PAIR(i)                                                    \
+    {                                                                   \
+        s32 a = f[2 * (i)] * 0x10000;                                   \
+        s32 b = f[2 * (i) + 1] * 0x10000;                               \
+                                                                        \
+        d[(i)] = ((u32)a & 0xFFFF0000) | ((u32)b >> 16);                \
+        d[8 + (i)] = ((u32)a << 16) | ((u32)b & 0xFFFF);                \
+    }
+    MTXF_PAIR(0);
+    MTXF_PAIR(1);
+    MTXF_PAIR(2);
+    MTXF_PAIR(3);
+    MTXF_PAIR(4);
+    MTXF_PAIR(5);
+    MTXF_PAIR(6);
+    MTXF_PAIR(7);
+#undef MTXF_PAIR
     return dest;
 }
 

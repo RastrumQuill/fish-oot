@@ -61,3 +61,12 @@ dump, entries, interval, unmapped, bucket size, dump count, six words for the pr
 Read a dump with the ELF of the same build. Line tables (`-g`) can change code slightly (GCC on MIPS: with the
 assembler scheduling, it can't fill some delay slots across line markers), so a dump from a build without them
 doesn't match an ELF with them.
+
+## Emulators can't time straight-line code
+
+ares (and other emulators with a recompiling CPU) take interrupts only between the blocks of code they translate, so a
+sample can't land inside a long run of code with no branch: its time goes to whatever comes after it. The console
+showed `Matrix_MtxFToMtx` (one straight run of 16 conversions) at 1.6% of the CPU where ares showed 0.04%, and the same
+function written as a loop jumped to 1.7% in ares with no real change in cost. So an emulator's profile is good for
+where the branchy code goes, not for comparing a straight run against a loop; the console's is the measure. Read every
+dump with the ELF of the very build that ran (a few bytes off and every name is wrong).

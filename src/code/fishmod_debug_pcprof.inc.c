@@ -12,6 +12,7 @@
 #include "kaleido_manager.h"
 #include "effect.h"
 #include "ultra64/osint.h"
+#define N64PROF_BUCKET_SHIFT 5 // (32-byte buckets: pcprof1 lost 12.8% of its samples to the save's room)
 #include "n64prof/n64prof.c"
 
 #define PCPROF_INTERVAL 11719 // count cycles between samples on average (46.875 MHz: about 4000 a second)
@@ -21,7 +22,6 @@
 
 extern void (*gFishmodTimerHook)(OSTimer* timer);
 extern u32 gFishmodCounterPc; // where the counter interrupt came in (exceptasm.s)
-extern char _codeSegmentEnd[];
 
 static N64ProfEntry* sPcTable;
 static u8* sPcOut;
@@ -91,7 +91,10 @@ static void PcProf_Update(void) {
         sLastSave = now;
         return;
     }
-    PcProf_Ranges();
+    // (every 8 frames: every frame cost 0.8% in pcprof1; an overlay loaded since is unmapped for a few frames)
+    if ((sPlayFrames & 7) == 0) {
+        PcProf_Ranges();
+    }
     if (OS_CYCLES_TO_USEC(now - sLastSave) > PCPROF_SAVE_SECONDS * 1000000ULL) {
         u32 user[6] = { 0x464D4F44 /* 'FMOD' */, 0, 0, 0, 0, 0 };
         u32 bytes;
@@ -101,13 +104,12 @@ static void PcProf_Update(void) {
         sLastSave = now;
         bytes = n64prof_serialize(sPcOut, PCPROF_SRAM_SIZE, user);
         if (bytes != 0) {
-            SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_PCPROF), sPcOut, bytes, OS_WRITE);
-        }
-    }
-    if (sPcOut != NULL) {
-        N64ProfHeader* h = (N64ProfHeader*)sPcOut;
+            N64ProfHeader* h = (N64ProfHeader*)sPcOut;
 
-        Fishmod_DebugPrintf(5, "pcprof dump %u: %u samples, %u buckets", h->dumps, h->total, h->entries);
+            SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_PCPROF), sPcOut, bytes, OS_WRITE);
+            // (once a save: the debug text's formatting every frame cost about 2% in pcprof1)
+            Fishmod_DebugPrintf(5, "pcprof dump %u: %u samples, %u buckets", h->dumps, h->total, h->entries);
+        }
     }
 }
 #endif

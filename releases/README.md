@@ -13,6 +13,7 @@ controls.
 | qol1 (test build) | `fish-oot-qol1-testmode.bps`, `-hw-testmode` | [notes](notes-qol1.md): D-pad item buttons, equipment on buttons, hold B for text, strength speeds up pushing and casting |
 | qol2 (test build) | `fish-oot-qol2-testmode.bps`, `-hw-testmode` | [notes](notes-qol2.md): qol1 with the shaded D-pad and ammo counts |
 | qol3 (test build) | `fish-oot-qol3-testmode.bps`, `-hw-testmode` | [notes](notes-qol3.md): qol2 plus a day clock under the minimap |
+| pcprof2 (profile) | `fish-oot-pcprof2-hw.bps` | [notes](notes-pcprof2.md): the compiler profile run again, on the memset and matrix fixes |
 | vrtime1 (timing tests) | `fish-oot-vrtime1-hw.bps` | [notes](notes-vrtime1.md): the VR4300 timing tests, console |
 | pcprof1 (profile build) | `fish-oot-pcprof1-hw.bps` | [notes](notes-pcprof1.md): the PC-sampling compiler profile, console |
 | refactor1 (test build) | `fish-oot-refactor1.bps`, `-hw`, `-testmode`, `-hw-testmode` | [notes](notes-refactor1.md): the refactored game; the rod in any scene, saves with a version mark |

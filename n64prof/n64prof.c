@@ -1,7 +1,10 @@
 /* n64prof: see n64prof.h and README.md. */
 #include "n64prof.h"
 
-#define BUCKET_SHIFT 4
+#ifndef N64PROF_BUCKET_SHIFT
+#define N64PROF_BUCKET_SHIFT 4 /* log2 of the bucket size: 16 bytes (4 instructions); 5 halves the table's need */
+#endif
+#define BUCKET_SHIFT N64PROF_BUCKET_SHIFT
 #define PROBES 16
 
 static N64ProfEntry* sTable;
