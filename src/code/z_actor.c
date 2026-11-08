@@ -2599,7 +2599,20 @@ void Actor_Draw(PlayState* play, Actor* actor) {
     ObjectEntry* slots;
 #endif
 
+    // fish-oot: an actor flung far outside the world isn't drawn (its matrix would overflow when made fixed point, a
+    // crash on the console: Matrix_MtxFToMtx's float to integer conversions trap). Written as "not inside", so a NaN
+    // position is caught too.
+    if (!((fabsf(actor->world.pos.x) < 30000.0f) && (fabsf(actor->world.pos.y) < 30000.0f) &&
+          (fabsf(actor->world.pos.z) < 30000.0f))) {
+#if FISHMOD_DEBUG
+        Fishmod_DebugPrintf(6, "actor %04X out of the world: not drawn", actor->id);
+#endif
+        return;
+    }
     Fault_AddClient(&faultClient, Actor_FaultPrint, actor, "Actor_draw");
+#if FISHMOD_DEBUG
+    gFishmodDrawingActor = actor; // (for the crash record: which actor was being drawn)
+#endif
 
     OPEN_DISPS(play->state.gfxCtx, "../z_actor.c", 6035);
 

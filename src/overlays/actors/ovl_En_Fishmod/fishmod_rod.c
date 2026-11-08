@@ -57,7 +57,10 @@ FishmodRod gFishmodRodState;
 #define BAIT_DEPTH_MAX 180.0f
 #define LINE_MAX_BASE 460.0f
 // Strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) let Link cast further and play out more line
-#define STRENGTH_CAST_SCALE() (1.0f + 0.2f * CUR_UPG_VALUE(UPG_STRENGTH))
+// (+35% each: about twice as far with the Golden Gauntlets), scaled to the scene's water (Fishmod_CastSceneScale)
+static s16 sRodScene; // the scene the rod is in (EnFishmod_RodUpdate), for the cast's reach there
+#define STRENGTH_CAST_SCALE() \
+    ((1.0f + 0.35f * CUR_UPG_VALUE(UPG_STRENGTH)) * Fishmod_CastSceneScale(sRodScene))
 #define LINE_MAX (LINE_MAX_BASE * STRENGTH_CAST_SCALE())
 #define LINE_SEGMENTS 16
 
@@ -721,6 +724,7 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
 }
 
 void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
+    sRodScene = play->sceneId;
     Player* player = GET_PLAYER(play);
     Input* input = &play->state.input[0];
     s32 holding = (player->heldItemAction == PLAYER_IA_FISHING_POLE);

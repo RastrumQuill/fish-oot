@@ -4321,8 +4321,9 @@ void Message_Update(PlayState* play) {
                 }
                 break;
             case MSGMODE_TEXT_DISPLAYING:
+                // fish-oot: holding B fills the box too, not only a press (moving on still takes a press)
                 if (msgCtx->textBoxType != TEXTBOX_TYPE_NONE_BOTTOM && YREG(31) == 0 &&
-                    CHECK_BTN_ALL(input->press.button, BTN_B) && !msgCtx->textUnskippable) {
+                    CHECK_BTN_ALL(input->cur.button, BTN_B) && !msgCtx->textUnskippable) {
                     sTextboxSkipped = true;
                     msgCtx->textDrawPos = msgCtx->decodedTextLen;
                 }

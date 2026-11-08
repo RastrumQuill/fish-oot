@@ -893,6 +893,31 @@ void Fishmod_DrawFps(Gfx** gfxP) {
 #endif
 
 /** Link can cast: the rod's controller is there (any scene but the Fishing Pond, whose own actor runs the rod). */
+/**
+ * How much faster Link pushes and pulls blocks with his strength upgrade: none 1, Goron's Bracelet 1.35, Silver
+ * Gauntlets 1.7, Golden Gauntlets 2 (his pace and the block's; first numbers, to be tuned by feel).
+ */
+f32 Fishmod_PushSpeedScale(void) {
+    static const f32 sScale[4] = { 1.0f, 1.35f, 1.7f, 2.0f };
+
+    return sScale[CLAMP(CUR_UPG_VALUE(UPG_STRENGTH), 0, 3)];
+}
+
+/**
+ * How far casts reach in a scene, against Lake Hylia's: a small pond gets a shorter cast (the strength upgrades still
+ * scale it; first numbers, to be tuned by feel).
+ */
+f32 Fishmod_CastSceneScale(s16 sceneId) {
+    switch (sceneId) {
+        case SCENE_KOKIRI_FOREST:
+            return 0.6f;
+        case SCENE_LAKE_HYLIA:
+            return 1.0f;
+        default:
+            return 0.8f;
+    }
+}
+
 s32 Fishmod_CanUseRod(PlayState* play) {
     return gFishmodRod != NULL;
 }

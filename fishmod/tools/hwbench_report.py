@@ -100,6 +100,10 @@ def read(path):
         print(f"({'CRASH' if kind == 1 else 'HANG'} on thread {thread}: pc {pc:08x} cause {cause:08x} "
               f"badvaddr {bad:08x} ra {ra:08x} sp {sp:08x} {text}; bench lap {bench[0] + 1} leg {bench[1] + 1} "
               f"block {bench[2]} state {bench[3]} frame {bench[4]}, play frame {bench[5]})")
+        did, dparams = struct.unpack(">hh", d[F + 0x78:F + 0x7C])
+        dpos = struct.unpack(">3i", d[F + 0x7C:F + 0x88])
+        if d[F + 0x78:F + 0x88] != b"\xff" * 16 and did != -1:
+            print(f"(the actor being drawn: id {did:#06x} params {dparams & 0xFFFF:#06x} at {dpos})")
     if magic != 0x4642454E:
         raise SystemExit(f"no bench results in {path}")
     laps, visits = struct.unpack(">II", d[12:20])

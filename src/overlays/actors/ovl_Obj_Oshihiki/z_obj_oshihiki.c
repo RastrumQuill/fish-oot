@@ -1,3 +1,4 @@
+#include "fishmod.h"
 /*
  * File: z_obj_oshihiki.c
  * Overlay: ovl_Obj_Oshihiki
@@ -558,9 +559,10 @@ void ObjOshihiki_Push(ObjOshihiki* this, PlayState* play) {
     f32 pushDistSigned;
     s32 stopFlag;
 
-    this->pushSpeed += 0.5f;
+    // fish-oot: a stronger Link pushes it faster (Fishmod_PushSpeedScale: his strength upgrade)
+    this->pushSpeed += 0.5f * Fishmod_PushSpeedScale();
     this->stateFlags |= PUSHBLOCK_PUSH;
-    this->pushSpeed = CLAMP_MAX(this->pushSpeed, 2.0f);
+    this->pushSpeed = CLAMP_MAX(this->pushSpeed, 2.0f * Fishmod_PushSpeedScale());
     stopFlag = Math_StepToF(&this->pushDist, 20.0f, this->pushSpeed);
     pushDistSigned = ((this->direction >= 0.0f) ? 1.0f : -1.0f) * this->pushDist;
     thisx->world.pos.x = thisx->home.pos.x + (pushDistSigned * this->yawSin);

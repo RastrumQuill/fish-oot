@@ -1202,6 +1202,8 @@ static void Watchdog_Start(void) {
  * was doing, and a hang's message. The console shows the crash screen only after a button combination, so without
  * this a crash on the hardware is just a frozen picture.
  */
+struct Actor* gFishmodDrawingActor;
+
 void Fishmod_DebugFault(OSThread* thread, const char* exp1, const char* exp2) {
     static struct {
         u32 magic; // 'FFLT'
@@ -1214,6 +1216,9 @@ void Fishmod_DebugFault(OSThread* thread, const char* exp1, const char* exp2) {
         u32 sp;
         u32 bench[6]; // play bench: lap, leg, block, state, frame, play frames
         char text[64]; // a hang's two messages
+        s16 drawId;    // the actor last given to Actor_Draw (-1: none): its id, params and where it was
+        s16 drawParams;
+        s32 drawPos[3];
     } sRec;
     s32 i = 0;
 
@@ -1240,6 +1245,17 @@ void Fishmod_DebugFault(OSThread* thread, const char* exp1, const char* exp2) {
     sRec.bench[4] = sAreaFrame;
 #endif
     sRec.bench[5] = sPlayFrames;
+    sRec.drawId = (gFishmodDrawingActor != NULL) ? gFishmodDrawingActor->id : -1;
+    sRec.drawParams = (gFishmodDrawingActor != NULL) ? gFishmodDrawingActor->params : 0;
+    if (gFishmodDrawingActor != NULL) {
+        f32* p = &gFishmodDrawingActor->world.pos.x;
+        s32 k;
+
+        // (a float out of an int's range, or a NaN, would trap again here: those are written as 0x7FFFFFFF)
+        for (k = 0; k < 3; k++) {
+            sRec.drawPos[k] = ((p[k] > -1.0e9f) && (p[k] < 1.0e9f)) ? (s32)p[k] : 0x7FFFFFFF;
+        }
+    }
     {
         const char* parts[2];
         s32 p;

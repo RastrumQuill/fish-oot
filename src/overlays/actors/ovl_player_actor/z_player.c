@@ -12687,9 +12687,11 @@ void Player_Action_8084B898(Player* this, PlayState* play) {
         }
     }
 
+    // fish-oot: stronger Link pushes faster (Fishmod_PushSpeedScale: his strength upgrade), his steps sped up to match
+    this->skelAnime.playSpeed = Fishmod_PushSpeedScale();
     if (this->stateFlags2 & PLAYER_STATE2_4) {
-        func_8084B840(play, this, 2.0f);
-        this->speedXZ = 2.0f;
+        func_8084B840(play, this, 2.0f * Fishmod_PushSpeedScale());
+        this->speedXZ = 2.0f * Fishmod_PushSpeedScale();
     }
 }
 
@@ -12704,6 +12706,7 @@ void Player_Action_8084B9E4(Player* this, PlayState* play) {
     LinkAnimationHeader* anim = GET_PLAYER_ANIM(PLAYER_ANIMGROUP_pulling, this->modelAnimType);
 
     this->stateFlags2 |= PLAYER_STATE2_0 | PLAYER_STATE2_6 | PLAYER_STATE2_8;
+    this->skelAnime.playSpeed = Fishmod_PushSpeedScale(); // fish-oot: his steps as fast as his pull
 
     if (func_80832CB0(play, this, anim)) {
         this->av2.actionVar2 = 1;
@@ -12750,7 +12753,8 @@ void Player_Action_8084B9E4(Player* this, PlayState* play) {
             sp44.z = this->actor.world.pos.z;
             sp44.y = sp5C.y;
             if (!BgCheck_EntityLineTest1(&play->colCtx, &sp44, &sp5C, &sp38, &sp54, true, false, false, true, &sp50)) {
-                func_8084B840(play, this, -2.0f);
+                // fish-oot: and pulls faster (Fishmod_PushSpeedScale)
+                func_8084B840(play, this, -2.0f * Fishmod_PushSpeedScale());
                 return;
             }
         }

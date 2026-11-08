@@ -154,6 +154,10 @@ void Fishmod_RosterSetCaught(s16 sceneId, s32 day, s32 index);
 void Fishmod_OnSceneLoad(struct PlayState* play);
 void Fishmod_PlayUpdate(struct PlayState* play);
 s32 Fishmod_CanUseRod(struct PlayState* play);
+// how much faster Link pushes and pulls blocks with his strength upgrade (1 without one)
+f32 Fishmod_PushSpeedScale(void);
+// how far casts reach in a scene, against Lake Hylia's
+f32 Fishmod_CastSceneScale(s16 sceneId);
 
 extern struct Actor* gFishmodRod;
 
@@ -479,6 +483,7 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;
+extern struct Actor* gFishmodDrawingActor; // debug builds: the actor Actor_Draw is drawing (the crash record says which)
 extern s32 gFishmodScatterDrawn; // props drawn in the last frame
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 #define FISHMOD_PROF(slot, stmt)                        \
