@@ -444,6 +444,10 @@ ifeq ($(COMPILER),gcc)
   GCC_OPT ?= Os
   # (no strict aliasing: the game and the mod reinterpret memory in places, e.g. FISHMOD_SAVE past sceneFlags)
   OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations
+  # debug builds carry line tables (the PC-sampling profile maps samples to source lines; GCC's code is the same)
+  ifeq ($(FISHMOD_DEBUG),1)
+    OPTFLAGS += -g
+  endif
 endif
 
 GBI_DEFINES := -DF3DEX_GBI_2
