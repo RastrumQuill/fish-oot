@@ -220,6 +220,11 @@ endif
 F3DEX3 ?= 0
 ifeq ($(F3DEX3),1)
   CPP_DEFINES += -DENABLE_F3DEX3=1
+  # the variant with the occlusion plane (the build profile's f3dex3_occlusion)
+  F3DEX3_OCC ?= 0
+  ifeq ($(F3DEX3_OCC),1)
+    CPP_DEFINES += -DF3DEX3_OCCLUSION=1
+  endif
   COMPARE := 0
 endif
 
@@ -1085,11 +1090,13 @@ endif
 
 # F3DEX3: patched from the ROM's own F3DZEX2 (see fishmod/f3dex3)
 FLIPS ?= flips
-$(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Text: fishmod/f3dex3/F3DEX3_BrW_NOC.code.bps $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoText
+# (two variants: BrW_NOC without the occlusion plane, BrW with it; data/gspF3DEX3.fifo.s picks by F3DEX3_OCCLUSION)
+$(EXTRACTED_DIR)/incbin/F3DEX3_%_Text: fishmod/f3dex3/F3DEX3_%.code.bps $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoText
 	$(FLIPS) --apply $< $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoText $@
-$(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Data: fishmod/f3dex3/F3DEX3_BrW_NOC.data.bps $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoData
+$(EXTRACTED_DIR)/incbin/F3DEX3_%_Data: fishmod/f3dex3/F3DEX3_%.data.bps $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoData
 	$(FLIPS) --apply $< $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoData $@
-$(BUILD_DIR)/data/gspF3DEX3.fifo.o: $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Data
+$(BUILD_DIR)/data/gspF3DEX3.fifo.o: $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Data \
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_Data
 
 $(BUILD_DIR)/src/makerom/ipl3.o: $(EXTRACTED_DIR)/incbin/ipl3
 	$(OBJCOPY) -I binary -O $(LD_OFORMAT) --rename-section .data=.text $< $@

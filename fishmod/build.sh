@@ -77,6 +77,8 @@ if [ "$(python3 fishmod/tools/build_profile.py "$PROFILE" --get f3dex3)" = 1 ]; 
     F3DEX3=1
 fi
 PROFILE_SUFFIX="$(python3 fishmod/tools/build_profile.py "$PROFILE" --get suffix)"
+# F3DEX3's variant: with the occlusion plane (BrW) or without it (BrW_NOC, a little faster where none is used)
+F3DEX3_OCC="$(python3 fishmod/tools/build_profile.py "$PROFILE" --get f3dex3_occlusion)"
 HW=0
 if [ "$PROFILE" = hw ]; then
     HW=1
@@ -85,7 +87,7 @@ fi
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 testmode=$TESTMODE profile=$PROFILE gcc=$GCC"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -127,7 +129,7 @@ GCC_ARGS=()
 if [ -n "$GCC" ]; then
     GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC")
 fi
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 FISHMOD_TESTMODE=$TESTMODE \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC FISHMOD_TESTMODE=$TESTMODE \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"

@@ -8,7 +8,8 @@ turn the F3DZEX2 microcode extracted from your own ROM into F3DEX3 at build time
 
 | Patch | Variant |
 |---|---|
-| `F3DEX3_BrW_NOC.*.bps` | `BrW`: the Z-buffer and tri setup used by OoT. `NOC`: without occlusion planes (unused here) |
+| `F3DEX3_BrW_NOC.*.bps` | `BrW`: the Z-buffer and tri setup used by OoT. `NOC`: without occlusion planes |
+| `F3DEX3_BrW.*.bps` | the same with the occlusion plane (the build profile's `f3dex3_occlusion`: the `hw` profile). Built from upstream with the steps below (target `F3DEX3_BrW`); upstream's `F3DEX3_BrW_NOC` built the same way matched ours byte for byte |
 
 F3DEX3 runs on real hardware and on LLE emulators (ares, parallel-n64 / ParaLLEl). HLE emulators (Project64,
 mupen64plus with rsp-hle) don't know it and will show a black screen.
