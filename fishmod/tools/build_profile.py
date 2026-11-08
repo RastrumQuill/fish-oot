@@ -40,6 +40,7 @@ def header(p):
         f"#define FISHMOD_PROFILE_HW {1 if p['name'] == 'hw' else 0} // made for the original hardware",
         f"#define FISHMOD_PROFILE_THINNED {1 if p['thinning'] else 0}",
         f"#define FISHMOD_PROFILE_OCCLUSION {1 if p.get('f3dex3_occlusion') else 0} // F3DEX3 with the occlusion plane",
+        f"#define FISHMOD_PROFILE_BED_CARDS {1 if p.get('bed_cards') else 0} // distant chunks' plants as one card",
         f"#define FISHMOD_PROFILE_PROP_BUDGET {int(p['prop_budget'])}",
         f"#define FISHMOD_PROFILE_XLU_MAX {int(p['xlu_max'])}",
         f"#define FISHMOD_PROFILE_DIST_SMALL {float(d['small'])}f",

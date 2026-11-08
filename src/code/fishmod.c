@@ -6,6 +6,7 @@
 
 #include "fishmod.h"
 #include "fishmod_bedcard.h"
+#include "src/fishmod_data/fishmod_profile.h"
 #include "assert.h"
 #include "fishmod_species_data.h"
 
@@ -1015,6 +1016,10 @@ static const FishmodWaterMapRom sBedCards[] = {
 
 s32 Fishmod_BedCardRom(s16 sceneId, uintptr_t* romStart, uintptr_t* romEnd) {
     s32 i;
+
+    if (!FISHMOD_PROFILE_BED_CARDS) {
+        return false; // (off in the profile: they cost more than they saved on the console)
+    }
 
     for (i = 0; i < ARRAY_COUNT(sBedCards); i++) {
         if (sBedCards[i].sceneId == sceneId) {
