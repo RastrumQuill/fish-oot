@@ -111,6 +111,7 @@ fi
 python3 -W ignore::DeprecationWarning fishmod/tools/gen_textures.py > /dev/null
 python3 fishmod/tools/gen_bait_icons.py
 python3 fishmod/tools/gen_dpad_tex.py >/dev/null
+python3 fishmod/tools/gen_clock_tex.py >/dev/null
 python3 fishmod/tools/assets.py --manifest src/fishmod_data/bait_manifest.json > /dev/null
 
 # the habitat props: textures edited from vanilla ones, models, and where they go (generated, not committed)

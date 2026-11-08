@@ -488,3 +488,54 @@ void Fishmod_DpadDraw(PlayState* play) {
 
     CLOSE_DISPS(play->state.gfxCtx, "fishmod_items.c", __LINE__);
 }
+
+/*
+ * The clock under the overworld minimap (fishmod/tools/gen_clock_tex.py): an arc from midnight to noon to midnight in
+ * the sky's colours, the sun (day) or moon (night) riding it at the time of day. It fades with the minimap. The
+ * minimap is raised only as far as the clock needs to end above a CRT's safe area.
+ */
+#include "src/fishmod_data/fishmod_clock_tex.inc.c"
+
+
+#define CLOCK_SAFE_BOTTOM 227 // (a CRT may hide the lines below)
+
+s16 gFishmodMinimapLift;
+
+s32 Fishmod_ClockLift(s32 mapBottom) {
+    // the clock: 2 below the map, the arc, and half an icon below the arc's ends
+    s32 bottom = mapBottom + 2 + FISHMOD_CLOCK_ARC_H + FISHMOD_CLOCK_ICON / 2 - 3;
+
+    return MAX(0, bottom - CLOCK_SAFE_BOTTOM);
+}
+
+void Fishmod_ClockDraw(PlayState* play, s32 centerX, s32 top, s16 alpha) {
+    s32 x0 = centerX - FISHMOD_CLOCK_ARC_W / 2;
+    s32 t = ((u16)((void)0, gSaveContext.save.dayTime) * (FISHMOD_CLOCK_ARC_W - 1)) >> 16; // the column for now
+    s32 day = (gSaveContext.save.dayTime >= CLOCK_TIME(6, 0)) && (gSaveContext.save.dayTime < CLOCK_TIME(18, 0));
+    s32 ix = x0 + t - FISHMOD_CLOCK_ICON / 2;
+    s32 iy = top + sFishmodClockArcY[t] + 1 - FISHMOD_CLOCK_ICON / 2;
+
+    if (alpha == 0) {
+        return;
+    }
+    alpha = MIN(255, alpha * 255 / 0xAA); // (the minimap itself is drawn see-through, at 0xAA at most: not the clock)
+    OPEN_DISPS(play->state.gfxCtx, "fishmod_items.c", __LINE__);
+
+    gDPPipeSync(OVERLAY_DISP++);
+    gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, alpha);
+    gDPLoadTextureBlock(OVERLAY_DISP++, sFishmodClockArcTex, G_IM_FMT_RGBA, G_IM_SIZ_32b, FISHMOD_CLOCK_ARC_W,
+                        FISHMOD_CLOCK_ARC_H, 0, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK,
+                        G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    gSPTextureRectangle(OVERLAY_DISP++, x0 << 2, top << 2, (x0 + FISHMOD_CLOCK_ARC_W) << 2,
+                        (top + FISHMOD_CLOCK_ARC_H) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+    gDPPipeSync(OVERLAY_DISP++);
+    gDPLoadTextureBlock(OVERLAY_DISP++, day ? sFishmodClockSunTex : sFishmodClockMoonTex, G_IM_FMT_RGBA,
+                        G_IM_SIZ_32b, FISHMOD_CLOCK_ICON, FISHMOD_CLOCK_ICON, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+                        G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    gSPTextureRectangle(OVERLAY_DISP++, ix << 2, iy << 2, (ix + FISHMOD_CLOCK_ICON) << 2,
+                        (iy + FISHMOD_CLOCK_ICON) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+    gDPPipeSync(OVERLAY_DISP++);
+
+    CLOSE_DISPS(play->state.gfxCtx, "fishmod_items.c", __LINE__);
+}

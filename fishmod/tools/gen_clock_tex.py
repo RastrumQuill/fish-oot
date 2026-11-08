@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""The HUD clock's textures (our own art): the day arc (midnight at its ends, noon at its top, the sky's colour along
+it: night blue, dawn rose, gold noon, dusk orange) and the sun and moon that ride it. RGBA32.
+
+Writes src/fishmod_data/fishmod_clock_tex.inc.c (and --png DIR: previews).
+Usage: fishmod/tools/gen_clock_tex.py [--png DIR]
+"""
+import argparse
+import math
+import os
+
+import numpy as np
+from PIL import Image
+
+ARC_W, ARC_H = 40, 11  # the texture; the band's curve fills it
+BAND = 3               # the band's thickness (texels)
+ICON = 12              # the sun and moon (texels; 12 x 4 bytes = a TMEM line multiple)
+SUPER = 8
+ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+# the sky through the day (hour, colour)
+SKY = [(0.0, (30, 38, 100)), (4.0, (52, 50, 128)), (5.5, (150, 80, 140)), (6.5, (245, 140, 100)),
+       (9.0, (250, 200, 95)), (12.0, (255, 238, 150)), (15.0, (250, 200, 95)), (17.5, (248, 130, 70)),
+       (18.5, (160, 70, 120)), (20.0, (52, 50, 128)), (24.0, (30, 38, 100))]
+
+
+def sky(hour):
+    for (h0, c0), (h1, c1) in zip(SKY, SKY[1:]):
+        if h0 <= hour <= h1:
+            t = (hour - h0) / (h1 - h0)
+            return tuple(c0[k] + (c1[k] - c0[k]) * t for k in range(3))
+    return SKY[-1][1]
+
+
+def arc_y(t):
+    """The band's top edge at t (0..1 along the arc), in texels from the texture's top."""
+    return 1 + (1 - math.sin(t * math.pi)) * (ARC_H - BAND - 2)
+
+
+def arc():
+    n_w, n_h = ARC_W * SUPER, ARC_H * SUPER
+    img = np.zeros((n_h, n_w, 4))
+    for xs in range(n_w):
+        t = (xs + 0.5) / n_w
+        t = min(max((t * ARC_W - 1) / (ARC_W - 2), 0), 1)  # (a texel of outline at each end)
+        top = arc_y(t) * SUPER
+        col = sky(t * 24)
+        for ys in range(n_h):
+            y = ys + 0.5
+            if top - SUPER <= y < top + (BAND + 1) * SUPER and (xs >= SUPER // 2) and (xs < n_w - SUPER // 2):
+                inside = top <= y < top + BAND * SUPER
+                if inside:
+                    c = np.array(col)
+                    if y < top + SUPER * 0.6:  # a lighter top edge, as the buttons' lit rims
+                        c = c + (255 - c) * 0.18
+                    img[ys, xs] = list(c) + [255]
+                else:
+                    img[ys, xs] = [10, 10, 24, 210]  # the outline
+    return downsample(img)
+
+
+def downsample(img):
+    h, w = img.shape[0] // SUPER, img.shape[1] // SUPER
+    blk = img.reshape(h, SUPER, w, SUPER, 4)
+    a = blk[..., 3].mean(axis=(1, 3))
+    rgb = (blk[..., :3] * blk[..., 3:4]).sum(axis=(1, 3)) / np.maximum(blk[..., 3].sum(axis=(1, 3)), 1)[..., None]
+    return np.concatenate([rgb, a[..., None]], -1).round().clip(0, 255).astype(np.uint8)
+
+
+def disc(fn):
+    n = ICON * SUPER
+    img = np.zeros((n, n, 4))
+    c = n / 2
+    for ys in range(n):
+        for xs in range(n):
+            x = (xs + 0.5 - c) / SUPER
+            y = (ys + 0.5 - c) / SUPER
+            v = fn(x, y)
+            if v is not None:
+                img[ys, xs] = v
+    return downsample(img)
+
+
+def sun_px(x, y):
+    r = math.hypot(x, y)
+    if r < 2.9:
+        k = max(0, 1 - math.hypot(x + 1, y + 1) / 4)  # lit from the upper left
+        return [255, 215 + 40 * k, 70 + 120 * k, 255]
+    if r < 3.7:
+        return [200, 100, 10, 255]  # the rim
+    ang = math.atan2(y, x)
+    ray = abs(math.cos(ang * 4))  # eight short rays
+    if r < 5.6 and ray > 0.82:
+        return [255, 190, 50, 255 * min(1, (5.6 - r) * 1.2)]
+    if r < 5.0:
+        return [255, 220, 120, 70]  # a faint glow
+    return None
+
+
+def moon_px(x, y):
+    r = math.hypot(x + 0.3, y)
+    cut = math.hypot(x - 1.9, y - 1.2)
+    if r < 3.9 and cut > 3.3:
+        k = max(0, 1 - math.hypot(x + 2, y + 1) / 4)
+        return [215 + 35 * k, 225 + 25 * k, 255, 255]
+    if r < 4.7 and cut > 2.6:
+        return [20, 25, 70, 255]  # the outline
+    if r < 5.4 and cut > 2.4:
+        return [170, 190, 255, 60]  # a faint glow
+    return None
+
+
+def c_array(name, img):
+    data = img.reshape(-1, 4).astype(np.uint32)
+    words = (data[:, 0] << 24) | (data[:, 1] << 16) | (data[:, 2] << 8) | data[:, 3]
+    lines = [f"static u32 {name}[{len(words)}] = {{"]
+    for k in range(0, len(words), 8):
+        lines.append("    " + ", ".join(f"0x{w:08X}" for w in words[k:k + 8]) + ",")
+    lines.append("};")
+    return lines
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--png")
+    args = ap.parse_args()
+    tex = {"sFishmodClockArcTex": arc(), "sFishmodClockSunTex": disc(sun_px), "sFishmodClockMoonTex": disc(moon_px)}
+    if args.png:
+        os.makedirs(args.png, exist_ok=True)
+        for k, v in tex.items():
+            Image.fromarray(v, "RGBA").save(os.path.join(args.png, k + ".png"))
+    out = os.path.join(ROOT, "src", "fishmod_data", "fishmod_clock_tex.inc.c")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    lines = ["// Generated by fishmod/tools/gen_clock_tex.py. Do not edit.",
+             f"#define FISHMOD_CLOCK_ARC_W {ARC_W}", f"#define FISHMOD_CLOCK_ARC_H {ARC_H}",
+             f"#define FISHMOD_CLOCK_ICON {ICON}"]
+    lines.append("// the band's top edge along the arc, per column (texels)")
+    lines.append("static u8 sFishmodClockArcY[" + str(ARC_W) + "] = { " +
+                 ", ".join(str(round(arc_y(min(max((x + 0.5 - 1) / (ARC_W - 2), 0), 1)))) for x in range(ARC_W)) + " };")
+    for k, v in tex.items():
+        lines += c_array(k, v)
+    with open(out, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"wrote {out}")
+
+
+if __name__ == "__main__":
+    main()

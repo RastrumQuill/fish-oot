@@ -333,6 +333,10 @@ s32 Fishmod_EquipItem(struct PlayState* play, s32 item);
 void Fishmod_DpadUpdateBottle(struct PlayState* play, u8 item, s32 button);
 s32 Fishmod_DpadAssign(u16 press, s32 slot);
 void Fishmod_DpadDraw(struct PlayState* play);
+// The HUD clock under the overworld minimap (fishmod_items.c)
+extern s16 gFishmodMinimapLift;
+s32 Fishmod_ClockLift(s32 mapBottom);
+void Fishmod_ClockDraw(struct PlayState* play, s32 centerX, s32 top, s16 alpha);
 
 // Bottles: six, numbered 0-5 (bottles 1-4 are the vanilla slots, 5 and 6 the new ones)
 #define FISHMOD_BOTTLES 6

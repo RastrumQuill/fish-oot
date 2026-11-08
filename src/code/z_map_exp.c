@@ -1,3 +1,4 @@
+#include "fishmod.h"
 #include "gfx.h"
 #include "gfx_setupdl.h"
 #include "controller.h"
@@ -314,7 +315,11 @@ void Map_Init(PlayState* play) {
             R_COMPASS_OFFSET_Y = gMapData->owCompassInfo[mapIndex][3];
             Map_InitData(play, mapIndex);
             R_OW_MINIMAP_X = gMapData->owMinimapPosX[mapIndex];
-            R_OW_MINIMAP_Y = gMapData->owMinimapPosY[mapIndex];
+            // fishmod: raised as far as the clock under it needs (its marks with it)
+            gFishmodMinimapLift =
+                Fishmod_ClockLift(gMapData->owMinimapPosY[mapIndex] + gMapData->owMinimapHeight[mapIndex]);
+            R_OW_MINIMAP_Y = gMapData->owMinimapPosY[mapIndex] - gFishmodMinimapLift;
+            R_COMPASS_OFFSET_Y += gFishmodMinimapLift * 10;
             break;
         case SCENE_DEKU_TREE:
         case SCENE_DODONGOS_CAVERN:
@@ -502,6 +507,15 @@ void Minimap_Draw(PlayState* play) {
                                         (R_OW_MINIMAP_Y + gMapData->owMinimapHeight[mapIndex]) << 2, G_TX_RENDERTILE, 0,
                                         0, 1 << 10, 1 << 10);
 
+                    // fishmod: the clock under it
+                    Fishmod_ClockDraw(play, R_OW_MINIMAP_X + gMapData->owMinimapWidth[mapIndex] / 2,
+                                      R_OW_MINIMAP_Y + gMapData->owMinimapHeight[mapIndex] + 2,
+                                      interfaceCtx->minimapAlpha);
+                    gDPPipeSync(OVERLAY_DISP++);
+                    gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+                    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, R_MINIMAP_COLOR(0), R_MINIMAP_COLOR(1), R_MINIMAP_COLOR(2),
+                                    interfaceCtx->minimapAlpha);
+
                     if (((play->sceneId != SCENE_KAKARIKO_VILLAGE) && (play->sceneId != SCENE_KOKIRI_FOREST) &&
                          (play->sceneId != SCENE_ZORAS_FOUNTAIN)) ||
                         (LINK_AGE_IN_YEARS != YEARS_ADULT)) {
@@ -516,9 +530,11 @@ void Minimap_Draw(PlayState* play) {
 
                             gSPTextureRectangle(OVERLAY_DISP++,
                                                 gMapData->owEntranceIconPosX[sEntranceIconMapIndex] << 2,
-                                                gMapData->owEntranceIconPosY[sEntranceIconMapIndex] << 2,
+                                                (gMapData->owEntranceIconPosY[sEntranceIconMapIndex] -
+                                                 gFishmodMinimapLift) << 2,
                                                 (gMapData->owEntranceIconPosX[sEntranceIconMapIndex] + 8) << 2,
-                                                (gMapData->owEntranceIconPosY[sEntranceIconMapIndex] + 8) << 2,
+                                                (gMapData->owEntranceIconPosY[sEntranceIconMapIndex] + 8 -
+                                                 gFishmodMinimapLift) << 2,
                                                 G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
                         }
                     }
