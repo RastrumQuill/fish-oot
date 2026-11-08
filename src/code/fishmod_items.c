@@ -492,9 +492,10 @@ void Fishmod_DpadDraw(PlayState* play) {
 /*
  * The clock under the overworld minimap (fishmod/tools/gen_clock_tex.py): an arc from midnight to noon to midnight in
  * the sky's colours, the sun (day) or moon (night) riding it at the time of day. It fades with the minimap. The
- * minimap is raised only as far as the clock needs to end above a CRT's safe area.
+ * minimap is raised only as far as the clock needs to end above a CRT's safe area. Hidden where time is frozen.
  */
 #include "src/fishmod_data/fishmod_clock_tex.inc.c"
+#include "environment.h" // (gTimeSpeed)
 
 
 #define CLOCK_SAFE_BOTTOM 227 // (a CRT may hide the lines below)
@@ -515,7 +516,9 @@ void Fishmod_ClockDraw(PlayState* play, s32 centerX, s32 top, s16 alpha) {
     s32 ix = x0 + t - FISHMOD_CLOCK_ICON / 2;
     s32 iy = top + sFishmodClockArcY[t] + 1 - FISHMOD_CLOCK_ICON / 2;
 
-    if (alpha == 0) {
+    // not where time stands still (the scene's time speed is 0: the mod's hidden clock runs on underneath, and the
+    // shown time would only mislead)
+    if ((alpha == 0) || (gTimeSpeed == 0)) {
         return;
     }
     alpha = MIN(255, alpha * 255 / 0xAA); // (the minimap itself is drawn see-through, at 0xAA at most: not the clock)
