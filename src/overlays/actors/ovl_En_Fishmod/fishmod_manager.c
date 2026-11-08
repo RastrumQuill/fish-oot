@@ -548,6 +548,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
             ManagerDrawItem* item = &full[fullCount++];
 
             item->fish = fish;
+            fish->drawnFull = 3; // (its swim wave keeps running while this lasts)
             item->variant = (close || ((dist < LOD_FULL_DIST) && (fish->lengthInches >= FISHMOD_SMALL_RIG_LENGTH)))
                                 ? FISH_RIG_FULL
                                 : FISH_RIG_REDUCED;

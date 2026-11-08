@@ -406,32 +406,39 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                                 pauseCtx->equipTargetCBtn = 2;
                             }
 
-                            pauseCtx->equipTargetItem = cursorItem;
-                            pauseCtx->equipTargetSlot = cursorSlot;
-                            pauseCtx->mainState = PAUSE_MAIN_STATE_3;
-                            pauseCtx->equipAnimX = pauseCtx->itemVtx[index].v.ob[0] * 10;
-                            pauseCtx->equipAnimY = pauseCtx->itemVtx[index].v.ob[1] * 10;
-                            pauseCtx->equipAnimAlpha = 255;
-                            sEquipAnimTimer = 0;
-                            sEquipState = 3;
-                            sEquipMoveTimer = 10;
-                            if ((pauseCtx->equipTargetItem == ITEM_ARROW_FIRE) ||
-                                (pauseCtx->equipTargetItem == ITEM_ARROW_ICE) ||
-                                (pauseCtx->equipTargetItem == ITEM_ARROW_LIGHT)) {
-                                index = 0;
-                                if (pauseCtx->equipTargetItem == ITEM_ARROW_ICE) {
-                                    index = 1;
-                                }
-                                if (pauseCtx->equipTargetItem == ITEM_ARROW_LIGHT) {
-                                    index = 2;
-                                }
-                                SFX_PLAY_CENTERED(NA_SE_SY_SET_FIRE_ARROW + index);
-                                pauseCtx->equipTargetItem = 0xBF + index;
-                                sEquipState = 0;
-                                pauseCtx->equipAnimAlpha = 0;
-                                sEquipMoveTimer = 6;
-                            } else {
+                            if (gSaveContext.save.info.equips.cButtonSlots[pauseCtx->equipTargetCBtn] == cursorSlot) {
+                                // fishmod: the same C button again takes it off
+                                gSaveContext.save.info.equips.cButtonSlots[pauseCtx->equipTargetCBtn] = SLOT_NONE;
+                                gSaveContext.save.info.equips.buttonItems[pauseCtx->equipTargetCBtn + 1] = ITEM_NONE;
                                 SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
+                            } else {
+                                pauseCtx->equipTargetItem = cursorItem;
+                                pauseCtx->equipTargetSlot = cursorSlot;
+                                pauseCtx->mainState = PAUSE_MAIN_STATE_3;
+                                pauseCtx->equipAnimX = pauseCtx->itemVtx[index].v.ob[0] * 10;
+                                pauseCtx->equipAnimY = pauseCtx->itemVtx[index].v.ob[1] * 10;
+                                pauseCtx->equipAnimAlpha = 255;
+                                sEquipAnimTimer = 0;
+                                sEquipState = 3;
+                                sEquipMoveTimer = 10;
+                                if ((pauseCtx->equipTargetItem == ITEM_ARROW_FIRE) ||
+                                    (pauseCtx->equipTargetItem == ITEM_ARROW_ICE) ||
+                                    (pauseCtx->equipTargetItem == ITEM_ARROW_LIGHT)) {
+                                    index = 0;
+                                    if (pauseCtx->equipTargetItem == ITEM_ARROW_ICE) {
+                                        index = 1;
+                                    }
+                                    if (pauseCtx->equipTargetItem == ITEM_ARROW_LIGHT) {
+                                        index = 2;
+                                    }
+                                    SFX_PLAY_CENTERED(NA_SE_SY_SET_FIRE_ARROW + index);
+                                    pauseCtx->equipTargetItem = 0xBF + index;
+                                    sEquipState = 0;
+                                    pauseCtx->equipAnimAlpha = 0;
+                                    sEquipMoveTimer = 6;
+                                } else {
+                                    SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
+                                }
                             }
                         } else {
                             SFX_PLAY_CENTERED(NA_SE_SY_ERROR);

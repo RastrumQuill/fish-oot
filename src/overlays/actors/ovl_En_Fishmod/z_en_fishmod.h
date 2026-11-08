@@ -140,6 +140,7 @@ typedef struct EnFishmod {
     /* 0x3FC */ s16 lastThink;                     // timer value when it last ran its AI
     /* 0x3FE */ s16 startleBend;                   // the C-bend of a startle (sign: which way), 0 otherwise
     /* 0x400 */ u8 rigReady;                       // the manager can draw it
+    /* 0x401 */ u8 drawnFull;                      // frames the full model was drawn lately (the swim wave runs while > 0)
     /* 0x404 */ s32 waterCell;                     // the water grid cell waterY/floorY are for
     /* 0x408 */ u8 biteStruck;                     // the strike reached the bait (after the wind-up)
     /* 0x409 */ FishmodMood mood;                  // hunger and fear (kept in its roster record while away)

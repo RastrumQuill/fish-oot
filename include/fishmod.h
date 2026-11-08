@@ -513,6 +513,8 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;
 extern struct Actor* gFishmodDrawingActor; // debug builds: the actor Actor_Draw is drawing (the crash record says which)
+// the benches and the profile: leave out debug-only work that the shipped game doesn't do
+extern s32 gFishmodTimingAsShipped;
 extern s32 gFishmodScatterDrawn; // props drawn in the last frame
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 #define FISHMOD_PROF(slot, stmt)                        \

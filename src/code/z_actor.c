@@ -2486,11 +2486,15 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                 }
             } else {
                 Math_Vec3f_Copy(&actor->prevPos, &actor->world.pos);
-                actor->xzDistToPlayer = Actor_WorldDistXZToActor(actor, &player->actor);
-                actor->yDistToPlayer = Actor_HeightDiff(actor, &player->actor);
-                actor->xyzDistToPlayerSq = SQ(actor->xzDistToPlayer) + SQ(actor->yDistToPlayer);
+                // fishmod: not for the mod's fish (dozens of them, and they never read these: a square root and an
+                // arctangent each, every frame)
+                if (!((actor->id == ACTOR_EN_FISHMOD) && (FISHMOD_GET_TYPE(actor->params) == FISHMOD_TYPE_FISH))) {
+                    actor->xzDistToPlayer = Actor_WorldDistXZToActor(actor, &player->actor);
+                    actor->yDistToPlayer = Actor_HeightDiff(actor, &player->actor);
+                    actor->xyzDistToPlayerSq = SQ(actor->xzDistToPlayer) + SQ(actor->yDistToPlayer);
 
-                actor->yawTowardsPlayer = Actor_WorldYawTowardActor(actor, &player->actor);
+                    actor->yawTowardsPlayer = Actor_WorldYawTowardActor(actor, &player->actor);
+                }
                 actor->flags &= ~ACTOR_FLAG_SFX_FOR_PLAYER_BODY_HIT;
 
                 if ((DECR(actor->freezeTimer) == 0) &&

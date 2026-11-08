@@ -1302,6 +1302,11 @@ static void Watchdog_Start(void) {
  * this a crash on the hardware is just a frozen picture.
  */
 struct Actor* gFishmodDrawingActor;
+#if defined(FISHMOD_HWBENCH) || defined(FISHMOD_PCPROF)
+s32 gFishmodTimingAsShipped = true;
+#else
+s32 gFishmodTimingAsShipped = false;
+#endif
 
 void Fishmod_DebugFault(OSThread* thread, const char* exp1, const char* exp2) {
     static struct {

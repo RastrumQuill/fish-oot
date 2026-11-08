@@ -602,6 +602,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                                                                           : 2;
                 s32 j;
 
+                if (gSaveContext.save.info.equips.cButtonSlots[c] == slot) {
+                    slot = SLOT_NONE; // the same C button again takes it off
+                }
                 for (j = 0; j < 3; j++) {
                     if ((j != c) && (gSaveContext.save.info.equips.cButtonSlots[j] == slot)) {
                         gSaveContext.save.info.equips.cButtonSlots[j] = SLOT_NONE;
@@ -610,7 +613,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                 }
                 gSaveContext.save.info.equips.cButtonSlots[c] = slot;
                 gSaveContext.save.info.equips.buttonItems[c + 1] = Fishmod_SlotItem(slot);
-                Interface_LoadItemIcon1(play, c + 1);
+                if (slot != SLOT_NONE) {
+                    Interface_LoadItemIcon1(play, c + 1);
+                }
                 SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
             }
         }

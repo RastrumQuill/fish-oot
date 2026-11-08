@@ -356,7 +356,7 @@ s32 Fishmod_DpadAssign(u16 press, s32 slot) {
  * The HUD: a D-pad under the C buttons, shaded as they are (fishmod/tools/gen_dpad_tex.py: a bevelled cross with an
  * arrow pressed into each arm), its items at 16 x 16 over the arrows with their ammo counts as the C buttons show them
  * (green when full, grey when none). Their icons are read from ROM as they change, into a buffer of their own. Shown
- * with the C buttons, empty or not; an item dimmed while it can't be used.
+ * with the C buttons once anything is on it; an item dimmed while it can't be used.
  */
 #include "src/fishmod_data/fishmod_dpad_tex.inc.c"
 
@@ -410,10 +410,16 @@ void Fishmod_DpadDraw(PlayState* play) {
     static const s8 sOffset[4][2] = { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } };
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     s16 alpha = MAX(MAX(interfaceCtx->cLeftAlpha, interfaceCtx->cDownAlpha), interfaceCtx->cRightAlpha);
+    s32 any = false;
     s32 d;
 
-    // (always shown with the C buttons, empty or not: an empty direction shows its arrow)
-    if (alpha == 0) {
+    // (shown with the C buttons once anything is on it: an empty direction then shows its arrow)
+    for (d = 0; d < 4; d++) {
+        if (Fishmod_SlotItem(FISHMOD_SAVE->dpad[DPAD_AGE()][d]) != ITEM_NONE) {
+            any = true;
+        }
+    }
+    if (!any || (alpha == 0)) {
         return;
     }
 

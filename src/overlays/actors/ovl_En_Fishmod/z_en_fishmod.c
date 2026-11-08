@@ -1948,6 +1948,18 @@ void EnFishmod_FishAI(EnFishmod* this, PlayState* play) {
 static void EnFishmod_UpdateSwim(EnFishmod* this) {
     s32 i;
 
+    // Only the full model shows the wave (the far card doesn't bend): a fish not drawn in full for a few frames only
+    // keeps the bookkeeping going (its last heading, a startle running out), not the wave's angles.
+    if (this->drawnFull == 0) {
+        this->lastYaw = this->actor.shape.rot.y;
+        if (this->startle != 0) {
+            this->startle -= (this->startle > 0) ? 1 : -1;
+        }
+        this->startleBend = 0;
+        return;
+    }
+    this->drawnFull--;
+
     // Small schooling fish swim in bursts: a few quick beats of the tail, then a glide (the big fish's steady wave
     // looks wrong on a minnow). Only while swimming, not resting.
     if ((this->species->schoolMax > 0) && (this->swimMag > 900.0f)) {
@@ -2079,9 +2091,10 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     // Away from attention (the camera or the bobber, whichever is nearer) a fish does
     // less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200 every 8th (gliding on in
     // between), and past 1600 it goes dormant: it holds still (and is out of drawing range) until attention comes.
-    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON) {
-        f32 attnDist = EnFishmod_AttentionDist(this, play);
+    f32 attnDist = 0.0f; // (once a frame: it was worked out twice)
 
+    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON) {
+        attnDist = EnFishmod_AttentionDist(this, play);
         if (attnDist > 1600.0f) {
             return;
         }
@@ -2091,7 +2104,7 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     }
     // away from attention, a wandering fish thinks every other frame and glides on in between
     if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !FISHMOD_PHOTO_ON &&
-        (EnFishmod_AttentionDist(this, play) > 500.0f)) {
+        (attnDist > 500.0f)) {
         FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
         return;
     }
@@ -2103,7 +2116,8 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     FISHMOD_PROF(FISHMOD_PROF_U_SWIM, EnFishmod_UpdateSwim(this));
 
 #if FISHMOD_DEBUG
-    {
+    // (not in the benches: they time the game as it ships, and this cost 2.4 ms a frame there)
+    if (!gFishmodTimingAsShipped) {
     OSTime debugStart = osGetTime();
     {
         // nearest fish to the camera focus, for testing
