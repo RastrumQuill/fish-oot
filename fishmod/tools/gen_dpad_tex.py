@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The HUD's D-pad texture (our own art): a cross shaded as the C buttons are, a flat face with a bevelled rim lit
-from the upper left, a dished middle and small raised arrows. IA8, drawn tinted by the primitive colour.
+from the upper left, a dished middle and small arrows pressed into its arms (under the items). IA8, drawn tinted by the primitive colour.
 
 Writes src/fishmod_data/fishmod_dpad_tex.inc.c (and --png PATH, a preview).
 Usage: fishmod/tools/gen_dpad_tex.py [--png PATH]
@@ -41,19 +41,22 @@ def render():
     # the dished middle
     rr = np.hypot(x - c, y - c) / SUPER
     h -= 0.35 * np.clip(1 - rr / 6.5, 0, 1) ** 2
-    # small raised arrows between the middle and each arm (the icons cover the arm ends)
+    dent = np.zeros_like(inside)
+    # an arrow pressed into each arm, under its item (pointing out; seen when the button is empty)
     for ang in range(4):
         u = (x - c) / SUPER
         v = (y - c) / SUPER
         for _ in range(ang):
             u, v = v, -u
-        tri = (v < -7.5) & (v > -11.5) & (np.abs(u) < (v + 11.5) * 0.9)
-        h += 0.25 * tri
+        tri = (v < -13.0) & (v > -20.5) & (np.abs(u) < (v + 20.5) * 0.75)
+        h -= 0.45 * tri
+        dent |= tri
     h = ndimage.gaussian_filter(h, SUPER * 0.35)
     gy, gx = np.gradient(h * SUPER)
     light = np.array([-1.0, -1.0]) / np.sqrt(2)  # from the upper left
     shade = (gx * light[0] + gy * light[1])
-    inten = np.clip(FACE + 520 * -shade / 1.0, 30, 255)
+    inten = np.clip(FACE + 520 * -shade, 30, 255)
+    inten = np.where(ndimage.binary_dilation(dent, iterations=SUPER // 2), inten * 0.82, inten)  # (the dents a little darker)
     # downsample: alpha is coverage, intensity the covered samples' mean
     a = inside.reshape(SIZE, SUPER, SIZE, SUPER).mean(axis=(1, 3))
     s = (inten * inside).reshape(SIZE, SUPER, SIZE, SUPER).sum(axis=(1, 3))

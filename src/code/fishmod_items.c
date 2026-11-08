@@ -353,11 +353,23 @@ s32 Fishmod_DpadAssign(u16 press, s32 slot) {
 }
 
 /*
- * The HUD: a small D-pad under the C buttons, its four items at 16 x 16 (their icons read from ROM as they change, into
- * a buffer of their own), dimmed while the D-pad is off.
+ * The HUD: a D-pad under the C buttons, shaded as they are (fishmod/tools/gen_dpad_tex.py: a bevelled cross with an
+ * arrow pressed into each arm), its items at 16 x 16 over the arrows with their ammo counts as the C buttons show them
+ * (green when full, grey when none). Their icons are read from ROM as they change, into a buffer of their own. Shown
+ * once anything is on it; an item dimmed while it can't be used.
  */
+#include "src/fishmod_data/fishmod_dpad_tex.inc.c"
+
 #define DPAD_X 282 // the cross's middle
 #define DPAD_Y 88
+#define DPAD_ARM 17 // from the middle to an item's
+#define DPAD_TEX 48
+#define DPAD_DIGIT 6 // the ammo digits' size (the C buttons': 8)
+
+#include "assets/textures/parameter_static/parameter_static.h" // (segment 2 while the HUD draws)
+
+Gfx* Gfx_TextureIA8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 textureHeight, s16 rectLeft, s16 rectTop,
+                    s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy); // (z_parameter.c)
 
 static u64 sDpadIcons[4][ITEM_ICON_SIZE / sizeof(u64)];
 static u16 sDpadIconItem[4]; // the item each holds, + 1 (0: none loaded)
@@ -373,8 +385,29 @@ static void Fishmod_DpadLoadIcon(s32 d, s32 item) {
     sDpadIconItem[d] = item + 1;
 }
 
+/** An item's ammo count as Interface_DrawAmmoCount shows it (-1: none shown); *full set when at its capacity. */
+static s32 Fishmod_DpadAmmo(s32 item, s32* full) {
+    s32 ammo;
+
+    if ((item >= ITEM_BOW_FIRE) && (item <= ITEM_BOW_LIGHT)) {
+        item = ITEM_BOW;
+    }
+    if (!((item == ITEM_DEKU_STICK) || (item == ITEM_DEKU_NUT) || (item == ITEM_BOMB) || (item == ITEM_BOW) ||
+          (item == ITEM_SLINGSHOT) || (item == ITEM_BOMBCHU) || (item == ITEM_MAGIC_BEAN))) {
+        return -1;
+    }
+    ammo = AMMO(item);
+    *full = ((item == ITEM_BOW) && (ammo == CUR_CAPACITY(UPG_QUIVER))) ||
+            ((item == ITEM_BOMB) && (ammo == CUR_CAPACITY(UPG_BOMB_BAG))) ||
+            ((item == ITEM_SLINGSHOT) && (ammo == CUR_CAPACITY(UPG_BULLET_BAG))) ||
+            ((item == ITEM_DEKU_STICK) && (ammo == CUR_CAPACITY(UPG_DEKU_STICKS))) ||
+            ((item == ITEM_DEKU_NUT) && (ammo == CUR_CAPACITY(UPG_DEKU_NUTS))) ||
+            ((item == ITEM_BOMBCHU) && (ammo == 50)) || ((item == ITEM_MAGIC_BEAN) && (ammo == 15));
+    return CLAMP(ammo, 0, 99);
+}
+
 void Fishmod_DpadDraw(PlayState* play) {
-    static const s8 sOffset[4][2] = { { 0, -14 }, { 0, 14 }, { -14, 0 }, { 14, 0 } };
+    static const s8 sOffset[4][2] = { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } };
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     s16 alpha = MAX(MAX(interfaceCtx->cLeftAlpha, interfaceCtx->cDownAlpha), interfaceCtx->cRightAlpha);
     s32 any = false;
@@ -391,23 +424,24 @@ void Fishmod_DpadDraw(PlayState* play) {
 
     OPEN_DISPS(play->state.gfxCtx, "fishmod_items.c", __LINE__);
 
-    // the cross (texture rectangles in the primitive colour: the texture loaded is not shown)
+    // the pad (its texture's intensity times the grey, as the C buttons' times their yellow)
     gDPPipeSync(OVERLAY_DISP++);
-    gDPSetCombineLERP(OVERLAY_DISP++, 0, 0, 0, PRIMITIVE, 0, 0, 0, PRIMITIVE, 0, 0, 0, PRIMITIVE, 0, 0, 0, PRIMITIVE);
-    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 120, 120, 120, alpha * 3 / 5);
-    gSPTextureRectangle(OVERLAY_DISP++, (DPAD_X - 4) << 2, (DPAD_Y - 22) << 2, (DPAD_X + 4) << 2, (DPAD_Y + 22) << 2,
-                        G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
-    gSPTextureRectangle(OVERLAY_DISP++, (DPAD_X - 22) << 2, (DPAD_Y - 5) << 2, (DPAD_X - 5) << 2, (DPAD_Y + 5) << 2,
-                        G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
-    gSPTextureRectangle(OVERLAY_DISP++, (DPAD_X + 5) << 2, (DPAD_Y - 5) << 2, (DPAD_X + 22) << 2, (DPAD_Y + 5) << 2,
-                        G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+    gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 143, 143, 150, alpha); // (the N64 controller's D-pad grey on screen)
+    gDPLoadTextureBlock(OVERLAY_DISP++, sFishmodDpadTex, G_IM_FMT_IA, G_IM_SIZ_8b, DPAD_TEX, DPAD_TEX, 0,
+                        G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
+                        G_TX_NOLOD);
+    gSPTextureRectangle(OVERLAY_DISP++, (DPAD_X - DPAD_TEX / 2) << 2, (DPAD_Y - DPAD_TEX / 2) << 2,
+                        (DPAD_X + DPAD_TEX / 2) << 2, (DPAD_Y + DPAD_TEX / 2) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10,
+                        1 << 10);
 
-    // the items, at half size
-    gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
     for (d = 0; d < 4; d++) {
         s32 item = Fishmod_SlotItem(FISHMOD_SAVE->dpad[DPAD_AGE()][d]);
-        s32 x = DPAD_X + sOffset[d][0] - 8;
-        s32 y = DPAD_Y + sOffset[d][1] - 8;
+        s32 x = DPAD_X + sOffset[d][0] * DPAD_ARM - 8;
+        s32 y = DPAD_Y + sOffset[d][1] * DPAD_ARM - 8;
+        s16 a;
+        s32 full = false;
+        s32 ammo;
 
         if ((item == ITEM_NONE) || (item >= ITEM_NONE_FE)) {
             continue;
@@ -415,14 +449,40 @@ void Fishmod_DpadDraw(PlayState* play) {
         if (sDpadIconItem[d] != item + 1) {
             Fishmod_DpadLoadIcon(d, item);
         }
+        a = Fishmod_DpadOn(play, item) ? alpha : MIN(alpha, 70);
+        // the item, at half size
         gDPPipeSync(OVERLAY_DISP++);
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255,
-                        Fishmod_DpadOn(play, item) ? alpha : MIN(alpha, 70));
+        gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, a);
         gDPLoadTextureBlock(OVERLAY_DISP++, sDpadIcons[d], G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
                             G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK,
                             G_TX_NOLOD, G_TX_NOLOD);
         gSPTextureRectangle(OVERLAY_DISP++, x << 2, y << 2, (x + 16) << 2, (y + 16) << 2, G_TX_RENDERTILE, 0, 0,
                             2 << 10, 2 << 10);
+        // its ammo, at its lower left (the C buttons' digits, smaller)
+        ammo = Fishmod_DpadAmmo(item, &full);
+        if (ammo >= 0) {
+            s32 dx = x;
+            s32 dy = y + 16 - DPAD_DIGIT + 1;
+
+            gDPPipeSync(OVERLAY_DISP++);
+            gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
+                              PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+            if (ammo == 0) {
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 100, 100, 100, a);
+            } else if (full) {
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 120, 255, 0, a);
+            } else {
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, a);
+            }
+            if (ammo >= 10) {
+                OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, (u8*)gAmmoDigit0Tex + 8 * 8 * (ammo / 10), 8, 8, dx, dy,
+                                              DPAD_DIGIT, DPAD_DIGIT, (8 << 10) / DPAD_DIGIT, (8 << 10) / DPAD_DIGIT);
+                dx += DPAD_DIGIT - 1;
+            }
+            OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, (u8*)gAmmoDigit0Tex + 8 * 8 * (ammo % 10), 8, 8, dx, dy,
+                                          DPAD_DIGIT, DPAD_DIGIT, (8 << 10) / DPAD_DIGIT, (8 << 10) / DPAD_DIGIT);
+        }
     }
     gDPPipeSync(OVERLAY_DISP++);
 
