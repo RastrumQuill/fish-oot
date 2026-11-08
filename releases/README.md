@@ -8,6 +8,7 @@ controls.
 
 | Release | Patches | Notes |
 |---|---|---|
+| pcprof1 (profile build) | `fish-oot-pcprof1-hw.bps` | [notes](notes-pcprof1.md): the PC-sampling compiler profile, console |
 | refactor1 (test build) | `fish-oot-refactor1.bps`, `-hw`, `-testmode`, `-hw-testmode` | [notes](notes-refactor1.md): the refactored game; the rod in any scene, saves with a version mark |
 | lake-tour1 (feedback build) | `fish-oot-lake-tour1.bps` | [notes](notes-lake-tour1.md): a camera tour of Lake Hylia's habitat props, above and below the water |
 | kokiri-test4 (newest) | `fish-oot-kokiri-test4.bps`, `-testmode`, `-animstudio` | [notes](notes-kokiri-test4.md): faster fish (fish manager, rigs), fish that stay for the day, animation studio |
