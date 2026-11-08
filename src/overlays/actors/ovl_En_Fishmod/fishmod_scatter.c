@@ -45,6 +45,8 @@ typedef struct FishmodBedShade {
 #include "src/fishmod_data/fishmod_bedshade.h"
 #include "src/fishmod_data/fishmod_profile.h"
 #include "sys_math.h" // (Math_Atan2S: without its prototype its floats were passed as doubles)
+#include "fishmod_bedcard.h"
+#include "dma.h"
 
 typedef enum FishmodPropKind {
 #define X(id, name) FISHMOD_PROP_##id,
@@ -345,11 +347,14 @@ typedef struct ScatterFrame {
 // What's drawn and the props' matrices: made when the camera has moved, and kept while it holds still (fishing,
 // mostly), so most frames only send the commands again. Two sets: a new one is made while the RSP may still be
 // reading the last.
+#define BEDCARD_SET_MAX 64 // bed cards drawn in a frame at most
 typedef struct ScatterSet {
     Mtx mtx[PROP_BUDGET];
     u16 prop[PROP_BUDGET]; // in drawing order: nearest band first, kind by kind within a band
     u8 tier[PROP_BUDGET];  // ScatterTier, as its matrix was made
     s32 count;
+    s16 cards[BEDCARD_SET_MAX]; // the bed cards drawn in place of their chunks' card-drawn plants
+    s32 cardCount;
 } ScatterSet;
 typedef struct ScatterBuffers {
     ScatterFrame frame[2];
@@ -382,6 +387,8 @@ static void Scatter_FreeBuffers(void) {
     }
 }
 
+static void BedCard_Load(PlayState* play);
+
 void EnFishmod_ScatterLoad(PlayState* play) {
     EnFishmod_ScatterUnload();
     sScatter = Fishmod_LoadScatter(play->sceneId);
@@ -395,6 +402,7 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sDryMade = false;
     sBedShadedRoom = NULL;
     Scatter_AllocBuffers();
+    BedCard_Load(play);
 #if FISHMOD_DEBUG
     {
         u32 maxFree;
@@ -466,7 +474,130 @@ s32 EnFishmod_ScatterRandomDrawnPlant(Vec3f* eye, f32 range, Vec3f* out) {
     return false;
 }
 
+/* ---------------------------------------------------------------------------------------------------------------
+ * Bed cards (fishmod/tools/bedcard.py): past BEDCARD_DIST a chunk's card-drawn plants are one card, laid in the plane of
+ * the view nearest the camera's direction to it. The card table stays loaded; each card's views (2.4 KB) are read from
+ * ROM into a cache the first time it's wanted (a few a frame; until then its plants are drawn as before).
+ */
+#define BEDCARD_DIST 1300.0f // from this far (to the card's middle, across the ground)
+#define BEDCARD_CACHE 24     // cards' views held at once
+#define BEDCARD_LOADS 2      // read from ROM in a frame at most
+
+static FishmodBedCard* sBedCards;
+static s32 sBedCount;
+static s16* sChunkCard; // per chunk: its card, or -1
+static uintptr_t sBedRom; // the first card's views in ROM
+static u8* sBedCache;
+static s16 sBedSlotCard[BEDCARD_CACHE];
+static u32 sBedSlotUsed[BEDCARD_CACHE]; // the frame it was last drawn (a slot the RSP may still read isn't reused)
+static s8* sBedCardSlot; // per card: its slot, or -1
+static s32 sBedLoads;    // read this frame
+static u32 sBedFrame;
+
+static void BedCard_Unload(void) {
+    if (sBedCards != NULL) {
+        ZeldaArena_Free(sBedCards);
+        sBedCards = NULL;
+    }
+    if (sChunkCard != NULL) {
+        ZeldaArena_Free(sChunkCard);
+        sChunkCard = NULL;
+    }
+    if (sBedCache != NULL) {
+        ZeldaArena_Free(sBedCache);
+        sBedCache = NULL;
+    }
+    if (sBedCardSlot != NULL) {
+        ZeldaArena_Free(sBedCardSlot);
+        sBedCardSlot = NULL;
+    }
+    sBedCount = 0;
+}
+
+static void BedCard_Load(PlayState* play) {
+    static u64 sHeadBuf[sizeof(FishmodBedCardHeader) / sizeof(u64)]; // (8-byte aligned, for the DMA)
+    FishmodBedCardHeader* head = (FishmodBedCardHeader*)sHeadBuf;
+    uintptr_t romStart;
+    uintptr_t romEnd;
+    s32 n;
+    s32 i;
+
+    BedCard_Unload();
+    if ((sScatter == NULL) || !Fishmod_BedCardRom(play->sceneId, &romStart, &romEnd)) {
+        return;
+    }
+    DmaMgr_RequestSync(head, romStart, sizeof(FishmodBedCardHeader));
+    if ((head->magic != FISHMOD_BEDCARD_MAGIC) || (head->count == 0) || (head->cardBytes != FISHMOD_BEDCARD_BYTES)) {
+        return;
+    }
+    n = head->count;
+    sBedCards = ZeldaArena_Malloc(ALIGN16(n * sizeof(FishmodBedCard)));
+    sChunkCard = ZeldaArena_Malloc(sScatter->width * sScatter->depth * sizeof(s16));
+    sBedCache = ZeldaArena_Malloc(BEDCARD_CACHE * FISHMOD_BEDCARD_BYTES);
+    sBedCardSlot = ZeldaArena_Malloc(ALIGN16(n));
+    if ((sBedCards == NULL) || (sChunkCard == NULL) || (sBedCache == NULL) || (sBedCardSlot == NULL)) {
+        BedCard_Unload();
+        return;
+    }
+    // the table (its size rounded up: the read may take a few bytes past it, which are the views' start)
+    DmaMgr_RequestSync(sBedCards, romStart + sizeof(FishmodBedCardHeader), ALIGN16(n * sizeof(FishmodBedCard)));
+    sBedRom = romStart + sizeof(FishmodBedCardHeader) + n * sizeof(FishmodBedCard);
+    for (i = 0; i < sScatter->width * sScatter->depth; i++) {
+        sChunkCard[i] = -1;
+    }
+    for (i = 0; i < n; i++) {
+        sBedCardSlot[i] = -1;
+        if ((sBedCards[i].chunk >= 0) && (sBedCards[i].chunk < sScatter->width * sScatter->depth)) {
+            sChunkCard[sBedCards[i].chunk] = i;
+        }
+    }
+    for (i = 0; i < BEDCARD_CACHE; i++) {
+        sBedSlotCard[i] = -1;
+        sBedSlotUsed[i] = 0;
+    }
+    sBedCount = n;
+}
+
+/** The card's views in the cache (read from ROM now if there's a free slot and reads left this frame), or NULL. */
+static u8* BedCard_Views(s32 card) {
+    s32 slot = sBedCardSlot[card];
+    s32 i;
+
+    if (slot < 0) {
+        u32 oldest = 0xFFFFFFFF;
+
+        if (sBedLoads >= BEDCARD_LOADS) {
+            return NULL;
+        }
+        // a free slot, or the one least lately drawn (not in the last two frames: the RSP may still be reading it)
+        for (i = 0; i < BEDCARD_CACHE; i++) {
+            if (sBedSlotCard[i] < 0) {
+                slot = i;
+                break;
+            }
+            if ((sBedFrame - sBedSlotUsed[i] > 2) && (sBedSlotUsed[i] < oldest)) {
+                oldest = sBedSlotUsed[i];
+                slot = i;
+            }
+        }
+        if (slot < 0) {
+            return NULL;
+        }
+        if (sBedSlotCard[slot] >= 0) {
+            sBedCardSlot[sBedSlotCard[slot]] = -1;
+        }
+        DmaMgr_RequestSync(sBedCache + slot * FISHMOD_BEDCARD_BYTES, sBedRom + card * FISHMOD_BEDCARD_BYTES,
+                           FISHMOD_BEDCARD_BYTES);
+        sBedLoads++;
+        sBedSlotCard[slot] = card;
+        sBedCardSlot[card] = slot;
+    }
+    sBedSlotUsed[slot] = sBedFrame;
+    return sBedCache + slot * FISHMOD_BEDCARD_BYTES;
+}
+
 void EnFishmod_ScatterUnload(void) {
+    BedCard_Unload();
     if (sScatter != NULL) {
         ZeldaArena_Free(sScatter);
         sScatter = NULL;
@@ -812,6 +943,10 @@ static f32 Scatter_ViewCos(PlayState* play) {
     return 1.0f / sqrtf(1.0f + SQ(t));
 }
 
+static s16 sCards[BEDCARD_SET_MAX]; // (the build's bed cards, until it has its set)
+static s32 sCardCount;
+static u8* sUseCard; // per visible chunk: drawn as its card
+
 static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f32 lookZ) {
     static u16 sVisible[256];                       // chunks near the camera
     static f32 sChunkDistSq[ARRAY_COUNT(sVisible)]; // their centres' distance from the eye, squared
@@ -919,6 +1054,34 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
     }
 
+    // Bed cards: a visible chunk far enough off (above water: under it the haze ends the props first) is drawn as its
+    // card, and its card-drawn plants are left out below
+    {
+        static u8 sUse[ARRAY_COUNT(sVisible)];
+
+        sCardCount = 0;
+        for (v = 0; v < visibleCount; v++) {
+            s32 card = (sChunkCard != NULL) ? sChunkCard[sVisible[v]] : -1;
+
+            sUse[v] = false;
+            if ((card < 0) || under || FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOBEDCARD) || (sCardCount >= BEDCARD_SET_MAX)) {
+                continue;
+            }
+            {
+                f32 dx = sBedCards[card].x - eye.x;
+                f32 dz = sBedCards[card].z - eye.z;
+                f32 dSq = SQ(dx) + SQ(dz);
+
+                if ((dSq > SQ(BEDCARD_DIST)) && (dSq < SQ(distFar * (1.0f + FADE_BAND))) &&
+                    (BedCard_Views(card) != NULL)) {
+                    sUse[v] = true;
+                    sCards[sCardCount++] = card;
+                }
+            }
+        }
+        sUseCard = sUse;
+    }
+
     // One pass over the props near the camera: in view (a cone around the look direction, any pitch) and within their
     // kind's distance (above or under water), kind by kind, each with its distance band.
     for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
@@ -954,6 +1117,9 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             }
             if (sChunkDry[c] && (info->floating || info->plant)) {
                 continue; // floating props wait for the water, plants don't grow on dry land
+            }
+            if (sUseCard[v] && (info->modelImp != NULL)) {
+                continue; // (in the chunk's bed card)
             }
             end = sKindStart[v][kind + 1];
             for (i = sKindStart[v][kind]; i < end; i++) {
@@ -1011,6 +1177,8 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     sMtxUsed = 0;
     set = &sBufs->set[sSet];
     set->count = 0;
+    set->cardCount = sCardCount;
+    bcopy(sCards, set->cards, sCardCount * sizeof(s16));
     // the single cards face the camera: they turn about their own up, by the look's direction across the ground
     sBillboardYaw = Math_Atan2S(-lookZ, -lookX);
     sLodScale = under ? UNDER_LOD_SCALE : 1.0f;
@@ -1103,6 +1271,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         return;
     }
     Scatter_UpdateDry(play);
+    sBedFrame++;
+    sBedLoads = 0;
     // a camera being set up can give a nonsense eye for a frame (and turning a NaN into an integer is a crash on
     // the N64): skip the props that frame
     if (!(eye.x == eye.x) || !(eye.y == eye.y) || !(eye.z == eye.z) || (fabsf(eye.x) > 30000.0f) ||
@@ -1254,6 +1424,81 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     if (lastOpa >= 0) {
         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
     }
+    // the bed cards (each in the plane of its view nearest the camera's direction to it: four views 45 degrees apart,
+    // and from the other side the double-sided card shows that view's mirror image)
+    if (set->cardCount > 0) {
+        s32 k;
+
+        opa = Gfx_SetupDL(opa, SETUPDL_25);
+        gDPPipeSync(opa++);
+        gDPSetCombineLERP(opa++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0, COMBINED);
+        gDPSetRenderMode(opa++, G_RM_FOG_SHADE_A,
+                         AA_EN | Z_CMP | Z_UPD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE |
+                             GBL_c2(G_BL_CLR_IN, G_BL_A_IN, G_BL_CLR_MEM, G_BL_A_MEM));
+        gSPClearGeometryMode(opa++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
+        gSPSetGeometryMode(opa++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
+        gDPSetPrimColor(opa++, 0, 0, light[0], light[1], light[2], 255);
+        gSPTexture(opa++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
+        gDPSetTextureLUT(opa++, G_TT_RGBA16);
+        for (k = 0; k < set->cardCount; k++) {
+            s32 card = set->cards[k];
+            FishmodBedCard* bc = &sBedCards[card];
+            u8* views = BedCard_Views(card);
+            Mtx* mtx;
+            Vtx* vtx;
+            f32 dx = bc->x - eye.x;
+            f32 dz = bc->z - eye.z;
+            f32 best = -1.0f;
+            s32 view = 0;
+            s32 v;
+            f32 rx;
+            f32 rz;
+
+            if (views == NULL) {
+                continue; // (pushed out of the cache: its plants come back with the next build)
+            }
+            // the view looking most nearly along the camera's direction to the card: view v looks along
+            // (sin t, -cos t) with t = v x 45 degrees
+            for (v = 0; v < FISHMOD_BEDCARD_VIEWS; v++) {
+                f32 t = v * (M_PI / FISHMOD_BEDCARD_VIEWS);
+                f32 d = fabsf(dx * sinf(t) - dz * cosf(t));
+
+                if (d > best) {
+                    best = d;
+                    view = v;
+                }
+            }
+            // the card's width along the view's right (cos t, sin t)
+            rx = cosf(view * (M_PI / FISHMOD_BEDCARD_VIEWS)) * bc->reach;
+            rz = sinf(view * (M_PI / FISHMOD_BEDCARD_VIEWS)) * bc->reach;
+            mtx = GRAPH_ALLOC(play->state.gfxCtx, sizeof(Mtx));
+            vtx = GRAPH_ALLOC(play->state.gfxCtx, 4 * sizeof(Vtx));
+            guTranslate(mtx, bc->x, bc->y, bc->z);
+            {
+                s16 ix = (s16)rx;
+                s16 iz = (s16)rz;
+                s16 h = bc->height;
+                s32 sw = FISHMOD_BEDCARD_TEX_W << 5;
+                s32 th = FISHMOD_BEDCARD_TEX_H << 5;
+
+                // (bottom left, bottom right, top right, top left; the texture's first row is the top)
+                vtx[0] = (Vtx){ { { -ix, 0, -iz }, 0, { 0, th }, { 255, 255, 255, 255 } } };
+                vtx[1] = (Vtx){ { { ix, 0, iz }, 0, { sw, th }, { 255, 255, 255, 255 } } };
+                vtx[2] = (Vtx){ { { ix, h, iz }, 0, { sw, 0 }, { 255, 255, 255, 255 } } };
+                vtx[3] = (Vtx){ { { -ix, h, -iz }, 0, { 0, 0 }, { 255, 255, 255, 255 } } };
+            }
+            gDPLoadTLUT_pal16(opa++, 0, views + view * FISHMOD_BEDCARD_VIEW_BYTES);
+            gDPLoadTextureBlock_4b(opa++, views + view * FISHMOD_BEDCARD_VIEW_BYTES + 32, G_IM_FMT_CI,
+                                   FISHMOD_BEDCARD_TEX_W, FISHMOD_BEDCARD_TEX_H, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+                                   G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+            gSPMatrix(opa++, mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+            gSPVertex(opa++, vtx, 4, 0);
+            gSP2Triangles(opa++, 0, 1, 2, 0, 0, 2, 3, 0);
+        }
+        gDPPipeSync(opa++);
+        gDPSetTextureLUT(opa++, G_TT_NONE);
+        gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+    }
     // the dock, placed by hand: always drawn when in reach (one deck, a few posts)
     if ((play->sceneId == FISHMOD_DOCK_SCENE) &&
         ((SQ(eye.x - (FISHMOD_DOCK_X)) + SQ(eye.z - (FISHMOD_DOCK_Z + 210))) < SQ(3000.0f))) {
@@ -1286,16 +1531,35 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     sT1 += osGetTime() - tStart;
     sT2++;
     if ((play->gameplayFrames & 15) == 0) { // (printing is slow: not every frame)
+#if FISHMOD_PROFILE_OCCLUSION && defined(F3DEX3_OCCLUSION)
+        Fishmod_DebugPrintf(10, "p%d b%d us %d+%d occ %d", set->count, sBuilt, (s32)OS_CYCLES_TO_USEC(sT0 / sT2),
+                            (s32)OS_CYCLES_TO_USEC(sT1 / sT2), EnFishmod_OcclusionChosen());
+#else
         Fishmod_DebugPrintf(10, "p%d b%d us %d+%d", set->count, sBuilt, (s32)OS_CYCLES_TO_USEC(sT0 / sT2),
                             (s32)OS_CYCLES_TO_USEC(sT1 / sT2));
+#endif
         sT0 = sT1 = sT2 = 0;
         sBuilt = 0;
     }
 #endif
 
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
+#if FISHMOD_PROFILE_OCCLUSION && defined(F3DEX3_OCCLUSION)
+    {
+        // the occlusion plane around the props only (the scene, the actors and the HUD as before)
+        void* occ = EnFishmod_OcclusionPlane(play);
+
+        gSPOcclusionPlane(POLY_OPA_DISP++, occ);
+        gSPDisplayList(POLY_OPA_DISP++, frame->opa);
+        gSPOcclusionPlane(POLY_OPA_DISP++, EnFishmod_OcclusionNone());
+        gSPOcclusionPlane(POLY_XLU_DISP++, occ);
+        gSPDisplayList(POLY_XLU_DISP++, frame->xlu);
+        gSPOcclusionPlane(POLY_XLU_DISP++, EnFishmod_OcclusionNone());
+    }
+#else
     gSPDisplayList(POLY_OPA_DISP++, frame->opa);
     gSPDisplayList(POLY_XLU_DISP++, frame->xlu);
+#endif
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
 }
 

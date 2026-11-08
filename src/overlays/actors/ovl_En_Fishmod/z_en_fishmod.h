@@ -310,4 +310,10 @@ f32 EnFishmod_RosterLength(s32 index);
 void EnFishmod_RosterCaught(struct PlayState* play, struct EnFishmod* fish);
 void EnFishmod_RosterForget(struct EnFishmod* fish);
 
+// the occlusion plane (fishmod_occlusion.c; F3DEX3 with it, the hardware profile)
+// (an OcclusionPlane*: the type exists only with F3DEX3's gbi)
+void* EnFishmod_OcclusionPlane(struct PlayState* play);
+void* EnFishmod_OcclusionNone(void);
+s32 EnFishmod_OcclusionChosen(void);
+
 #endif

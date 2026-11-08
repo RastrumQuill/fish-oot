@@ -118,6 +118,7 @@ typedef struct FishmodScript {
     s16 day;
     s16 roster; // fish in the scene's roster (0: the scene's own count)
     u16 flags;  // FishmodScriptFlag
+    s32 bench;  // bench switches on from the start (FISHMOD_BENCH_*: e.g. one half of an A/B)
     Vec3f walkTo;
     Vec3f walkProbe;
     Vec3f releaseAt;
@@ -136,6 +137,9 @@ typedef struct FishmodScript {
 #endif
 #ifndef FISHMOD_SCRIPT_ROSTER
 #define FISHMOD_SCRIPT_ROSTER 0
+#endif
+#ifndef FISHMOD_SCRIPT_BENCH
+#define FISHMOD_SCRIPT_BENCH 0
 #endif
 #ifdef FISHMOD_SCRIPT_ADULT
 #define SF_ADULT FISHMOD_SCRIPT_F_ADULT
@@ -210,6 +214,7 @@ static FishmodScript sScript = {
     FISHMOD_SCRIPT_ROSTER,
     SF_ADULT | SF_BUGS | SF_EMPTY_ITEMS | SF_OLD_SAVE | SF_NORMAL_BOOT | SF_NOTEXT | SF_NO_PROPCOL | SF_ALTEDGE |
         SF_HIVE | SF_WALK | SF_PROBE | SF_RELEASE,
+    FISHMOD_SCRIPT_BENCH,
     FISHMOD_SCRIPT_WALK_TO,
     FISHMOD_SCRIPT_WALK_PROBE,
     FISHMOD_SCRIPT_TEST_RELEASE,
@@ -642,6 +647,7 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.showTitleCard = false;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
 
+    gFishmodBench |= sScript.bench;
     if (sScript.flags & FISHMOD_SCRIPT_F_ALTEDGE) {
         gFishmodBench |= FISHMOD_BENCH_ALTEDGE; // the props' other edge mode from the start
     }

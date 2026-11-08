@@ -5,6 +5,7 @@
  */
 
 #include "fishmod.h"
+#include "fishmod_bedcard.h"
 #include "assert.h"
 #include "fishmod_species_data.h"
 
@@ -969,6 +970,30 @@ static const FishmodWaterMapRom sScatters[] = {
 #include "fishmod_scatter_scenes.h"
 #undef FISHMOD_SCATTER
 };
+
+#define FISHMOD_BEDCARD(sceneId, segment) DECLARE_ROM_SEGMENT(segment)
+#include "fishmod_bedcard_scenes.h"
+#undef FISHMOD_BEDCARD
+
+static const FishmodWaterMapRom sBedCards[] = {
+#define FISHMOD_BEDCARD(sceneId, segment) \
+    { sceneId, (uintptr_t)_##segment##SegmentRomStart, (uintptr_t)_##segment##SegmentRomEnd },
+#include "fishmod_bedcard_scenes.h"
+#undef FISHMOD_BEDCARD
+};
+
+s32 Fishmod_BedCardRom(s16 sceneId, uintptr_t* romStart, uintptr_t* romEnd) {
+    s32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sBedCards); i++) {
+        if (sBedCards[i].sceneId == sceneId) {
+            *romStart = sBedCards[i].romStart;
+            *romEnd = sBedCards[i].romEnd;
+            return true;
+        }
+    }
+    return false;
+}
 
 #define FISHMOD_COLLISION(sceneId, segment, extraMem, gridCells) DECLARE_ROM_SEGMENT(segment)
 #include "fishmod_collision_scenes.h"

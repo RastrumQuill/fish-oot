@@ -1520,6 +1520,13 @@ beginseg
     include "$(BUILD_DIR)/src/fishmod_data/fishmod_sc_spot06.o"
 endseg
 
+// fishmod: bed cards, distant plant chunks as one card (fishmod/tools/bedcard.py). Not compressed: read in pieces
+beginseg
+    name "fishmod_bc_spot06"
+    romalign 0x1000
+    include "$(BUILD_DIR)/src/fishmod_data/fishmod_bc_spot06.o"
+endseg
+
 // fishmod: collision for the habitat props (rocks), added to the scene's at load (fishmod/tools/gen_collision.py)
 beginseg
     name "fishmod_col_spot06"

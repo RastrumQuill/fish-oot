@@ -466,6 +466,8 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 // the hardware bench (fishmod_debug.c, FISHMOD_HWBENCH) switches these off to time the rest without them
 #define FISHMOD_BENCH_NOPROPS (1 << 0)
+#define FISHMOD_BENCH_NOOCC (1 << 3)     // no occlusion plane (fishmod_occlusion.c)
+#define FISHMOD_BENCH_NOBEDCARD (1 << 4) // no bed cards: distant clumps drawn plant by plant
 #define FISHMOD_BENCH_NOFISH (1 << 1)
 #define FISHMOD_BENCH_ALTEDGE (1 << 2)    // the props' old edge mode (anti-aliased in the RDP, reading the colour buffer)
 #define FISHMOD_BENCH_NOIMP (1 << 12)      // no far single cards: the whole cards out to the cutoff

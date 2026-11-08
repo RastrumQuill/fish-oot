@@ -116,10 +116,14 @@ python3 fishmod/tools/assets.py --manifest src/fishmod_data/bait_manifest.json >
 FISHMOD_HW=$HW python3 fishmod/tools/gen_habitat.py > /dev/null
 python3 fishmod/tools/assets.py --manifest src/fishmod_data/props_manifest.json > /dev/null
 python3 fishmod/tools/gen_scatter.py --c ${FISHMOD_UNTHINNED:+--unthinned}  # (FISHMOD_UNTHINNED=1: the beds before thinning, for A/B)
+# the bed cards: each chunk's distant plants as one card, from the scatter and the plants' meshes (not committed)
+FISHMOD_HW=$HW python3 fishmod/tools/bedcard.py > /dev/null
 # Lake Hylia's bed shaded under the water (generated, not committed)
 python3 fishmod/tools/gen_bedshade.py > /dev/null
 # the solid props' collision (rocks), added to the scene's at load (generated, not committed)
 python3 fishmod/tools/gen_collision.py
+# occluder candidates for the occlusion plane, from the collision (generated, not committed)
+python3 fishmod/tools/gen_occluders.py > /dev/null
 # the item page's graphics, made from the game's own (generated, not committed)
 python3 fishmod/tools/gen_item_page.py
 # the water floor maps, baked from the extracted scenes and the props' collision (generated, not committed)
