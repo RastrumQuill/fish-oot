@@ -516,6 +516,9 @@ extern s32 gFishmodBench;
 extern struct Actor* gFishmodDrawingActor; // debug builds: the actor Actor_Draw is drawing (the crash record says which)
 // the benches and the profile: leave out debug-only work that the shipped game doesn't do
 extern s32 gFishmodTimingAsShipped;
+// the stress benches (fishmod_debug_stress.inc.c): 1 fish, 2 plants, 0 none; and the step's count of them
+extern s32 gFishmodStress;
+extern s32 gFishmodStressCount;
 extern s32 gFishmodScatterDrawn; // props drawn in the last frame
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 #define FISHMOD_PROF(slot, stmt)                        \

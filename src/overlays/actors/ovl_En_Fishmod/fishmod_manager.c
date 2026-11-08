@@ -358,6 +358,25 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
     s32 checks = MIN(sRosterCount, ROSTER_CHECKS_PER_FRAME);
     s32 spawns = ROSTER_SPAWNS_PER_FRAME;
     s32 n;
+#if FISHMOD_DEBUG
+    s32 awake = 0; // (the fish stress bench caps the fish in the water at its step's count)
+
+    if (gFishmodStress == 1) {
+        for (n = 0; n < sRosterCount; n++) {
+            if (sRoster[n].fish != NULL) {
+                if (awake >= gFishmodStressCount) {
+                    // one too many after a pass starts over: it goes home
+                    sRoster[n].mood = sRoster[n].fish->mood;
+                    Actor_Kill(&sRoster[n].fish->actor);
+                    sRoster[n].fish = NULL;
+                } else {
+                    awake++;
+                }
+            }
+        }
+        spawns = MIN(spawns, gFishmodStressCount - awake);
+    }
+#endif
 
     for (n = 0; n < checks; n++) {
         FishmodRosterFish* rec;
@@ -514,6 +533,11 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         {
             FISHMOD_PROF(FISHMOD_PROF_D_SCATTER, EnFishmod_ScatterDraw(play));
         }
+#if FISHMOD_DEBUG
+        if (gFishmodStress == 2) {
+            FISHMOD_PROF(FISHMOD_PROF_D_SCATTER, EnFishmod_StressPlantsDraw(play, gFishmodStressCount));
+        }
+#endif
 #if FISHMOD_DEBUG
         if (gFishmodLodTest.active) {
             return; // the LOD calibration compares frames: nothing moving but the props

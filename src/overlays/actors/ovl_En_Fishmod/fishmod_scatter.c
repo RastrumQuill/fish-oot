@@ -10,6 +10,8 @@
  * a colour and its kind's display list: no per-vertex work.
  */
 
+#include "player.h"
+#include "libc64/malloc.h"
 #include "z_en_fishmod.h"
 #include "segmented_address.h"
 #include "fishmod.h"
@@ -1652,3 +1654,186 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_scatter.c", __LINE__);
 }
 
+
+#if FISHMOD_DEBUG
+/*
+ * The plant stress bench (fishmod_debug_stress.inc.c): a kelp forest in the view ahead of Link, its first `count`
+ * plants drawn as the scene's props are (full models, the same materials and lighting), nearest first. Placed once on
+ * the bed in a wedge 60 to 900 units ahead, 70 degrees wide, of the tall underwater kinds in turn.
+ */
+#define STRESS_PLANTS_MAX 1600
+
+typedef struct StressPlant {
+    FishmodProp prop;
+    Mtx mtx;
+} StressPlant;
+
+static StressPlant* sStressPlants;
+static s32 sStressPlantCount;
+// its own display lists, two (one built while the RSP draws the other): a plant takes 4 commands, a kind's material
+// about 30 (the frame's own lists have no room for a forest)
+#define STRESS_DL_SIZE (STRESS_PLANTS_MAX * 4 + 512)
+static Gfx* sStressDL[2];
+
+static void Stress_PlacePlants(PlayState* play) {
+    static const u8 sKindsUsed[] = { FISHMOD_PROP_KELP_FROND, FISHMOD_PROP_RIBBON_WEED, FISHMOD_PROP_BIG_PONDWEED,
+                                     FISHMOD_PROP_TALL_WEED, FISHMOD_PROP_FAN_WEED };
+    Player* player = GET_PLAYER(play);
+    u32 seed = 0x5EED1234;
+    s32 i;
+
+    sStressPlants = SystemArena_Malloc(STRESS_PLANTS_MAX * sizeof(StressPlant)); // (120 KB: the actor heap has no room)
+    sStressDL[0] = SystemArena_Malloc(STRESS_DL_SIZE * sizeof(Gfx));
+    sStressDL[1] = SystemArena_Malloc(STRESS_DL_SIZE * sizeof(Gfx));
+    if ((sStressPlants == NULL) || (sStressDL[0] == NULL) || (sStressDL[1] == NULL)) {
+        sStressPlants = NULL;
+        return;
+    }
+    sStressPlantCount = 0;
+    for (i = 0; i < STRESS_PLANTS_MAX; i++) {
+        StressPlant* p = &sStressPlants[sStressPlantCount];
+        // nearest first: the distance grows with the index (the area of the wedge out to d grows as d squared)
+        f32 t = (i + 0.5f) / STRESS_PLANTS_MAX;
+        f32 d = 60.0f + sqrtf(t) * 840.0f;
+        s16 yaw;
+        f32 surface;
+        f32 floor;
+        f32 x;
+        f32 z;
+
+        seed = seed * 1664525 + 1013904223;
+        yaw = player->actor.shape.rot.y + (s16)((s32)((seed >> 16) & 0xFFFF) * 0x3200 / 0x10000 - 0x1900);
+        x = player->actor.world.pos.x + Math_SinS(yaw) * d;
+        z = player->actor.world.pos.z + Math_CosS(yaw) * d;
+        {
+            // the bed by a raycast from above the water (the fish's water map may not be built yet)
+            CollisionPoly* poly;
+            Vec3f from;
+
+            from.x = x;
+            from.y = player->actor.world.pos.y + 1500.0f;
+            from.z = z;
+            floor = BgCheck_EntityRaycastDown1(&play->colCtx, &poly, &from);
+            if (floor <= BGCHECK_Y_MIN + 1.0f) {
+                continue;
+            }
+            (void)surface;
+        }
+        p->prop.x = x;
+        p->prop.y = floor;
+        p->prop.z = z;
+        p->prop.kind = sKindsUsed[i % ARRAY_COUNT(sKindsUsed)];
+        p->prop.yaw = seed >> 8;
+        p->prop.scale = 56 + ((seed >> 4) & 31);
+        p->prop.tint = 128;
+        p->prop.tiltX = p->prop.tiltZ = 0;
+        {
+            f32 s = p->prop.scale * (65536.0f / 64.0f);
+            s16 a = p->prop.yaw << 8;
+            s32 c = (s32)(Math_CosS(a) * s);
+            s32 sn = (s32)(Math_SinS(a) * s);
+            Mtx* mtx = &p->mtx;
+
+            MTX_SET(mtx, 0, 0, c);
+            MTX_SET(mtx, 0, 1, 0);
+            MTX_SET(mtx, 0, 2, -sn);
+            MTX_SET(mtx, 0, 3, 0);
+            MTX_SET(mtx, 1, 0, 0);
+            MTX_SET(mtx, 1, 1, (s32)s);
+            MTX_SET(mtx, 1, 2, 0);
+            MTX_SET(mtx, 1, 3, 0);
+            MTX_SET(mtx, 2, 0, sn);
+            MTX_SET(mtx, 2, 1, 0);
+            MTX_SET(mtx, 2, 2, c);
+            MTX_SET(mtx, 2, 3, 0);
+            mtx->intPart[3][0] = p->prop.x;
+            mtx->intPart[3][1] = p->prop.y;
+            mtx->intPart[3][2] = p->prop.z;
+            mtx->intPart[3][3] = 1;
+            mtx->fracPart[3][0] = mtx->fracPart[3][1] = mtx->fracPart[3][2] = mtx->fracPart[3][3] = 0;
+        }
+        sStressPlantCount++;
+    }
+    osWritebackDCache(sStressPlants, sStressPlantCount * sizeof(StressPlant));
+}
+
+void EnFishmod_StressPlantsDraw(PlayState* play, s32 count) {
+    u32 light[3];
+    s32 lastKind = -1;
+    s32 i;
+
+    if ((sScatter == NULL) || (GET_PLAYER(play) == NULL) || (count <= 0)) {
+        return; // (none until the bench starts: Link is in place by then, and the forest is laid out ahead of him)
+    }
+    if (sStressPlants == NULL) {
+        Stress_PlacePlants(play);
+        if (sStressPlants == NULL) {
+            return;
+        }
+    }
+    {
+        EnvironmentContext* env = &play->envCtx;
+
+        for (i = 0; i < 3; i++) {
+            s32 l = play->lightCtx.ambientColor[i] + (env->dirLight1.params.dir.color[i] >> 1) +
+                    (env->dirLight2.params.dir.color[i] >> 1);
+
+            light[i] = CLAMP_MAX(l, 255);
+        }
+    }
+#if ENABLE_F3DEX3
+    sSceneLights = NULL;
+    if (SCATTER_ONE_CYCLE()) {
+        sSceneLights = LightContext_NewLights(&play->lightCtx, play->state.gfxCtx);
+        Lights_BindAll(sSceneLights, play->lightCtx.listHead, NULL);
+        sSceneLights->l.l[sSceneLights->numLights].l.col[0] = sSceneLights->l.l[sSceneLights->numLights].l.colc[0] =
+            sSceneLights->l.a.l.col[0];
+        sSceneLights->l.l[sSceneLights->numLights].l.col[1] = sSceneLights->l.l[sSceneLights->numLights].l.colc[1] =
+            sSceneLights->l.a.l.col[1];
+        sSceneLights->l.l[sSceneLights->numLights].l.col[2] = sSceneLights->l.l[sSceneLights->numLights].l.colc[2] =
+            sSceneLights->l.a.l.col[2];
+    }
+#endif
+    count = CLAMP(count, 0, sStressPlantCount);
+    gFishmodScatterDrawn = count;
+    Fishmod_DebugPrintf(3, "forest: %d of %d plants", count, sStressPlantCount);
+
+    OPEN_DISPS(play->state.gfxCtx, "fishmod_scatter.c", __LINE__);
+    {
+        Gfx* start = sStressDL[play->gameplayFrames & 1];
+        Gfx* opa = start;
+
+        s32 kind;
+
+        // kind by kind, as the scene's props are drawn (one material each), nearest first within a kind
+        for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
+            FishmodPropKindInfo* info = &sKinds[kind];
+
+            for (i = 0; i < count; i++) {
+                StressPlant* p = &sStressPlants[i];
+
+                if (p->prop.kind != kind) {
+                    continue;
+                }
+                if (kind != lastKind) {
+                    opa = Scatter_Material(opa, info, kind, TIER_NEAR);
+                    lastKind = kind;
+                }
+                opa = Scatter_PropColor(opa, TIER_NEAR, light[0], light[1], light[2], 255);
+                gSPMatrix(opa++, &p->mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+                gSPDisplayList(opa++, info->model);
+            }
+        }
+        gDPPipeSync(opa++);
+        gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+        if (SCATTER_ONE_CYCLE()) {
+            gDPSetCycleType(opa++, G_CYC_2CYCLE);
+            gSPClearGeometryMode(opa++, G_PACKED_NORMALS);
+            opa = Scatter_SceneLights(opa);
+        }
+        gSPEndDisplayList(opa++);
+        gSPDisplayList(POLY_OPA_DISP++, start);
+    }
+    CLOSE_DISPS(play->state.gfxCtx, "fishmod_scatter.c", __LINE__);
+}
+#endif

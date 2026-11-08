@@ -662,7 +662,7 @@ void Fishmod_DebugBoot(void) {
 
 /** True if the script spawns its own fish, so the fish object is needed even in scenes without fishing. */
 s32 Fishmod_DebugWantsFish(void) {
-    return false;
+    return gFishmodStress == 1; // (the fish stress bench: fish in the lab's tank)
 }
 
 s32 Fishmod_DebugNormalBoot(void) {
@@ -817,6 +817,8 @@ s32 Fishmod_DebugRosterCount(void) {
 
 #include "fishmod_debug_vrtime.inc.c" // the VR4300 timing tests (FISHMOD_VRTIME)
 
+#include "fishmod_debug_stress.inc.c" // the stress benches: fish and plants (FISHMOD_STRESS)
+
 // the script's walk: Link is steered (by the camera, as the stick works) toward a point, from frame 60 until there
 static s8 sWalkStickX;
 static s8 sWalkStickY;
@@ -914,6 +916,11 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     CodeGuard_Update();
 #endif
     Fishmod_DebugTiming();
+#ifdef FISHMOD_STRESS
+    if (sPlacedPlayer) {
+        Stress_Update(play);
+    }
+#endif
 #ifdef FISHMOD_PCPROF
     PcProf_Update();
 #endif
@@ -930,6 +937,9 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         player->actor.world.pos = player->actor.prevPos = player->actor.home.pos = sScript.startPos;
         player->actor.shape.rot.y = player->actor.world.rot.y = player->yaw = sScript.startYaw;
         sPlacedPlayer = true;
+#ifdef FISHMOD_STRESS
+        Stress_Place(play, player);
+#endif
 #ifdef FISHMOD_SCRIPT
         sScriptActive = true;
         // the same random numbers every run, so benchmark runs of different builds start alike

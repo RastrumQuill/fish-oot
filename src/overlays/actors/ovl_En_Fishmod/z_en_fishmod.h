@@ -260,6 +260,7 @@ s32 EnFishmod_ScatterRandomDrawnPlant(Vec3f* eye, f32 range, Vec3f* out);
 void EnFishmod_ParticlesUpdate(struct PlayState* play);
 void EnFishmod_ParticlesDraw(struct PlayState* play);
 void EnFishmod_ScatterDraw(struct PlayState* play);
+void EnFishmod_StressPlantsDraw(struct PlayState* play, s32 count); // (debug builds: the plant stress bench)
 
 s32 EnFishmod_FindWaterPoint(struct PlayState* play, Vec3f* center, f32 radius, f32 minDepth, Vec3f* out,
                              f32* outSurface, f32* outFloor);

@@ -17,6 +17,7 @@ controls.
 | qol4 (test build) | `fish-oot-qol4-testmode.bps`, `-hw-testmode` | [notes](notes-qol4.md): the D-pad always shown; memset and matrix speedups; occlusion plane and bed cards off |
 | fishopt1 (bench) | `fish-oot-fishopt1-hw.bps` | [notes](notes-fishopt1.md): the play bench on the cheaper fish update (and the memset and matrix fixes) |
 | qol5 (test build) | `fish-oot-qol5-testmode.bps`, `-hw-testmode` | [notes](notes-qol5.md): clear a C button by pressing it again; the D-pad hides when empty; the cheaper fish update |
+| stress1 (bench) | `fish-oot-stress-fish1-hw.bps`, `fish-oot-stress-plants1-hw.bps` | [notes](notes-stress1.md): how many fish, and how many plants on screen, hold 20 fps |
 | vrtime1 (timing tests) | `fish-oot-vrtime1-hw.bps` | [notes](notes-vrtime1.md): the VR4300 timing tests, console |
 | pcprof1 (profile build) | `fish-oot-pcprof1-hw.bps` | [notes](notes-pcprof1.md): the PC-sampling compiler profile, console |
 | refactor1 (test build) | `fish-oot-refactor1.bps`, `-hw`, `-testmode`, `-hw-testmode` | [notes](notes-refactor1.md): the refactored game; the rod in any scene, saves with a version mark |

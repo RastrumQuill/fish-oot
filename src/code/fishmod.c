@@ -85,6 +85,11 @@ FishmodRodInfo gFishmodRodInfo;
 const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId) {
     s32 i;
 
+#if FISHMOD_DEBUG
+    if ((gFishmodStress == 1) && (sceneId == SCENE_LAKESIDE_LABORATORY)) {
+        sceneId = SCENE_LAKE_HYLIA; // the fish stress bench: Lake Hylia's fish in the lab's tank
+    }
+#endif
     for (i = 0; i < gFishmodSceneSpawnsCount; i++) {
         if (gFishmodSceneSpawns[i].sceneId == sceneId) {
             return &gFishmodSceneSpawns[i];
