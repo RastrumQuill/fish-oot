@@ -805,6 +805,8 @@ s32 Fishmod_DebugRosterCount(void) {
 
 #include "fishmod_debug_playlog.inc.c" // the play log (FISHMOD_PLAYLOG)
 
+#include "fishmod_debug_pcprof.inc.c" // the PC-sampling profiler (FISHMOD_PCPROF)
+
 // the script's walk: Link is steered (by the camera, as the stick works) toward a point, from frame 60 until there
 static s8 sWalkStickX;
 static s8 sWalkStickY;
@@ -900,6 +902,9 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     Watchdog_Start();
 #endif
     Fishmod_DebugTiming();
+#ifdef FISHMOD_PCPROF
+    PcProf_Update();
+#endif
 #ifdef FISHMOD_PLAYLOG
     Fishmod_PlayLog(play);
 #endif

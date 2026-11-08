@@ -258,10 +258,16 @@ static void Bench_SetMode(s32 mode) {
         FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI | FISHMOD_BENCH_NOROOMXLU |
             FISHMOD_BENCH_NOSKY,
     };
+#ifdef FISHMOD_PCPROF
+    mode = 0; // the profile wants the game as shipped on every pass
+#endif
     gFishmodBench = sFlags[mode];
 }
 
 static void Bench_Save(void) {
+#ifdef FISHMOD_PCPROF
+    return; // (the profile has the save's space)
+#endif
     sBench.magic = 0x4642454E; // 'FBEN'
     sBench.version = BENCH_VERSION;
     sBench.stops = BENCH_STOPS;

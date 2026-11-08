@@ -6,6 +6,11 @@ u32 __osBaseCounter;
 u32 __osViIntrCount;
 u32 __osTimerCounter;
 OSTimer* __osTimerList = &__osBaseTimer;
+#if FISHMOD_DEBUG
+// fish-oot debug builds: called (interrupts off) for each timer as it fires, before it's sent and set again; the
+// PC-sampling profiler reads the interrupted thread's PC here (fishmod_debug_pcprof.inc.c)
+void (*gFishmodTimerHook)(OSTimer* timer);
+#endif
 
 void __osTimerServicesInit(void) {
     __osCurrentTime = 0;
@@ -47,6 +52,11 @@ void __osTimerInterrupt(void) {
         timer->next->prev = timer->prev;
         timer->next = NULL;
         timer->prev = NULL;
+#if FISHMOD_DEBUG
+        if (gFishmodTimerHook != NULL) {
+            gFishmodTimerHook(timer);
+        }
+#endif
         if (timer->mq != NULL) {
             osSendMesg(timer->mq, timer->msg, OS_MESG_NOBLOCK);
         }
