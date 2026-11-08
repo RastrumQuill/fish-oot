@@ -15,7 +15,11 @@
 #endif
 #define BENCH_ROUNDS 1
 #define BENCH_MICRO_FRAMES 30
+#ifdef FISHMOD_BENCH_FOURWAY
+#define BENCH_VERSION 9 // the four-way set: occlusion plane x bed cards
+#else
 #define BENCH_VERSION 8
+#endif
 #define BENCH_CONDS 8 // the times of day (4) x clear or rain
 #ifndef FISHMOD_BENCH_LAPS
 #define FISHMOD_BENCH_LAPS 15 // then it stops and says so
@@ -247,6 +251,20 @@ static void Bench_Breadcrumb(s32 stop, s32 mode, s32 block) {
 }
 
 static void Bench_SetMode(s32 mode) {
+#ifdef FISHMOD_BENCH_FOURWAY
+    // the occlusion plane and the bed cards, each on and off, and three references
+    static const s32 sFlags[BENCH_MODES] = {
+        0, // the first pass along the leg (fish waking as Link arrives)
+        0, // both on (as shipped)
+        FISHMOD_BENCH_NOOCC,
+        FISHMOD_BENCH_NOBEDCARD,
+        FISHMOD_BENCH_NOOCC | FISHMOD_BENCH_NOBEDCARD,
+        FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI,
+        FISHMOD_BENCH_NOPROPS,
+        FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI | FISHMOD_BENCH_NOROOMXLU |
+            FISHMOD_BENCH_NOSKY,
+    };
+#else
     static const s32 sFlags[BENCH_MODES] = {
         0, // the first pass along the leg (fish waking as Link arrives)
         0,
@@ -258,6 +276,7 @@ static void Bench_SetMode(s32 mode) {
         FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOFISHAI | FISHMOD_BENCH_NOROOMXLU |
             FISHMOD_BENCH_NOSKY,
     };
+#endif
 #ifdef FISHMOD_PCPROF
     mode = 0; // the profile wants the game as shipped on every pass
 #endif

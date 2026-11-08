@@ -24,11 +24,15 @@ MODES_V = {
     6: ["base", "nosway", "mtxonly", "nomoss", "nonear", "nofar", "noprops", "nosky"],
     7: ["base", "fishfrozen", "nofishdraw", "nofish", "noprops", "nowater", "noskyonly", "bare"],  # roaming
     8: ["fresh", "base", "fishfrozen", "nofishdraw", "nofish", "noprops", "nowater", "bare"],  # Link plays
+    9: ["fresh", "base", "noocc", "nobedcard", "neither", "nofish", "noprops", "bare"],  # the four-way set
 }
 CONDS = ["clear dawn", "clear midday", "clear dusk", "clear night", "rain dawn", "rain midday", "rain dusk",
          "rain night"]
 MODE_DOC = {
     "base": "as shipped",
+    "noocc": "no occlusion plane (props behind the chosen wall drawn)",
+    "nobedcard": "no bed cards (distant chunks plant by plant)",
+    "neither": "neither the occlusion plane nor the bed cards",
     "tex4": "props' textures in 4 bits (half the memory per texture load)",
     "cold": "caches filled with other data before each update (CPU work from RDRAM, not the cache)",
     "noprops": "props not drawn (what the props cost)",
