@@ -8,6 +8,7 @@ controls.
 
 | Release | Patches | Notes |
 |---|---|---|
+| fourway1 (bench) | `fish-oot-fourway1-hw.bps` | [notes](notes-fourway1.md): occlusion plane x bed cards, console |
 | vrtime1 (timing tests) | `fish-oot-vrtime1-hw.bps` | [notes](notes-vrtime1.md): the VR4300 timing tests, console |
 | pcprof1 (profile build) | `fish-oot-pcprof1-hw.bps` | [notes](notes-pcprof1.md): the PC-sampling compiler profile, console |
 | refactor1 (test build) | `fish-oot-refactor1.bps`, `-hw`, `-testmode`, `-hw-testmode` | [notes](notes-refactor1.md): the refactored game; the rod in any scene, saves with a version mark |
