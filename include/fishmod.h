@@ -503,6 +503,7 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOBEDCARD (1 << 4) // no bed cards: distant clumps drawn plant by plant
 #define FISHMOD_BENCH_NOFISH (1 << 1)
 #define FISHMOD_BENCH_ALTEDGE (1 << 2)    // the props' old edge mode (anti-aliased in the RDP, reading the colour buffer)
+#define FISHMOD_BENCH_TWOCYCLE (1 << 5)   // the props' old 2-cycle drawing (the light in the combiner's second cycle, fog in the blender's first)
 #define FISHMOD_BENCH_NOIMP (1 << 12)      // no far single cards: the whole cards out to the cutoff
 #define FISHMOD_BENCH_NOFARTEX (1 << 13)   // far props on their full-size textures
 #define FISHMOD_BENCH_NODISSOLVE (1 << 14) // the single cards pop at the cutoff instead of dissolving

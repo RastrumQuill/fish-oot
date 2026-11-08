@@ -788,10 +788,53 @@ static void Scatter_UpdateDry(PlayState* play) {
 }
 
 /** A kind's material, at the start of its props in a band. */
+/*
+ * 1-cycle props (F3DEX3 only). The 2-cycle way gave the combiner's second cycle the light (texel x vertex colour x
+ * primitive) and the blender's first the fog: 2-cycle mode, half the RDP's pixel rate. Here the light is in the vertex
+ * colour instead: the RSP lights each vertex with an ambient light of the prop's colour (F3DEX3's packed normals mode
+ * multiplies the lighting by the vertex colour, so the vertex colours stay), the combiner takes texel x shade, and the
+ * blender (forced, every pixel) the fog. The per-prop colour goes in the ambient light, not the primitive colour.
+ */
+#if ENABLE_F3DEX3
+#define SCATTER_ONE_CYCLE() (!FISHMOD_BENCH_SKIP(FISHMOD_BENCH_TWOCYCLE))
+#else
+#define SCATTER_ONE_CYCLE() 0
+#endif
+
+static Lights* sSceneLights; // this frame's scene lights (1-cycle: put back for the lit materials and after the props)
+
+/** The scene's lights again, as Lights_Draw sets them (the 1-cycle props' ambient-only light replaced them). */
+static Gfx* Scatter_SceneLights(Gfx* gfx) {
+#if ENABLE_F3DEX3
+    if (sSceneLights != NULL) {
+        gSPSetLights(gfx++, sSceneLights->numLights, sSceneLights->l);
+    }
+#endif
+    return gfx;
+}
+
+/** The prop's colour (r, g, b) and alpha: the ambient light in 1-cycle mode, the primitive colour in 2-cycle. */
+static Gfx* Scatter_PropColor(Gfx* gfx, s32 tier, u32 r, u32 g, u32 b, u32 a) {
+#if ENABLE_F3DEX3
+    if (SCATTER_ONE_CYCLE()) {
+        gSPLightColor(gfx++, LIGHT_1, (r << 24) | (g << 16) | (b << 8));
+        if (tier == TIER_IMP) {
+            gDPSetPrimColor(gfx++, 0, 0, 255, 255, 255, a); // (its alpha: the dissolve)
+        }
+        return gfx;
+    }
+#endif
+    gDPSetPrimColor(gfx++, 0, 0, r, g, b, a);
+    return gfx;
+}
+
 static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 tier) {
     gfx = Gfx_SetupDL(gfx, SETUPDL_25);
     if (info->xlu || (kind == FISHMOD_PROP_LILY_PAD)) {
         // vanilla's own materials (lit by the scene's lights, like the Fishing Pond's props)
+        if (SCATTER_ONE_CYCLE()) {
+            gfx = Scatter_SceneLights(gfx);
+        }
         gSPDisplayList(gfx++, info->material);
         return gfx;
     }
@@ -810,6 +853,24 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
 #endif
         mode = ra ? (AA_EN | Z_CMP | Z_UPD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE)
                   : (AA_EN | Z_CMP | Z_UPD | IM_RD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE);
+#if ENABLE_F3DEX3
+        if (SCATTER_ONE_CYCLE()) {
+            // the fog blended into every pixel (forced: no colour-buffer read, as the RA mode); the coverage still
+            // written for the VI to smooth the cut-out edges
+            u32 mode1 = AA_EN | Z_CMP | Z_UPD | CVG_DST_CLAMP | CVG_X_ALPHA | ALPHA_CVG_SEL | ZMODE_OPA | TEX_EDGE | FORCE_BL;
+
+            gDPSetCycleType(gfx++, G_CYC_1CYCLE);
+            if (tier == TIER_IMP) {
+                gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0,
+                                  PRIMITIVE, 0);
+                gDPSetAlphaCompare(gfx++, G_AC_DITHER);
+            } else {
+                gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0, TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0);
+            }
+            gDPSetRenderMode(gfx++, mode1 | GBL_c1(G_BL_CLR_FOG, G_BL_A_SHADE, G_BL_CLR_IN, G_BL_1MA),
+                             mode1 | GBL_c2(G_BL_CLR_FOG, G_BL_A_SHADE, G_BL_CLR_IN, G_BL_1MA));
+        } else
+#endif
         {
             if (tier == TIER_IMP) {
                 // the single card: its alpha times the primitive's (how far it has faded), against noise
@@ -827,6 +888,13 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
     }
     gSPClearGeometryMode(gfx++, G_CULL_BACK | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
     gSPSetGeometryMode(gfx++, G_FOG | G_SHADE | G_SHADING_SMOOTH);
+#if ENABLE_F3DEX3
+    if (SCATTER_ONE_CYCLE()) {
+        // lit by the ambient light alone (its colour: the prop's), times the vertex colour (packed normals mode)
+        gSPSetGeometryMode(gfx++, G_LIGHTING | G_PACKED_NORMALS);
+        gSPNumLights(gfx++, 0);
+    }
+#endif
     if (kind == FISHMOD_PROP_ROCK) {
         gSPSetGeometryMode(gfx++, G_CULL_BACK); // (solid: their far sides cost nothing)
     }
@@ -1293,6 +1361,20 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             light[i] = CLAMP_MAX(l, 255);
         }
     }
+#if ENABLE_F3DEX3
+    sSceneLights = NULL;
+    if (SCATTER_ONE_CYCLE()) {
+        // the scene's lights as the fish manager's draw had them (to put back after the 1-cycle props' own)
+        sSceneLights = LightContext_NewLights(&play->lightCtx, play->state.gfxCtx);
+        Lights_BindAll(sSceneLights, play->lightCtx.listHead, NULL);
+        sSceneLights->l.l[sSceneLights->numLights].l.col[0] = sSceneLights->l.l[sSceneLights->numLights].l.colc[0] =
+            sSceneLights->l.a.l.col[0];
+        sSceneLights->l.l[sSceneLights->numLights].l.col[1] = sSceneLights->l.l[sSceneLights->numLights].l.colc[1] =
+            sSceneLights->l.a.l.col[1];
+        sSceneLights->l.l[sSceneLights->numLights].l.col[2] = sSceneLights->l.l[sSceneLights->numLights].l.colc[2] =
+            sSceneLights->l.a.l.col[2];
+    }
+#endif
     lookX = at.x - eye.x;
     lookY = at.y - eye.y;
     lookZ = at.z - eye.z;
@@ -1403,10 +1485,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 static const u8 sStone[4][3] = { { 255, 255, 255 }, { 255, 240, 222 }, { 228, 240, 255 }, { 240, 248, 232 } };
                 const u8* c = sStone[((u32)(prop->x * 7 + prop->z * 13) >> 4) & 3];
 
-                gDPSetPrimColor(opa++, 0, 0, (t * light[0] * c[0]) >> 16, (t * light[1] * c[1]) >> 16,
-                                (t * light[2] * c[2]) >> 16, a);
+                opa = Scatter_PropColor(opa, tier, (t * light[0] * c[0]) >> 16, (t * light[1] * c[1]) >> 16,
+                                        (t * light[2] * c[2]) >> 16, a);
             } else {
-                gDPSetPrimColor(opa++, 0, 0, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
+                opa = Scatter_PropColor(opa, tier, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
             }
         }
         gSPMatrix((*disp)++, &set->mtx[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
@@ -1517,7 +1599,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         }
         for (k = FISHMOD_PROP_DOCK_DECK; k <= FISHMOD_PROP_DOCK_POSTS; k++) {
             opa = Scatter_Material(opa, &sKinds[k], k, TIER_NEAR);
-            gDPSetPrimColor(opa++, 0, 0, light[0], light[1], light[2], 255);
+            opa = Scatter_PropColor(opa, TIER_NEAR, light[0], light[1], light[2], 255);
             gSPMatrix(opa++, &sDockMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
             gSPDisplayList(opa++, sKinds[k].model);
         }
@@ -1525,6 +1607,13 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     }
     gDPPipeSync(opa++);
     gDPSetTextureLUT(opa++, G_TT_NONE); // (a 4-bit texture's palette mode off again for what's drawn next)
+    if (SCATTER_ONE_CYCLE()) {
+        // what's drawn next: the 2-cycle mode, no packed normals, and the scene's lights
+        gDPSetCycleType(opa++, G_CYC_2CYCLE);
+        gSPClearGeometryMode(opa++, G_PACKED_NORMALS);
+        opa = Scatter_SceneLights(opa);
+        xlu = Scatter_SceneLights(xlu);
+    }
     gSPEndDisplayList(opa++);
     gSPEndDisplayList(xlu++);
 #if FISHMOD_DEBUG
