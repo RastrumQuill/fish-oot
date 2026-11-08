@@ -10,6 +10,7 @@ controls.
 |---|---|---|
 | fourway1 (bench) | `fish-oot-fourway1-hw.bps` | [notes](notes-fourway1.md): occlusion plane x bed cards, console |
 | fourway2 (bench) | `fish-oot-fourway2-hw.bps` | [notes](notes-fourway2.md): fourway1 plus a code guard for its console crash |
+| qol1 (test build) | `fish-oot-qol1-testmode.bps`, `-hw-testmode` | [notes](notes-qol1.md): D-pad item buttons, equipment on buttons, hold B for text, strength speeds up pushing and casting |
 | vrtime1 (timing tests) | `fish-oot-vrtime1-hw.bps` | [notes](notes-vrtime1.md): the VR4300 timing tests, console |
 | pcprof1 (profile build) | `fish-oot-pcprof1-hw.bps` | [notes](notes-pcprof1.md): the PC-sampling compiler profile, console |
 | refactor1 (test build) | `fish-oot-refactor1.bps`, `-hw`, `-testmode`, `-hw-testmode` | [notes](notes-refactor1.md): the refactored game; the rod in any scene, saves with a version mark |

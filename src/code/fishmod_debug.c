@@ -944,6 +944,14 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             gSaveContext.save.info.inventory.items[SLOT_BOTTLE_1] = ITEM_BOTTLE_FISH;
             Fishmod_ReleaseBottleFish(play, SLOT_BOTTLE_1, &sScript.releaseAt, player->actor.shape.rot.y);
         }
+#ifdef FISHMOD_SCRIPT_DPAD
+        {
+            // the D-pad set up by the script (up, down, left, right; this age)
+            static const u8 sDpad[4] = FISHMOD_SCRIPT_DPAD;
+
+            bcopy(sDpad, FISHMOD_SAVE->dpad[gSaveContext.save.linkAge == LINK_AGE_CHILD], 4);
+        }
+#endif
         if (sScript.flags & FISHMOD_SCRIPT_F_HIVE) {
             // a beehive just in front of Link, low enough for the sword
             Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_COMB,

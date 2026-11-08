@@ -436,6 +436,14 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                         } else {
                             SFX_PLAY_CENTERED(NA_SE_SY_ERROR);
                         }
+                    } else if (CHECK_BTN_ANY(input->press.button, BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT)) {
+                        // fishmod: onto (or off) a D-pad button, at once
+                        if (CHECK_AGE_REQ_SLOT(cursorSlot) && (cursorItem != ITEM_SOLD_OUT) &&
+                            Fishmod_DpadAssign(input->press.button, cursorSlot)) {
+                            SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
+                        } else {
+                            SFX_PLAY_CENTERED(NA_SE_SY_ERROR);
+                        }
                     }
                 }
             } else {

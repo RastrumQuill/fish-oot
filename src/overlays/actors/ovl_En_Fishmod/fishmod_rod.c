@@ -792,8 +792,9 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         case ROD_STATE_WINDUP: {
             // Hold the rod's button to charge the cast, release to throw. A tap lobs it a few steps; a full
             // charge reaches about 350 units. The stick aims left/right while charging.
-            static u16 sItemButtons[] = { BTN_B, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT };
-            u16 rodButton = sItemButtons[CLAMP(player->heldItemButton, 0, 3)];
+            static u16 sItemButtons[] = { BTN_B,   BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT,
+                                          BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
+            u16 rodButton = sItemButtons[CLAMP(player->heldItemButton, 0, FISHMOD_BUTTON_MAX - 1)];
             s32 charging = CHECK_BTN_ALL(input->cur.button, rodButton) && (ROD->castPower < 1.0f + 0.5f);
 
             ROD->castYaw = -input->rel.stick_x * 60;

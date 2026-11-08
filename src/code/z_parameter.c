@@ -1260,7 +1260,7 @@ void Inventory_SwapAgeEquipment(void) {
                      (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                     PRINTF("Register_Item_Pt(%d)=%d\n", i, gSaveContext.save.info.equips.cButtonSlots[i - 1]);
                     gSaveContext.save.info.equips.buttonItems[i] =
-                        INV_SLOT(gSaveContext.save.info.equips.cButtonSlots[i - 1]);
+                        Fishmod_SlotItem(gSaveContext.save.info.equips.cButtonSlots[i - 1]); // (fishmod: or equipment)
                 }
             }
 
@@ -1293,7 +1293,7 @@ void Inventory_SwapAgeEquipment(void) {
                      (gSaveContext.save.info.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                     PRINTF("Register_Item_Pt(%d)=%d\n", i, gSaveContext.save.info.equips.cButtonSlots[i - 1]);
                     gSaveContext.save.info.equips.buttonItems[i] =
-                        INV_SLOT(gSaveContext.save.info.equips.cButtonSlots[i - 1]);
+                        Fishmod_SlotItem(gSaveContext.save.info.equips.cButtonSlots[i - 1]); // (fishmod: or equipment)
                 }
             }
 
@@ -2095,6 +2095,10 @@ s32 Inventory_HasSpecificBottle(u8 bottleItem) {
 }
 
 void Inventory_UpdateBottleItem(PlayState* play, u8 item, u8 button) {
+    if (button >= FISHMOD_BUTTON_DPAD) {
+        Fishmod_DpadUpdateBottle(play, item, button); // fishmod: a D-pad button
+        return;
+    }
     PRINTF("item_no=%x,  c_no=%x,  Pt=%x  Item_Register=%x\n", item, button,
            gSaveContext.save.info.equips.cButtonSlots[button - 1],
            INV_SLOT(gSaveContext.save.info.equips.cButtonSlots[button - 1]));
@@ -3429,6 +3433,8 @@ void Interface_Draw(PlayState* play) {
                               PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
             Interface_DrawAmmoCount(play, 3, interfaceCtx->cRightAlpha);
         }
+
+        Fishmod_DpadDraw(play); // fishmod: the D-pad's items
 
         // A Button
         Gfx_SetupDL_42Overlay(play->state.gfxCtx);

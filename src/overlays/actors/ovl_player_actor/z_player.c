@@ -1688,7 +1688,8 @@ static LinkAnimationHeader* D_80854378[] = {
 static u8 D_80854380[2] = { PLAYER_MWA_SPIN_ATTACK_1H, PLAYER_MWA_SPIN_ATTACK_2H };
 static u8 D_80854384[2] = { PLAYER_MWA_BIG_SPIN_1H, PLAYER_MWA_BIG_SPIN_2H };
 
-static u16 sItemButtons[] = { BTN_B, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT };
+// fishmod: and the D-pad (buttons 4-7: Fishmod_DpadItem)
+static u16 sItemButtons[] = { BTN_B, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
 
 static u8 sMagicSpellCosts[] = { 12, 24, 24, 12, 24, 12 };
 
@@ -2625,9 +2626,23 @@ s32 Player_ItemIsItemAction(s32 item1, s32 itemAction) {
     }
 }
 
+/** fishmod: whether an item on the D-pad (whether or not it works now) is this action: what's on it isn't put away. */
+static s32 Player_DpadHasItemAction(s32 itemAction) {
+    s32 b;
+
+    for (b = FISHMOD_BUTTON_DPAD; b < FISHMOD_BUTTON_MAX; b++) {
+        if (Player_ItemIsItemAction(Fishmod_SlotItem(Fishmod_ButtonSlot(b)), itemAction)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 s32 Player_GetItemOnButton(PlayState* play, s32 index) {
-    if (index >= 4) {
+    if (index >= FISHMOD_BUTTON_MAX) {
         return ITEM_NONE;
+    } else if (index >= FISHMOD_BUTTON_DPAD) {
+        return (play->bombchuBowlingStatus != 0) ? ITEM_NONE : Fishmod_DpadItem(play, index);
     } else if (play->bombchuBowlingStatus != 0) {
         return (play->bombchuBowlingStatus > 0) ? ITEM_BOMBCHU : ITEM_NONE;
     } else if (index == 0) {
@@ -2660,7 +2675,7 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
 
         if (!Player_ItemIsItemAction(C_BTN_ITEM(0), maskItemAction) &&
             !Player_ItemIsItemAction(C_BTN_ITEM(1), maskItemAction) &&
-            !Player_ItemIsItemAction(C_BTN_ITEM(2), maskItemAction)) {
+            !Player_ItemIsItemAction(C_BTN_ITEM(2), maskItemAction) && !Player_DpadHasItemAction(maskItemAction)) {
             this->currentMask = PLAYER_MASK_NONE;
         }
     }
@@ -2668,7 +2683,8 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
     if (!(this->stateFlags1 & (PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_29)) && !func_8008F128(this)) {
         if (this->itemAction >= PLAYER_IA_FISHING_POLE) {
             if (!Player_ItemIsInUse(this, B_BTN_ITEM) && !Player_ItemIsInUse(this, C_BTN_ITEM(0)) &&
-                !Player_ItemIsInUse(this, C_BTN_ITEM(1)) && !Player_ItemIsInUse(this, C_BTN_ITEM(2))) {
+                !Player_ItemIsInUse(this, C_BTN_ITEM(1)) && !Player_ItemIsInUse(this, C_BTN_ITEM(2)) &&
+                !Player_DpadHasItemAction(this->itemAction)) {
                 Player_UseItem(play, this, ITEM_NONE);
                 return;
             }
@@ -2694,6 +2710,9 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
             if ((item < ITEM_NONE_FE) && (Player_ItemToItemAction(item) == this->heldItemAction)) {
                 sHeldItemButtonIsHeldDown = true;
             }
+        } else if ((i >= 1) && Fishmod_IsEquipItem(item)) {
+            // fishmod: equipment on a C or D-pad button is put on, not held
+            Fishmod_EquipItem(play, item);
         } else {
             this->heldItemButton = i;
             Player_UseItem(play, this, item);
@@ -14133,7 +14152,7 @@ void Player_Action_SwingBottle(Player* this, PlayState* play) {
 
                     Player_UpdateBottleHeld(play, this, catchInfo->itemId, ABS(catchInfo->itemAction));
                     Fishmod_OnBottleCatch(catchInfo->actorId,
-                                          gSaveContext.save.info.equips.cButtonSlots[this->heldItemButton - 1]);
+                                          Fishmod_ButtonSlot(this->heldItemButton));
                     Player_AnimPlayOnceAdjusted(play, this, swingEntry->catchAnimation);
                     Player_SetTurnAroundCamera(play, CAM_ITEM_TYPE_4);
                 }
@@ -14194,7 +14213,7 @@ void Player_Action_8084EFC0(Player* this, PlayState* play) {
         dropPos.z = (Math_CosS(this->actor.shape.rot.y) * 5.0f) + this->leftHandPos.z;
         // fishmod: a bottled fish poured into water goes back in as the fish it was
         if ((dropInfo->actorId != ACTOR_EN_FISH) ||
-            !Fishmod_ReleaseBottleFish(play, gSaveContext.save.info.equips.cButtonSlots[this->heldItemButton - 1],
+            !Fishmod_ReleaseBottleFish(play, Fishmod_ButtonSlot(this->heldItemButton),
                                        &dropPos, this->actor.shape.rot.y)) {
             Actor_Spawn(&play->actorCtx, play, dropInfo->actorId, dropPos.x, dropPos.y, dropPos.z, 0x4000,
                         this->actor.shape.rot.y, 0, dropInfo->actorParams);

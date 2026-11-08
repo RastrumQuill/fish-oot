@@ -391,7 +391,7 @@ s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
         return true;
     }
     gFishmodRodInfo.baitRequest = bait;
-    if ((button >= 1) && (button <= 3)) {
+    if ((button >= 1) && (button < FISHMOD_BUTTON_MAX)) {
         Inventory_UpdateBottleItem(play, next, button); // the bottle on the button that was pressed
     } else {
         Inventory_ReplaceItem(play, item, next);
@@ -938,7 +938,7 @@ static_assert((FISHMOD_SAVE_SCENE - FISHMOD_SAVE_OLD_SCENE) * sizeof(SavedSceneF
 static_assert(FISHMOD_SAVE_SCENE * sizeof(SavedSceneFlags) + sizeof(FishmodSaveData) <=
                   sizeof(gSaveContext.save.info.sceneFlags),
               "the save block doesn't fit in the scene flags");
-static_assert(sizeof(FishmodSaveData) == 0xAE, "the save block's layout changed: bump FISHMOD_SAVE_VERSION");
+static_assert(sizeof(FishmodSaveData) == 0xB2, "the save block's layout changed: bump FISHMOD_SAVE_VERSION");
 static_assert(FISHMOD_SPECIES_MAX <= FISHMOD_SAVE_SPECIES_MAX, "more species than the save keeps records for");
 
 /**
@@ -968,9 +968,7 @@ void Fishmod_InitSaveExtras(void) {
     }
     if (!(save->flags & FISHMOD_SAVE_FLAG_DPAD)) {
         // the D-pad's buttons, empty (a new file, or one from before them)
-        for (i = 0; i < ARRAY_COUNT(FISHMOD_SAVE->dpad); i++) {
-            FISHMOD_SAVE->dpad[i] = SLOT_NONE;
-        }
+        memset(FISHMOD_SAVE->dpad, SLOT_NONE, sizeof(FISHMOD_SAVE->dpad));
         FISHMOD_SAVE->flags |= FISHMOD_SAVE_FLAG_DPAD;
     }
     save->version = FISHMOD_SAVE_VERSION;

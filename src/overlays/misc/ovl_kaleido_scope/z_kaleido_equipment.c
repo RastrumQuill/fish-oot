@@ -1,4 +1,5 @@
 #include "z_kaleido_scope.h"
+#include "fishmod.h"
 
 #include "controller.h"
 #include "gfx.h"
@@ -580,6 +581,37 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                 sEquipTimer = 10;
             } else {
                 SFX_PLAY_CENTERED(NA_SE_SY_ERROR);
+            }
+        }
+
+        // fishmod: equipment onto a C or D-pad button (pressing it there equips it)
+        if ((pauseCtx->cursorSpecialPos == 0) && (cursorItem != PAUSE_ITEM_NONE) &&
+            (pauseCtx->state == PAUSE_STATE_MAIN) && (pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) &&
+            (pauseCtx->cursorX[PAUSE_EQUIP] != EQUIP_CURSOR_X_UPG) &&
+            CHECK_BTN_ANY(input->press.button,
+                          BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT)) {
+            s32 slot = FISHMOD_EQUIP_SLOT(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
+
+            if (!CHECK_AGE_REQ_EQUIP(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP])) {
+                SFX_PLAY_CENTERED(NA_SE_SY_ERROR);
+            } else if (Fishmod_DpadAssign(input->press.button, slot)) {
+                SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
+            } else {
+                s32 c = CHECK_BTN_ALL(input->press.button, BTN_CLEFT)   ? 0
+                        : CHECK_BTN_ALL(input->press.button, BTN_CDOWN) ? 1
+                                                                          : 2;
+                s32 j;
+
+                for (j = 0; j < 3; j++) {
+                    if ((j != c) && (gSaveContext.save.info.equips.cButtonSlots[j] == slot)) {
+                        gSaveContext.save.info.equips.cButtonSlots[j] = SLOT_NONE;
+                        gSaveContext.save.info.equips.buttonItems[j + 1] = ITEM_NONE;
+                    }
+                }
+                gSaveContext.save.info.equips.cButtonSlots[c] = slot;
+                gSaveContext.save.info.equips.buttonItems[c + 1] = Fishmod_SlotItem(slot);
+                Interface_LoadItemIcon1(play, c + 1);
+                SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
             }
         }
 

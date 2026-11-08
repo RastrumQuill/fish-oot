@@ -255,9 +255,10 @@ typedef struct FishmodSaveData {
     /* 0x84 */ u8 baitCount[FISHMOD_BAIT_SLOTS];  // the bait pouch
     /* 0x8C */ FishmodBottleFish bottleFish[6];    // per bottle (FISHMOD_BOTTLE_INDEX)
     /* 0xA4 */ u8 items[6];                         // the item page's slots past the vanilla 24 (INV_SLOT)
-    /* 0xAA */ u8 dpad[4];                          // the D-pad's buttons (up, down, left, right): a slot as the C
-                                                    // buttons keep one, FISHMOD_SLOT_EQUIP + n, or SLOT_NONE
-} FishmodSaveData; // size = 0xAE
+    /* 0xAA */ u8 dpad[2][4]; // the D-pad's buttons (up, down, left, right) for each age (LINK_AGE_ADULT, _CHILD, as
+                              // the C buttons have one set each): a slot as the C buttons keep one, an equipment
+                              // mark (FISHMOD_SLOT_EQUIP), or SLOT_NONE
+} FishmodSaveData; // size = 0xB2
 
 // FishmodSaveData.flags
 #define FISHMOD_SAVE_FLAG_ITEMS (1 << 0) // items[] set up (a save from before has zeros there, the Deku Stick's id)
@@ -315,8 +316,23 @@ u8* Fishmod_InvSlot(s32 slot);
 
 // A C or D-pad button can hold a piece of equipment (a sword, shield, tunic or boots): its slot is this mark plus the
 // equipment item's place after ITEM_SWORD_KOKIRI (fishmod_items.c: pressing it equips it)
+// An equipment button (C or D-pad): FISHMOD_SLOT_EQUIP + type * 4 + value (EQUIP_TYPE_*, EQUIP_VALUE_* 1-3); its item
+// is ITEM_SWORD_KOKIRI + type * 3 + value - 1
 #define FISHMOD_SLOT_EQUIP 0x80
-#define FISHMOD_IS_EQUIP_SLOT(slot) (((slot) >= FISHMOD_SLOT_EQUIP) && ((slot) < SLOT_NONE))
+#define FISHMOD_IS_EQUIP_SLOT(slot) (((slot) >= FISHMOD_SLOT_EQUIP) && ((slot) < FISHMOD_SLOT_EQUIP + 16))
+#define FISHMOD_EQUIP_SLOT(type, value) (FISHMOD_SLOT_EQUIP + (type) * 4 + (value))
+
+// Item buttons: 0 B, 1-3 the C buttons, 4-7 the D-pad (up, down, left, right)
+#define FISHMOD_BUTTON_DPAD 4
+#define FISHMOD_BUTTON_MAX 8
+u8 Fishmod_ButtonSlot(s32 button);
+u8 Fishmod_SlotItem(s32 slot);
+s32 Fishmod_DpadItem(struct PlayState* play, s32 button);
+s32 Fishmod_IsEquipItem(s32 item);
+s32 Fishmod_EquipItem(struct PlayState* play, s32 item);
+void Fishmod_DpadUpdateBottle(struct PlayState* play, u8 item, s32 button);
+s32 Fishmod_DpadAssign(u16 press, s32 slot);
+void Fishmod_DpadDraw(struct PlayState* play);
 
 // Bottles: six, numbered 0-5 (bottles 1-4 are the vanilla slots, 5 and 6 the new ones)
 #define FISHMOD_BOTTLES 6
