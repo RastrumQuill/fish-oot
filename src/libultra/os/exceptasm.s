@@ -276,6 +276,13 @@ IP7_Hdlr:
 counter:
     MFC0(   t1, C0_COMPARE)
     MTC0(   t1, C0_COMPARE)
+#if FISHMOD_DEBUG
+    /* fish-oot debug builds: where the interrupted thread was (the timers run later, in the VI manager's thread),
+       for the PC-sampling profiler (timerintr.c) */
+    lw      t2, THREAD_PC(k0)
+    la      t3, gFishmodCounterPc
+    sw      t2, (t3)
+#endif
     /* Post counter message */
     li      a0, MESG(OS_EVENT_COUNTER)
     jal     send_mesg

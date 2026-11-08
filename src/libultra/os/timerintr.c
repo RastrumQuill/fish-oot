@@ -10,6 +10,9 @@ OSTimer* __osTimerList = &__osBaseTimer;
 // fish-oot debug builds: called (interrupts off) for each timer as it fires, before it's sent and set again; the
 // PC-sampling profiler reads the interrupted thread's PC here (fishmod_debug_pcprof.inc.c)
 void (*gFishmodTimerHook)(OSTimer* timer);
+// the PC the last counter interrupt came in at (exceptasm.s): the timers themselves run later, in the VI manager's
+// thread, so its own saved PC would always be in osRecvMesg
+u32 gFishmodCounterPc;
 #endif
 
 void __osTimerServicesInit(void) {

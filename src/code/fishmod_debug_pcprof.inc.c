@@ -20,16 +20,20 @@
 #define PCPROF_SAVE_SECONDS 30
 
 extern void (*gFishmodTimerHook)(OSTimer* timer);
+extern u32 gFishmodCounterPc; // where the counter interrupt came in (exceptasm.s)
 extern char _codeSegmentEnd[];
 
 static N64ProfEntry* sPcTable;
 static u8* sPcOut;
 static OSTimer sPcTimer;
 
-/** The timer hook (interrupts off, the interrupted thread's registers saved): one sample. */
+/**
+ * The timer hook: one sample. libultra runs its timers in the VI manager's thread after the counter interrupt has
+ * posted a message, so the PC is the one the exception handler saw (exceptasm.s keeps it), not the running thread's.
+ */
 static void PcProf_Hook(OSTimer* timer) {
     if (timer == &sPcTimer) {
-        n64prof_sample(__osRunningThread->context.pc);
+        n64prof_sample(gFishmodCounterPc);
         timer->interval = n64prof_next_interval();
     }
 }

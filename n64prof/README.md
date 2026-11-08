@@ -24,10 +24,14 @@ misses per instruction; run the same program and input on both and compare (`n64
    overlays).
 3. Call `n64prof_sample(pc)` from a timer interrupt with the interrupted PC, and set the timer's next interval to
    `n64prof_next_interval()`.
-   - **libultra:** in `__osTimerInterrupt` (`src/libultra/os/timerintr.c` in the decomps), call a hook for each timer
-     as it fires, before it is set again; the hook passes `__osRunningThread->context.pc` (the exception handler has
-     saved the interrupted thread's registers by then) and sets `timer->interval`. Start it with
-     `osSetTimer(&timer, interval, interval, NULL, NULL)`. fish-oot's glue: `src/code/fishmod_debug_pcprof.inc.c`.
+   - **libultra:** the counter interrupt doesn't run the timers: it posts a message, and the VI manager's thread
+     runs them later (`__osTimerInterrupt`). So keep the interrupted PC in the exception handler: at `counter:` in
+     `exceptasm.s`, store `THREAD_PC(k0)` (the interrupted thread's saved PC) to a global. Then in
+     `__osTimerInterrupt` (`timerintr.c`) call a hook for each timer as it fires, before it is set again; the hook
+     passes that global to `n64prof_sample` and sets `timer->interval`. Start it with
+     `osSetTimer(&timer, interval, interval, NULL, NULL)`. fish-oot's glue: `src/code/fishmod_debug_pcprof.inc.c`
+     (reading `__osRunningThread->context.pc` in the hook instead gives the VI manager's own PC: always
+     `osRecvMesg`).
    - **libdragon:** a timer callback runs in interrupt context; read the interrupted PC from the saved exception
      frame (`reg_block_t`'s `epc`).
 4. If the program loads code at run time, once a frame fill `n64prof_ranges_begin()` with each loaded overlay's
