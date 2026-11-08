@@ -807,6 +807,8 @@ s32 Fishmod_DebugRosterCount(void) {
 
 #include "fishmod_debug_pcprof.inc.c" // the PC-sampling profiler (FISHMOD_PCPROF)
 
+#include "fishmod_debug_vrtime.inc.c" // the VR4300 timing tests (FISHMOD_VRTIME)
+
 // the script's walk: Link is steered (by the camera, as the stick works) toward a point, from frame 60 until there
 static s8 sWalkStickX;
 static s8 sWalkStickY;
@@ -904,6 +906,9 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     Fishmod_DebugTiming();
 #ifdef FISHMOD_PCPROF
     PcProf_Update();
+#endif
+#ifdef FISHMOD_VRTIME
+    Vrtime_Update();
 #endif
 #ifdef FISHMOD_PLAYLOG
     Fishmod_PlayLog(play);
