@@ -18,6 +18,8 @@
 #   --ido          everything with IDO, as the decompilation builds; outputs get an -ido suffix
 #   --clang        the mod's own code (src/code/fishmod*.c, the fish actor) with clang (LLVM) instead of GCC; outputs get
 #                  a -clang suffix. CLANG_EXTRA (in the environment) passes it more options
+#   --clang-opt L  (implies --clang) clang's optimisation level for the mod's code (Os, Oz, O3...; default the GCC
+#                  level, O2); outputs get it in the suffix (-clangOs)
 #   --pgo          (implies --clang) clang optimises with the console's sample profile, PGO_PROFILE (default
 #                  n64prof/profiles/oot-console2.prof; see its README); outputs get a -clang-pgo suffix
 # Uses `flips` on PATH (or FLIPS=/path/to/flips) for the release patch if there is one, else fishmod/tools/bps.py.
@@ -34,6 +36,7 @@ FLIPS="${FLIPS:-flips}"
 
 DEBUG=0
 CLANG=0
+CLANG_OPT=""
 PGO=0
 SCRIPT=""
 F3DEX3=0
@@ -54,6 +57,7 @@ while [ $# -gt 0 ]; do
         --ido) GCC="" ;;
         --clang) CLANG=1 ;;
         --pgo) CLANG=1; PGO=1 ;;
+        --clang-opt) CLANG=1; CLANG_OPT="$2"; shift ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
     shift
@@ -95,6 +99,8 @@ fi
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
+# (after the -O the Makefile gives, so it wins)
+[ -n "$CLANG_OPT" ] && export CLANG_EXTRA="-$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ "$PGO" = 1 ]; then
     PGO_PROFILE="$(realpath "${PGO_PROFILE:-n64prof/profiles/oot-console2.prof}")"
     export CLANG_EXTRA="-fprofile-sample-use=$PGO_PROFILE ${CLANG_EXTRA:-}"
@@ -176,7 +182,7 @@ elif [ "$GCC" != "O2" ]; then
     SUFFIX="$SUFFIX-gcc$GCC"
 fi
 if [ "$CLANG" = 1 ]; then
-    SUFFIX="$SUFFIX-clang"
+    SUFFIX="$SUFFIX-clang$CLANG_OPT"
 fi
 if [ "$PGO" = 1 ]; then
     SUFFIX="$SUFFIX-pgo"
