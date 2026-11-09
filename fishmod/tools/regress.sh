@@ -4,7 +4,8 @@
 # Compare two labels with fishmod/tools/state_hash.py <dir>/<label>/<script>/r.ram ...
 #
 # Usage: fishmod/tools/regress.sh <outdir> <label> [scripts...]
-#   Needs ARES (the ares binary). Builds with the test build's settings (--hw --f3dex3).
+#   Needs ARES (the ares binary). Builds with the test build's settings (--hw --f3dex3), plus REGRESS_BUILD (more
+#   build.sh options, e.g. --clang) whose outputs carry REGRESS_SUFFIX (e.g. -clang).
 set -euo pipefail
 OUT="$1"; LABEL="$2"; shift 2
 SCRIPTS=("$@")
@@ -12,8 +13,9 @@ SCRIPTS=("$@")
 cd "$(dirname "$0")/../.."
 for s in "${SCRIPTS[@]}"; do
     d="$OUT/$LABEL/$s"; mkdir -p "$d"
-    fishmod/build.sh --script "$s" --hw --f3dex3 > "$d/build.log" 2>&1 || { echo "$s: build failed"; exit 1; }
-    cp "fishmod/out/fish-oot-debug-$s-f3dex3-hw.z64" "$d/r.z64"
+    # shellcheck disable=SC2086
+    fishmod/build.sh --script "$s" --hw --f3dex3 ${REGRESS_BUILD:-} > "$d/build.log" 2>&1 || { echo "$s: build failed"; exit 1; }
+    cp "fishmod/out/fish-oot-debug-$s-f3dex3-hw${REGRESS_SUFFIX:-}.z64" "$d/r.z64"
 done
 git checkout -q -- fishmod/assets/habitat 2>/dev/null || true  # (the build regenerates these per profile)
 n=170

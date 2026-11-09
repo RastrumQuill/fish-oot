@@ -899,6 +899,13 @@ $(BUILD_DIR)/src/overlays/%.o: CFLAGS += -mno-explicit-relocs -mno-split-address
 SEG_LDFLAGS += --no-warn-mismatch
 # (files whose own rule names IDO 5.3)
 $(BUILD_DIR)/src/code/jpegutils.o $(BUILD_DIR)/src/code/jpegdecoder.o: CC := tools/fishmod_gcc_cc.sh
+# fish-oot: CLANG_MOD=1 compiles the mod's own code in the code segment (src/code/fishmod*.c) with clang (LLVM)
+# instead, the step towards LLVM's profile-guided optimisation (n64prof/profiles); CLANG_EXTRA passes more options
+# to it. Not the fish actor's overlay yet: the game's overlay loader pairs each %lo with the last %hi in the same
+# register, which clang's code doesn't keep to (tools/check_overlay_relocs.py shows where).
+ifeq ($(CLANG_MOD),1)
+$(BUILD_DIR)/src/code/fishmod.o $(BUILD_DIR)/src/code/fishmod_%.o: CC := tools/fishmod_clang_cc.sh
+endif
 endif
 
 #### Main Targets ###

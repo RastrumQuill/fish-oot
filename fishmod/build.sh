@@ -16,6 +16,8 @@
 #                  on IDO). The default is O2 (hwbench-4: CPU time 14-16% lower, no other change); --gcc Os is the other
 #                  level. Outputs get a -gccOs suffix for Os only
 #   --ido          everything with IDO, as the decompilation builds; outputs get an -ido suffix
+#   --clang        the mod's own code (src/code/fishmod*.c, the fish actor) with clang (LLVM) instead of GCC; outputs get
+#                  a -clang suffix. CLANG_EXTRA (in the environment) passes it more options
 # Uses `flips` on PATH (or FLIPS=/path/to/flips) for the release patch if there is one, else fishmod/tools/bps.py.
 set -euo pipefail
 
@@ -29,6 +31,7 @@ OUT_DIR="fishmod/out"
 FLIPS="${FLIPS:-flips}"
 
 DEBUG=0
+CLANG=0
 SCRIPT=""
 F3DEX3=0
 TESTMODE=0
@@ -46,6 +49,7 @@ while [ $# -gt 0 ]; do
         --profile) PROFILE="$2"; shift ;;
         --gcc) GCC="$2"; shift ;;
         --ido) GCC="" ;;
+        --clang) CLANG=1 ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
     shift
@@ -87,7 +91,7 @@ fi
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -134,6 +138,12 @@ python3 fishmod/tools/gen_watermap.py
 GCC_ARGS=()
 if [ -n "$GCC" ]; then
     GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC")
+    if [ "$CLANG" = 1 ]; then
+        GCC_ARGS+=(CLANG_MOD=1)
+    fi
+elif [ "$CLANG" = 1 ]; then
+    echo "error: --clang goes with the GCC build (not --ido)" >&2
+    exit 1
 fi
 make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC FISHMOD_TESTMODE=$TESTMODE \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
@@ -153,6 +163,9 @@ if [ -z "$GCC" ]; then
     SUFFIX="$SUFFIX-ido"
 elif [ "$GCC" != "O2" ]; then
     SUFFIX="$SUFFIX-gcc$GCC"
+fi
+if [ "$CLANG" = 1 ]; then
+    SUFFIX="$SUFFIX-clang"
 fi
 
 if [ "$DEBUG" = 1 ]; then
