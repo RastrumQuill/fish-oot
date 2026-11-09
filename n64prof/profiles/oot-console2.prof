@@ -1,4 +1,4 @@
-Matrix_MtxFToMtx:4303299:0
+Matrix_MtxFToMtx:4303299:21666
  4: 21666
  4.1: 14443
  4.2: 11823
@@ -12,7 +12,7 @@ Matrix_MtxFToMtx:4303299:0
  28: 385964
  29: 299111
  32: 7882
-Actor_UpdateAll:3837292:0
+Actor_UpdateAll:3837292:48069
  54.1: 48069
  55: 43426
  57: 8517
@@ -80,7 +80,7 @@ Actor_UpdateAll:3837292:0
   1: 150092
  109: Actor_SetObjectDependency:80862
   1: 80862
-EnFishmod_ScatterDraw:3550190:0
+EnFishmod_ScatterDraw:3550190:22544
  0: 22544
  1: 2396
  2: 2394
@@ -354,7 +354,7 @@ EnFishmod_ScatterDraw:3550190:0
   32: 9100
   33: 9100
   34: 4550
-SkinMatrix_MtxFMtxFMult:3441100:0
+SkinMatrix_MtxFMtxFMult:3441100:1503
  6: 1503
  7: 1502
  8: 3800
@@ -388,7 +388,7 @@ SkinMatrix_MtxFMtxFMult:3441100:0
  118: 74645
  124: 124839
  125: 38422
-BgCheck_RaycastDownStaticList:3267760:0
+BgCheck_RaycastDownStaticList:3267760:141411
  1: 141411
  7: 29676
  8: 45252
@@ -412,7 +412,7 @@ BgCheck_RaycastDownStaticList:3267760:0
  41: 75267
  44: 75265
  47: 68054
-EffectSsGRipple_DrawRipple:2646069:0
+EffectSsGRipple_DrawRipple:2646069:157597
  0: 157597
  3: 21317
  12: 176692
@@ -433,7 +433,7 @@ EffectSsGRipple_DrawRipple:2646069:0
  33: 184514
  34: 243346
  38: 271324
-EnFishmod_OcclusionPlane:2546903:0
+EnFishmod_OcclusionPlane:2546903:30221
  0: 30221
  1: 18436
  3: 1236
@@ -576,7 +576,7 @@ EnFishmod_OcclusionPlane:2546903:0
    5: 9184
    2: Occ_Finite:717
     7: 717
-CollisionPoly_GetVertices:2501456:0
+CollisionPoly_GetVertices:2501456:149244
  1: 149244
  2: 224666
  3: 140369
@@ -593,7 +593,7 @@ CollisionPoly_GetVertices:2501456:0
   1: 180991
   2: 208072
   3: 98968
-Math3D_TriChkPointParaYImpl:2146670:0
+Math3D_TriChkPointParaYImpl:2146670:285792
  0: 285792
  8: 116246
  13: 16944
@@ -637,7 +637,7 @@ Math3D_TriChkPointParaYImpl:2146670:0
   29: 59320
   33: 252349
   34: 10763
-Fishmod_DebugPlayUpdate:1975078:0
+Fishmod_DebugPlayUpdate:1975078:12423
  117: 12423
  118: 1290
  121: 2263
@@ -694,7 +694,7 @@ Fishmod_DebugPlayUpdate:1975078:0
    20: 926
    21: 1854
    22: 4632
-Actor_DrawAll:1705321:0
+Actor_DrawAll:1705321:104834
  0: 104834
  13.2: 18744
  14: 10700
@@ -733,7 +733,7 @@ Actor_DrawAll:1705321:0
  110: TitleCard_Draw:6675
   10: 3201
   2214: 3474
-Matrix_TranslateRotateZYX:1577254:0
+Matrix_TranslateRotateZYX:1577254:135198
  0: 135198
  1: 27904
  2: 45367
@@ -793,7 +793,7 @@ Matrix_TranslateRotateZYX:1577254:0
  77: 28403
  78: 27397
  80: 52174
-SkelAnime_GetFrameData:1550367:0
+SkelAnime_GetFrameData:1550367:64174
  1: 64174
  2: 45121
  3: 45011
@@ -817,7 +817,7 @@ SkelAnime_GetFrameData:1550367:0
  24.1: 20311
  24.2: 8036
  26: 16072
-BgCheck_SphVsStaticWall:1546646:0
+BgCheck_SphVsStaticWall:1546646:72277
  1: 72277
  25: 3822
  26: 31089
@@ -895,7 +895,7 @@ BgCheck_SphVsStaticWall:1546646:0
  197: 15590
  198: 15353
  200: 65099
-DynaPoly_UnsetAllInteractFlags:1419125:0
+DynaPoly_UnsetAllInteractFlags:1419125:430640
  4: 430640
  4.2: 160116
  5: 339338
@@ -906,7 +906,7 @@ DynaPoly_UnsetAllInteractFlags:1419125:0
  6: DynaPoly_GetActor:189455
   1: 173096
   5: 16359
-EnFishmod_Update:1293709:0
+EnFishmod_Update:1293709:62744
  0: 62744
  1: 37324
  5: 12022
@@ -970,7 +970,7 @@ EnFishmod_Update:1293709:0
   124: 7786
   76: EnFishmod_WaterAt:26642
    1: 26642
-Math_Atan2S:1276348:0
+Math_Atan2S:1276348:80754
  3: 80754
  4: 50270
  5: 22923
@@ -1034,7 +1034,7 @@ Math_Atan2S:1276348:0
    6: 43471
    8: 7326
    11: 10160
-CollisionPoly_CheckYIntersect:1115370:0
+CollisionPoly_CheckYIntersect:1115370:91898
  0: 91898
  6: 60529
  8: 537943
@@ -1043,7 +1043,7 @@ CollisionPoly_CheckYIntersect:1115370:0
   1: 114174
   2: 129136
   3: 132050
-BgCheck_RaycastDownDyna:1110843:0
+BgCheck_RaycastDownDyna:1110843:61346
  0: 61346
  20: 13236
  21: 19855
@@ -1066,7 +1066,7 @@ BgCheck_RaycastDownDyna:1110843:0
  71: DynaPoly_GetActor:9159
   1: DynaPoly_IsBgIdBgActor:9159
    1: 9159
-EffectSs_DrawAll:1081643:0
+EffectSs_DrawAll:1081643:7576
  0: 7576
  1: 3435
  4: 3432
@@ -1091,13 +1091,13 @@ EffectSs_DrawAll:1081643:0
  28: EffectSs_Draw:123111
   3: 59577
   4: 63534
-SkinMatrix_Vec3fMtxFMultXYZW:1078237:0
+SkinMatrix_Vec3fMtxFMultXYZW:1078237:413039
  1: 413039
  2: 255566
  3: 192949
  4: 201426
  5: 15257
-BgCheck_CheckWallImpl:847335:0
+BgCheck_CheckWallImpl:847335:122924
  1: 122924
  24: 2026
  25: 11747
@@ -1135,7 +1135,7 @@ BgCheck_CheckWallImpl:847335:0
   4: 24276
   5: 5301
   6: 66504
-Attention_FindActorInCategory:801416:0
+Attention_FindActorInCategory:801416:13013
  0: 13013
  8: 2236
  11: 64247
@@ -1154,7 +1154,7 @@ Attention_FindActorInCategory:801416:0
  45: 97116
  24: Attention_ActorIsInRange:23680
   1: 23680
-BgCheck_RaycastDownImpl:800128:0
+BgCheck_RaycastDownImpl:800128:108609
  1: 108609
  10: 9192
  11: 7698
@@ -1185,7 +1185,7 @@ BgCheck_RaycastDownImpl:800128:0
  63: 78101
  59: SurfaceType_IsSoft:85765
   1.1: 85765
-EnFishmod_UpdateSwim:782310:0
+EnFishmod_UpdateSwim:782310:45679
  0: 45679
  5: 33270
  5.1: 32101
@@ -1220,18 +1220,18 @@ EnFishmod_UpdateSwim:782310:0
  54.4: 1502
  61: 28154
  62: 23481
-Math_SinS:729224:0
+Math_SinS:729224:156858
  0: 156858
  1: 272236
  2: 300130
-Math3D_TriChkPointParaYIntersectInsideTri:727198:0
+Math3D_TriChkPointParaYIntersectInsideTri:727198:105601
  1: 105601
  2: 185977
  6: 212133
  7: 109223
  8: 5113
  12: 109151
-Actor_UpdateBgCheckInfo:712998:0
+Actor_UpdateBgCheckInfo:712998:76892
  1: 76892
  6: 13820
  7: 5560
@@ -1267,7 +1267,7 @@ Actor_UpdateBgCheckInfo:712998:0
  79: 3498
  80: 1166
  83: 133798
-BgCheck_GetWaterSurface:677156:0
+BgCheck_GetWaterSurface:677156:16163
  1: 16163
  2: 8082
  6: 20100
@@ -1286,7 +1286,7 @@ BgCheck_GetWaterSurface:677156:0
  24: 10174
  25: 30411
  30: 9505
-Actor_Draw:670196:0
+Actor_Draw:670196:10731
  0: 10731
  10: 20510
  10.1: 8114
@@ -1323,7 +1323,7 @@ Actor_Draw:670196:0
   87: 13884
   41: Actor_SetObjectDependency:61600
    1: 61600
-EffectSs_Update:643516:0
+EffectSs_Update:643516:16502
  1: 16502
  3: 137112
  4: 142808
@@ -1333,7 +1333,7 @@ EffectSs_Update:643516:0
  9: 17482
  10: 10853
  12: 13256
-BgCheck_SphVsDynaWall:625006:0
+BgCheck_SphVsDynaWall:625006:70810
  1: 70810
  10: 4805
  11: 32530
@@ -1351,7 +1351,7 @@ BgCheck_SphVsDynaWall:625006:0
  41: 21084
  42: 21084
  46: 55580
-Matrix_RotateY:611689:0
+Matrix_RotateY:611689:24014
  0: 24014
  7: 7811
  8: 11195
@@ -1376,11 +1376,11 @@ Matrix_RotateY:611689:0
  37: 5076
  59: 5110
  62: 43114
-Math_CosS:609068:0
+Math_CosS:609068:108868
  0: 108868
  1: 162775
  2: 337425
-Math3D_DistPlaneToPos:604206:0
+Math3D_DistPlaneToPos:604206:17166
  0: 17166
  3: 109857
  4: 150284
@@ -1389,7 +1389,7 @@ Math3D_DistPlaneToPos:604206:0
  13: 45898
  12: Math3D_Planef:212154
   1: 212154
-Math3D_PointDistSqToLine2D:596543:0
+Math3D_PointDistSqToLine2D:596543:11778
  0: 11778
  7: 9558
  9: 16261
@@ -1405,7 +1405,7 @@ Math3D_PointDistSqToLine2D:596543:0
  22: 28671
  23: 75607
  25: 66796
-BgCheck_GetStaticLookupIndicesFromPos:578058:0
+BgCheck_GetStaticLookupIndicesFromPos:578058:196715
  1: 196715
  2: 112441
  3: 77140
@@ -1417,7 +1417,7 @@ BgCheck_GetStaticLookupIndicesFromPos:578058:0
  19: 22396
  20: 1512
  22: 3022
-SkelAnime_DrawFlexLimbLod:567806:0
+SkelAnime_DrawFlexLimbLod:567806:41876
  2: 41876
  9: 6798
  11: 49422
@@ -1445,7 +1445,7 @@ SkelAnime_DrawFlexLimbLod:567806:0
  49: 11816
  50: 30395
  53: 38109
-SkelAnime_DrawFlexLimbOpa:566889:0
+SkelAnime_DrawFlexLimbOpa:566889:28044
  2: 28044
  13: 32109
  14: 2383
@@ -1473,7 +1473,7 @@ SkelAnime_DrawFlexLimbOpa:566889:0
  48: 5753
  49: 8526
  53: 23030
-EffectSsGRipple_Update:544885:0
+EffectSsGRipple_Update:544885:26580
  0: 26580
  5: 14247
  5.1: 54140
@@ -1488,7 +1488,7 @@ EffectSsGRipple_Update:544885:0
   14: 15028
   16: 23348
   17: 23348
-EnTite_Update:528663:0
+EnTite_Update:528663:20974
  0: 20974
  7: 5382
  9: 34347
@@ -1518,7 +1518,7 @@ EnTite_Update:528663:0
  67: 31779
  68: 20276
  69: 28794
-Matrix_Push:515280:0
+Matrix_Push:515280:28147
  0: 28147
  1: 39822
  2: 20701
@@ -1540,7 +1540,7 @@ Matrix_Push:515280:0
   22: 31978
   23: 31978
   24: 31978
-CollisionCheck_SetAC:479459:0
+CollisionCheck_SetAC:479459:61274
  0: 61274
  3: 51528
  4: 6413
@@ -1551,7 +1551,7 @@ CollisionCheck_SetAC:479459:0
  16: 64900
  20: 46833
  22: 37019
-BgCheck_GetStaticLookup:469015:0
+BgCheck_GetStaticLookup:469015:23332
  0: 23332
  7: 34998
  8: 11666
@@ -1564,12 +1564,12 @@ BgCheck_GetStaticLookup:469015:0
   4: 42136
   5: 53942
   6: 13814
-Math_Vec3f_DistXZ:426995:0
+Math_Vec3f_DistXZ:426995:90371
  1: 90371
  2: 90370
  4: 175896
  5: 70358
-EnFishmod_FishAI:423184:0
+EnFishmod_FishAI:423184:24985
  0: 24985
  6: 528
  7: 528
@@ -1626,7 +1626,7 @@ EnFishmod_FishAI:423184:0
    65: 5693
  44: Fish_Flee:3272
   8: 3272
-Matrix_Scale:418109:0
+Matrix_Scale:418109:36497
  0: 36497
  1: 8322
  3: 13223
@@ -1644,7 +1644,7 @@ Matrix_Scale:418109:0
  15: 32044
  17: 7054
  19: 39751
-SkinMatrix_SetTranslate:403840:0
+SkinMatrix_SetTranslate:403840:35632
  1: 35632
  2: 35632
  3: 35632
@@ -1661,7 +1661,7 @@ SkinMatrix_SetTranslate:403840:0
  14: 14253
  15: 14253
  17: 14253
-Math3D_SphVsSphOverlap:367806:0
+Math3D_SphVsSphOverlap:367806:7512
  4: 7512
  3: Math3D_SphVsSphOverlapCenterDist:360294
   3: 45574
@@ -1672,7 +1672,7 @@ Math3D_SphVsSphOverlap:367806:0
   10: 76103
   14: 1878
   15: 1878
-EnFishmod_ParticlesUpdate:346953:0
+EnFishmod_ParticlesUpdate:346953:2819
  0: 2819
  1: 4763
  4: 3573
@@ -1712,7 +1712,7 @@ EnFishmod_ParticlesUpdate:346953:0
   23: 815
   25: 814
   26: 814
-BgCheck_RaycastDownStatic:346623:0
+BgCheck_RaycastDownStatic:346623:83592
  1: 83592
  5: 23319
  6: 86530
@@ -1723,7 +1723,7 @@ BgCheck_RaycastDownStatic:346623:0
  20: 12550
  24: 12550
  28: 36685
-EnFishmod_SwimToward:345995:0
+EnFishmod_SwimToward:345995:31973
  0: 31973
  3: 60318
  5: 21952
@@ -1763,7 +1763,7 @@ EnFishmod_SwimToward:345995:0
    5: 1434
    6: 11335
    8: 4300
-BgCheck_CheckLineAgainstSSList:340283:0
+BgCheck_CheckLineAgainstSSList:340283:22781
  2: 22781
  12: 1019
  13: 3448
@@ -1785,7 +1785,7 @@ BgCheck_CheckLineAgainstSSList:340283:0
  52: 15532
  55: 7765
  58: 4658
-func_8002E2AC:333686:0
+func_8002E2AC:333686:51777
  0: 51777
  4: 30907
  6: 44780
@@ -1807,7 +1807,7 @@ func_8002E2AC:333686:0
  53: 24906
  49: func_8002E234:15616
   1: 15616
-EnFishmod_ManagerDraw:323471:0
+EnFishmod_ManagerDraw:323471:955
  0: 955
  4: 1162
  5: 1162
@@ -1834,7 +1834,7 @@ EnFishmod_ManagerDraw:323471:0
  93.2: 588
  94: 588
  95: 3524
-EnFishmod_WaterFloor:316836:0
+EnFishmod_WaterFloor:316836:17405
  0: 17405
  3: 43302
  5: 12259
@@ -1860,11 +1860,11 @@ EnFishmod_WaterFloor:316836:0
   45: 7090
   46: 1151
   82: 5673
-Math3D_XZInSphere:314023:0
+Math3D_XZInSphere:314023:72843
  4: 72843
  5: 71514
  6: 169666
-Room_DrawCullable:298647:0
+Room_DrawCullable:298647:5529
  23: 5529
  24: 2210
  25: 11758
@@ -1911,7 +1911,7 @@ Room_DrawCullable:298647:0
  149: 4802
  150: 2792
  156: 558
-Lights_BindAll:297956:0
+Lights_BindAll:297956:14889
  0: 14889
  1: 17990
  4: 33106
@@ -1919,7 +1919,7 @@ Lights_BindAll:297956:0
  6: 174348
  7: 8808
  9: 26424
-CollisionCheck_OC_JntSphVsJntSph:297495:0
+CollisionCheck_OC_JntSphVsJntSph:297495:44485
  1: 44485
  8: 7643
  12: 3598
@@ -1936,7 +1936,7 @@ CollisionCheck_OC_JntSphVsJntSph:297495:0
   25: 2105
   26: 701
   27: 5580
-Math_SmoothStepToF:296808:0
+Math_SmoothStepToF:296808:36985
  0: 36985
  3: 40638
  4: 17365
@@ -1949,7 +1949,7 @@ Math_SmoothStepToF:296808:0
  26: 4089
  35: 48228
  36: 4089
-EnFishmod_Shared:293462:0
+EnFishmod_Shared:293462:38403
  0: 38403
  1: 119618
  2: 13903
@@ -1964,7 +1964,7 @@ EnFishmod_Shared:293462:0
  16: 3750
  17: 17226
  20: 25070
-Play_Draw:289197:0
+Play_Draw:289197:1331
  1: 1331
  7: 9296
  8: 6223
@@ -2038,7 +2038,7 @@ Play_Draw:289197:0
  265: Play_DrawOverlayElements:13699
   5: 8563
   9: 5136
-Math_SmoothStepToS:286275:0
+Math_SmoothStepToS:286275:15908
  0: 15908
  2: 95453
  4: 25309
@@ -2054,14 +2054,14 @@ Math_SmoothStepToS:286275:0
  25: 1394
  27: 2790
  35: 2790
-Occ_Transform:284833:0
+Occ_Transform:284833:10996
  0: 10996
  1: 66294
  2: 71472
  3: 67286
  4: 63449
  5: 5336
-DynaPoly_UpdateContext:281586:0
+DynaPoly_UpdateContext:281586:60076
  0: 60076
  8.3: 16557
  12.2: 25490
@@ -2086,7 +2086,7 @@ DynaPoly_UpdateContext:281586:0
  20: BgActor_Initialize:22072
   3: ScaleRotPos_Initialize:22072
    1: 22072
-EffectSsBubble_Draw:280850:0
+EffectSsBubble_Draw:280850:22195
  0: 22195
  2: 26859
  7: 22419
@@ -2099,13 +2099,13 @@ EffectSsBubble_Draw:280850:0
  14.1: 18749
  15.3: 48702
  18.3: 8438
-Matrix_MultVec3f:280289:0
+Matrix_MultVec3f:280289:10788
  1: 10788
  3: 118814
  4: 74509
  5: 74914
  6: 1264
-BgCheck_CheckLineImpl:279653:0
+BgCheck_CheckLineImpl:279653:49036
  2: 49036
  3: 1396
  10: 10504
@@ -2154,10 +2154,10 @@ BgCheck_CheckLineImpl:279653:0
   4: 2130
   5: 1065
   6: 12124
-Lib_MemSet:272171:0
+Lib_MemSet:272171:163303
  4: 163303
  6: 108868
-EffectSs_UpdateAll:268680:0
+EffectSs_UpdateAll:268680:8595
  3: 8595
  3.2: 87385
  4: 85936
@@ -2167,7 +2167,7 @@ EffectSs_UpdateAll:268680:0
  12: 4280
  13: 8595
  16: 10891
-CollisionCheck_SetOC:266464:0
+CollisionCheck_SetOC:266464:13454
  0: 13454
  3: 12660
  9: 24329
@@ -2177,7 +2177,7 @@ CollisionCheck_SetOC:266464:0
  18: 20468
  22: 40252
  24: 50029
-SkelAnime_LoopFull:254225:0
+SkelAnime_LoopFull:254225:16796
  0: 16796
  1: 126821
  3: 47276
@@ -2187,7 +2187,7 @@ SkelAnime_LoopFull:254225:0
  7: 7812
  9: 3656
  11: 4876
-BgCheck_PosInStaticBoundingBox:251098:0
+BgCheck_PosInStaticBoundingBox:251098:97011
  1: 97011
  1.1: 26787
  2: 17640
@@ -2197,7 +2197,7 @@ BgCheck_PosInStaticBoundingBox:251098:0
  5: 24674
  6: 9218
  10: 3180
-CollisionPoly_LineVsPoly:248503:0
+CollisionPoly_LineVsPoly:248503:40341
  1: 40341
  8: 28787
  9: 3456
@@ -2210,7 +2210,7 @@ CollisionPoly_LineVsPoly:248503:0
  18.3: 2910
  19: 1455
  37: 11411
-DynaPoly_AddBgActorToLookup:244130:0
+DynaPoly_AddBgActorToLookup:244130:8330
  0: 8330
  1: 18093
  26: 7230
@@ -2245,7 +2245,7 @@ DynaPoly_AddBgActorToLookup:244130:0
   4: SSNode_SetValue:3376
    1: 1688
    2: 1688
-Matrix_SetTranslateRotateYXZ:234434:0
+Matrix_SetTranslateRotateYXZ:234434:55990
  0: 55990
  1: 9332
  2: 13666
@@ -2273,13 +2273,13 @@ Matrix_SetTranslateRotateYXZ:234434:0
  36: 11106
  54: 3702
  56: 21848
-Lights_Draw:229463:0
+Lights_Draw:229463:20412
  8: 20412
  10: 20916
  12: 107162
  13: 76001
  34: 4972
-Particles_Matrix:226572:0
+Particles_Matrix:226572:7290
  0: 7290
  1: 3696
  5: 25808
@@ -2310,7 +2310,7 @@ Particles_Matrix:226572:0
   4: 4266
  13: Particles_Set:2796
   3: 2796
-BgCheck_CheckLineAgainstDyna:225930:0
+BgCheck_CheckLineAgainstDyna:225930:15437
  2: 15437
  5: 4075
  10: 13797
@@ -2327,7 +2327,7 @@ BgCheck_CheckLineAgainstDyna:225930:0
  18: 1144
  20: 4075
  32: 4714
-SkelAnime_AnimateFrame:224686:0
+SkelAnime_AnimateFrame:224686:29587
  0: 29587
  3: 67812
  4: 34560
@@ -2338,7 +2338,7 @@ SkelAnime_AnimateFrame:224686:0
  15: 26402
  16: 11091
  26: 25196
-Camera_Update:223000:0
+Camera_Update:223000:1439
  0: 1439
  17: 3988
  23: 4317
@@ -2394,11 +2394,11 @@ Camera_Update:223000:0
   2: 2975
  133: Camera_UpdateInterface:3405
   34: 3405
-Math_Vec3f_Yaw:222671:0
+Math_Vec3f_Yaw:222671:83490
  1: 83490
  2: 83490
  4: 55691
-EnCrow_Update:217743:0
+EnCrow_Update:217743:5762
  6: 5762
  7: 11523
  8: 14313
@@ -2422,7 +2422,7 @@ EnCrow_Update:217743:0
  44: 6111
  44.1: 16224
  47: 7054
-Interface_Draw:215898:0
+Interface_Draw:215898:1980
  23: 1980
  33: 6664
  34: 5900
@@ -2485,7 +2485,7 @@ Interface_Draw:215898:0
  264: func_8008A994:5375
   1: 3840
   2: 1535
-CollisionCheck_OC:213265:0
+CollisionCheck_OC:213265:2219
  6: 2219
  9: 15746
  9.2: 27073
@@ -2498,7 +2498,7 @@ CollisionCheck_OC:213265:0
   1.2: 4436
  10: CollisionCheck_SkipOC:24951
   1.2: 24951
-Math3D_SphVsCylOverlapCenterDist:201203:0
+Math3D_SphVsCylOverlapCenterDist:201203:16470
  12: 16470
  12.1: 16469
  14: 9231
@@ -2512,7 +2512,7 @@ Math3D_SphVsCylOverlapCenterDist:201203:0
  23: 14821
  24: 33191
  25: 29220
-EnTite_Idle:196891:0
+EnTite_Idle:196891:14040
  0: 14040
  1: 10528
  2: 63338
@@ -2526,11 +2526,11 @@ EnTite_Idle:196891:0
  18: 10639
  19: 10986
  23: 27463
-CollisionCheck_ResetDamage:195931:0
+CollisionCheck_ResetDamage:195931:6999
  1: 6999
  5: 94466
  6: 94466
-Scatter_Material:195146:0
+Scatter_Material:195146:6968
  0: 6968
  1: 4180
  2: 9762
@@ -2552,7 +2552,7 @@ Scatter_Material:195146:0
  45: 10914
  47: 5416
  50: 6008
-Actor_CullingVolumeTest:190303:0
+Actor_CullingVolumeTest:190303:4804
  0: 4804
  3: 28824
  3.1: 18397
@@ -2564,7 +2564,7 @@ Actor_CullingVolumeTest:190303:0
  10.1: 9799
  11: 3714
  17: 6670
-PadMgr_HandleRetrace:189282:0
+PadMgr_HandleRetrace:189282:3677
  0: 3677
  4: 4052
  7: 7365
@@ -2596,10 +2596,10 @@ PadMgr_HandleRetrace:189282:0
   22: 2027
  34: PadMgr_ReleaseSerialEventQueue:10293
   7: 10293
-CollisionCheck_SetInfoNoDamageTable:188930:0
+CollisionCheck_SetInfoNoDamageTable:188930:94466
  1: 94466
  2: 94464
-Play_Update:184694:0
+Play_Update:184694:9688
  5: 9688
  7: 9001
  45: 4255
@@ -2642,7 +2642,7 @@ Play_Update:184694:0
  566: 10722
  572.1: 7982
  574.1: 5550
-EnFishmod_CheckSpook:182999:0
+EnFishmod_CheckSpook:182999:9103
  0: 9103
  1: 6088
  2: 4089
@@ -2658,11 +2658,11 @@ EnFishmod_CheckSpook:182999:0
   26: 17500
   27: 61262
   30: 9755
-Gfx_SetupDL_60NoCDXlu:181457:0
+Gfx_SetupDL_60NoCDXlu:181457:97747
  3: 97747
  4: 41342
  7: 42368
-Matrix_RotateX:179018:0
+Matrix_RotateX:179018:32750
  0: 32750
  7: 6357
  8: 9375
@@ -2689,13 +2689,13 @@ Matrix_RotateX:179018:0
  59: 543
  60: 542
  62: 20741
-SkinMatrix_MtxFToNewMtx:178991:0
+SkinMatrix_MtxFToNewMtx:178991:47446
  0: 47446
  1: 62229
  10: 27830
  8: SkinMatrix_MtxFToMtx:41486
   1: 41486
-EnFishmod_ParticlesDraw:177764:0
+EnFishmod_ParticlesDraw:177764:774
  1: 774
  6: 2442
  9: 3120
@@ -2722,12 +2722,12 @@ EnFishmod_ParticlesDraw:177764:0
  51: 9120
  53: 829
  57: 3314
-Math_Vec3f_Copy:173056:0
+Math_Vec3f_Copy:173056:76477
  1: 76477
  2: 76476
  3: 6701
  4: 13402
-Player_PostLimbDrawGameplay:172918:0
+Player_PostLimbDrawGameplay:172918:22737
  0: 22737
  3: 4851
  4: 16140
@@ -2747,7 +2747,7 @@ Player_PostLimbDrawGameplay:172918:0
  224: 13120
  228: 16370
  231: 16409
-Health_DrawMeter:172140:0
+Health_DrawMeter:172140:597
  12: 597
  13: 2776
  14: 6147
@@ -2783,7 +2783,7 @@ Health_DrawMeter:172140:0
  191: 1451
  194.1: 5239
  201: 5503
-RumbleMgr_Update:171613:0
+RumbleMgr_Update:171613:3390
  0: 3390
  4: 7588
  8: 3390
@@ -2812,7 +2812,7 @@ RumbleMgr_Update:171613:0
  118: 6150
  119: 1083
  121: 4332
-Lights_BindPoint:166379:0
+Lights_BindPoint:166379:6094
  8: 6094
  9: 17338
  10: 22498
@@ -2822,7 +2822,7 @@ Lights_BindPoint:166379:0
  15: 18266
  16: Lights_FindSlot:6580
   2: 6580
-AudioMgr_HandleRetrace:166065:0
+AudioMgr_HandleRetrace:166065:11570
  0: 11570
  3: 12705
  5: 2882
@@ -2837,7 +2837,7 @@ AudioMgr_HandleRetrace:166065:0
  42: 1277
  51: 2449
  52: 14690
-PcProf_Ranges:160797:0
+PcProf_Ranges:160797:17251
  2: 17251
  12: 17251
  12.2: 10186
@@ -2846,10 +2846,10 @@ PcProf_Ranges:160797:0
  13.3: 4489
  17: 4059
  17.1: 4059
-Math_Vec3f_DiffY:160415:0
+Math_Vec3f_DiffY:160415:76925
  1: 76925
  2: 83490
-EnFishmod_ManagerUpdate:159059:0
+EnFishmod_ManagerUpdate:159059:2929
  0: 2929
  1: 1464
  4: 5331
@@ -2869,7 +2869,7 @@ EnFishmod_ManagerUpdate:159059:0
   24: 4160
   18: Manager_Mood:45004
    1: 45004
-Lights_BindDirectional:158249:0
+Lights_BindDirectional:158249:16249
  5: 16249
  6: 16249
  8: 40104
@@ -2882,7 +2882,7 @@ Lights_BindDirectional:158249:0
  1: Lights_FindSlot:17287
   2: 11525
   8: 5762
-PadMgr_UpdateInputs:158094:0
+PadMgr_UpdateInputs:158094:13994
  0: 13994
  8: 25824
  9: 3736
@@ -2906,7 +2906,7 @@ PadMgr_UpdateInputs:158094:0
   1: 8884
  57: PadMgr_UnlockPadData:8252
   1: 8252
-EnFishmod_WaterCell:157968:0
+EnFishmod_WaterCell:157968:2521
  0: 2521
  3: 26426
  3.2: 6735
@@ -2919,7 +2919,7 @@ EnFishmod_WaterCell:157968:0
  10: 11145
  12: 9909
  16: 4886
-Collider_ResetJntSphAC:157536:0
+Collider_ResetJntSphAC:157536:33134
  6: 33134
  10: 17085
  4: Collider_ResetACBase:12049
@@ -2931,7 +2931,7 @@ Collider_ResetJntSphAC:157536:0
    3: 35726
    4: 11908
    5: 11908
-Player_UpdateCommon:157208:0
+Player_UpdateCommon:157208:4823
  0: 4823
  3: 2410
  5: 2411
@@ -2993,14 +2993,14 @@ Player_UpdateCommon:157208:0
   1: 1122
  309: Player_UpdateCamAndSeqModes:5681
   6: 5681
-EnFishmod_AttentionDist:155491:0
+EnFishmod_AttentionDist:155491:50375
  0: 50375
  1: 44647
  2: 31720
  4: 11591
  5.1: 1706
  8: 15452
-View_ApplyOrthoToOverlay:154683:0
+View_ApplyOrthoToOverlay:154683:9934
  0: 9934
  10: 4675
  12: 5518
@@ -3020,7 +3020,7 @@ View_ApplyOrthoToOverlay:154683:0
   13: 7173
   14: 3959
   15: 792
-Environment_Update:153324:0
+Environment_Update:153324:533
  10: 533
  10.1: 1599
  15: 1599
@@ -3076,15 +3076,15 @@ Environment_Update:153324:0
   3: 5394
   4: 1107
   5: 2214
-Rand_S16OffsetStride:152956:0
+Rand_S16OffsetStride:152956:152956
  2: 152956
-Actor_UpdateVelocityXZGravity:150435:0
+Actor_UpdateVelocityXZGravity:150435:46925
  0: 46925
  1: 33528
  2: 31024
  4: 16266
  6: 22692
-EnTite_CheckDamage:145791:0
+EnTite_CheckDamage:145791:28850
  0: 28850
  3: 24024
  5: 8903
@@ -3096,12 +3096,12 @@ EnTite_CheckDamage:145791:0
   7: 2412
  41: EnTite_SetupFlipOnBack:7236
   8: 7236
-EffectSsGRipple_Draw:145213:0
+EffectSsGRipple_Draw:145213:49344
  1: 49344
  4: 32895
  0: EffectSsGRipple_Draw:62974
   2: 62974
-SkelAnime_DrawFlexOpa:139684:0
+SkelAnime_DrawFlexOpa:139684:8267
  1: 8267
  8: 1181
  19: 8250
@@ -3118,7 +3118,7 @@ SkelAnime_DrawFlexOpa:139684:0
  51: 11336
  55: 2248
  57: 25514
-Math3D_TriChkPointParaXImpl:135835:0
+Math3D_TriChkPointParaXImpl:135835:28624
  0: 28624
  7: 9030
  13.1: 606
@@ -3143,7 +3143,7 @@ Math3D_TriChkPointParaXImpl:135835:0
   27: 6683
   29: 4029
   33: 26322
-OLib_Vec3fToVecSph:130795:0
+OLib_Vec3fToVecSph:130795:15661
  0: 15661
  2: 11434
  3: 2003
@@ -3155,7 +3155,7 @@ OLib_Vec3fToVecSph:130795:0
  15: 15600
  18: 2917
  19: 13285
-EffectSs_FindSlot:129436:0
+EffectSs_FindSlot:129436:9251
  4: 9251
  12: 48133
  20: 6126
@@ -3163,7 +3163,7 @@ EffectSs_FindSlot:129436:0
  31: 23920
  39: 23920
  56: 11960
-BgCheck_CheckCeilingImpl:128110:0
+BgCheck_CheckCeilingImpl:128110:24815
  1: 24815
  8: 4963
  9: 6659
@@ -3180,7 +3180,7 @@ BgCheck_CheckCeilingImpl:128110:0
   4: 3557
   5: 1257
   6: 13600
-EnFishmod_DrawBillboard:127984:0
+EnFishmod_DrawBillboard:127984:1771
  4: 1771
  5: 1770
  6: 1180
@@ -3215,7 +3215,7 @@ EnFishmod_DrawBillboard:127984:0
  98.8: 7800
  100.8: 5862
  104: 728
-BgCheck_CheckDynaCeiling:127773:0
+BgCheck_CheckDynaCeiling:127773:15647
  1: 15647
  5: 1696
  11: 13004
@@ -3226,7 +3226,7 @@ BgCheck_CheckDynaCeiling:127773:0
  21: 5989
  31: 2050
  33: 8393
-CollisionPoly_GetMinY:127742:0
+CollisionPoly_GetMinY:127742:14609
  3: 14609
  3.1: 8423
  14: 6770
@@ -3235,7 +3235,7 @@ CollisionPoly_GetMinY:127742:0
   9: 20305
   11: 25435
   14: 41772
-Collider_ResetJntSphOC:126630:0
+Collider_ResetJntSphOC:126630:67619
  6: 67619
  10: 8608
  4: Collider_ResetOCBase:41557
@@ -3245,7 +3245,7 @@ Collider_ResetJntSphOC:126630:0
  7: Collider_ResetJntSphElementOC:8846
   1: Collider_ResetOCElement:8846
    1: 8846
-CollisionCheck_Incompatible:124577:0
+CollisionCheck_Incompatible:124577:26385
  1: 26385
  1.1: 29292
  1.2: 10016
@@ -3254,7 +3254,7 @@ CollisionCheck_Incompatible:124577:0
  3: 13438
  6: 27180
  10: 5436
-CollisionCheck_AC:123716:0
+CollisionCheck_AC:123716:3391
  0: 3391
  4: 6740
  4.2: 2064
@@ -3268,7 +3268,7 @@ CollisionCheck_AC:123716:0
  12.2: 1186
  15: 6192
  19: 4384
-EffectSsBubble_Update:121520:0
+EffectSsBubble_Update:121520:11815
  0: 11815
  2: 1722
  5: 24874
@@ -3278,7 +3278,7 @@ EffectSsBubble_Update:121520:0
  21: 13560
  22: 20004
  24: 27648
-SkelAnime_InterpFrameTable:120166:0
+SkelAnime_InterpFrameTable:120166:1
  0: SkelAnime_InterpFrameTable:120166
   6: 10932
   8: 4883
@@ -3287,7 +3287,7 @@ SkelAnime_InterpFrameTable:120166:0
   12: 32440
   14: 6324
   15: 31460
-EnFishmod_RigDraw:116389:0
+EnFishmod_RigDraw:116389:4410
  3: 4410
  6: 1470
  12: 4410
@@ -3340,7 +3340,7 @@ EnFishmod_RigDraw:116389:0
   8.3: 1688
   9.3: 1688
   17.3: 1689
-ActorShadow_Draw:115991:0
+ActorShadow_Draw:115991:28422
  0: 28422
  5: 9063
  9: 8110
@@ -3358,18 +3358,18 @@ ActorShadow_Draw:115991:0
  40: 8005
  41: 4803
  45: 5492
-Matrix_Finalize:114933:0
+Matrix_Finalize:114933:16419
  0: 16419
  1: 32838
  1: Matrix_ToMtx:65676
   1: 65676
-BgCheck_GetWaterSurfaceAllHack:114377:0
+BgCheck_GetWaterSurfaceAllHack:114377:14188
  1: 14188
  2: 56751
  5: 14187
  12: 17550
  13: 11701
-Effect_UpdateAll:113525:0
+Effect_UpdateAll:113525:3302
  3: 3302
  4: 4953
  5: 4953
@@ -3379,7 +3379,7 @@ Effect_UpdateAll:113525:0
  13: 22134
  20: 2944
  21: 5890
-Matrix_Get:112507:0
+Matrix_Get:112507:6108
  1: 6108
  2: 2339
  1: Matrix_MtxFCopy:104060
@@ -3415,7 +3415,7 @@ Matrix_Get:112507:0
   30: 2434
   31: 2434
   32: 1217
-CollisionCheck_OC_JntSphVsCyl.part.0:110882:0
+CollisionCheck_OC_JntSphVsCyl.part.0:110882:23405
  0: 23405
  7: 3348
  8: 18086
@@ -3425,7 +3425,7 @@ CollisionCheck_OC_JntSphVsCyl.part.0:110882:0
  14: 22371
  18: 1900
  26: 20904
-SkinMatrix_SetScale:109943:0
+SkinMatrix_SetScale:109943:7224
  1: 7224
  2: 7224
  3: 7223
@@ -3442,7 +3442,7 @@ SkinMatrix_SetScale:109943:0
  14: 6519
  15: 6519
  17: 6519
-func_8002E830:108437:0
+func_8002E830:108437:15643
  0: 15643
  4: 5679
  6: 8358
@@ -3450,7 +3450,7 @@ func_8002E830:108437:0
  22.6: 5582
  23.6: 18532
  26.6: 6883
-Actor_MoveXZGravity:107731:0
+Actor_MoveXZGravity:107731:10551
  0: 10551
  1: 7034
  3: 10710
@@ -3459,9 +3459,9 @@ Actor_MoveXZGravity:107731:0
   3: 17507
   4: 14455
   5: 14616
-Gfx_SetupDL_61Xlu:105916:0
+Gfx_SetupDL_61Xlu:105916:105916
  3: 105916
-BgCheck_CheckLineInSubdivision:105676:0
+BgCheck_CheckLineInSubdivision:105676:29202
  2: 29202
  5: 7260
  5.1: 11507
@@ -3472,7 +3472,7 @@ BgCheck_CheckLineInSubdivision:105676:0
  19: 4341
  19.1: 5784
  26: 16980
-IrqMgr_HandleRetrace:105305:0
+IrqMgr_HandleRetrace:105305:6226
  0: 6226
  1: 10378
  3: 3176
@@ -3482,7 +3482,7 @@ IrqMgr_HandleRetrace:105305:0
  9: IrqMgr_SendMesgToClients:56741
   3: 22089
   4: 34652
-View_ApplyPerspectiveToOverlay:102652:0
+View_ApplyPerspectiveToOverlay:102652:4989
  0: 4989
  16: 5185
  18: 2073
@@ -3501,7 +3501,7 @@ View_ApplyPerspectiveToOverlay:102652:0
   7: 1212
   11: 1316
   13: 3946
-Math_ScaledStepToS:101596:0
+Math_ScaledStepToS:101596:39066
  1: 39066
  2: 16850
  4: 12676
@@ -3512,7 +3512,7 @@ Math_ScaledStepToS:101596:0
  14: 929
  18: 2177
  19: 1856
-Math_ApproachF:101555:0
+Math_ApproachF:101555:30663
  0: 30663
  1: 40883
  2: 7495
@@ -3520,7 +3520,7 @@ Math_ApproachF:101555:0
  6: 7516
  10: 3752
  12: 3758
-Effect_DrawAll:101550:0
+Effect_DrawAll:101550:1150
  0: 1150
  3.2: 17144
  4: 3448
@@ -3530,7 +3530,7 @@ Effect_DrawAll:101550:0
  14: 41148
  18: 2514
  21: 7542
-EffectSs_Delete:96642:0
+EffectSs_Delete:96642:3336
  1: 3336
  5: 2499
  10: 4730
@@ -3542,7 +3542,7 @@ EffectSs_Delete:96642:0
   13: 2365
   14: 2365
   17: 9457
-EnCrow_OverrideLimbDraw:96535:0
+EnCrow_OverrideLimbDraw:96535:8641
  0: 8641
  3: 9540
  4: 11337
@@ -3552,14 +3552,14 @@ EnCrow_OverrideLimbDraw:96535:0
  11: 11076
  0: EnCrow_OverrideLimbDraw:18497
   7: 18497
-EnFishmod_BodyClearance:95996:0
+EnFishmod_BodyClearance:95996:16241
  0: 16241
  1: 38512
  1.1: 13105
  1.2: 9170
  2.1: 14455
  2.2: 4513
-SurfaceType_GetData:95431:0
+SurfaceType_GetData:95431:7076
  5: 7076
  5.1: 7076
  9: 2813
@@ -3572,13 +3572,13 @@ SurfaceType_GetData:95431:0
   0: BgCheck_GetCollisionHeader:18795
    7: 8178
    14: 10617
-DynaPoly_UpdateBgActorTransforms:94596:0
+DynaPoly_UpdateBgActorTransforms:94596:4971
  3.2: 4971
  4: 17557
  8: 3314
  5: DynaPoly_SetBgActorPrevTransform:68754
   1: 68754
-Player_OverrideLimbDrawGameplayDefault:91458:0
+Player_OverrideLimbDrawGameplayDefault:91458:13575
  1: 13575
  4: 13596
  5: 5141
@@ -3591,10 +3591,10 @@ Player_OverrideLimbDrawGameplayDefault:91458:0
  50: 3330
  51: 8958
  56: 20549
-CollisionPoly_GetPointDistanceFromPlane:90802:0
+CollisionPoly_GetPointDistanceFromPlane:90802:64860
  1: 64860
  3: 25942
-Player_OverrideLimbDrawGameplayCommon:89042:0
+Player_OverrideLimbDrawGameplayCommon:89042:22109
  1: 22109
  4: 7368
  5: 1599
@@ -3611,19 +3611,19 @@ Player_OverrideLimbDrawGameplayCommon:89042:0
  68: func_8008F87C:16861
   0: 9943
   24: 6918
-Math3D_TriChkPointParaYIntersectDist:86534:0
+Math3D_TriChkPointParaYIntersectDist:86534:4912
  1: 4912
  2: 7307
  6: 17098
  12: 57217
-Interface_DrawItemIconTexture:84391:0
+Interface_DrawItemIconTexture:84391:38469
  3: 38469
  6: 45922
-BgCheck_EntityRaycastDown5:83437:0
+BgCheck_EntityRaycastDown5:83437:11625
  1: 11625
  2: 52441
  6: 19371
-BgCheck_CheckStaticCeiling:81391:0
+BgCheck_CheckStaticCeiling:81391:10990
  1: 10990
  2: 3668
  11: 4532
@@ -3644,7 +3644,7 @@ BgCheck_CheckStaticCeiling:81391:0
  53: 6165
  35: CollisionPoly_CheckYIntersectApprox2:2634
   1: 2634
-View_ApplyPerspective:80963:0
+View_ApplyPerspective:80963:840
  0: 840
  12: 2520
  15: 2208
@@ -3667,7 +3667,7 @@ View_ApplyPerspective:80963:0
   15: 737
  65: View_StepDistortion:8775
   5: 8775
-Math3D_TriLineIntersect:80552:0
+Math3D_TriLineIntersect:80552:18166
  1: 18166
  4: 967
  7.3: 1530
@@ -3683,7 +3683,7 @@ Math3D_TriLineIntersect:80552:0
    1: 8421
  7: Math3D_TriChkPointParaX:14474
   4: 14474
-Interface_Update:80318:0
+Interface_Update:80318:1854
  28.1: 1854
  28.2: 2472
  29: 617
@@ -3711,7 +3711,7 @@ Interface_Update:80318:0
  281: 4965
  281.1: 1701
  297: 2550
-EnCrow_FlyIdle:79454:0
+EnCrow_FlyIdle:79454:4555
  6: 4555
  7: 11385
  9: 2277
@@ -3725,7 +3725,7 @@ EnCrow_FlyIdle:79454:0
  48: 9738
  51: 5730
  51.2: 3056
-Sched_HandleNotification:79030:0
+Sched_HandleNotification:79030:12778
  0: 12778
  1: 1605
  2: 1605
@@ -3748,7 +3748,7 @@ Sched_HandleNotification:79030:0
  17: Sched_Yield:2550
   5: 850
   8: 1700
-CollisionPoly_CheckXIntersectApprox:78836:0
+CollisionPoly_CheckXIntersectApprox:78836:3877
  0: 3877
  6: 3878
  8: 40155
@@ -3757,11 +3757,11 @@ CollisionPoly_CheckXIntersectApprox:78836:0
   1: 8085
   2: 6627
   3: 7090
-EnFishmod_Glide:78250:0
+EnFishmod_Glide:78250:17702
  0: 17702
  1: 46954
  2: 13594
-Player_InCsMode:76696:0
+Player_InCsMode:76696:1604
  1: 1604
  3.2: 2538
  4: 5008
@@ -3774,14 +3774,14 @@ Player_InCsMode:76696:0
   4: Player_ActionToMagicSpell:8622
    1: 2451
    3: 6171
-BgCheck_EntitySphVsWall3:76465:0
+BgCheck_EntitySphVsWall3:76465:6495
  1: 6495
  2: 69970
-Math_Vec3s_ToVec3f:75558:0
+Math_Vec3s_ToVec3f:75558:33502
  1: 33502
  2: 26285
  3: 15771
-EffectSsGRipple_Init:74927:0
+EffectSsGRipple_Init:74927:5221
  0: 5221
  7: 6319
  8: 6025
@@ -3792,7 +3792,7 @@ EffectSsGRipple_Init:74927:0
  13: 956
  25: 10617
  28: 18598
-EnFishmod_ThinkAllowed:74879:0
+EnFishmod_ThinkAllowed:74879:11936
  0: 11936
  1: 6434
  3: 19299
@@ -3801,7 +3801,7 @@ EnFishmod_ThinkAllowed:74879:0
  4.2: 10568
  9: 6027
  15: 2642
-func_800359B8:74222:0
+func_800359B8:74222:8257
  0: 8257
  1: 712
  15: 8183
@@ -3815,7 +3815,7 @@ func_800359B8:74222:0
  26: 4010
  27: 2405
  29: 8310
-Fault_AddClient:73198:0
+Fault_AddClient:73198:37740
  0: 37740
  4: 11822
  6: 3751
@@ -3825,10 +3825,10 @@ Fault_AddClient:73198:0
  10: 2158
  12: 4316
  13: 2158
-Math_Vec3f_DistXYZAndStoreDiff:72657:0
+Math_Vec3f_DistXYZAndStoreDiff:72657:12409
  1: 12409
  6: 60248
-Matrix_Translate:71385:0
+Matrix_Translate:71385:18887
  0: 18887
  1: 8502
  5: 12753
@@ -3838,7 +3838,7 @@ Matrix_Translate:71385:0
  17: 2765
  19: 11742
  21: 11742
-SkelAnime_DrawLimbOpa:71192:0
+SkelAnime_DrawLimbOpa:71192:1780
  1: 1780
  8: 1186
  10: 15281
@@ -3854,7 +3854,7 @@ SkelAnime_DrawLimbOpa:71192:0
  27: 1426
  30: 2852
  31: 1426
-Rig_RotateAxis:71060:0
+Rig_RotateAxis:71060:2466
  2: 2466
  3: 2464
  7: 3598
@@ -3871,7 +3871,7 @@ Rig_RotateAxis:71060:0
  21.3: 13573
  22.3: 15360
  23.3: 14092
-EnFishmod_Draw:69586:0
+EnFishmod_Draw:69586:9684
  0: 9684
  1: 5059
  4: 1183
@@ -3881,7 +3881,7 @@ EnFishmod_Draw:69586:0
  3: EnFishmod_DrawImpl:11025
   7: 5514
   11: 5511
-Graph_Update:69559:0
+Graph_Update:69559:1470
  0: 1470
  3: 1470
  4: 2940
@@ -3905,7 +3905,7 @@ Graph_Update:69559:0
  133: 2356
  136: 676
  154: 1350
-Gfx_SetupFrame:68406:0
+Gfx_SetupFrame:68406:9219
  9: 9219
  10: 7195
  11: 4116
@@ -3920,7 +3920,7 @@ Gfx_SetupFrame:68406:0
  77: 3998
  78: 2397
  103: 2198
-PadMgr_UpdateRumble:68157:0
+PadMgr_UpdateRumble:68157:7617
  0: 7617
  8.2: 8234
  9: 3360
@@ -3944,14 +3944,14 @@ PadMgr_UpdateRumble:68157:0
   14: 1088
  86: PadMgr_ReleaseSerialEventQueue:1780
   7.1: 1780
-PadMgr_RequestPadData:66324:0
+PadMgr_RequestPadData:66324:4577
  8.2: 4577
  9: 6332
  11: 50837
  13: 1526
  14: 1526
  16: 1526
-Player_ProcessSceneCollision:66160:0
+Player_ProcessSceneCollision:66160:619
  0: 619
  10: 1237
  15: 2474
@@ -3977,7 +3977,7 @@ Player_ProcessSceneCollision:66160:0
  275: 3814
  276: 2332
  281: 4132
-Interface_DrawItemButtons:65966:0
+Interface_DrawItemButtons:65966:650
  22: 650
  23: 3897
  24: 6390
@@ -3996,13 +3996,13 @@ Interface_DrawItemButtons:65966:0
   6: 8439
  170: Gfx_TextureIA8:782
   6: 782
-Math_Vec3f_DistXYZ:65841:0
+Math_Vec3f_DistXYZ:65841:13056
  1: 13056
  2: 11575
  3: 11575
  5: 23429
  6: 6206
-Sched_HandleRetrace:65454:0
+Sched_HandleRetrace:65454:2548
  0: 2548
  4: 9989
  6: 9988
@@ -4014,10 +4014,10 @@ Sched_HandleRetrace:65454:0
  27: 2972
  37: 742
  38: 742
-EffectSs_LerpInv:63533:0
+EffectSs_LerpInv:63533:42356
  1: 42356
  1.1: 21177
-EnFishmod_LookTable:63312:0
+EnFishmod_LookTable:63312:6234
  14: 6234
  14.3: 16358
  17: 3117
@@ -4029,20 +4029,20 @@ EnFishmod_LookTable:63312:0
  23: 4140
  23.1: 1035
  27: 1825
-CollisionCheck_SetJntSphHitFX:62033:0
+CollisionCheck_SetJntSphHitFX:62033:3610
  0: 3610
  4: 33461
  4.2: 10698
  5: 10698
  5.1: 3566
-Fishmod_DebugPrintf:61597:0
+Fishmod_DebugPrintf:61597:10895
  0: 10895
  4: 12729
  14: 4243
  15: 9661
  18: 1175
  19: 22894
-Magic_DrawMeter:61548:0
+Magic_DrawMeter:61548:609
  4: 609
  6: 1848
  8: 2456
@@ -4062,7 +4062,7 @@ Magic_DrawMeter:61548:0
  22: Gfx_TextureIA8:4120
   2: 1765
   6: 2355
-CollisionPoly_CheckYIntersectApprox1:61099:0
+CollisionPoly_CheckYIntersectApprox1:61099:3043
  1: 3043
  11: 2578
  12: 6425
@@ -4070,7 +4070,7 @@ CollisionPoly_CheckYIntersectApprox1:61099:0
  14: 1568
  15: 1568
  23: 40354
-BgCheck_FindWaterBox:61073:0
+BgCheck_FindWaterBox:61073:5850
  1: 5850
  2: 5850
  8: 6748
@@ -4082,21 +4082,21 @@ BgCheck_FindWaterBox:61073:0
  25.1: 3759
  26: 3756
  26.1: 2697
-BgCheck_SphVsFirstStaticPoly:59652:0
+BgCheck_SphVsFirstStaticPoly:59652:8522
  14.2: 8522
  21.2: 51130
-CollisionPoly_GetVerticesByBgId:58752:0
+CollisionPoly_GetVerticesByBgId:58752:49482
  3: 49482
  12: 3974
  16: 5296
-Math3D_TriChkPointParaYDeterminate:58148:0
+Math3D_TriChkPointParaYDeterminate:58148:11630
  0: 11630
  1: 46518
-Math3D_TriChkPointParaXIntersect:57459:0
+Math3D_TriChkPointParaXIntersect:57459:4595
  1: 4595
  2: 4594
  6: 48270
-Math3D_LineSegFindPlaneIntersect:56908:0
+Math3D_LineSegFindPlaneIntersect:56908:26766
  0: 26766
  3: 1273
  4: 5092
@@ -4106,7 +4106,7 @@ Math3D_LineSegFindPlaneIntersect:56908:0
    1: 10319
    2: 6379
    3: 3405
-Graph_TaskSet00:55865:0
+Graph_TaskSet00:55865:3324
  0: 3324
  7: 3432
  8: 1107
@@ -4135,14 +4135,14 @@ Graph_TaskSet00:55865:0
  119: 830
  122: 831
  127: 1662
-EnFishmod_LookColor.isra.0:55519:0
+EnFishmod_LookColor.isra.0:55519:8799
  1: 8799
  2: 6545
  4: 10599
  5: 13912
  6: 12956
  7: 2708
-Lights_GlowCheck:55110:0
+Lights_GlowCheck:55110:1534
  1: 1534
  3: 7940
  4: 3339
@@ -4160,12 +4160,12 @@ Lights_GlowCheck:55110:0
  30: 627
  36: 1254
  41: 1533
-SfxSource_UpdateAll:54503:0
+SfxSource_UpdateAll:54503:20439
  4.2: 20439
  5: 20438
  6: 6813
  7: 6813
-func_8008F87C.part.0:52452:0
+func_8008F87C.part.0:52452:14718
  0: 14718
  28: 4641
  29: 1099
@@ -4181,13 +4181,13 @@ func_8008F87C.part.0:52452:0
  44: 8740
  46: 4187
  47: 1674
-LightContext_NewLights:51815:0
+LightContext_NewLights:51815:12372
  1: 12372
  1: Lights_New:39443
   3: 14703
   5: 12370
   7: 12370
-Minimap_DrawCompassIcons:51520:0
+Minimap_DrawCompassIcons:51520:1268
  0: 1268
  2: 1268
  5: 634
@@ -4211,7 +4211,7 @@ Minimap_DrawCompassIcons:51520:0
  36: 1529
  37: 3072
  38: 1024
-Player_DrawImpl:51004:0
+Player_DrawImpl:51004:1396
  1: 1396
  9: 1274
  10: 698
@@ -4229,10 +4229,10 @@ Player_DrawImpl:51004:0
  60: 1470
  60.4: 2940
  65.5: 1468
-Object_IsLoaded:49926:0
+Object_IsLoaded:49926:31165
  1: 31165
  6: 18761
-Math3D_LineVsCube:49839:0
+Math3D_LineVsCube:49839:17673
  0: 17673
  9: 7247
  10: 3422
@@ -4248,10 +4248,10 @@ Math3D_LineVsCube:49839:0
  181: 1319
  182: 1319
  183: 659
-CollisionCheck_InitInfo:48995:0
+CollisionCheck_InitInfo:48995:34997
  5: 34997
  6: 13998
-func_80A053F0:48324:0
+func_80A053F0:48324:1664
  0: 1664
  3: 1664
  6: 4992
@@ -4264,7 +4264,7 @@ func_80A053F0:48324:0
  93: 13091
  92: func_80A04D90:1871
   6: 1871
-Interface_InitVertices:47336:0
+Interface_InitVertices:47336:4025
  6: 4025
  7: 9438
  9: 2307
@@ -4277,10 +4277,10 @@ Interface_InitVertices:47336:0
  48: 3935
  49: 3933
  73: 2176
-Object_ReloadAll:46900:0
+Object_ReloadAll:46900:18760
  0: 18760
  5: 28140
-Player_Update:46768:0
+Player_Update:46768:1049
  0: 1049
  12: 5247
  33: 2098
@@ -4292,7 +4292,7 @@ Player_Update:46768:0
  64: 5360
  66: 2679
  68: 4314
-Environment_DrawSunAndMoon:46259:0
+Environment_DrawSunAndMoon:46259:1376
  0: 1376
  7: 1376
  9: 4126
@@ -4311,7 +4311,7 @@ Environment_DrawSunAndMoon:46259:0
  61: 2260
  64: 1130
  65: 1128
-Matrix_MtxToMtxF:45987:0
+Matrix_MtxToMtxF:45987:10794
  4: 10794
  5: 3598
  7: 2389
@@ -4321,11 +4321,11 @@ Matrix_MtxToMtxF:45987:0
  13: 2174
  16: 6586
  17: 2194
-Math_GetAtan2Tbl:45638:0
+Math_GetAtan2Tbl:45638:26078
  16: 26078
  0: Math_GetAtan2Tbl:19560
   11: 19560
-Minimap_Draw:44923:0
+Minimap_Draw:44923:1292
  8: 1292
  77: 5165
  84: 20865
@@ -4333,7 +4333,7 @@ Minimap_Draw:44923:0
  84.12: 4254
  106: 7854
  139: 3873
-EnCrow_PostLimbDraw:44884:0
+EnCrow_PostLimbDraw:44884:6498
  0: 6498
  4: 4563
  7: 7698
@@ -4343,7 +4343,7 @@ EnCrow_PostLimbDraw:44884:0
  12: 8689
  0: EnCrow_PostLimbDraw:2940
   5: 2940
-Attention_WeightedDistToPlayerSq:44399:0
+Attention_WeightedDistToPlayerSq:44399:29455
  1: 29455
  1.2: 6144
  3.4: 3070
@@ -4351,7 +4351,7 @@ Attention_WeightedDistToPlayerSq:44399:0
  20: 2150
  25: 1432
  26: 1432
-OLib_Vec3fDiffToVecGeo:44195:0
+OLib_Vec3fDiffToVecGeo:44195:5150
  0: 5150
  3: 6155
  4: 6154
@@ -4361,11 +4361,11 @@ OLib_Vec3fDiffToVecGeo:44195:0
   3: 6692
   4: 5124
   6: 6504
-BgCheck_EntityRaycastDown4:43911:0
+BgCheck_EntityRaycastDown4:43911:3086
  1: 3086
  2: 25321
  6: 15504
-func_80A0461C:43860:0
+func_80A0461C:43860:5079
  0: 5079
  3: 1693
  5: 5079
@@ -4379,12 +4379,12 @@ func_80A0461C:43860:0
  102: 968
  104: 968
  118: 969
-Object_UpdateEntries:43685:0
+Object_UpdateEntries:43685:16383
  6.2: 16383
  7: 16382
  8: 5460
  9: 5460
-Graph_InitTHGA:43000:0
+Graph_InitTHGA:43000:3624
  0: 3624
  1: 1076
  3: 1466
@@ -4400,23 +4400,23 @@ Graph_InitTHGA:43000:0
  22: 9062
  23: 1567
  24: 1567
-Actor_UpdateVelocityXYZ:42060:0
+Actor_UpdateVelocityXYZ:42060:24689
  0: 24689
  1: 6478
  3: 3791
  4: 4295
  5: 600
  6: 2207
-EnCrow_Draw:42049:0
+EnCrow_Draw:42049:8352
  3: 8352
  4: 25054
  6: 8643
-Math_Vec3f_Pitch:41837:0
+Math_Vec3f_Pitch:41837:6972
  1: 6972
  1: Math_Vec3f_DistXZ:34865
   1: 20919
   2: 13946
-Lights_DrawGlow:40564:0
+Lights_DrawGlow:40564:3641
  0: 3641
  2: 606
  4: 606
@@ -4425,14 +4425,14 @@ Lights_DrawGlow:40564:0
  11: 7530
  12: 15057
  16: 7528
-CollisionCheck_SetHitEffects:40343:0
+CollisionCheck_SetHitEffects:40343:5400
  4.2: 5400
  7.1: 2088
  8: 6264
  8.1: 6262
  11: 18292
  14: 2037
-Matrix_MtxFToYXZRotS:39949:0
+Matrix_MtxFToYXZRotS:39949:1797
  0: 1797
  7: 1198
  8: 4263
@@ -4442,7 +4442,7 @@ Matrix_MtxFToYXZRotS:39949:0
  19: 1858
  44: 5455
  47: 8848
-EffectSs_Spawn:39563:0
+EffectSs_Spawn:39563:3996
  0: 3996
  10: 1332
  15: 4503
@@ -4453,10 +4453,10 @@ EffectSs_Spawn:39563:0
  52.1: 4827
  58: 6369
  70: 1206
-Collider_ResetJntSphAT:39164:0
+Collider_ResetJntSphAT:39164:26110
  6: 26110
  10: 13054
-Player_UpdateInterface.part.0:38903:0
+Player_UpdateInterface.part.0:38903:7763
  0: 7763
  5: 1294
  9: 576
@@ -4471,18 +4471,18 @@ Player_UpdateInterface.part.0:38903:0
  121: 1300
  6: func_808332B8:1293
   1: 1293
-Actor_UpdatePos:38728:0
+Actor_UpdatePos:38728:11038
  1: 11038
  3: 7688
  4: 5566
  5: 5051
  6: 9385
-SkinMatrix_GetClear:38422:0
+SkinMatrix_GetClear:38422:38422
  1: 38422
-Matrix_MtxFToNewMtx:37994:0
+Matrix_MtxFToNewMtx:37994:5394
  0: 5394
  1: 32600
-Sched_Schedule:37776:0
+Sched_Schedule:37776:8535
  0: 8535
  2: 2844
  5: 8533
@@ -4492,23 +4492,23 @@ Sched_Schedule:37776:0
  41: Sched_GfxTaskFramebufferValid:4136
   25: 1034
   35: 3102
-Fault_RemoveClient:37743:0
+Fault_RemoveClient:37743:17391
  0: 17391
  2: 9435
  5: 7278
  6: 3639
-CollisionCheck_SetAT_SAC:37153:0
+CollisionCheck_SetAT_SAC:37153:14860
  3: 14860
  27: 22293
-Actor_ProcessInitChain:37105:0
+Actor_ProcessInitChain:37105:37105
  4: 37105
-AudioMgr_ThreadEntry:36805:0
+AudioMgr_ThreadEntry:36805:11638
  19: 11638
  21: 20669
  23: 2268
  43: AudioMgr_HandlePreNMI:2230
   3: 2230
-Environment_UpdateSkybox:36664:0
+Environment_UpdateSkybox:36664:1540
  27: 1540
  28: 10935
  28.1: 2539
@@ -4528,7 +4528,7 @@ Environment_UpdateSkybox:36664:0
  36: Environment_LerpWeight:2129
   1: 1065
   3: 1064
-Player_GetEnvironmentalHazard:36103:0
+Player_GetEnvironmentalHazard:36103:524
  1: 524
  5: 4298
  7: 4397
@@ -4544,7 +4544,7 @@ Player_GetEnvironmentalHazard:36103:0
    1: 8304
    2: 2546
    3: 1919
-SkelAnime_DrawFlexLod:35896:0
+SkelAnime_DrawFlexLod:35896:5860
  19: 5860
  20: 1443
  22: 4241
@@ -4556,7 +4556,7 @@ SkelAnime_DrawFlexLod:35896:0
  47: 1584
  48: 5566
  55: 4538
-Skybox_Draw:35664:0
+Skybox_Draw:35664:5447
  5: 5447
  6: 778
  9: 4374
@@ -4572,13 +4572,13 @@ Skybox_Draw:35664:0
  71: 697
  72: 4874
  74: 660
-CollisionCheck_Damage:35047:0
+CollisionCheck_Damage:35047:2463
  4: 2463
  4.2: 4844
  7: 3302
  10: 6604
  13: 17834
-Matrix_Put:34617:0
+Matrix_Put:34617:2244
  1: 2244
  1: Matrix_MtxFCopy:32373
   1: 2243
@@ -4602,10 +4602,10 @@ Matrix_Put:34617:0
   25: 1296
   26: 1296
   27: 648
-Gfx_SetupDL_25Opa:33805:0
+Gfx_SetupDL_25Opa:33805:24773
  3: 24773
  6: 9032
-Math3D_CylVsCylOverlapCenterDist:32899:0
+Math3D_CylVsCylOverlapCenterDist:32899:543
  4: 543
  5: 3231
  6: 3746
@@ -4618,7 +4618,7 @@ Math3D_CylVsCylOverlapCenterDist:32899:0
  17: 2308
  18: 1365
  29: 2728
-Camera_Jump3:32770:0
+Camera_Jump3:32770:1210
  41: 1210
  42: 2420
  46: 1209
@@ -4635,9 +4635,9 @@ Camera_Jump3:32770:0
   1: 922
   5: 5527
   6: 921
-Skin_ApplyAnimTransformations:32717:0
+Skin_ApplyAnimTransformations:32717:32717
  41: 32717
-func_80B0D590:32620:0
+func_80B0D590:32620:2252
  0: 2252
  3: 5630
  4: 2718
@@ -4653,11 +4653,11 @@ func_80B0D590:32620:0
  21: 1801
  22: 1200
  62: 600
-func_80042108:32328:0
+func_80042108:32328:16164
  2: 16164
  1: SurfaceType_GetData:16164
   14: 16164
-n64prof_serialize:32219:0
+n64prof_serialize:32219:2550
  33: 2550
  33.3: 5504
  34: 2752
@@ -4670,7 +4670,7 @@ n64prof_serialize:32219:0
  40: TopBit:8256
   3: 5504
   4: 2752
-Attention_FindActor:31907:0
+Attention_FindActor:31907:3492
  8: 3492
  9: 4675
  10: 1164
@@ -4680,15 +4680,15 @@ Attention_FindActor:31907:0
  21.2: 1042
  22.2: 4168
  34: 7994
-BgCheck_EntityCheckCeiling:31875:0
+BgCheck_EntityCheckCeiling:31875:4025
  1: 4025
  2: 22864
  3: 4986
-EnKakasi2_Update:31723:0
+EnKakasi2_Update:31723:11896
  0: 11896
  4: 11897
  5: 7930
-GameState_Update:31506:0
+GameState_Update:31506:3442
  0: 3442
  1: 1721
  3: 3442
@@ -4699,7 +4699,7 @@ GameState_Update:31506:0
  104: 2246
  107: 3368
  108: 3366
-EnFishmod_RodUpdate:31278:0
+EnFishmod_RodUpdate:31278:2565
  0: 2565
  1: 7696
  2: 2566
@@ -4711,13 +4711,13 @@ EnFishmod_RodUpdate:31278:0
  24: 1280
  26: 2557
  349: 1278
-View_LookAt:31192:0
+View_LookAt:31192:1755
  1: 1755
  5: 6435
  6: 11649
  7: 7674
  8: 3679
-Matrix_Mult:31145:0
+Matrix_Mult:31145:3027
  3: 3027
  4: 7251
  8: 4834
@@ -4732,16 +4732,16 @@ Matrix_Mult:31145:0
   23: 769
   31: 2418
   32: 2417
-Sched_ThreadEntry:30545:0
+Sched_ThreadEntry:30545:3708
  8: 3708
  10: 11120
  13.3: 2246
  14.3: 4491
  29.1: 4490
  30.1: 4490
-Gfx_SetupDL_27Xlu:30344:0
+Gfx_SetupDL_27Xlu:30344:30344
  6: 30344
-func_80847298:29372:0
+func_80847298:29372:955
  1: 955
  8: 2863
  12: 2862
@@ -4761,7 +4761,7 @@ func_80847298:29372:0
   7: 1108
  41: Player_ApproachZeroBinang:4225
   6: 4225
-func_80038A28:29166:0
+func_80038A28:29166:1323
  11: 1323
  16: 1078
  17: 3231
@@ -4779,7 +4779,7 @@ func_80038A28:29166:0
   1: 9256
   2: 2154
   3: 2154
-func_808382DC:28683:0
+func_808382DC:28683:7483
  11: 7483
  13: 1935
  13.1: 644
@@ -4792,7 +4792,7 @@ func_808382DC:28683:0
   2: 1186
  144: func_80838144:1186
   3: 1186
-Attention_Update:28551:0
+Attention_Update:28551:1200
  21: 1200
  24: 600
  25: 1200
@@ -4804,14 +4804,14 @@ Attention_Update:28551:0
  126: 861
  127: 3442
  129: 8873
-Fishmod_TimeUpdate:28272:0
+Fishmod_TimeUpdate:28272:8556
  0: 8556
  1: 1820
  3: Fishmod_UpdateHaze:17896
   1: 3245
   7: 9829
   8: 4822
-Math3D_PointInSph:27924:0
+Math3D_PointInSph:27924:13417
  1: 13417
  5: 11778
  1: Math3D_DistXYZ16toF:2729
@@ -4819,14 +4819,14 @@ Math3D_PointInSph:27924:0
   6: Math3D_Vec3fMagnitude:2184
    1: Math3D_Vec3fMagnitudeSq:2184
     1: 2184
-BedCard_Views:27919:0
+BedCard_Views:27919:6117
  0: 6117
  1: 1223
  4: 2446
  33: 4534
  34: 4534
  35: 9065
-Camera_BGCheckInfo:27756:0
+Camera_BGCheckInfo:27756:4704
  10: 4704
  11: 3525
  18: 1668
@@ -4841,7 +4841,7 @@ Camera_BGCheckInfo:27756:0
  36: 726
  12: Camera_AddVecGeoToVec3f:1176
   2: 1176
-EnRiverSound_GetSfxPos:27713:0
+EnRiverSound_GetSfxPos:27713:7945
  0: 7945
  11: 3398
  14: 3372
@@ -4849,11 +4849,11 @@ EnRiverSound_GetSfxPos:27713:0
  18: 3530
  19: 3610
  20: 2407
-Math3D_SphVsCylOverlap:27690:0
+Math3D_SphVsCylOverlap:27690:9230
  0: 9230
  3: 9230
  4: 9230
-func_8008A8B8:27621:0
+func_8008A8B8:27621:3261
  0: 3261
  8: 2174
  9: 1168
@@ -4864,14 +4864,14 @@ func_8008A8B8:27621:0
  17: 2335
  18: 4107
  20: 5879
-StaticLookup_AddPoly:27303:0
+StaticLookup_AddPoly:27303:18202
  3: 18202
  7: 9101
-Gfx_SetupDL:26921:0
+Gfx_SetupDL:26921:7140
  2: 7140
  1: Gfx_SetupDLImpl:19781
   3: 19781
-Rig_BodyAngle:26791:0
+Rig_BodyAngle:26791:2388
  0: 2388
  1: 4777
  6: 2865
@@ -4881,26 +4881,26 @@ Rig_BodyAngle:26791:0
  11: 2130
  12: 3457
  14: 692
-EffectSsGRipple_Spawn:26677:0
+EffectSsGRipple_Spawn:26677:3693
  0: 3693
  3: 3692
  4: 1489
  6: 1846
  8: 10005
  9: 5952
-Play_InCsMode:26089:0
+Play_InCsMode:26089:6522
  0.2: 6522
  1: 9784
  1.2: 3261
  2: 6522
-SkelAnime_SetUpdate:26040:0
+SkelAnime_SetUpdate:26040:26040
  8: 26040
-LinkAnimation_AnimateFrame:25769:0
+LinkAnimation_AnimateFrame:25769:3868
  0: 3868
  1: 11763
  3: 8026
  4: 2112
-AnimTaskQueue_AddLoadPlayerFrame:25602:0
+AnimTaskQueue_AddLoadPlayerFrame:25602:2754
  1: 2754
  5: 2214
  8: 1107
@@ -4911,7 +4911,7 @@ AnimTaskQueue_AddLoadPlayerFrame:25602:0
   4: 2067
   8: 554
   11: 553
-Gfx_TwoTexScrollEnvColor:25341:0
+Gfx_TwoTexScrollEnvColor:25341:1126
  2: 1126
  9: 2042
  10: 7461
@@ -4920,7 +4920,7 @@ Gfx_TwoTexScrollEnvColor:25341:0
  13: 5420
  14: 2041
  17: 2041
-Play_Main:25104:0
+Play_Main:25104:955
  0: 955
  3: 1909
  5: 1048
@@ -4929,7 +4929,7 @@ Play_Main:25104:0
  35: 6437
  43: 1060
  48: 7413
-Health_UpdateMeter:24894:0
+Health_UpdateMeter:24894:10169
  2: 10169
  12: 3389
  37: 1836
@@ -4941,9 +4941,9 @@ Health_UpdateMeter:24894:0
  85: 805
  91: 1416
  93: 805
-SkelAnime_Update:24667:0
+SkelAnime_Update:24667:24667
  1: 24667
-Attention_SetNaviState:23544:0
+Attention_SetNaviState:23544:2964
  1: 2964
  2: 7153
  5: 6640
@@ -4953,10 +4953,10 @@ Attention_SetNaviState:23544:0
  10: 969
  11: 969
  13: 1940
-EnFishmod_RodMessage:23115:0
+EnFishmod_RodMessage:23115:3303
  9: 3303
  10: 19812
-Actor_MoveXYZ:22946:0
+Actor_MoveXYZ:22946:2205
  0: 2205
  1: 1470
  2: Actor_UpdatePos:19271
@@ -4964,12 +4964,12 @@ Actor_MoveXYZ:22946:0
   3: 4818
   4: 5589
   5: 3953
-Player_ProcessControlStick:22682:0
+Player_ProcessControlStick:22682:4329
  7: 4329
  9: 8603
  11: 4178
  13: 5572
-Animation_OnFrame:22529:0
+Animation_OnFrame:22529:4174
  2: 4174
  1: Animation_OnFrameImpl:18355
   1: 2222
@@ -4978,21 +4978,21 @@ Animation_OnFrame:22529:0
   12: 3757
   16: 1878
   18: 6054
-func_80093C80:22325:0
+func_80093C80:22325:727
  1: 727
  5: 3090
  8: 6708
  12: 4472
  3: Gfx_SetupDL_25Opa:7328
   3: 7328
-Player_DrawGameplay:22024:0
+Player_DrawGameplay:22024:2214
  0: 2214
  1: 695
  3: 4863
  6: 6641
  36.1: 952
  71: 6659
-func_80A03CF8:21836:0
+func_80A03CF8:21836:2833
  0: 2833
  13: 3047
  13.1: 3045
@@ -5005,7 +5005,7 @@ func_80A03CF8:21836:0
   11: 2032
  73: func_80A029A8:664
   1: 664
-Collider_ResetCylinderAC:21796:0
+Collider_ResetCylinderAC:21796:4688
  6: 4688
  3: Collider_ResetACBase:4418
   1: 1104
@@ -5015,41 +5015,41 @@ Collider_ResetCylinderAC:21796:0
   3: 3314
   4: 2344
   5: 2344
-Object_GetSlot:21788:0
+Object_GetSlot:21788:21788
  11: 21788
-Main:21628:0
+Main:21628:8112
  96: 8112
  97: 8110
  100: 5406
-EnRiverSound_Update:21496:0
+EnRiverSound_Update:21496:2022
  0: 2022
  7: 3033
  7.1: 3030
  9: 4530
  10: 771
  12: 8110
-BgCheck_ComputeWallDisplacement:21453:0
+BgCheck_ComputeWallDisplacement:21453:6128
  14: 6128
  18: 3065
  20: 6130
  25: 6130
-Player_Draw:21119:0
+Player_Draw:21119:3870
  11: 3870
  18: 3869
  19: 3868
  21: 3868
  67: 2823
  69: 2821
-Player_TryActionHandlerList:21106:0
+Player_TryActionHandlerList:21106:5278
  20: 5278
  21: 15828
-PadMgr_ThreadEntry:20996:0
+PadMgr_ThreadEntry:20996:6776
  13: 6776
  16: 6182
  22: 3388
  37: 2790
  40: 1860
-Sched_RunTask:20844:0
+Sched_RunTask:20844:1110
  23: 1110
  24: 2220
  27: 4439
@@ -5058,11 +5058,11 @@ Sched_RunTask:20844:0
  54: 725
  55: 5076
  58: 2313
-PadMgr_RumbleSet:20779:0
+PadMgr_RumbleSet:20779:5196
  3: 5196
  3.3: 5194
  4.3: 10389
-IrqMgr_ThreadEntry:20673:0
+IrqMgr_ThreadEntry:20673:2596
  0: 2596
  10: 2574
  17: 1297
@@ -5075,26 +5075,26 @@ IrqMgr_ThreadEntry:20673:0
  43: IrqMgr_HandlePreNMI500:2574
   1: IrqMgr_CheckStacks:2574
    3: 2574
-Math_Vec3f_Diff:20509:0
+Math_Vec3f_Diff:20509:10256
  1: 10256
  2: 10253
-Math_StepToF:20497:0
+Math_StepToF:20497:1067
  0: 1067
  1: 4266
  2: 4694
  6: 1496
  8: 8974
-BgSpot06Objects_DrawLakeHyliaWater:20362:0
+BgSpot06Objects_DrawLakeHyliaWater:20362:6221
  8: 6221
  10: 1244
  12: 2488
  15: 5134
  19: 3956
  21: 1319
-Rig_MulPoint:19890:0
+Rig_MulPoint:19890:13994
  1: 13994
  2: 5896
-Player_UpdateCamAndSeqModes.part.0:19850:0
+Player_UpdateCamAndSeqModes.part.0:19850:1068
  32: 1068
  34: 2133
  37: 1066
@@ -5103,94 +5103,94 @@ Player_UpdateCamAndSeqModes.part.0:19850:0
  78: 1033
  79: 3097
  82: 2064
-Math3D_UDistPlaneToPos:19761:0
+Math3D_UDistPlaneToPos:19761:9880
  10: 9880
  9: Math3D_DistPlaneToPos:9881
   12: 9881
-Gfx_TwoTexScroll:19723:0
+Gfx_TwoTexScroll:19723:2465
  9: 2465
  10: 4930
  11: 2465
  12: 7397
  13: 2466
-Math3D_SphVsSph:19716:0
+Math3D_SphVsSph:19716:9858
  4: 9858
  3: Math3D_SphVsSphOverlap:9858
   3: Math3D_SphVsSphOverlapCenterDist:9858
    10: 9858
-ActorShadow_DrawFeet:19545:0
+ActorShadow_DrawFeet:19545:9401
  0: 9401
  1: 2174
  3: 1087
  62: 1377
  64: 2752
  108: 2754
-Actor_SetFocus:18984:0
+Actor_SetFocus:18984:3365
  1: 3365
  2: 3365
  3: 3364
  5: 3525
  7: 1682
  8: 3683
-CollisionCheck_SetAC_SAC:18682:0
+CollisionCheck_SetAC_SAC:18682:12824
  0: 12824
  3: 2928
  27: 2930
-Scene_DrawConfigLakeHylia:18666:0
+Scene_DrawConfigLakeHylia:18666:2063
  5: 2063
  5.1: 3093
  5.2: 3093
  9: 2605
  10: 7812
-Room_Draw:18542:0
+Room_Draw:18542:3282
  1: 3282
  2: 3382
  5: 10124
  7: 1754
-Actor_GetWorldPosShapeRot:18441:0
+Actor_GetWorldPosShapeRot:18441:6029
  0: 6029
  3: 3616
  7: 8796
-CollisionPoly_CheckZIntersectApprox:18041:0
+CollisionPoly_CheckZIntersectApprox:18041:2289
  0: 2289
  6: 2289
  8: 5080
  10: 7620
  7: CollisionPoly_GetNormalF:763
   3: 763
-Gfx_SetupDLAtPtr:17849:0
+Gfx_SetupDLAtPtr:17849:3570
  1: 3570
  1: Gfx_SetupDL:14279
   1: Gfx_SetupDLImpl:14279
    3: 14279
-Math3D_TriChkPointParaZIntersect:17709:0
+Math3D_TriChkPointParaZIntersect:17709:3610
  1: 3610
  3: 3612
  7: 10487
-Environment_DrawLightning:17666:0
+Environment_DrawLightning:17666:1213
  18: 1213
  18.1: 3980
  19: 9488
  76: 2985
-Rumble_Update:17385:0
+Rumble_Update:17385:5861
  0: 5861
  1: 3516
  2: 4576
  3: 3432
-Collider_ResetCylinderOC:17229:0
+Collider_ResetCylinderOC:17229:1
  3: Collider_ResetOCBase:14094
   2: 10183
   3: 3911
  4: Collider_ResetOCElement:3135
   1: 3135
-ScaleRotPos_Equals:17072:0
+ScaleRotPos_Equals:17072:2175
  1: 2175
  1.1: 788
  1.2: 4723
  1.3: 4012
  2: 4300
  2.1: 1074
-Fishmod_ClockDraw:17070:0
+Fishmod_ClockDraw:17070:518
  3.4: 518
  4.4: 513
  18.4: 4270
@@ -5198,10 +5198,10 @@ Fishmod_ClockDraw:17070:0
  23.4: 2072
  24.4: 3595
  27.4: 4548
-Fishmod_DebugFault:16866:0
+Fishmod_DebugFault:16866:2410
  19: 2410
  20: 14456
-PreRender_SetValues:16787:0
+PreRender_SetValues:16787:2099
  2: 2099
  3: 2098
  4: 4197
@@ -5209,19 +5209,19 @@ PreRender_SetValues:16787:0
  6: 2098
  7: 2098
  8: 2099
-Collider_UpdateCylinder:16627:0
+Collider_UpdateCylinder:16627:4727
  1: 4727
  2: 7875
  3: 2415
  4: 1610
-CollisionCheck_AT:16544:0
+CollisionCheck_AT:16544:5163
  0.1: 5163
  4: 3286
  4.1: 2439
  11: 2121
  11.1: 2121
  14: 1414
-CollisionCheck_ATJntSphVsACCyl:16334:0
+CollisionCheck_ATJntSphVsACCyl:16334:4465
  1.1: 4465
  8.1: 3218
  8.2: 1619
@@ -5229,25 +5229,25 @@ CollisionCheck_ATJntSphVsACCyl:16334:0
  56: 4876
  9: CollisionCheck_IsElementNotAC:539
   1: 539
-LightContext_SetFog:16322:0
+LightContext_SetFog:16322:2332
  1: 2332
  2: 2332
  3: 2332
  4: 2332
  5: 2332
  6: 4662
-Gfx_SetFog2:16311:0
+Gfx_SetFog2:16311:1
  1: Gfx_SetFog:16311
   8: 997
   12: 1993
   25: 13321
-EnFishmod_GridCorner:15914:0
+EnFishmod_GridCorner:15914:5482
  1: 5482
  3: 3979
  4: 1075
  5: 2150
  10: 3228
-Collider_ResetQuadAT:15850:0
+Collider_ResetQuadAT:15850:2400
  7: 2400
  3: Collider_ResetATBase:4143
   1: 1381
@@ -5258,7 +5258,7 @@ Collider_ResetQuadAT:15850:0
   4: 2762
  5: Collider_ResetQuadACDist:3963
   1: 3963
-CollisionCheck_ClearContext.part.0:15729:0
+CollisionCheck_ClearContext.part.0:15729:902
  6: 902
  7: 901
  9: 1802
@@ -5267,30 +5267,30 @@ CollisionCheck_ClearContext.part.0:15729:0
  21: 1738
  22: 5208
  25: 1574
-func_80083108:15587:0
+func_80083108:15587:1221
  8: 1221
  9: 1221
  11: 6104
  11.1: 3640
  13: 3401
-func_80B0C9F0:15404:0
+func_80B0C9F0:15404:2651
  0: 2651
  3: 6626
  10: 2525
  11: 1800
  30: 1802
-Player_UpdateUpperBody:15321:0
+Player_UpdateUpperBody:15321:1988
  1.1: 1988
  1.2: 2648
  17: 4421
  24: 6264
-Play_CamIsNotFixed:15284:0
+Play_CamIsNotFixed:15284:9171
  5.3: 9171
  6: 6113
-Matrix_Pop:15274:0
+Matrix_Pop:15274:9165
  1: 9165
  3: 6109
-SkelAnime_DrawOpa:15135:0
+SkelAnime_DrawOpa:15135:2865
  17: 2865
  18: 5467
  20: 1383
@@ -5298,7 +5298,7 @@ SkelAnime_DrawOpa:15135:0
  24: 1382
  25: 691
  40: 1964
-EnAObj_Update:15013:0
+EnAObj_Update:15013:2556
  0: 2556
  3: 3834
  4: 2556
@@ -5307,39 +5307,39 @@ EnAObj_Update:15013:0
  18: 1198
  19: 1197
  21: 598
-CollisionCheck_SetAT:14949:0
+CollisionCheck_SetAT:14949:3440
  3: 3440
  7: 2062
  8.1: 3543
  11: 4724
  16: 1180
-Player_GetHeight:14879:0
+Player_GetHeight:14879:10370
  1: 10370
  3.4: 4509
-CollisionCheck_ApplyDamage:14763:0
+CollisionCheck_ApplyDamage:14763:5235
  5: 5235
  5.1: 4712
  8: 2442
  23: 1154
  35: 1220
-View_SetViewport:14664:0
+View_SetViewport:14664:10998
  1: 10998
  2: 1833
  3: 1833
-Matrix_ToMtx:14592:0
+Matrix_ToMtx:14592:3648
  0: 3648
  1: 10944
-SkinMatrix_SetRotateYXZ:14292:0
+SkinMatrix_SetRotateYXZ:14292:14292
  60: 14292
-Graph_ThreadEntry:14028:0
+Graph_ThreadEntry:14028:1754
  32: 1754
  34: 8767
  35: 3507
-Cutscene_UpdateManual:13436:0
+Cutscene_UpdateManual:13436:7029
  1: 7029
  2: 5607
  4: 800
-Player_InBlockingCsMode:13288:0
+Player_InBlockingCsMode:13288:1196
  1: 1196
  1.1: 3640
  2: 1820
@@ -5347,14 +5347,14 @@ Player_InBlockingCsMode:13288:0
  5: 4118
  4: Player_ActionToMagicSpell:1604
   1: 1604
-GameState_Draw:13130:0
+GameState_Draw:13130:1031
  38: 1031
  51: 5151
  52: 2672
  53: 611
  57: 1833
  59: 1832
-Message_Draw:13109:0
+Message_Draw:13109:1702
  0: 1702
  10: 851
  25: 2553
@@ -5362,24 +5362,24 @@ Message_Draw:13109:0
  28: 2364
  29: 3151
  30: 787
-BgCheck_EntityRaycastDown6:12914:0
+BgCheck_EntityRaycastDown6:12914:6457
  1: 6457
  2: 6457
-CollisionCheck_SkipOC:12903:0
+CollisionCheck_SkipOC:12903:12903
  5: 12903
-GameState_SetFrameBuffer:12859:0
+GameState_SetFrameBuffer:12859:5907
  4: 5907
  5: 843
  7: 1528
  8: 3818
  9: 763
-Math3D_LineVsSph:12338:0
+Math3D_LineVsSph:12338:2010
  0: 2010
  20: 3226
  21: 1074
  7: Math3D_PointInSph:6028
   1: 6028
-Sched_HandleRDPDone:12320:0
+Sched_HandleRDPDone:12320:1664
  7: 1664
  15: 832
  18: 2494
@@ -5391,7 +5391,7 @@ Sched_HandleRDPDone:12320:0
     0: Sched_SetNextFramebufferFromTask:4960
      6: 3544
      7: 1416
-func_80B0CBE8:12278:0
+func_80B0CBE8:12278:623
  0: 623
  1: 1869
  1.1: 2491
@@ -5399,27 +5399,27 @@ func_80B0CBE8:12278:0
  0: func_80B0CBE8:5471
   7: 4559
   10: 912
-CollisionCheck_ApplyDamageJntSph:12234:0
+CollisionCheck_ApplyDamageJntSph:12234:2713
  0: 2713
  4: 3462
  4.1: 3459
  0: CollisionCheck_ApplyDamageJntSph:2600
   6: 2600
-Interface_DrawActionLabel:12213:0
+Interface_DrawActionLabel:12213:11443
  3: 11443
  7: 770
-BgCheck_GetCollisionHeader:11946:0
+BgCheck_GetCollisionHeader:11946:11946
  2: 11946
-Math3D_PointRelativeToCubeFaces:11934:0
+Math3D_PointRelativeToCubeFaces:11934:1040
  15: 1040
  19: 6235
  23: 3453
  28: 1206
-View_ApplyLetterbox:11853:0
+View_ApplyLetterbox:11853:651
  32: 651
  42: 7878
  43: 3324
-Matrix_SetTranslateScaleMtx2:11805:0
+Matrix_SetTranslateScaleMtx2:11805:1180
  8: 1180
  9: 1180
  10: 1180
@@ -5428,43 +5428,43 @@ Matrix_SetTranslateScaleMtx2:11805:0
  38: 592
  39: 591
  41: 1182
-Actor_WorldToActorCoords:11775:0
+Actor_WorldToActorCoords:11775:8118
  0: 8118
  6: 2705
  14: 952
-Fishmod_DpadDraw:11740:0
+Fishmod_DpadDraw:11740:1564
  0: 1564
  3.1: 2058
  4: 782
  7.2: 1372
  8: 4592
  12: 1372
-Player_ProcessItemButtons:11670:0
+Player_ProcessItemButtons:11670:2464
  25.2: 2464
  26: 3288
  31: 2733
  33: 1911
  35: 1274
-Fishmod_AdvanceTime:11557:0
+Fishmod_AdvanceTime:11557:1445
  1: 1445
  4: 4335
  7: 4333
  10: 1444
-KaleidoScopeCall_LoadPlayer:11258:0
+KaleidoScopeCall_LoadPlayer:11258:2815
  0: 2815
  3: 8443
-EnElf_UpdateLights:11240:0
+EnElf_UpdateLights:11240:4964
  16: 4964
  20: 4189
  23: 2087
-Message_DrawMain:11159:0
+Message_DrawMain:11159:1737
  50: 1737
  51: 3710
  53: 2448
  54: 3264
-AnimTask_ActorMovement:11113:0
+AnimTask_ActorMovement:11113:11113
  10: 11113
-EnKanban_Update:10900:0
+EnKanban_Update:10900:2300
  0: 2300
  6: 766
  9: 1532
@@ -5474,7 +5474,7 @@ EnKanban_Update:10900:0
  164: 1193
  488: 1192
  491: 1192
-Camera_CalcAtDefault:10890:0
+Camera_CalcAtDefault:10890:1932
  0: 1932
  1: 643
  6: 1932
@@ -5482,26 +5482,26 @@ Camera_CalcAtDefault:10890:0
  18: 2871
  21: 1434
  22: 1434
-EnFishmod_RodDraw:10885:0
+EnFishmod_RodDraw:10885:1361
  1: 1361
  3: 4083
  4: 4081
  4.1: 1360
-Player_DetectRumbleSecrets:10849:0
+Player_DetectRumbleSecrets:10849:9493
  2: 9493
  4: 1356
-Camera_UpdateInterface:10698:0
+Camera_UpdateInterface:10698:2676
  22: 2676
  25: 2674
  29: 5348
-CollisionCheck_SetOCvsOC:10510:0
+CollisionCheck_SetOCvsOC:10510:3502
  0: 3502
  68: 7008
-Interface_DrawActionButton:10365:0
+Interface_DrawActionButton:10365:1316
  10: 1316
  12: 8411
  16: 638
-Rod_PublishInfo:10210:0
+Rod_PublishInfo:10210:1276
  4: 1276
  4.1: 1277
  5: 1276
@@ -5509,14 +5509,14 @@ Rod_PublishInfo:10210:0
  6: 1276
  6.1: 1276
  8.1: 2552
-func_80043334:9989:0
+func_80043334:9989:7492
  0: 7492
  1: 2497
-AnimTaskQueue_Update:9952:0
+AnimTaskQueue_Update:9952:1244
  7: 1244
  8: 4976
  10: 3732
-Quake_Update:9927:0
+Quake_Update:9927:1241
  14: 1241
  15: 1241
  17: 1241
@@ -5525,207 +5525,207 @@ Quake_Update:9927:0
  21: 1241
  22: 1241
  23: 1240
-Math3D_TriChkPointParaZImpl:9841:0
+Math3D_TriChkPointParaZImpl:9841:4304
  0: 4304
  7: 1436
  7: Math3D_CirSquareVsTriSquare:4101
   29: 2052
   33: 2049
-BgCheck_ResetPolyCheckTbl:9812:0
+BgCheck_ResetPolyCheckTbl:9812:9812
  2: 9812
-Collider_ResetCylinderAT:9713:0
+Collider_ResetCylinderAT:9713:1105
  6: 1105
  3: Collider_ResetATBase:4304
   2: 4304
  4: Collider_ResetATElement:4304
   4: 4304
-OLib_Vec3fDistNormalize:9695:0
+OLib_Vec3fDistNormalize:9695:1380
  5: 1380
  6: 1379
  7: 1380
  9: 1046
  9: OLib_ClampMinDist:4510
   1: 4510
-func_8083D53C:9566:0
+func_8083D53C:9566:1196
  0: 1196
  1: 3588
  2: 2392
  3: 1195
  11: 1195
-Fishmod_SampleRdp:9564:0
+Fishmod_SampleRdp:9564:1196
  1: 1196
  2: 3586
  3: 2391
  4: 2391
-Camera_CalcDefaultYaw:9494:0
+Camera_CalcDefaultYaw:9494:2374
  0: 2374
  16: Camera_InterpolateCurve:4746
   9: 4746
  24: Camera_InterpolateCurve:2374
   16: 2374
-func_8084B000:9481:0
+func_8084B000:9481:1186
  8: 1186
  9: 2370
  13: 3555
  14: 2370
-Math3D_SphVsSphOverlapCenterDist:9245:0
+Math3D_SphVsSphOverlapCenterDist:9245:1878
  3: 1878
  4: 1877
  16: 5490
-Actor_SetWorldRotToShape:9205:0
+Actor_SetWorldRotToShape:9205:5523
  1: 5523
  2: 3682
-FrameAdvance_IsEnabled:9168:0
+FrameAdvance_IsEnabled:9168:3056
  1: 3056
  2: 6112
-EnFishmod_WaterGridAcquire:9084:0
+EnFishmod_WaterGridAcquire:9084:4542
  2: 4542
  4: 4542
-EnFishmod_RosterFish:9068:0
+EnFishmod_RosterFish:9068:3024
  1: 3024
  1.1: 6044
-func_80A90264:9034:0
+func_80A90264:9034:1505
  1: 1505
  3: 3012
  23: 4517
-Gfx_SetupDL_54Opa:8944:0
+Gfx_SetupDL_54Opa:8944:7826
  3: 7826
  6: 1118
-KaleidoSetup_Update:8935:0
+KaleidoSetup_Update:8935:2234
  9: 2234
  9.1: 2234
  10: 2233
  10.1: 2234
-Camera_RequestModeImpl:8928:0
+Camera_RequestModeImpl:8928:3078
  0: 3078
  7: 1230
  12: 4620
-TransitionFade_Update:8811:0
+TransitionFade_Update:8811:3306
  5: 3306
  25: 1101
  26: 4404
-Gfx_SetupDL_39Overlay:8780:0
+Gfx_SetupDL_39Overlay:8780:1756
  3: 1756
  3: Gfx_SetupDL_39:7024
   1: 7024
-Fishmod_PlayUpdate:8742:0
+Fishmod_PlayUpdate:8742:2186
  3: 2186
  7: 4372
  7.1: 2184
-ActorShadow_DrawCircle:8643:0
+ActorShadow_DrawCircle:8643:1235
  0: 1235
  1: 3705
  2: 3703
-Player_UpdateShapeYaw:8609:0
+Player_UpdateShapeYaw:8609:3228
  10: 3228
  19: 5381
-EnDoor_Draw:8376:0
+EnDoor_Draw:8376:1
  0: EnDoor_Draw:8376
   7: 7329
   9: 1047
-Matrix_RotateZYX:8100:0
+Matrix_RotateZYX:8100:8100
  83: 8100
-func_8002E234:8091:0
+func_8002E234:8091:8091
  6: 8091
-THA_Init:8067:0
+THA_Init:8067:1345
  1: 1345
  2: 1345
  4: 2688
  3: THA_Reset:2689
   1: 1344
   2: 1345
-Fishmod_AutoplayInput:7973:0
+Fishmod_AutoplayInput:7973:997
  5: 997
  41: 2988
  16: PlayBench_Input:3988
   3: 3988
-Math_Atan2F:7736:0
+Math_Atan2F:7736:3868
  0: 3868
  1: 3868
-func_80046E20:7733:0
+func_80046E20:7733:966
  62: 966
  95: 6767
-SkinMatrix_Vec3fMtxFMultXYZ:7515:0
+SkinMatrix_Vec3fMtxFMultXYZ:7515:4509
  16: 4509
  17: 3006
-Lights_FindSlot:7458:0
+Lights_FindSlot:7458:7458
  2: 7458
-func_800418D0:7359:0
+func_800418D0:7359:7359
  12: 7359
-SkinMatrix_SetRotateAxis:7086:0
+SkinMatrix_SetRotateAxis:7086:7086
  0: 7086
-PlayerCall_Draw:6996:0
+PlayerCall_Draw:6996:4372
  2: 4372
  3: 2624
-EnFishmod_OpenWaterTo:6949:0
+EnFishmod_OpenWaterTo:6949:2779
  0: 2779
  5: 4170
-Math3D_TriChkPointParaYDist:6900:0
+Math3D_TriChkPointParaYDist:6900:2300
  5: 2300
  10: 4600
-Math3D_CylVsCylOverlap:6820:0
+Math3D_CylVsCylOverlap:6820:2728
  0: 2728
  3: 2728
  4: 1364
-Environment_UpdateLightningStrike:6816:0
+Environment_UpdateLightningStrike:6816:1704
  1: 1704
  2: 5112
-BgCheck_CheckLineAgainstBgActorSSList:6750:0
+BgCheck_CheckLineAgainstBgActorSSList:6750:6750
  0: 6750
-Magic_Update:6535:0
+Magic_Update:6535:3268
  17: 3268
  67: 3267
-GameState_ReqPadData:6520:0
+GameState_ReqPadData:6520:815
  0: 815
  1: 3260
  3: 1630
  5: 815
-Sched_SwapFrameBuffer:6447:0
+Sched_SwapFrameBuffer:6447:1
  15: Sched_SwapFrameBufferImpl:6447
   3: 1612
   5: 1612
   6: 806
   11: 2417
-EnFishmod_RodBobberInWater:6402:0
+EnFishmod_RodBobberInWater:6402:4852
  1: 4852
  2: 1550
-PlayerCall_Update:6377:0
+PlayerCall_Update:6377:3985
  2: 3985
  3: 2392
-Sched_HandleRSPDone:6211:0
+Sched_HandleRSPDone:6211:6211
  12: 6211
-BgCheck_Vec3fToVec3s:6190:0
+BgCheck_Vec3fToVec3s:6190:3714
  3: 3714
  4: 2476
-CollisionCheck_ClearContext:6011:0
+CollisionCheck_ClearContext:6011:5153
  4: 5153
  25: 858
-SkinMatrix_Vec3sToVec3f:5961:0
+SkinMatrix_Vec3sToVec3f:5961:1987
  3: 1987
  4: 3974
-BgCheck_RaycastDownDynaList:5928:0
+BgCheck_RaycastDownDynaList:5928:5928
  49: 5928
-Player_UpdateHoverBoots:5903:0
+Player_UpdateHoverBoots:5903:1476
  14: 1476
  24: 1476
  25: 2214
  29: 737
-BgCheck_CameraLineTest1:5895:0
+BgCheck_CameraLineTest1:5895:5159
  3: 5159
  5: 736
-FrameAdvance_Update:5860:0
+FrameAdvance_Update:5860:2199
  1.1: 2199
  5: 1465
  5.1: 2196
-TitleCard_Update:5736:0
+TitleCard_Update:5736:2868
  2.1: 2868
  3: 2151
  10: 717
-func_800C49F4:5700:0
+func_800C49F4:5700:2139
  10: 2139
  15: 2849
  16: 712
-SurfaceType_GetConveyorSpeed:5688:0
+SurfaceType_GetConveyorSpeed:5688:1
  1: SurfaceType_GetData:5688
   5: 2544
   10: 636
@@ -5733,152 +5733,152 @@ SurfaceType_GetConveyorSpeed:5688:0
    1: 598
    0: BgCheck_GetCollisionHeader:1910
     14: 1910
-Camera_CalcSlopeYAdj:5666:0
+Camera_CalcSlopeYAdj:5666:2834
  0: 2834
  4: 1416
  6: 1416
-Attention_Draw:5575:0
+Attention_Draw:5575:2788
  0: 2788
  5: 697
  7: 2090
-Math3D_PointRelativeToCubeEdges:5489:0
+Math3D_PointRelativeToCubeEdges:5489:535
  0: 535
  3: 4954
-func_800342EC:5454:0
+func_800342EC:5454:2046
  3: 2046
  4: 2045
  5: 682
  7: func_8002EABC:681
   5: 681
-Camera_GetWaterBoxBgCamIndex:5450:0
+Camera_GetWaterBoxBgCamIndex:5450:2726
  15: 2726
  21: 2043
  24: 681
-SurfaceType_GetLightSetting:5405:0
+SurfaceType_GetLightSetting:5405:1802
  1: 1802
  2: 1801
  1: SurfaceType_GetData:1802
   14: 1802
-Fishmod_DebugDrawText:5367:0
+Fishmod_DebugDrawText:5367:671
  4: 671
  10: 3355
  14: 1341
-EnFishmod_Init:5337:0
+EnFishmod_Init:5337:1
  66: EnFishmod_PatchSkeleton:5337
   15: 1335
   16: 1334
   18: 1334
   21: 1334
-Environment_PlayTimeBasedSequence:5302:0
+Environment_PlayTimeBasedSequence:5302:2652
  1: 2652
  3: 2650
-CollisionCheck_OC_CylVsCyl:5271:0
+CollisionCheck_OC_CylVsCyl:5271:659
  7: 659
  7.1: 2636
  19: 1976
-Gfx_SetupDL_39Opa:5269:0
+Gfx_SetupDL_39Opa:5269:3512
  6: 3512
  3: Gfx_SetupDL_39:1757
   1: 1757
-CollisionCheck_SetInfoGetDamageTable:5235:0
+CollisionCheck_SetInfoGetDamageTable:5235:5235
  2: 5235
-Player_HandleExitsAndVoids:5223:0
+Player_HandleExitsAndVoids:5223:653
  7.2: 653
  8: 1959
  8.1: 1306
  9: 1305
-EnSw_Update:5175:0
+EnSw_Update:5175:1294
  0: 1294
  3: 1294
  4: 1941
  5: 646
-func_80A02C98:5125:0
+func_80A02C98:5125:641
  12.4: 641
  15: 640
  15.4: 2564
  15.7: 640
  16.7: 640
-Environment_GraphCallback:5091:0
+Environment_GraphCallback:5091:2547
  3: 2547
  3: Environment_GetPixelDepth:2544
   1: 2544
-func_8083D6EC:5088:0
+func_8083D6EC:5088:3816
  0: 3816
  4: 1272
-EnFishmod_OpenWaterDir:5044:0
+EnFishmod_OpenWaterDir:5044:5044
  20: 5044
-Letterbox_Update:5014:0
+Letterbox_Update:5014:627
  6: 627
  9: 4387
-EnKanban_Message:4997:0
+EnKanban_Message:4997:1250
  11: 1250
  19: 3123
  0: EnKanban_Message:624
   3: 624
-EnCrow_UpdateDamage:4888:0
+EnCrow_UpdateDamage:4888:4888
  1: 4888
-LinkAnimation_Loop:4853:0
+LinkAnimation_Loop:4853:1821
  3: 1821
  4: 2425
  5: 607
-Matrix_RotateAxis:4824:0
+Matrix_RotateAxis:4824:1206
  45: 1206
  46: 1809
  47: 1206
  49: 603
-Actor_CullingCheck:4805:0
+Actor_CullingCheck:4805:4805
  2: 4805
-Camera_UpdateWater:4803:0
+Camera_UpdateWater:4803:2403
  29: 2403
  31: 600
  45: 1200
  47: 600
-Actor_ProjectPos:4791:0
+Actor_ProjectPos:4791:599
  1: 599
  2: 4192
-Player_UpdateItems:4737:0
+Player_UpdateItems:4737:593
  7.1: 593
  8: 2368
  8.1: 1776
-EffectBlure_Draw:4735:0
+EffectBlure_Draw:4735:1776
  10: 1776
  12: 2959
-Lights_Reset:4727:0
+Lights_Reset:4727:2364
  3: 2364
  5: 2363
-Map_Update:4713:0
+Map_Update:4713:589
  2: 589
  9: 4124
-Actor_SetShapeRotToWorld:4675:0
+Actor_SetShapeRotToWorld:4675:2805
  1: 2805
  2: 1870
-Rig_RotateX:4664:0
+Rig_RotateX:4664:583
  5.3: 583
  7.3: 583
  9.3: 2332
  10.3: 1166
-Scene_Draw:4663:0
+Scene_Draw:4663:4663
  6: 4663
-Math3D_PointRelativeToCubeVertices:4657:0
+Math3D_PointRelativeToCubeVertices:4657:583
  3: 583
  7: 4074
-EnDoor_Idle:4594:0
+EnDoor_Idle:4594:574
  5: 574
  16: 1150
  17: 2870
-Rig_RotateY:4537:0
+Rig_RotateY:4537:1135
  2: 1135
  5: 567
  5.3: 567
  6.3: 567
  7.3: 567
  9.3: 1134
-Actor_Destroy:4491:0
+Actor_Destroy:4491:642
  6: 642
  15: 3849
-Attention_InitReticle:4446:0
+Attention_InitReticle:4446:4446
  19: 4446
-Lights_PointNoGlowSetInfo:4392:0
+Lights_PointNoGlowSetInfo:4392:1254
  2: 1254
  1: Lights_PointSetInfo:3138
   2: 628
@@ -5887,189 +5887,189 @@ Lights_PointNoGlowSetInfo:4392:0
   5: Lights_PointSetColorAndRadius:1256
    3: 628
    4: 628
-Math_Vec3f_Scale:4352:0
+Math_Vec3f_Scale:4352:4352
  4: 4352
-OLib_VecSphToVec3f:4303:0
+OLib_VecSphToVec3f:4303:1614
  5: 1614
  7: 1614
  8: 1075
-func_80A04414:4292:0
+func_80A04414:4292:1074
  20: 1074
  21: 3218
-Math3D_DistXYZ16toF:4271:0
+Math3D_DistXYZ16toF:4271:534
  3: 534
  4: 534
  5: 2136
  6: Math3D_Vec3fMagnitude:1067
   1: Math3D_Vec3fMagnitudeSq:1067
    1: 1067
-SurfaceType_IsFloorConveyor:4189:0
+SurfaceType_IsFloorConveyor:4189:599
  3: 599
  7: 2394
  8: 1196
-Actor_SetFeetPos:4128:0
+Actor_SetFeetPos:4128:1376
  1: 1376
  2: 2752
-Environment_DrawSkyboxFilters:4119:0
+Environment_DrawSkyboxFilters:4119:1030
  1: 1030
  1.1: 2060
  4: 515
  6: 514
-View_SetScale:4077:0
+View_SetScale:4077:1359
  1: 1359
  3: 2718
-View_GetScale:4075:0
+View_GetScale:4075:1359
  1: 1359
  2: 2716
-SkinMatrix_MtxFToMtx:3974:0
+SkinMatrix_MtxFToMtx:3974:3974
  1: 3974
-ActorShadow_DrawFoot:3968:0
+ActorShadow_DrawFoot:3968:3968
  9.4: 3968
-Player_CheckHostileLockOn:3805:0
+Player_CheckHostileLockOn:3805:1269
  1: 1269
  2: 2536
-Actor_HeightDiff:3805:0
+Actor_HeightDiff:3805:1903
  1: 1903
  2: 1902
-Matrix_MtxFCopy:3790:0
+Matrix_MtxFCopy:3790:1264
  1: 1264
  2: 1264
  3: 1262
-OLib_ClampMinDist:3781:0
+OLib_ClampMinDist:3781:630
  1: 630
  1.2: 631
  1.5: 1260
  2.8: 1260
-OLib_Vec3fToVecGeo:3780:0
+OLib_Vec3fToVecGeo:3780:3780
  0: 3780
-SkelAnime_DrawLod:3676:0
+SkelAnime_DrawLod:3676:3676
  39: 3676
-ScaleRotPos_SetValue:3627:0
+ScaleRotPos_SetValue:3627:2177
  3: 2177
  4: 1450
-Player_SetBootData:3592:0
+Player_SetBootData:3592:1198
  17: 1198
  20: 2394
-Actor_DisableLens:3578:0
+Actor_DisableLens:3578:1
  0: Actor_DisableLens:3578
   3: 3578
-EnTite_SetupTurnTowardPlayer:3510:0
+EnTite_SetupTurnTowardPlayer:3510:3510
  12: 3510
-Room_FinishRoomChange:3508:0
+Room_FinishRoomChange:3508:2631
  0: 2631
  2: 877
-View_Apply:3312:0
+View_Apply:3312:3312
  6: 3312
-Room_ProcessRoomRequest:3282:0
+Room_ProcessRoomRequest:3282:1094
  9: 1094
  15: 2188
-Gfx_Open:3210:0
+Gfx_Open:3210:3210
  2: 3210
-Gfx_Close:3210:0
+Gfx_Close:3210:1605
  0: 1605
  1: 1605
-Gfx_SetupDL_42Opa:3181:0
+Gfx_SetupDL_42Opa:3181:2121
  3: 2121
  6: 1060
-EnFishmod_RodClaim:3097:0
+EnFishmod_RodClaim:3097:3097
  1: 3097
-EffectSs_Reset:3084:0
+EffectSs_Reset:3084:3084
  17: 3084
-ActorShape_Init:3022:0
+ActorShape_Init:3022:3022
  5: 3022
-func_80A90948:3012:0
+func_80A90948:3012:3012
  6: 3012
-View_New:2928:0
+View_New:2928:2928
  9: 2928
-Gfx_SetupDL_25Xlu2:2908:0
+Gfx_SetupDL_25Xlu2:2908:1454
  3: 1454
  6: 1454
-Actor_SetScale:2804:0
+Actor_SetScale:2804:935
  1: 935
  2: 935
  4: 934
-Math_StepToS:2784:0
+Math_StepToS:2784:1856
  1: 1856
  2: 928
-func_80035B18:2723:0
+func_80035B18:2723:2723
  0: 2723
-View_SetPerspective:2716:0
+View_SetPerspective:2716:1358
  1: 1358
  4: 1358
-THA_Destroy:2688:0
+THA_Destroy:2688:2688
  1: 2688
-BgCheck_AnyCheckCeiling:2578:0
+BgCheck_AnyCheckCeiling:2578:2578
  5: 2578
-CollisionCheck_ApplyDamageTris:2466:0
+CollisionCheck_ApplyDamageTris:2466:2466
  7: 2466
-Collider_SetCylinderPosition:2414:0
+Collider_SetCylinderPosition:2414:1610
  1: 1610
  2: 804
-OLib_VecGeoToVec3f:2402:0
+OLib_VecGeoToVec3f:2402:2402
  8: 2402
-CollisionCheck_NoBlood:2400:0
+CollisionCheck_NoBlood:2400:2400
  1: 2400
-CollisionCheck_BlueBlood:2400:0
+CollisionCheck_BlueBlood:2400:2400
  0: 2400
-Cutscene_StopManual:2344:0
+Cutscene_StopManual:2344:2344
  4: 2344
-OLib_Vec3fDiffToVecSph:2342:0
+OLib_Vec3fDiffToVecSph:2342:2342
  8: 2342
-ShotSun_Update:2328:0
+ShotSun_Update:2328:2328
  3: 2328
-Sched_Notify:2245:0
+Sched_Notify:2245:2245
  3: 2245
-CollisionCheck_ATQuadVsACQuad:2167:0
+CollisionCheck_ATQuadVsACQuad:2167:1
  0: CollisionCheck_ATQuadVsACQuad:2167
   28: 2167
-Player_OverrideLimbDrawGameplayCrawling:1930:0
+Player_OverrideLimbDrawGameplayCrawling:1930:1930
  7: 1930
-Math3D_TriChkPointParaYSlopedY:1887:0
+Math3D_TriChkPointParaYSlopedY:1887:1887
  2: 1887
-EnFishmod_ProbeWater:1870:0
+EnFishmod_ProbeWater:1870:1870
  15: 1870
-SurfaceType_GetEcho:1800:0
+SurfaceType_GetEcho:1800:1
  1: SurfaceType_GetData:1800
   4: BgCheck_GetCollisionHeader:1800
    1: 1800
-SysUcode_GetUCodeBoot:1773:0
+SysUcode_GetUCodeBoot:1773:591
  1: 591
  2: 1182
-EnElf_GetCuePos:1701:0
+EnElf_GetCuePos:1701:1701
  19: 1701
-EnCrow_Die:1630:0
+EnCrow_Die:1630:1630
  12: 1630
-BgCheck_GetBccFlags:1590:0
+BgCheck_GetBccFlags:1590:795
  0: 795
  6: 795
-func_8008F2BC:1575:0
+func_8008F2BC:1575:1050
  13: 1050
  14: 525
-func_8009BEEC:1554:0
+func_8009BEEC:1554:1554
  0: 1554
-BgCheck_EntityRaycastDown3:1446:0
+BgCheck_EntityRaycastDown3:1446:1446
  5: 1446
-OLib_ClampMaxDist:1260:0
+OLib_ClampMaxDist:1260:1260
  1: 1260
-ActorShadow_DrawWhiteCircle:1234:0
+ActorShadow_DrawWhiteCircle:1234:1234
  3: 1234
-Rumble_Override:1144:0
+Rumble_Override:1144:1144
  4: 1144
-Gfx_SetupDL_42Overlay:1060:0
+Gfx_SetupDL_42Overlay:1060:1060
  3: 1060
-CollisionCheck_DestroyContext:859:0
+CollisionCheck_DestroyContext:859:859
  1: 859
-ShotSun_Destroy:776:0
+ShotSun_Destroy:776:776
  4: 776
-Gfx_SetupDL_31Opa:759:0
+Gfx_SetupDL_31Opa:759:759
  3: 759
-Lights_PointGlowSetInfo:627:0
+Lights_PointGlowSetInfo:627:1
  1: Lights_PointSetInfo:627
   5: Lights_PointSetColorAndRadius:627
    1: 627
-Camera_SetNewModeStateFlags:616:0
+Camera_SetNewModeStateFlags:616:616
  4: 616
-SysUcode_GetUCodeBootSize:591:0
+SysUcode_GetUCodeBootSize:591:591
  2: 591
-LinkAnimation_Update:545:0
+LinkAnimation_Update:545:545
  1: 545

@@ -18,6 +18,8 @@
 #   --ido          everything with IDO, as the decompilation builds; outputs get an -ido suffix
 #   --clang        the mod's own code (src/code/fishmod*.c, the fish actor) with clang (LLVM) instead of GCC; outputs get
 #                  a -clang suffix. CLANG_EXTRA (in the environment) passes it more options
+#   --pgo          (implies --clang) clang optimises with the console's sample profile, PGO_PROFILE (default
+#                  n64prof/profiles/oot-console2.prof; see its README); outputs get a -clang-pgo suffix
 # Uses `flips` on PATH (or FLIPS=/path/to/flips) for the release patch if there is one, else fishmod/tools/bps.py.
 set -euo pipefail
 
@@ -32,6 +34,7 @@ FLIPS="${FLIPS:-flips}"
 
 DEBUG=0
 CLANG=0
+PGO=0
 SCRIPT=""
 F3DEX3=0
 TESTMODE=0
@@ -50,6 +53,7 @@ while [ $# -gt 0 ]; do
         --gcc) GCC="$2"; shift ;;
         --ido) GCC="" ;;
         --clang) CLANG=1 ;;
+        --pgo) CLANG=1; PGO=1 ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
     shift
@@ -91,8 +95,13 @@ fi
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-# (a clang build also rebuilds when its compiler options change: the wrapper's contents count)
+if [ "$PGO" = 1 ]; then
+    PGO_PROFILE="$(realpath "${PGO_PROFILE:-n64prof/profiles/oot-console2.prof}")"
+    export CLANG_EXTRA="-fprofile-sample-use=$PGO_PROFILE ${CLANG_EXTRA:-}"
+fi
+# (a clang build also rebuilds when its compiler options change: the wrapper's and the profile's contents count)
 CLANG_SUM=""; [ "$CLANG" = 1 ] && CLANG_SUM="$(md5sum < tools/fishmod_clang_cc.sh | cut -c1-8)"
+[ "$PGO" = 1 ] && CLANG_SUM="$CLANG_SUM-$(md5sum < "$PGO_PROFILE" | cut -c1-8)"
 MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
@@ -168,6 +177,9 @@ elif [ "$GCC" != "O2" ]; then
 fi
 if [ "$CLANG" = 1 ]; then
     SUFFIX="$SUFFIX-clang"
+fi
+if [ "$PGO" = 1 ]; then
+    SUFFIX="$SUFFIX-pgo"
 fi
 
 if [ "$DEBUG" = 1 ]; then

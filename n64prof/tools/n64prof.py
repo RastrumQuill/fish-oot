@@ -159,6 +159,14 @@ class Node:
     def total(self):
         return sum(self.body.values()) + sum(n.total() for n in self.calls.values())
 
+    def head(self):
+        """The function's head samples (LLVM takes them as its entry count). PC sampling sees no calls, so: the samples
+        on its first line (the prologue), in the same units as the body. Never 0 for a sampled function: LLVM would
+        take it as never called, every call in it cold, and stop inlining there."""
+        if self.body:
+            return max(1, self.body[min(self.body)])
+        return 1 if self.calls else 0
+
     def write(self, out, indent):
         pad = " " * indent
         for (off, disc), c in sorted(self.body.items()):
@@ -199,7 +207,7 @@ def cmd_llvm(args):
         node.body[(max(0, inner["Line"] - inner["StartLine"]), inner.get("Discriminator", 0))] += c
     out = []
     for name, node in sorted(tops.items(), key=lambda kv: -kv[1].total()):
-        out.append(f"{name}:{node.total()}:0")
+        out.append(f"{name}:{node.total()}:{node.head()}")
         node.write(out, 1)
     with open(args.output, "w") as f:
         f.write("\n".join(out) + "\n")
