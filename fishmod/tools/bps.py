@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """BPS patches (the format Flips makes), with no outside tool: create one from a source and a target, or apply one.
 
-The patch copies the source wherever the target matches it at the same place, and the target's own bytes elsewhere,
-also borrowing from earlier in the target where a stretch repeats (TargetCopy). Not as small as Flips' search, but
-any BPS patcher applies it (Flips, the online patcher).
+The patch copies the source wherever the target matches it at the same place (SourceRead), or anywhere else in the
+source (SourceCopy: the ROM's files move when one before them grows), and the target's own bytes elsewhere, also
+borrowing from earlier in the target where a stretch repeats (TargetCopy). Any BPS patcher applies it (Flips, the
+online patcher).
 
 Usage:
   fishmod/tools/bps.py --create --bps SOURCE TARGET PATCH   (Flips' own argument order)
@@ -15,6 +16,9 @@ import zlib
 SOURCE_READ, TARGET_READ, SOURCE_COPY, TARGET_COPY = 0, 1, 2, 3
 MIN_SAME = 16   # a run of equal bytes shorter than this goes as target bytes (each action costs a few bytes)
 BLOCK = 32      # TargetCopy: the stretch length its search indexes
+SRC_KEY = 16    # SourceCopy: the source is indexed by the SRC_KEY bytes at every SRC_KEY-th offset, so a match at any
+                # shift is found within SRC_KEY bytes of its start (then extended back over them)
+MIN_COPY = 32   # a SourceCopy shorter than this isn't worth its offset
 
 
 def varint(n):
@@ -46,11 +50,29 @@ def signed(n):
     return varint((abs(n) << 1) | (1 if n < 0 else 0))
 
 
+def match_len(a, ai, b, bi, limit):
+    """How many bytes a[ai:] and b[bi:] share, up to limit (compared in chunks: the patch has long matches)."""
+    n = 0
+    step = 4096
+    while step:
+        while n + step <= limit and a[ai + n:ai + n + step] == b[bi + n:bi + n + step]:
+            n += step
+        step //= 8
+    while n < limit and a[ai + n] == b[bi + n]:
+        n += 1
+    return n
+
+
 def create(source, target):
     out = bytearray(b"BPS1")
     out += varint(len(source)) + varint(len(target)) + varint(0)
+    source = bytes(source)
+    target = bytes(target)
+    src_index = {}  # the source's SRC_KEY bytes at each SRC_KEY-th offset -> the first offset holding them
+    for k in range(0, len(source) - SRC_KEY + 1, SRC_KEY):
+        src_index.setdefault(source[k:k + SRC_KEY], k)
     seen = {}  # a target block's bytes -> where it first started (for TargetCopy)
-    target_rel = 0
+    rel = {"source": 0, "target": 0}
     lit = bytearray()
 
     def flush_literal():
@@ -64,29 +86,50 @@ def create(source, target):
     while i < n:
         # the source at the same place
         if i < len(source) and source[i] == target[i]:
-            j = i
-            limit = min(n, len(source))
-            while j < limit and source[j] == target[j]:
-                j += 1
-            if j - i >= MIN_SAME:
+            j = match_len(source, i, target, i, min(n, len(source)) - i)
+            if j >= MIN_SAME:
                 flush_literal()
-                out.extend(varint(((j - i - 1) << 2) | SOURCE_READ))
-                i = j
+                out.extend(varint(((j - 1) << 2) | SOURCE_READ))
+                i += j
                 continue
+        # the same bytes elsewhere in the source: try each of the SRC_KEY alignments the index can see
+        best = None
+        for d in range(SRC_KEY):
+            at = src_index.get(target[i + d:i + d + SRC_KEY])
+            if at is None or at < d:
+                continue
+            s0 = at - d  # where target[i] would sit in the source
+            j = match_len(source, s0, target, i, min(n - i, len(source) - s0))
+            if j >= MIN_COPY and (best is None or j > best[1]):
+                best = (s0, j)
+            if best is not None:
+                break
+        if best is not None:
+            s0, j = best
+            # take back literal bytes the match also covers
+            back = 0
+            while back < len(lit) and s0 - back - 1 >= 0 and source[s0 - back - 1] == lit[-1 - back]:
+                back += 1
+            if back:
+                del lit[len(lit) - back:]
+            flush_literal()
+            out.extend(varint(((j + back - 1) << 2) | SOURCE_COPY))
+            out.extend(signed(s0 - back - rel["source"]))
+            rel["source"] = s0 + j
+            i += j
+            continue
         # an earlier stretch of the target
-        key = bytes(target[i:i + BLOCK])
+        key = target[i:i + BLOCK]
         at = seen.get(key) if len(key) == BLOCK else None
         if at is not None and at < i:
-            j = 0
-            while i + j < n and target[at + j] == target[i + j]:
-                j += 1
+            j = match_len(target, at, target, i, n - i)
             flush_literal()
             out.extend(varint(((j - 1) << 2) | TARGET_COPY))
-            out.extend(signed(at - target_rel))
-            target_rel = at + j
+            out.extend(signed(at - rel["target"]))
+            rel["target"] = at + j
             for k in range(i, i + j, BLOCK):
                 if k + BLOCK <= n:
-                    seen.setdefault(bytes(target[k:k + BLOCK]), k)
+                    seen.setdefault(target[k:k + BLOCK], k)
             i += j
             continue
         if len(key) == BLOCK and i % 4 == 0:
