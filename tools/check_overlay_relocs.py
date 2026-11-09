@@ -6,9 +6,12 @@ HI16 must be followed, before any other HI16 in its register, by the LO16s that 
 at least one LO16 (else its lui is never relocated). Pairs are checked by symbol: a LO16 paired with a HI16 for another
 symbol is wrong.
 
-IDO complies; GCC needs -mno-explicit-relocs -mno-split-addresses; clang is checked here.
+IDO complies; GCC needs -mno-explicit-relocs -mno-split-addresses; clang doesn't, so its overlays are marked for the
+linker's own pairing (RELOC_ELF_PAIRING, include/libu64/overlay.h): each HI16 takes the next LO16 in the table. --elf
+checks that rule instead: the next LO16 after a HI16 must be for the same symbol.
 
-Usage: tools/check_overlay_relocs.py OBJECT...   (all of one overlay's objects; exit status 1 if any breaks the rule)
+Usage: tools/check_overlay_relocs.py [--elf] OBJECT...   (all of one overlay's objects; exit status 1 if any breaks
+the rule)
 """
 import struct
 import sys
@@ -47,7 +50,7 @@ def defined_names(paths):
     return names
 
 
-def check(path, overlay_names):
+def check(path, overlay_names, elf_pairing=False):
     d = open(path, "rb").read()
     if d[:4] != b"\x7fELF" or d[4] != 1 or d[5] != 2:
         return [f"{path}: not a 32-bit big-endian ELF"]
@@ -80,6 +83,24 @@ def check(path, overlay_names):
         def insn(off):
             return struct.unpack_from(">I", d, tsec[4] + off)[0]
 
+        if elf_pairing:
+            his = []  # the HI16s waiting for the next LO16: [(symbol, offset)]
+            for k in range(sec[5] // 8):
+                off, info = struct.unpack_from(">II", d, sec[4] + k * 8)
+                typ, sym = info & 0xFF, info >> 8
+                if typ not in (R_MIPS_HI16, R_MIPS_LO16) or not internal(sym):
+                    continue
+                if typ == R_MIPS_HI16:
+                    his.append((sym, off))
+                    continue
+                for hsym, hoff in his:
+                    if hsym != sym:
+                        problems.append(f"{path}: {target}+{hoff:#x}: HI16 paired with the LO16 at {off:#x}, "
+                                        "for another symbol")
+                his = []
+            for _, hoff in his:
+                problems.append(f"{path}: {target}+{hoff:#x}: HI16 with no LO16 after it")
+            continue
         pending = {}  # register -> [symbol, offset, used]: the last HI16 in it, as the loader keeps it
         for k in range(sec[5] // 8):
             off, info = struct.unpack_from(">II", d, sec[4] + k * 8)
@@ -109,15 +130,18 @@ def check(path, overlay_names):
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+    elf_pairing = "--elf" in args
+    paths = [a for a in args if a != "--elf"]
+    if not paths:
         sys.exit(__doc__)
     problems = []
-    overlay_names = defined_names(sys.argv[1:])  # (give all of one overlay's objects together)
-    for p in sys.argv[1:]:
-        problems += check(p, overlay_names)
+    overlay_names = defined_names(paths)  # (give all of one overlay's objects together)
+    for p in paths:
+        problems += check(p, overlay_names, elf_pairing)
     for p in problems:
         print(p)
-    print(f"{len(sys.argv) - 1} objects, {len(problems)} problems")
+    print(f"{len(paths)} objects, {len(problems)} problems ({'ELF' if elf_pairing else 'register'} pairing)")
     sys.exit(1 if problems else 0)
 
 

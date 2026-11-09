@@ -15,6 +15,14 @@
 #define R_MIPS_HI16 5
 #define R_MIPS_LO16 6
 
+/**
+ * fish-oot: an overlay whose relocation table starts with this entry (section NULL, type 0: never a real relocation)
+ * pairs its HI16s and LO16s the standard ELF way, each HI16 with the next LO16 in the table, instead of by register
+ * (Overlay_Relocate). Clang's overlays need it (tools/reloc_elf_pairing.py adds it, tools/check_overlay_relocs.py
+ * checks).
+ */
+#define RELOC_ELF_PAIRING 0x00454C46
+
 /* Reloc section id, must fit in 2 bits otherwise the relocation format must be modified */
 typedef enum RelocSectionId {
     /* 0 */ RELOC_SECTION_NULL,

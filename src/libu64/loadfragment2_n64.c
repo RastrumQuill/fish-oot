@@ -24,6 +24,50 @@ s32 gOverlayLogSeverity = 2;
 #define MIPS_JUMP_TARGET(insn) (((insn)&0x03FFFFFF) << 2)
 
 /**
+ * fish-oot: relocation for an overlay marked RELOC_ELF_PAIRING (clang's), pairing as the linker does: a HI16 takes
+ * its full address from the next LO16 in the table. A LO16 needs no HI16: only its low 16 bits change. Only the
+ * overlay's own relocations are in the table (fado), so there's no address check.
+ */
+static void Overlay_RelocateElfPairs(OverlayRelocationSection* ovlRelocs, u32* sections, u32 delta) {
+    u32 n = ovlRelocs->nRelocations;
+    u32* relocs = ovlRelocs->relocations;
+    u32 i;
+    u32 j;
+
+    for (i = 1; i < n; i++) {
+        u32 reloc = relocs[i];
+        u32* p = (u32*)(sections[RELOC_SECTION(reloc)] + RELOC_OFFSET(reloc));
+
+        switch (RELOC_TYPE_MASK(reloc)) {
+            case R_MIPS_32 << RELOC_TYPE_SHIFT:
+                *p += delta;
+                break;
+
+            case R_MIPS_26 << RELOC_TYPE_SHIFT:
+                *p = (*p & 0xFC000000) | (((PHYS_TO_K0(MIPS_JUMP_TARGET(*p)) + delta) & 0x0FFFFFFF) >> 2);
+                break;
+
+            case R_MIPS_HI16 << RELOC_TYPE_SHIFT:
+                for (j = i + 1; j < n; j++) {
+                    if (RELOC_TYPE_MASK(relocs[j]) == (R_MIPS_LO16 << RELOC_TYPE_SHIFT)) {
+                        // (the LO16 comes later in the table, so it isn't relocated yet)
+                        u32 lo = *(u32*)(sections[RELOC_SECTION(relocs[j])] + RELOC_OFFSET(relocs[j]));
+                        u32 addr = (*p << 0x10) + (s16)lo + delta;
+
+                        *p = (*p & 0xFFFF0000) | (((addr >> 0x10) + ((addr & 0x8000) ? 1 : 0)) & 0xFFFF);
+                        break;
+                    }
+                }
+                break;
+
+            case R_MIPS_LO16 << RELOC_TYPE_SHIFT:
+                *p = (*p & 0xFFFF0000) | ((*p + delta) & 0xFFFF);
+                break;
+        }
+    }
+}
+
+/**
  * Performs runtime relocation of overlay files, loadable code segments.
  *
  * Overlays are expected to be loadable anywhere in direct-mapped cached (KSEG0) memory, with some appropriate
@@ -71,6 +115,11 @@ void Overlay_Relocate(void* allocatedRamAddr, OverlayRelocationSection* ovlReloc
     sections[RELOC_SECTION_TEXT] = allocu32;
     sections[RELOC_SECTION_DATA] = allocu32 + ovlRelocs->textSize;
     sections[RELOC_SECTION_RODATA] = sections[RELOC_SECTION_DATA] + ovlRelocs->dataSize;
+
+    if (ovlRelocs->nRelocations != 0 && ovlRelocs->relocations[0] == RELOC_ELF_PAIRING) {
+        Overlay_RelocateElfPairs(ovlRelocs, sections, allocu32 - vramu32);
+        return;
+    }
 
     for (i = 0; i < ovlRelocs->nRelocations; i++) {
         // This will always resolve to a 32-bit aligned address as each section
