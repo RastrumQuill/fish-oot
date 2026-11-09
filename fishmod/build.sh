@@ -16,7 +16,7 @@
 #                  on IDO). The default is O2 (hwbench-4: CPU time 14-16% lower, no other change); --gcc Os is the other
 #                  level. Outputs get a -gccOs suffix for Os only
 #   --ido          everything with IDO, as the decompilation builds; outputs get an -ido suffix
-# Needs `flips` on PATH (or FLIPS=/path/to/flips) for the release patch.
+# Uses `flips` on PATH (or FLIPS=/path/to/flips) for the release patch if there is one, else fishmod/tools/bps.py.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -51,9 +51,9 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-if [ "$DEBUG" = 0 ] && ! command -v "$FLIPS" >/dev/null 2>&1; then
-    echo "error: flips not found (https://github.com/Alcaro/Flips); set FLIPS=/path/to/flips" >&2
-    exit 1
+if ! command -v "$FLIPS" >/dev/null 2>&1; then
+    # no Flips: the repository's own BPS tool (the same patch format, a little larger)
+    FLIPS="fishmod/tools/bps.py"
 fi
 
 baserom=""
