@@ -91,7 +91,9 @@ fi
 # make doesn't track flag changes, so rebuild from clean whenever the build mode changes
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG ${CLANG_EXTRA:-}"
+# (a clang build also rebuilds when its compiler options change: the wrapper's contents count)
+CLANG_SUM=""; [ "$CLANG" = 1 ] && CLANG_SUM="$(md5sum < tools/fishmod_clang_cc.sh | cut -c1-8)"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi

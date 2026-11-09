@@ -16,13 +16,19 @@ def main():
         sys.exit(__doc__)
     path = sys.argv[1]
     s = open(path).read()
-    m = re.search(r"^\.word (\d+) # relocCount\n", s, re.M)
-    if not m:
-        sys.exit(f"{path}: no relocCount line")
     if f"0x{RELOC_ELF_PAIRING:08X}" in s:
         return  # already marked
-    s = (s[:m.start()] + f".word {int(m.group(1)) + 1} # relocCount\n\n"
-         f".word 0x{RELOC_ELF_PAIRING:08X} # RELOC_ELF_PAIRING\n" + s[m.end():])
+    m = re.search(r"^\.word (\d+) # relocCount\n", s, re.M)
+    tail = re.search(r"((?:^\.word 0\n)*)\n?^\.word 0x([0-9A-Fa-f]+) # (\w+OverlayInfoOffset)\n?\Z", s, re.M)
+    if not m or not tail:
+        sys.exit(f"{path}: not fado's layout (relocCount, padding, OverlayInfoOffset)")
+    # The table is padded to 16 bytes and ends with its own size (the loader finds it from the end): one entry more
+    # changes both.
+    count = int(m.group(1)) + 1
+    words = 5 + count + 1  # the 4 sizes and the count, the relocations, the offset
+    pad = -words % 4
+    s = (s[:m.start()] + f".word {count} # relocCount\n\n.word 0x{RELOC_ELF_PAIRING:08X} # RELOC_ELF_PAIRING\n"
+         + s[m.end():tail.start()] + ".word 0\n" * pad + f"\n.word 0x{(words + pad) * 4:08X} # {tail.group(3)}\n")
     open(path, "w").write(s)
 
 

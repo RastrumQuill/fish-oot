@@ -4,7 +4,9 @@
 # Makefile builds and turns it into clang's: the same o32 ABI, VR4300 (as MIPS II, with LLVM's own VR4300
 # multiply-bug fix), no PIC, no small data. Drops what's GCC- or IDO-only. FISHMOD_CLANG names the clang (default
 # clang); CLANG_EXTRA adds options (for example -fprofile-sample-use=...).
-args=(--target=mips-linux-gnu -mfp32 -fno-pic -mno-abicalls -std=gnu89
+# -mno-odd-spreg: the VR4300 in the game's FPU mode (FR=0) does single-precision arithmetic in the even registers only;
+# an odd one raises "unimplemented operation" (GCC never uses them; LLVM does unless told).
+args=(--target=mips-linux-gnu -mfp32 -mno-odd-spreg -fno-pic -mno-abicalls -std=gnu89
       # what GCC's MIPS port predefines and the game's headers test (clang has the _MIPS_SZ*, _ABIO32 and MIPSEB ones)
       -D_LANGUAGE_C -DLANGUAGE_C -D__LANGUAGE_C -D__LANGUAGE_C__ -U_MIPS_ISA -D_MIPS_ISA=2)
 skip=0
