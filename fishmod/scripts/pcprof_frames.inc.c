@@ -6,4 +6,5 @@
 // Build: fishmod/build.sh --script pcprof_frames --hw   (the game as shipped: GCC, IDO for audio and libultra)
 #define FISHMOD_PCPROF 1
 #define FISHMOD_FRAMELOG 1
+#define PB_BLOCKS 1 // each leg walked once (the first pass, as in play): about an hour for the eight laps
 #include "hwbench_play.inc.c"

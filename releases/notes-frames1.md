@@ -1,7 +1,7 @@
 # frames1: the game as shipped against vanilla, frame by frame, on the same route
 
-Two ROMs that play the play bench's route at Lake Hylia by themselves (the tour's stops, eight laps: every time of day
-and weather), log every frame and sample the CPU, over the SummerCart64's USB:
+Two ROMs that play the play bench's route at Lake Hylia by themselves (the tour's 22 stops, each leg walked once, eight
+laps: every time of day and weather), log every frame and sample the CPU, over the SummerCart64's USB:
 
 | patch | what |
 |---|---|
@@ -15,8 +15,7 @@ Both from the commit that adds this file. The same in each: what's timed and how
 2. Start the ROM (blank save for the mod's; the vanilla one keeps no save). It plays by itself.
 3. On screen: **`pcprof usb: N packets`** (the mod's) or **`vbench usb: N packets`** (vanilla's). At the end it says
    **DONE** and stops sending: then stop `sc64deployer`.
-4. Zip each folder and send them. The mod's run takes about 8 hours (the reeling in after fishing legs adds a little);
-   vanilla's a little less.
+4. Zip each folder and send them. About an hour each (the mod's a little more: reeling in after the fishing legs).
 
 ## What it gives
 Per frame: its length, the CPU's update (by section: collision, actors, camera, environment...) and draw, the RSP, the

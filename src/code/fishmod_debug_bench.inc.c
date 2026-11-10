@@ -395,6 +395,9 @@ static void PlayBench_Steer(PlayState* play, s16 yaw, s32 mag) {
 #define PB_SKIP 30   // frames after putting Link back, not counted (the camera catching up)
 #define PB_CLEANUP 400 // at most, after a fishing block: reeling in and through any catch (not counted)
 #define PB_ARRIVED 90.0f
+#ifndef PB_BLOCKS // (a script can walk each leg fewer times: the frame log's runs walk it once, the first pass)
+#define PB_BLOCKS BENCH_MODES
+#endif
 
 static s32 sPbState; // 0: new lap (reload the lake), 1: loading, 2: a block, 3: after a block, 4: memory tests
 static s32 sPbLeg;
@@ -614,7 +617,7 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
                 break;
             }
             sPbFrame = 0;
-            if (++sPbBlock < BENCH_MODES) {
+            if (++sPbBlock < PB_BLOCKS) {
                 sPbState = 2;
                 Bench_Save(); // after every block: a run cut short keeps what it timed
             } else {

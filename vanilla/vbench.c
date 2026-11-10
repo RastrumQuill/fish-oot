@@ -67,7 +67,7 @@ typedef struct FishmodAutoplayStep {
 #include "vbench_tour.inc.c"
 
 #define BENCH_LAPS 8
-#define BENCH_MODES 8      // blocks a leg (the mod's play bench: each as shipped in its profile builds)
+#define BENCH_MODES 1      // blocks a leg: once, the first pass (as the mod's frame-log build, PB_BLOCKS 1)
 #define BENCH_FRAMES 240   // frames counted a block
 #define BENCH_GAP_FRAMES 30 // after a leg's blocks (the mod's memory tests' frames, the tests left out in both)
 #define PB_SKIP 30
