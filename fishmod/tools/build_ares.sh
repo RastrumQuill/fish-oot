@@ -20,6 +20,7 @@ fi
 git -C "$DIR" fetch -q --depth 1 origin tag "$REV"
 git -C "$DIR" checkout -q -f "$REV"
 git -C "$DIR" apply "$PATCH"
+git -C "$DIR" apply "$(dirname "$PATCH")/ares-sc64.patch" # ARES_SC64_DIR=<dir>: a minimal SummerCart64, its USB packets saved there
 cmake -S "$DIR" -B "$DIR/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DARES_CORES=n64 -DARES_ENABLE_LIBRASHADER=OFF \
     -DARES_ENABLE_SDL=OFF
 ninja -C "$DIR/build"

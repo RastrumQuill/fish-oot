@@ -1433,7 +1433,11 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
         return; // clean screenshots (the pause-menu mockups)
     }
 #if defined(FISHMOD_BENCH_PLAY) || defined(FISHMOD_BENCH_AREA)
-    if (!sTourDebugText) {
+    if (!sTourDebugText
+#if defined(FISHMOD_PCPROF_NORING) || defined(FISHMOD_FRAMELOG_NOSEND) || defined(FISHMOD_FAKE_SC64)
+        && false // (the console bisection's ROMs: their frame counter shows)
+#endif
+    ) {
         return; // the bench as played: nothing over the frames being timed until it's done
     }
 #endif

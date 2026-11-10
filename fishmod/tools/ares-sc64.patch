@@ -1,0 +1,76 @@
+diff --git a/ares/n64/pi/bus.hpp b/ares/n64/pi/bus.hpp
+index f554df8..a8ef9bc 100644
+--- a/ares/n64/pi/bus.hpp
++++ b/ares/n64/pi/bus.hpp
+@@ -1,3 +1,49 @@
++
++// fish-oot test hook: a minimal SummerCart64 (ARES_SC64_DIR: its USB writes are saved there, one file a packet)
++struct FishSc64 {
++  u8 buf[8192];
++  u32 data0 = 0, data1 = 0, scr = 0, key = 0, unlocked = 0, busyReads = 0, packets = 0;
++  static auto dir() -> const char* { static const char* d = getenv("ARES_SC64_DIR"); return d; }
++  auto command(u32 id) -> void {
++    scr = 0;
++    if(id == 'M') {
++      u32 addr = data0, len = data1 & 0xffffff;
++      if(addr >= 0x1ffe'0000 && len <= 8192) {
++        char name[512]; snprintf(name, sizeof(name), "%s/binaryout-%06u.bin", dir(), packets++);
++        if(FILE* f = fopen(name, "wb")) { fwrite(buf + (addr - 0x1ffe'0000), 1, len, f); fclose(f); }
++      } else scr = 1u << 30;
++      busyReads = 4; // (the USB "sending" for the next few status checks)
++    } else if(id == 'U') {
++      data0 = busyReads ? (1u << 31) : 0;
++      if(busyReads) busyReads--;
++    }
++  }
++  auto read(u32 address) -> u32 {
++    if(address >= 0x1ffe'0000 && address < 0x1ffe'2000) {
++      u32 o = address & 0x1ffe; return buf[o] << 8 | buf[o + 1];
++    }
++    switch(address & 0x1f) {
++    case 0x00: return scr; case 0x04: return data0; case 0x08: return data1;
++    case 0x0c: return unlocked ? 0x53437632 : 0;
++    }
++    return 0;
++  }
++  auto write(u32 address, u32 data, bool half) -> void {
++    if(address >= 0x1ffe'0000 && address < 0x1ffe'2000) {
++      u32 o = address & 0x1fff;
++      if(half) { o &= ~1; buf[o] = data >> 8; buf[o + 1] = data; }
++      else { o &= ~3; buf[o] = data >> 24; buf[o + 1] = data >> 16; buf[o + 2] = data >> 8; buf[o + 3] = data; }
++      return;
++    }
++    switch(address & 0x1f) {
++    case 0x00: command(data & 0xff); return;
++    case 0x04: data0 = data; return; case 0x08: data1 = data; return;
++    case 0x10: if(key == 0x5F554E4C && data == 0x4F434B5F) unlocked = 1; key = data; return;
++    }
++  }
++};
++inline FishSc64 fishSc64;
++
+ inline auto PI::readWord(u32 address, Thread& thread) -> u32 {
+   if(address <= 0x046f'ffff) return ioRead(address);
+ 
+@@ -18,6 +64,11 @@ inline auto PI::busRead(u32 address) -> u32 {
+   const u32 unmapped = (address & 0xFFFF) | (address << 16);
+ 
+   if(address <= 0x04ff'ffff) return unmapped; //Address range not memory mapped, only accessible via DMA
++  if(FishSc64::dir() && address >= 0x1ffe'0000 && address <= 0x1fff'001f) {
++    u32 v = fishSc64.read(address & ~(Size == Word ? 3 : 1));
++    if(Size == Word && address < 0x1fff'0000) v = v << 16 | fishSc64.read((address & ~3) + 2);
++    return v;
++  }
+   if(address <= 0x0500'03ff) {
+     if(_DD()) return dd.c2s.read<Size>(address);
+     return unmapped;
+@@ -69,6 +120,9 @@ template <u32 Size>
+ inline auto PI::busWrite(u32 address, u32 data) -> void {
+   static_assert(Size == Half || Size == Word);  //PI bus will do 32-bit (CPU) or 16-bit (DMA) only
+   if(address <= 0x04ff'ffff) return; //Address range not memory mapped, only accessible via DMA
++  if(FishSc64::dir() && address >= 0x1ffe'0000 && address <= 0x1fff'001f) {
++    return fishSc64.write(address, data, Size == Half);
++  }
+   if(address <= 0x0500'03ff) {
+     if(_DD()) return dd.c2s.write<Size>(address, data);
+     return;

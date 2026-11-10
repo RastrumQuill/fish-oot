@@ -99,6 +99,10 @@ static s32 Sc64_Command(u8 id, u32 arg0, u32 arg1, u32* data0) {
 static s32 Sc64_Init(void) {
     u32 prevInt;
 
+#ifdef FISHMOD_FAKE_SC64
+    return 1; // (a test in an emulator: the USB path all but the transfers, which go nowhere)
+#endif
+
     if (gCartHandle == NULL) {
         return 0;
     }
@@ -120,6 +124,10 @@ static s32 Sc64_Init(void) {
 static s32 Sc64_UsbBusy(void) {
     u32 status;
 
+#ifdef FISHMOD_FAKE_SC64
+    return 0;
+#endif
+
     if (Sc64_Command(SC64_USB_WRITE_STATUS, 0, 0, &status) != 0) {
         return 1;
     }
@@ -129,6 +137,10 @@ static s32 Sc64_UsbBusy(void) {
 /** Copies len bytes (8-aligned) into the cart's buffer and sends them to the PC. */
 static s32 Sc64_UsbSend(void* buf, u32 len) {
     OSMesg msg;
+
+#ifdef FISHMOD_FAKE_SC64
+    return 0;
+#endif
 
     sSc64IoMesg.hdr.pri = OS_MESG_PRI_NORMAL;
     sSc64IoMesg.hdr.retQueue = &sSc64Queue;
@@ -334,7 +346,9 @@ static void PcProf_Update(void) {
                 sFl[0] = SYSTEM_ARENA_MALLOC(2 * sizeof(FrameLogPacket), "../fishmod_debug.c", __LINE__);
                 if ((rings != NULL) && (sFl[0] != NULL)) {
                     sFl[1] = sFl[0] + 1;
+#ifndef FISHMOD_PCPROF_NORING // (a console bisection: profile samples untagged)
                     n64prof_set_frame_ring(rings, PCPROF_RING); // (samples tagged by their frame: slow or not)
+#endif
                 } else {
                     sFl[0] = NULL;
                 }
@@ -351,6 +365,11 @@ static void PcProf_Update(void) {
     if ((sPlayFrames & 7) == 0) {
         PcProf_Ranges();
     }
+#if defined(FISHMOD_PCPROF_NORING) || defined(FISHMOD_FRAMELOG_NOSEND) || defined(FISHMOD_FAKE_SC64)
+    if ((sPlayFrames % 30) == 0) { // (the bisection ROMs: still running?)
+        Fishmod_DebugPrintf(5, "test: frame %u, %u packets", sPlayFrames, sPcPackets);
+    }
+#endif
     if (sPcUsb) {
         u32 user[6] = { 0x464D4F44 /* 'FMOD' */, 0, 0, 0, 0, 0 };
 
@@ -384,6 +403,9 @@ static void PcProf_Update(void) {
         }
 #ifdef FISHMOD_FRAMELOG
         // the frame log first (one packet a frame in all)
+#ifdef FISHMOD_FRAMELOG_NOSEND // (a console bisection: the records are made, never sent)
+        sFlReady = -1;
+#endif
         if ((sFlReady >= 0) && !Sc64_UsbBusy()) {
             FrameLogPacket* pk = sFl[sFlReady];
 
