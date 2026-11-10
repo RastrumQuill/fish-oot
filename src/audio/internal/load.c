@@ -118,6 +118,68 @@ void AudioLoad_DecreaseSampleDmaTtls(void) {
     gAudioCtx.unused2628 = 0;
 }
 
+/*
+ * fish-oot: the sample DMA search (AudioLoad_DmaSampleData), faster and finding the same buffer. The search runs over
+ * each buffer's ROM address and size; the addresses also go in this compact array (four to a cache line, where the
+ * buffers are 16 bytes each), written wherever a buffer's address is, and a list's buffers all have one size. The order
+ * and the test are the original's: the first buffer holding the range wins. Debug builds also run the original
+ * search every time and count any disagreement (gFishmodAudioDmaChecks, gFishmodAudioDmaMismatches).
+ */
+static u32 sSampleDmaDevAddr[0x100];
+
+/** The first of buffers [from, to) holding devAddr..+size (they share one size), or -1. */
+static s32 AudioLoad_FindSampleDma(u32 devAddr, u32 size, u32 from, u32 to) {
+    u32 lim;
+    u32 i;
+
+    if (from >= to) {
+        return -1;
+    }
+    lim = gAudioCtx.sampleDmas[from].size - size; // (as the original: u16 - u32, unsigned)
+    for (i = from; i < to; i++) {
+        s32 bufferPos = devAddr - sSampleDmaDevAddr[i];
+
+        if (0 <= bufferPos && (u32)bufferPos <= lim) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+#if FISHMOD_DEBUG
+u32 gFishmodAudioDmaChecks;
+u32 gFishmodAudioDmaMismatches;
+
+/** The original's test, buffer by buffer from the structs: the check for AudioLoad_FindSampleDma. */
+static s32 AudioLoad_FindSampleDmaRef(u32 devAddr, u32 size, u32 from, u32 to) {
+    u32 i;
+
+    for (i = from; i < to; i++) {
+        SampleDma* dma = &gAudioCtx.sampleDmas[i];
+        s32 bufferPos = devAddr - dma->devAddr;
+
+        if (0 <= bufferPos && (u32)bufferPos <= dma->size - size) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static s32 AudioLoad_FindSampleDmaChecked(u32 devAddr, u32 size, u32 from, u32 to) {
+    s32 found = AudioLoad_FindSampleDma(devAddr, size, from, to);
+
+    gFishmodAudioDmaChecks++;
+    if (found != AudioLoad_FindSampleDmaRef(devAddr, size, from, to)) {
+        gFishmodAudioDmaMismatches++;
+        return AudioLoad_FindSampleDmaRef(devAddr, size, from, to); // (the original's answer, whatever ours was)
+    }
+    return found;
+}
+#define AUDIO_FIND_SAMPLE_DMA AudioLoad_FindSampleDmaChecked
+#else
+#define AUDIO_FIND_SAMPLE_DMA AudioLoad_FindSampleDma
+#endif
+
 /**
  * original name: Nas_WaveDmaCallBack
  */
@@ -133,10 +195,13 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
     u32 i;
 
     if (arg2 != 0 || *dmaIndexRef >= gAudioCtx.sampleDmaListSize1) {
-        for (i = gAudioCtx.sampleDmaListSize1; i < gAudioCtx.sampleDmaCount; i++) {
+        // fish-oot: the first long-lived buffer holding the range, as the original loop found it
+        s32 found = AUDIO_FIND_SAMPLE_DMA(devAddr, size, gAudioCtx.sampleDmaListSize1, gAudioCtx.sampleDmaCount);
+
+        if (found >= 0) {
+            i = found;
             dma = &gAudioCtx.sampleDmas[i];
-            bufferPos = devAddr - dma->devAddr;
-            if (0 <= bufferPos && (u32)bufferPos <= dma->size - size) {
+            {
                 // We already have a DMA request for this memory range.
                 if (dma->ttl == 0 && gAudioCtx.sampleDmaReuseQueue2RdPos != gAudioCtx.sampleDmaReuseQueue2WrPos) {
                     // Move the DMA out of the reuse queue, by swapping it with the
@@ -167,12 +232,18 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
             hasDma = true;
         }
     } else {
+        s32 found;
+
     search_short_lived:
+        // fish-oot: the last buffer this note used first (with its own size: it can be a long-lived one), then the
+        // short-lived ones in order, as the original loop
         dma = gAudioCtx.sampleDmas + *dmaIndexRef;
-        i = 0;
-    again:
         bufferPos = devAddr - dma->devAddr;
-        if (0 <= bufferPos && (u32)bufferPos <= dma->size - size) {
+        found = (0 <= bufferPos && (u32)bufferPos <= dma->size - size)
+                    ? *dmaIndexRef
+                    : AUDIO_FIND_SAMPLE_DMA(devAddr, size, 0, gAudioCtx.sampleDmaListSize1);
+        if (found >= 0) {
+            dma = gAudioCtx.sampleDmas + found;
             // We already have DMA for this memory range.
             if (dma->ttl == 0) {
                 // Move the DMA out of the reuse queue, by swapping it with the
@@ -187,10 +258,6 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
             }
             dma->ttl = 2;
             return dma->ramAddr + (devAddr - dma->devAddr);
-        }
-        dma = gAudioCtx.sampleDmas + i++;
-        if (i <= gAudioCtx.sampleDmaListSize1) {
-            goto again;
         }
     }
 
@@ -208,6 +275,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
     dmaDevAddr = devAddr & ~0xF;
     dma->ttl = 3;
     dma->devAddr = dmaDevAddr;
+    sSampleDmaDevAddr[dma - gAudioCtx.sampleDmas] = dmaDevAddr; // (fish-oot: the search's copy)
     dma->sizeUnused = transfer;
     AudioLoad_Dma(&gAudioCtx.curAudioFrameDmaIoMsgBuf[gAudioCtx.curAudioFrameDmaCount++], OS_MESG_PRI_NORMAL, OS_READ,
                   dmaDevAddr, dma->ramAddr, transfer, &gAudioCtx.curAudioFrameDmaQueue, medium, "SUPERDMA");
@@ -237,6 +305,7 @@ void AudioLoad_InitSampleDmaBuffers(UNUSED s32 numNotes) {
             AudioHeap_WritebackDCache(dma->ramAddr, gAudioCtx.sampleDmaBufSize);
             dma->size = gAudioCtx.sampleDmaBufSize;
             dma->devAddr = 0;
+            sSampleDmaDevAddr[gAudioCtx.sampleDmaCount] = 0; // (fish-oot: the search's copy)
             dma->sizeUnused = 0;
             dma->unused = 0;
             dma->ttl = 0;
@@ -267,6 +336,7 @@ void AudioLoad_InitSampleDmaBuffers(UNUSED s32 numNotes) {
             AudioHeap_WritebackDCache(dma->ramAddr, gAudioCtx.sampleDmaBufSize);
             dma->size = gAudioCtx.sampleDmaBufSize;
             dma->devAddr = 0U;
+            sSampleDmaDevAddr[gAudioCtx.sampleDmaCount] = 0; // (fish-oot: the search's copy)
             dma->sizeUnused = 0;
             dma->unused = 0;
             dma->ttl = 0;
