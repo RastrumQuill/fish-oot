@@ -40,6 +40,17 @@ misses per instruction; run the same program and input on both and compare (`n64
    every 30 seconds, the hottest few thousand buckets), a flashcart's USB link, or anything else.
 6. Drive the program with recorded or scripted input, so runs compare.
 
+### Streaming instead (a link to a PC)
+
+Save memory holds only the hottest few thousand buckets. With a link to a PC there's no such limit: count one bucket
+per instruction (`n64prof_set_bucket_shift(2)` before `n64prof_init`), and every few seconds, or when
+`n64prof_used()` says the table is half full, `n64prof_swap()` in a cleared second table (`n64prof_clear`) and send
+the one it returns with `n64prof_pack()`, a chunk at a time (`n64prof_pack_done`), then clear it for the next swap.
+Each chunk is a version-2 dump: the counts since the last swap and the run's totals so far. The PC side adds them up.
+
+fish-oot does this through a SummerCart64's USB (`src/code/fishmod_debug_pcprof.inc.c`): each chunk goes into the
+cart's 8 KB buffer and out as a raw-binary packet, which `sc64deployer debug` saves as a `binaryout-*.bin` file.
+
 ## Reading it
 
 ```
@@ -48,7 +59,8 @@ n64prof/tools/n64prof.py llvm    DUMP --elf program.elf -o program.prof
 n64prof/tools/n64prof.py compare CONSOLE_DUMP ARES_DUMP --elf program.elf
 ```
 
-`--offset` finds a dump inside a bigger file (a save). Needs `llvm-symbolizer`. Build with line tables (`-g`; GCC's
+A DUMP can be a folder of streamed chunks (e.g. the `binaryout-*.bin` files): they're added up, and missing chunks
+are reported. `--offset` finds a dump inside a bigger file (a save). Needs `llvm-symbolizer`. Build with line tables (`-g`; GCC's
 code doesn't change with it) for the LLVM profile; the function report needs only symbols. The profile is by source
 line, so one taken from a GCC build serves an LLVM build of the same source.
 

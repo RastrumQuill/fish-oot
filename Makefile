@@ -913,6 +913,32 @@ endif
 ifeq ($(CLANG_GAME),1)
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CC := tools/fishmod_clang_cc.sh
 $(SEGMENTS_DIR)/%.reloc.o: POSTPROCESS_OBJ := $(PYTHON) tools/reloc_elf_pairing.py
+# the audio driver too (IDO otherwise). Recursive (=): each file's own defines (MML_VERSION, NO_SQRTF_INTRINSIC) and
+# IDO options (-signed: the wrapper maps it) still apply
+$(BUILD_DIR)/src/audio/%.o: CC := tools/fishmod_clang_cc.sh
+$(BUILD_DIR)/src/audio/%.o: CC_CHECK := @:
+$(BUILD_DIR)/src/audio/%.o: PREPROCESS :=
+$(BUILD_DIR)/src/audio/%.o: CFLAGS = $(CPP_DEFINES) -DCOMPILER_GCC $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) \
+  -march=vr4300 -mabi=32 -mno-abicalls -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
+  -fno-builtin-sinf -fno-builtin-cosf -w
+$(BUILD_DIR)/src/audio/%.o: MIPS_VERSION :=
+$(BUILD_DIR)/src/audio/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing
+ifeq ($(FISHMOD_DEBUG),1)
+$(BUILD_DIR)/src/audio/%.o: OPTFLAGS += -g
+endif
+# and libultra's C (os, io, gu; IDO otherwise): every libultra game runs it, so its profile carries over. Not libc
+# (ll.c, llcvt.c are MIPS III 64-bit code) or reg/ (64-bit registers); the assembly stays as it is
+CLANG_LIBULTRA := $(BUILD_DIR)/src/libultra/os/%.o $(BUILD_DIR)/src/libultra/io/%.o $(BUILD_DIR)/src/libultra/gu/%.o
+$(CLANG_LIBULTRA): CC := tools/fishmod_clang_cc.sh
+$(CLANG_LIBULTRA): CC_CHECK := @:
+$(CLANG_LIBULTRA): PREPROCESS :=
+$(CLANG_LIBULTRA): CFLAGS = $(CPP_DEFINES) -DCOMPILER_GCC -DFISHMOD_CLANG_KEEP_OPT $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) \
+  -march=vr4300 -mabi=32 -mno-abicalls -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
+  -fno-builtin-sinf -fno-builtin-cosf -w
+$(CLANG_LIBULTRA): OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing
+ifeq ($(FISHMOD_DEBUG),1)
+$(CLANG_LIBULTRA): OPTFLAGS += -g
+endif
 endif
 endif
 

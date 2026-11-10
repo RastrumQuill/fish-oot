@@ -14,7 +14,8 @@
  */
 
 #define N64PROF_MAGIC 0x4E363450 /* 'N64P' */
-#define N64PROF_VERSION 1
+#define N64PROF_VERSION 1       /* a snapshot: every count since the start (n64prof_serialize) */
+#define N64PROF_VERSION_DELTA 2 /* a chunk of counts since the last swap (n64prof_pack): a reader adds them all up */
 #define N64PROF_MAX_RANGES 128
 
 typedef struct N64ProfEntry {
@@ -57,6 +58,20 @@ typedef struct N64ProfRange {
 N64ProfRange* n64prof_ranges_begin(void);
 void n64prof_ranges_end(int count);
 
+/* The bucket size, log2 bytes (default N64PROF_BUCKET_SHIFT): 2 is one bucket per instruction. Before n64prof_init. */
+void n64prof_set_bucket_shift(unsigned int shift);
+/* Streaming (a link to a PC, e.g. a flashcart's USB): count into one table while the last is sent. n64prof_swap starts
+   counting into fresh (the same size as n64prof_init's, all zero: n64prof_clear) and returns the table it replaces;
+   n64prof_used says how many entries the current table has filled (time to swap before it gets full). */
+N64ProfEntry* n64prof_swap(N64ProfEntry* fresh);
+unsigned int n64prof_used(void);
+void n64prof_clear(N64ProfEntry* table);
+/* Packs a table n64prof_swap returned into chunks: the header (version N64PROF_VERSION_DELTA, a running chunk number
+   in dumps, the totals so far) and its buckets from *pos on, as many as fit in outSize. Returns the bytes written
+   and moves *pos on; the table is done when *pos passes the last entry (n64prof_pack_done). */
+unsigned int n64prof_pack(const N64ProfEntry* table, unsigned int* pos, void* out, unsigned int outSize,
+                          const unsigned int* user);
+int n64prof_pack_done(unsigned int pos);
 /* Writes the header and the hottest buckets that fit into out (outSize bytes); returns the bytes written (a multiple
    of 16). user[] goes into the header as given (6 words, or NULL). */
 unsigned int n64prof_serialize(void* out, unsigned int outSize, const unsigned int* user);

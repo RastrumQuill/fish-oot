@@ -4,7 +4,6 @@
 #ifndef N64PROF_BUCKET_SHIFT
 #define N64PROF_BUCKET_SHIFT 4 /* log2 of the bucket size: 16 bytes (4 instructions); 5 halves the table's need */
 #endif
-#define BUCKET_SHIFT N64PROF_BUCKET_SHIFT
 #define PROBES 16
 
 static N64ProfEntry* sTable;
@@ -16,6 +15,8 @@ static unsigned int sRand = 0x2545F491;
 static volatile unsigned int sTotal;
 static volatile unsigned int sDropped;
 static volatile unsigned int sUnmapped;
+static volatile unsigned int sUsed; /* entries filled in the current table */
+static unsigned int sShift = N64PROF_BUCKET_SHIFT;
 static unsigned int sDumps;
 static N64ProfRange sRanges[2][N64PROF_MAX_RANGES];
 static int sRangeCount[2];
@@ -36,8 +37,33 @@ void n64prof_init(N64ProfEntry* table, unsigned int tableSize, unsigned int inte
     sInterval = interval;
     sStaticEnd = staticEnd;
     sRangeCount[0] = sRangeCount[1] = 0;
-    sTotal = sDropped = sUnmapped = 0;
+    sTotal = sDropped = sUnmapped = sUsed = 0;
     sTable = table; /* last: the interrupt checks it */
+}
+
+void n64prof_set_bucket_shift(unsigned int shift) {
+    sShift = shift;
+}
+
+void n64prof_clear(N64ProfEntry* table) {
+    unsigned int i;
+
+    for (i = 0; i <= sMask; i++) {
+        table[i].addr = 0;
+        table[i].count = 0;
+    }
+}
+
+N64ProfEntry* n64prof_swap(N64ProfEntry* fresh) {
+    N64ProfEntry* old = sTable;
+
+    sTable = fresh; /* one store: the interrupt counts into the old table or the new one */
+    sUsed = 0;      /* (a sample between the two stores is lost from the count, not from the table) */
+    return old;
+}
+
+unsigned int n64prof_used(void) {
+    return sUsed;
 }
 
 unsigned int n64prof_next_interval(void) {
@@ -49,6 +75,7 @@ unsigned int n64prof_next_interval(void) {
 
 void n64prof_sample(unsigned int pc) {
     const N64ProfRange* r;
+    N64ProfEntry* table = sTable;
     N64ProfEntry* e;
     unsigned int key;
     unsigned int h;
@@ -56,7 +83,7 @@ void n64prof_sample(unsigned int pc) {
     int n;
     int i;
 
-    if (sTable == 0) {
+    if (table == 0) {
         return;
     }
     sTotal++;
@@ -72,10 +99,10 @@ void n64prof_sample(unsigned int pc) {
     if ((i == n) && (pc >= sStaticEnd)) {
         sUnmapped++;
     }
-    key = pc & ~((1u << BUCKET_SHIFT) - 1);
-    h = ((key >> BUCKET_SHIFT) * 2654435761u) >> sHashShift;
+    key = pc & ~((1u << sShift) - 1);
+    h = ((key >> sShift) * 2654435761u) >> sHashShift;
     for (i = 0; i < PROBES; i++) {
-        e = &sTable[(h + i) & sMask];
+        e = &table[(h + i) & sMask];
         if (e->addr == key) {
             e->count++;
             return;
@@ -83,6 +110,7 @@ void n64prof_sample(unsigned int pc) {
         if (e->addr == 0) {
             e->addr = key;
             e->count = 1;
+            sUsed++;
             return;
         }
     }
@@ -167,11 +195,50 @@ unsigned int n64prof_serialize(void* out, unsigned int outSize, const unsigned i
     hdr->entries = saved;
     hdr->interval = sInterval;
     hdr->unmapped = sUnmapped;
-    hdr->bucketShift = BUCKET_SHIFT;
+    hdr->bucketShift = sShift;
     hdr->dumps = ++sDumps;
     for (i = 0; i < 6; i++) {
         hdr->user[i] = (user != 0) ? user[i] : 0;
     }
     bytes = sizeof(N64ProfHeader) + saved * sizeof(N64ProfEntry);
     return (bytes + 15) & ~15u;
+}
+
+int n64prof_pack_done(unsigned int pos) {
+    return pos > sMask;
+}
+
+unsigned int n64prof_pack(const N64ProfEntry* table, unsigned int* pos, void* out, unsigned int outSize,
+                          const unsigned int* user) {
+    N64ProfHeader* hdr = (N64ProfHeader*)out;
+    N64ProfEntry* dst = (N64ProfEntry*)((char*)out + sizeof(N64ProfHeader));
+    unsigned int max;
+    unsigned int saved = 0;
+    unsigned int i = *pos;
+
+    if (outSize < sizeof(N64ProfHeader) + sizeof(N64ProfEntry)) {
+        return 0;
+    }
+    max = (outSize - sizeof(N64ProfHeader)) / sizeof(N64ProfEntry);
+    for (; (i <= sMask) && (saved < max); i++) {
+        if (table[i].count != 0) {
+            dst[saved] = table[i];
+            saved++;
+        }
+    }
+    *pos = i;
+    hdr->magic = N64PROF_MAGIC;
+    hdr->version = N64PROF_VERSION_DELTA;
+    hdr->total = sTotal;
+    hdr->dropped = sDropped;
+    hdr->unsaved = 0;
+    hdr->entries = saved;
+    hdr->interval = sInterval;
+    hdr->unmapped = sUnmapped;
+    hdr->bucketShift = sShift;
+    hdr->dumps = ++sDumps;
+    for (i = 0; i < 6; i++) {
+        hdr->user[i] = (user != 0) ? user[i] : 0;
+    }
+    return sizeof(N64ProfHeader) + saved * sizeof(N64ProfEntry);
 }

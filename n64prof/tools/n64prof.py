@@ -6,7 +6,8 @@
   n64prof.py compare DUMP_A DUMP_B --elf ELF         two runs side by side, by function (e.g. the console and ares)
 
 DUMP is a file holding the dump; --offset says where in it the dump starts (e.g. a save file: default 0). Several
-DUMPs (to report/llvm) are added together. The ELF needs line tables (-g) for the LLVM profile; functions alone
+DUMPs (to report/llvm) are added together. A DUMP can also be a folder of streamed chunks (version 2: e.g. the
+binaryout-*.bin files `sc64deployer debug` saves from a SummerCart64's USB): every chunk's counts are added up. The ELF needs line tables (-g) for the LLVM profile; functions alone
 come from its symbols. Needs llvm-symbolizer (LLVM 14 or later) on PATH or in $LLVM_SYMBOLIZER.
 """
 import argparse
@@ -39,6 +40,35 @@ def read_dump(path, offset=0):
         addr, count = struct.unpack_from(">II", data, 0x40 + 8 * i)
         buckets[addr] = buckets.get(addr, 0) + count
     return head, buckets
+
+
+def load(paths, offset=0):
+    """Every dump named: files as they are, folders as streamed chunks (all their files). Version 2 chunks (counts
+    since the last swap) are added up into one dump, whose header is the last chunk's (its totals are the run's)."""
+    out = []
+    chunks = []
+    for path in paths:
+        files = sorted(os.path.join(path, f) for f in os.listdir(path)) if os.path.isdir(path) else [path]
+        for f in files:
+            head, buckets = read_dump(f, offset if f == path else 0)
+            (chunks if head["version"] == 2 else out).append((head, buckets))
+    if chunks:
+        last = max(h["dumps"] for h, _ in chunks)
+        seen = set()
+        total = collections.Counter()
+        for h, b in chunks:
+            if h["dumps"] in seen:
+                continue  # (the same chunk saved twice)
+            seen.add(h["dumps"])
+            total.update(b)
+        head = dict(next(h for h, _ in chunks if h["dumps"] == last))
+        head["entries"] = len(total)
+        missing = sorted(set(range(1, last + 1)) - seen)
+        if missing:
+            print(f"warning: {len(missing)} of {last} chunks missing (first: {missing[:5]})", file=sys.stderr)
+        head["unsaved"] = 0
+        out.append((head, dict(total)))
+    return out
 
 
 def merge(dumps):
@@ -113,7 +143,7 @@ def describe(heads):
 
 
 def cmd_report(args):
-    dumps = [read_dump(p, args.offset) for p in args.dumps]
+    dumps = load(args.dumps, args.offset)
     heads, buckets = merge(dumps)
     shift = heads[0]["bucket_shift"]
     pcs = expand(buckets, shift)
@@ -129,8 +159,8 @@ def cmd_report(args):
 
 
 def cmd_compare(args):
-    a_heads, a = merge([read_dump(args.a, args.offset)])
-    b_heads, b = merge([read_dump(args.b, args.offset)])
+    a_heads, a = merge(load([args.a], args.offset))
+    b_heads, b = merge(load([args.b], args.offset))
     pa = expand(a, a_heads[0]["bucket_shift"])
     pb = expand(b, b_heads[0]["bucket_shift"])
     frames = symbolize(args.elf, set(pa) | set(pb))
@@ -179,7 +209,7 @@ class Node:
 
 
 def cmd_llvm(args):
-    dumps = [read_dump(p, args.offset) for p in args.dumps]
+    dumps = load(args.dumps, args.offset)
     heads, buckets = merge(dumps)
     pcs = expand(buckets, heads[0]["bucket_shift"])
     frames = symbolize(args.elf, pcs.keys())

@@ -104,7 +104,7 @@ fi
 # (including the first build after a matching build).
 STAMP="build/$VERSION/.fishmod"
 # (after the -O the Makefile gives, so it wins)
-[ -n "$CLANG_OPT" ] && export CLANG_EXTRA="-$CLANG_OPT ${CLANG_EXTRA:-}"
+export CLANG_OPT  # (tools/fishmod_clang_cc.sh adds it after the Makefile's -O; libultra keeps -O2)
 if [ "$PGO" = 1 ]; then
     PGO_PROFILE="$(realpath "${PGO_PROFILE:-n64prof/profiles/oot-console2.prof}")"
     export CLANG_EXTRA="-fprofile-sample-use=$PGO_PROFILE ${CLANG_EXTRA:-}"
@@ -112,7 +112,7 @@ fi
 # (a clang build also rebuilds when its compiler options change: the wrapper's and the profile's contents count)
 CLANG_SUM=""; [ "$CLANG" = 1 ] && CLANG_SUM="$(md5sum < tools/fishmod_clang_cc.sh | cut -c1-8)"
 [ "$PGO" = 1 ] && CLANG_SUM="$CLANG_SUM-$(md5sum < "$PGO_PROFILE" | cut -c1-8)"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME ${CLANG_EXTRA:-}"
+MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
