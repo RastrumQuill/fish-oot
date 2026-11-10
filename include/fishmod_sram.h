@@ -19,6 +19,7 @@
 
 // Over the saves: blank-save ROMs only
 #define FISHMOD_SRAM_BENCH 0x0000     // the benches' results (play and area benches), and the LOD jobs' sweeps
+#define FISHMOD_SRAM_BENCH_PLANTS 0x0800 // the plant stress bench's results (the fish's at FISHMOD_SRAM_BENCH)
 #define FISHMOD_SRAM_LOD_DIAG 0x1000  // the LOD jobs' diagnosis frames (to 0x7000)
 #define FISHMOD_SRAM_PCPROF 0x0000    // 'FPCP': the PC-sampling profile (to 0x7000; the profile ROM saves no bench)
 #define FISHMOD_SRAM_CRUMB 0x7000     // 'FBCR': where the bench was, as each mode starts (a crash says where)

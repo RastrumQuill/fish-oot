@@ -3,7 +3,7 @@
 per step, the count of fish or plants and the frame rate, CPU, RSP and RDP times, averaged over every pass, and the
 largest count that held 20 fps.
 
-Usage: fishmod/tools/stress_report.py SAVE
+Usage: fishmod/tools/stress_report.py SAVE   (every bench in it: the fish's, the plants', or both)
 """
 import struct
 import sys
@@ -14,13 +14,25 @@ FIELDS = ["count", "frames", "period", "cpuUpdate", "cpuDraw", "rsp", "rdp", "fi
           "slow"]
 
 
+RECORDS = (0x0000, 0x0800)  # the fish's (FISHMOD_SRAM_BENCH) and the plants' (FISHMOD_SRAM_BENCH_PLANTS)
+
+
 def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
-    d = open(sys.argv[1], "rb").read()
-    magic, kind, passes, steps, version = struct.unpack(">IBBBB", d[:8])
-    if magic != 0x46535452:
+    data = open(sys.argv[1], "rb").read()
+    found = 0
+    for at in RECORDS:
+        if struct.unpack(">I", data[at:at + 4])[0] == 0x46535452:
+            found += 1
+            report(data[at:])
+            print()
+    if not found:
         sys.exit(f"no stress bench results in {sys.argv[1]}")
+
+
+def report(d):
+    magic, kind, passes, steps, version = struct.unpack(">IBBBB", d[:8])
     what = {1: "fish", 2: "plants"}.get(kind, f"kind {kind}")
     print(f"# Stress bench: {what} ({passes} passes done, {steps} steps reached)\n")
     print(f"| {what} | fps | frame ms | CPU update | CPU draw | RSP | RDP | fish update | fish draw | worst frame | "
