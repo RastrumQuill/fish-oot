@@ -301,6 +301,21 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
   the RDP's budget (Lake Hylia is RDP-bound): for example a scrolling caustic texture on the underwater rock
   materials only, rather than an extra full-screen pass.
 
+### Quality-of-life ideas (later; from another mod's list)
+- Center the "Navi" text in the C-Up button properly.
+- Collecting a Gold Skulltula token no longer freezes Link (as in Majora's Mask's spider houses).
+- The rupee counter's color shows the wallet upgrade held.
+- Farore's Wind survives time travel, with a separate warp point for child and adult Link.
+- The Bunny Hood boosts movement speed when worn, as in Majora's Mask.
+- Bombchu Bowling prizes in a fixed order instead of random: piece of heart, purple rupee, bomb bag upgrade, bombs.
+- The burning Kakariko cutscene starts from any entrance into Kakariko, not only the main one.
+- No Song of Storms cooldown, and it works in every area.
+- The Lakeside Laboratory diving heart piece can be won at any time.
+- The subscreen (pause menu) delay fix: to look up what this is. Probably the lag when opening or closing the pause menu.
+- Extended draw distance, if the RDP budget allows (Lake Hylia already can't spare it).
+- Ganon's Castle bridge needs all six medallions (the original needs only Shadow and Spirit).
+- Tunics usable by young Link.
+
 ### Water current (not a moonshot: small)
 Flowing water, where it actually flows (the Gerudo river's inflow into the lake, the rivers, Zora's River), pushes
 on what's in it; still water next to it doesn't, even where both are one body of water to the game.
