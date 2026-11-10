@@ -31,6 +31,7 @@ extern u32 gFishmodCounterPc; // where the counter interrupt came in (exceptasm.
 static N64ProfEntry* sPcTable;
 static u8* sPcOut;
 static OSTimer sPcTimer;
+static s32 sPcStopped; // the route is over: the last counts sent, then nothing
 
 // --- SummerCart64 (its docs: docs/01_memory_map.md, docs/02_n64_commands.md in the SummerCart64 repository) ---
 #define SC64_BUFFER 0x1FFE0000 // 8 KB data buffer; the registers are 64 KB above it
@@ -233,6 +234,23 @@ static void PcProf_Update(void) {
 
         user[1] = sPlayFrames;
         user[2] = FISHMOD_PROFILE_HW;
+        // the route over (the bench's last lap): stop sampling, send what's counted, and mark the last packets
+        // (user[3] = 1) so the reader knows the run ended there
+        if (gFishmodBenchDone && !sPcStopped && (sPcSending == NULL)) {
+            osStopTimer(&sPcTimer);
+            gFishmodTimerHook = NULL;
+            sPcStopped = true;
+            sPcSending = n64prof_swap(sPcSpare);
+            sPcSpare = NULL;
+            sPcSendPos = 0;
+        }
+        if (sPcStopped) {
+            user[3] = 1;
+            if (sPcSending == NULL) {
+                Fishmod_DebugPrintf(5, "pcprof usb: DONE, %u packets: stop sc64deployer", sPcPackets);
+                return;
+            }
+        }
         // swap tables every few seconds, or sooner if the one counting fills up
         if ((sPcSending == NULL) &&
             ((n64prof_used() >= PCPROF_USB_SWAP_FILL) ||

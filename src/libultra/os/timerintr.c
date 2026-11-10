@@ -74,7 +74,10 @@ void __osSetTimerIntr(OSTime time) {
     OSTime newTime;
     u32 prevInt;
 
-#if LIBULTRA_VERSION >= LIBULTRA_VERSION_K
+// fish-oot: debug builds too. Without it a compare set closer than the CPU takes to write it is already passed, and
+// no timer fires until the count wraps (about 91 s): the profiler's timer, at about 3,500 a second, hit it 14 times
+// in pcprof3 (142 ten-second packets without a sample)
+#if (LIBULTRA_VERSION >= LIBULTRA_VERSION_K) || FISHMOD_DEBUG
     if (time < 468) {
         time = 468;
     }

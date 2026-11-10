@@ -486,6 +486,7 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     if (sBench.laps >= FISHMOD_BENCH_LAPS) {
         Bench_SetMode(BENCH_BASE);
         sPbActive = false;
+        gFishmodBenchDone = true; // (the profiler stops here: fishmod_debug_pcprof.inc.c)
         sTourDebugText = true;
         Fishmod_DebugPrintf(2, "BENCH DONE: %d laps saved", sBench.laps);
         Fishmod_DebugPrintf(3, "You can turn the console off");
