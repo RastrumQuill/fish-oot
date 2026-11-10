@@ -58,10 +58,14 @@ def main():
     ap.add_argument("folder")
     ap.add_argument("--csv")
     ap.add_argument("--by-leg", action="store_true")
+    ap.add_argument("--all-frames", action="store_true", help="every frame, not just the bench's counted ones")
     args = ap.parse_args()
     recs = records(args.folder)
     if not recs:
         sys.exit(f"no frame log in {args.folder}")
+    if not args.all_frames and any(r[1] & 1 for r in recs):
+        recs = [r for r in recs if r[1] & 1]  # the bench's counted frames (inside its blocks): like for like
+        print("(the bench's counted frames only: --all-frames for every frame)")
     sects = enum_names("include/fishmod.h", "FishmodSect", "FISHMOD_SECT_")
     cats = enum_names("include/actor_profile.h", "ActorCategory", "ACTORCAT_")
     actors = actor_names()

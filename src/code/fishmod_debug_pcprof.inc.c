@@ -144,7 +144,7 @@ static s32 Sc64_UsbSend(void* buf, u32 len) {
 /*
  * The frame log (FISHMOD_FRAMELOG, over the SummerCart64's USB with the profile): a record of every frame, so a slow
  * one can be told apart and explained. 52 words a record (FRAMELOG_WORDS; fishmod/tools/framelog.py reads them):
- *   0 the frame (play frames so far)          1 the route: leg << 24 | lap << 16 | conditions << 8
+ *   0 the frame (play frames so far)          1 the route: leg << 24 | lap << 16 | conditions << 8 | counted
  *   2 the frame period, us                    3, 4 the CPU's update and draw, us
  *   5, 6 the RSP's graphics and audio, us     7 the RDP, us
  *   8-11 the RDP's counters: clock, command buffer busy, pipeline busy, TMEM (cycles at 62.5 MHz)
@@ -210,7 +210,9 @@ static void PcProf_FrameEnd(void) {
     bzero(r, FRAMELOG_WORDS * 4);
     r[0] = sPlayFrames;
 #ifdef FISHMOD_BENCH_PLAY
-    r[1] = ((u32)(sPbLeg & 0xFF) << 24) | ((u32)(sBench.laps & 0xFF) << 16) | ((u32)(sPbCond & 0xFF) << 8);
+    r[1] = ((u32)(sPbLeg & 0xFF) << 24) | ((u32)(sBench.laps & 0xFF) << 16) | ((u32)(sPbCond & 0xFF) << 8) |
+           (sBenchCounted ? 1 : 0); // (bit 0: a frame the bench counted, inside a block)
+    sBenchCounted = false;
 #endif
     r[2] = period;
     r[3] = sLastCpu[FISHMOD_CPU_UPDATE];

@@ -195,11 +195,14 @@ static void Bench_Micro(void) {
     }
 }
 
+static s32 sBenchCounted; // this frame was counted (the frame log marks it: frames outside blocks compare less well)
+
 static void Bench_Record(s32 stop, s32 mode) {
     BenchCell* cell = &sBench.cell[stop][mode];
     u32 v[BENCH_METRICS];
     s32 i;
 
+    sBenchCounted = true;
     v[BM_PERIOD] = (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
     v[BM_CPU_UPDATE] = sLastCpu[FISHMOD_CPU_UPDATE];
     v[BM_CPU_DRAW] = sLastCpu[FISHMOD_CPU_DRAW];
@@ -620,7 +623,9 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
             break;
 
         default: // the memory tests, then the next leg
+#ifndef FISHMOD_FRAMELOG // (not in the frame log's run: the vanilla build it's compared with has none)
             Bench_Micro();
+#endif
             if (++sPbFrame >= BENCH_MICRO_FRAMES) {
                 sBench.visits++;
                 sPbBlock = 0;

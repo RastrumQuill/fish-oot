@@ -165,8 +165,14 @@ static s32 AudioLoad_FindSampleDmaRef(u32 devAddr, u32 size, u32 from, u32 to) {
     return -1;
 }
 
+extern s32 gFishmodTimingAsShipped;
+
 static s32 AudioLoad_FindSampleDmaChecked(u32 devAddr, u32 size, u32 from, u32 to) {
     s32 found = AudioLoad_FindSampleDma(devAddr, size, from, to);
+
+    if (gFishmodTimingAsShipped) {
+        return found; // (the benches and the profile: timed as shipped, without the check's second search)
+    }
 
     gFishmodAudioDmaChecks++;
     if (found != AudioLoad_FindSampleDmaRef(devAddr, size, from, to)) {
