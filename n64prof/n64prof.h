@@ -72,6 +72,11 @@ void n64prof_clear(N64ProfEntry* table);
 unsigned int n64prof_pack(const N64ProfEntry* table, unsigned int* pos, void* out, unsigned int outSize,
                           const unsigned int* user);
 int n64prof_pack_done(unsigned int pos);
+/* Per-frame tags (for "where does a slow frame's time go"): with a frame ring set, samples wait in it (at most size;
+   two rings of size are used, alternately) until n64prof_frame_end(tag) counts the frame's samples with tag in the
+   bucket address's low bits (bucket shift 2 or more: the low two bits are free; tag 1 or 2). Thread context. */
+void n64prof_set_frame_ring(unsigned int* rings, unsigned int size);
+void n64prof_frame_end(unsigned int tag);
 /* Writes the header and the hottest buckets that fit into out (outSize bytes); returns the bytes written (a multiple
    of 16). user[] goes into the header as given (6 words, or NULL). */
 unsigned int n64prof_serialize(void* out, unsigned int outSize, const unsigned int* user);

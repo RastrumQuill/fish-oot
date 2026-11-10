@@ -141,6 +141,113 @@ static s32 Sc64_UsbSend(void* buf, u32 len) {
     return Sc64_Command(SC64_USB_WRITE, SC64_BUFFER, (SC64_DATATYPE_RAW << 24) | len, NULL);
 }
 
+/*
+ * The frame log (FISHMOD_FRAMELOG, over the SummerCart64's USB with the profile): a record of every frame, so a slow
+ * one can be told apart and explained. 52 words a record (FRAMELOG_WORDS; fishmod/tools/framelog.py reads them):
+ *   0 the frame (play frames so far)          1 the route: leg << 24 | lap << 16 | conditions << 8
+ *   2 the frame period, us                    3, 4 the CPU's update and draw, us
+ *   5, 6 the RSP's graphics and audio, us     7 the RDP, us
+ *   8-11 the RDP's counters: clock, command buffer busy, pipeline busy, TMEM (cycles at 62.5 MHz)
+ *   12, 13 the fish's update and draw, us     14 the props' drawing, us; 15 props drawn
+ *   16-35 Play_Update's sections (FishmodSect), us    36-47 the actor categories' updates, us
+ *   48-51 the four costliest actor kinds this frame: id << 20 | us
+ * 39 records a packet ('FFRM', version, count, the first record's frame). The profile's samples are tagged by their
+ * frame as they're counted: 1 for a frame over 52 ms, 2 otherwise (n64prof_frame_end; n64prof.py --frames).
+ */
+#ifdef FISHMOD_FRAMELOG
+#define FRAMELOG_WORDS 52
+#define FRAMELOG_PER_PACKET ((SC64_BUFFER_SIZE - 16) / (FRAMELOG_WORDS * 4))
+#define PCPROF_RING 1024 // samples a frame can hold (about 290 ms at 3,500 a second)
+#define FRAMELOG_SLOW_US 52000
+
+typedef struct FrameLogPacket {
+    u32 magic; // 'FFRM'
+    u32 version;
+    u32 count;
+    u32 first;
+    u32 rec[FRAMELOG_PER_PACKET][FRAMELOG_WORDS];
+} FrameLogPacket;
+
+typedef char FrameLogSectsFit[(16 + FISHMOD_SECT_MAX <= 36) && (36 + FISHMOD_ACTOR_CATS <= 48) ? 1 : -1];
+
+static FrameLogPacket* sFl[2];
+static s32 sFlCur;
+static s32 sFlReady = -1; // the packet waiting to be sent, or -1
+static u32 sFlLost;       // records dropped (both packets full: the USB fell behind)
+#endif
+
+/** The frame just ended: its samples tagged, and its record logged (USB only). */
+static void PcProf_FrameEnd(void) {
+#ifdef FISHMOD_FRAMELOG
+    u32 period = (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
+    FrameLogPacket* pk;
+    u32* r;
+    u32 top[4] = { 0, 0, 0, 0 };
+    s32 i;
+    s32 j;
+
+    if (!sPcUsb || (sFl[0] == NULL)) {
+        return;
+    }
+    n64prof_frame_end((period > FRAMELOG_SLOW_US) ? 1 : 2);
+    pk = sFl[sFlCur];
+    if (pk->count >= FRAMELOG_PER_PACKET) {
+        if (sFlReady >= 0) {
+            sFlLost++;
+            return; // (both full: this frame's record is lost)
+        }
+        sFlReady = sFlCur;
+        sFlCur ^= 1;
+        pk = sFl[sFlCur];
+        pk->count = 0;
+    }
+    if (pk->count == 0) {
+        pk->magic = 0x4646524D; // 'FFRM'
+        pk->version = 1;
+        pk->first = sPlayFrames;
+    }
+    r = pk->rec[pk->count++];
+    bzero(r, FRAMELOG_WORDS * 4);
+    r[0] = sPlayFrames;
+#ifdef FISHMOD_BENCH_PLAY
+    r[1] = ((u32)(sPbLeg & 0xFF) << 24) | ((u32)(sBench.laps & 0xFF) << 16) | ((u32)(sPbCond & 0xFF) << 8);
+#endif
+    r[2] = period;
+    r[3] = sLastCpu[FISHMOD_CPU_UPDATE];
+    r[4] = sLastCpu[FISHMOD_CPU_DRAW];
+    r[5] = (u32)OS_CYCLES_TO_USEC(gRSPGfxTimeTotal);
+    r[6] = (u32)OS_CYCLES_TO_USEC(gRSPAudioTimeTotal);
+    r[7] = (u32)OS_CYCLES_TO_USEC(gRDPTimeTotal);
+    r[8] = gFishmodRdp.clock;
+    r[9] = gFishmodRdp.buf;
+    r[10] = gFishmodRdp.pipe;
+    r[11] = gFishmodRdp.tmem;
+    r[12] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_U_ENGINE]);
+    r[13] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_D_ENGINE]);
+    r[14] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_D_SCATTER]);
+    r[15] = gFishmodScatterDrawn;
+    for (i = 0; i < FISHMOD_SECT_MAX; i++) {
+        r[16 + i] = (u32)OS_CYCLES_TO_USEC(gFishmodSect[i]);
+    }
+    for (i = 0; i < FISHMOD_ACTOR_CATS; i++) {
+        r[36 + i] = (u32)OS_CYCLES_TO_USEC((OSTime)gFishmodCatCycles[i]);
+    }
+    // the four costliest actor kinds (an insertion into four slots, cycles << 0 kept alongside the id)
+    for (i = 0; i < FISHMOD_ACTOR_IDS; i++) {
+        u32 c = gFishmodActorCycles[i];
+
+        if (c > (top[3] >> 0)) {
+            for (j = 3; (j > 0) && (c > top[j - 1]); j--) {
+                top[j] = top[j - 1];
+                r[48 + j] = r[48 + j - 1];
+            }
+            top[j] = c;
+            r[48 + j] = ((u32)i << 20) | MIN((u32)OS_CYCLES_TO_USEC((OSTime)c), 0xFFFFF);
+        }
+    }
+#endif
+}
+
 /**
  * The timer hook: one sample. libultra runs its timers in the VI manager's thread after the counter interrupt has
  * posted a message, so the PC is the one the exception handler saw (exceptasm.s keeps it), not the running thread's.
@@ -218,6 +325,19 @@ static void PcProf_Update(void) {
         n64prof_init(sPcTable, hash, PCPROF_INTERVAL, (u32)_codeSegmentEnd);
         if (sPcUsb) {
             n64prof_clear(sPcSpare);
+#ifdef FISHMOD_FRAMELOG
+            {
+                u32* rings = SYSTEM_ARENA_MALLOC(2 * PCPROF_RING * sizeof(u32), "../fishmod_debug.c", __LINE__);
+
+                sFl[0] = SYSTEM_ARENA_MALLOC(2 * sizeof(FrameLogPacket), "../fishmod_debug.c", __LINE__);
+                if ((rings != NULL) && (sFl[0] != NULL)) {
+                    sFl[1] = sFl[0] + 1;
+                    n64prof_set_frame_ring(rings, PCPROF_RING); // (samples tagged by their frame: slow or not)
+                } else {
+                    sFl[0] = NULL;
+                }
+            }
+#endif
         }
         PcProf_Ranges();
         gFishmodTimerHook = PcProf_Hook;
@@ -260,6 +380,18 @@ static void PcProf_Update(void) {
             sPcSendPos = 0;
             sLastSave = now;
         }
+#ifdef FISHMOD_FRAMELOG
+        // the frame log first (one packet a frame in all)
+        if ((sFlReady >= 0) && !Sc64_UsbBusy()) {
+            FrameLogPacket* pk = sFl[sFlReady];
+
+            if (Sc64_UsbSend(pk, 16 + pk->count * FRAMELOG_WORDS * 4) == 0) {
+                sPcPackets++;
+            }
+            sFlReady = -1;
+            return;
+        }
+#endif
         // one packet a frame, when the last one has gone (never waits: with no PC listening the counts wait, and
         // the table counting drops samples once full)
         if ((sPcSending != NULL) && !Sc64_UsbBusy()) {

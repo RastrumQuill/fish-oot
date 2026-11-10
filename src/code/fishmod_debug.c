@@ -739,6 +739,10 @@ static void Fishmod_DebugProfile(s32 record) {
     }
 }
 
+#ifdef FISHMOD_PCPROF
+static void PcProf_FrameEnd(void); // (fishmod_debug_pcprof.inc.c: the frame's profile tag and its log record)
+#endif
+
 static void Fishmod_DebugTiming(void) {
     static u32 sSum[2 + FISHMOD_CPU_MAX + 1];
     static u32 sShown[2 + FISHMOD_CPU_MAX + 1];
@@ -800,6 +804,9 @@ static void Fishmod_DebugTiming(void) {
     Fishmod_DebugProfile(sStatsFrames > FISHMOD_STATS_SKIP);
 #ifdef FISHMOD_BENCH_AREA
     AreaBench_Sample();
+#endif
+#ifdef FISHMOD_PCPROF
+    PcProf_FrameEnd(); // (before the frame's sections are cleared)
 #endif
     bzero(gFishmodSect, sizeof(gFishmodSect));
     bzero(gFishmodActorCycles, sizeof(gFishmodActorCycles));

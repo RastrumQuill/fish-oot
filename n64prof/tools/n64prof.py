@@ -42,7 +42,21 @@ def read_dump(path, offset=0):
     return head, buckets
 
 
-def load(paths, offset=0):
+FRAME_TAGS = {"slow": 1, "fast": 2}
+
+
+def untag(buckets, frames):
+    """Per-frame tags (n64prof_frame_end) are in the bucket addresses' low bits: keep those of the frames asked for
+    (all, slow, fast) and drop the tags."""
+    out = collections.Counter()
+    want = FRAME_TAGS.get(frames)
+    for addr, c in buckets.items():
+        if want is None or (addr & 3) == want:
+            out[addr & ~3] += c
+    return dict(out)
+
+
+def load(paths, offset=0, frames="all"):
     """Every dump named: files as they are, folders as streamed chunks (all their files). Version 2 chunks (counts
     since the last swap) are added up into one dump, whose header is the last chunk's (its totals are the run's)."""
     out = []
@@ -50,8 +64,11 @@ def load(paths, offset=0):
     for path in paths:
         files = sorted(os.path.join(path, f) for f in os.listdir(path)) if os.path.isdir(path) else [path]
         for f in files:
+            if os.path.isdir(path) and open(f, "rb").read(4) != struct.pack(">I", MAGIC):
+                continue  # (another stream's packets in the same folder, e.g. fish-oot's frame log)
             head, buckets = read_dump(f, offset if f == path else 0)
             (chunks if head["version"] == 2 else out).append((head, buckets))
+    out = [(h, untag(b, frames)) for h, b in out]
     if chunks:
         last = max(h["dumps"] for h, _ in chunks)
         seen = set()
@@ -67,7 +84,7 @@ def load(paths, offset=0):
         if missing:
             print(f"warning: {len(missing)} of {last} chunks missing (first: {missing[:5]})", file=sys.stderr)
         head["unsaved"] = 0
-        out.append((head, dict(total)))
+        out.append((head, untag(total, frames)))
     return out
 
 
@@ -143,7 +160,7 @@ def describe(heads):
 
 
 def cmd_report(args):
-    dumps = load(args.dumps, args.offset)
+    dumps = load(args.dumps, args.offset, args.frames)
     heads, buckets = merge(dumps)
     shift = heads[0]["bucket_shift"]
     pcs = expand(buckets, shift)
@@ -159,8 +176,8 @@ def cmd_report(args):
 
 
 def cmd_compare(args):
-    a_heads, a = merge(load([args.a], args.offset))
-    b_heads, b = merge(load([args.b], args.offset))
+    a_heads, a = merge(load([args.a], args.offset, args.frames))
+    b_heads, b = merge(load([args.b], args.offset, args.frames))
     pa = expand(a, a_heads[0]["bucket_shift"])
     pb = expand(b, b_heads[0]["bucket_shift"])
     frames = symbolize(args.elf, set(pa) | set(pb))
@@ -209,7 +226,7 @@ class Node:
 
 
 def cmd_llvm(args):
-    dumps = load(args.dumps, args.offset)
+    dumps = load(args.dumps, args.offset, args.frames)
     heads, buckets = merge(dumps)
     pcs = expand(buckets, heads[0]["bucket_shift"])
     frames = symbolize(args.elf, pcs.keys())
@@ -255,12 +272,16 @@ def main():
     r.add_argument("--elf", required=True)
     r.add_argument("--top", type=int, default=40)
     r.add_argument("--offset", type=lambda s: int(s, 0), default=0)
+    r.add_argument("--frames", choices=("all", "slow", "fast"), default="all",
+                    help="with per-frame tags: only the samples of frames over 52 ms (slow) or not (fast)")
     r.set_defaults(fn=cmd_report)
     lv = sub.add_parser("llvm")
     lv.add_argument("dumps", nargs="+")
     lv.add_argument("--elf", required=True)
     lv.add_argument("-o", "--output", required=True)
     lv.add_argument("--offset", type=lambda s: int(s, 0), default=0)
+    lv.add_argument("--frames", choices=("all", "slow", "fast"), default="all",
+                    help="with per-frame tags: only the samples of frames over 52 ms (slow) or not (fast)")
     lv.set_defaults(fn=cmd_llvm)
     c = sub.add_parser("compare")
     c.add_argument("a")
@@ -268,6 +289,8 @@ def main():
     c.add_argument("--elf", required=True)
     c.add_argument("--top", type=int, default=40)
     c.add_argument("--offset", type=lambda s: int(s, 0), default=0)
+    c.add_argument("--frames", choices=("all", "slow", "fast"), default="all",
+                    help="with per-frame tags: only the samples of frames over 52 ms (slow) or not (fast)")
     c.set_defaults(fn=cmd_compare)
     args = ap.parse_args()
     args.fn(args)

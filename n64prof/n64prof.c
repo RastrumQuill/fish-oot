@@ -17,6 +17,10 @@ static volatile unsigned int sDropped;
 static volatile unsigned int sUnmapped;
 static volatile unsigned int sUsed; /* entries filled in the current table */
 static unsigned int sShift = N64PROF_BUCKET_SHIFT;
+static unsigned int* sRing[2]; /* per-frame rings (n64prof_set_frame_ring), or 0 */
+static unsigned int sRingSize;
+static volatile unsigned int sRingFill[2];
+static volatile int sRingSet;
 static unsigned int sDumps;
 static N64ProfRange sRanges[2][N64PROF_MAX_RANGES];
 static int sRangeCount[2];
@@ -73,12 +77,11 @@ unsigned int n64prof_next_interval(void) {
     return (sInterval * 3 / 4) + (sRand % (sInterval / 2 + 1));
 }
 
+static void n64prof_count_into(N64ProfEntry* table, unsigned int pc, unsigned int tag);
+
 void n64prof_sample(unsigned int pc) {
     const N64ProfRange* r;
     N64ProfEntry* table = sTable;
-    N64ProfEntry* e;
-    unsigned int key;
-    unsigned int h;
     int set;
     int n;
     int i;
@@ -99,7 +102,28 @@ void n64prof_sample(unsigned int pc) {
     if ((i == n) && (pc >= sStaticEnd)) {
         sUnmapped++;
     }
-    key = pc & ~((1u << sShift) - 1);
+    if (sRing[0] != 0) {
+        /* (per-frame tags: the sample waits for its frame's end) */
+        int ring = sRingSet;
+
+        if (sRingFill[ring] < sRingSize) {
+            sRing[ring][sRingFill[ring]++] = pc;
+        } else {
+            sDropped++;
+        }
+        return;
+    }
+    n64prof_count_into(table, pc, 0);
+}
+
+/* A sample (or a tagged one) into table. */
+static void n64prof_count_into(N64ProfEntry* table, unsigned int pc, unsigned int tag) {
+    N64ProfEntry* e;
+    unsigned int key;
+    unsigned int h;
+    int i;
+
+    key = (pc & ~((1u << sShift) - 1)) | tag;
     h = ((key >> sShift) * 2654435761u) >> sHashShift;
     for (i = 0; i < PROBES; i++) {
         e = &table[(h + i) & sMask];
@@ -241,4 +265,26 @@ unsigned int n64prof_pack(const N64ProfEntry* table, unsigned int* pos, void* ou
         hdr->user[i] = (user != 0) ? user[i] : 0;
     }
     return sizeof(N64ProfHeader) + saved * sizeof(N64ProfEntry);
+}
+
+void n64prof_set_frame_ring(unsigned int* rings, unsigned int size) {
+    sRingFill[0] = sRingFill[1] = 0;
+    sRingSet = 0;
+    sRingSize = size;
+    sRing[1] = rings + size;
+    sRing[0] = rings; /* last: the interrupt checks it */
+}
+
+void n64prof_frame_end(unsigned int tag) {
+    int done = sRingSet;
+    unsigned int i;
+
+    if ((sRing[0] == 0) || (sTable == 0)) {
+        return;
+    }
+    sRingFill[done ^ 1] = 0;
+    sRingSet = done ^ 1; /* one store: the interrupt fills the other ring from here on */
+    for (i = 0; i < sRingFill[done]; i++) {
+        n64prof_count_into(sTable, sRing[done][i], tag);
+    }
 }
