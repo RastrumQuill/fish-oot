@@ -371,7 +371,9 @@ static void PcProf_Start(void) {
     sFl[0] = VB_FRAMELOG;
     sFl[1] = VB_FRAMELOG + 1;
     sFl[0]->count = sFl[1]->count = 0;
+#ifdef VB_FRAME_TAGS // (off: the tags crashed on the console in frames1, not in ares; releases/notes-bisect1.md)
     n64prof_set_frame_ring((unsigned int*)VB_RINGS, PCPROF_RING);
+#endif
     PcProf_Ranges();
     gVBenchTimerHook = PcProf_Hook;
     osSetTimer(&sPcTimer, PCPROF_INTERVAL, PCPROF_INTERVAL, NULL, NULL);
