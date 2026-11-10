@@ -14,6 +14,7 @@
 #include "libc64/malloc.h"
 #include "z_en_fishmod.h"
 #include "segmented_address.h"
+#include "stddef.h"
 #include "fishmod.h"
 #include "fishmod_scatter.h"
 
@@ -41,7 +42,7 @@
 
 // Lake Hylia's bed shaded under the full lake (fishmod/tools/gen_bedshade.py, made at build time)
 typedef struct FishmodBedShade {
-    u32 offset; // of a vertex's normal in the room
+    Vtx* vtx; // the vertex, at its address in the room's segment (the linker's: right whatever the room's layout)
     s8 normal[3];
 } FishmodBedShade;
 #include "src/fishmod_data/fishmod_bedshade.h"
@@ -740,11 +741,12 @@ static void Scatter_ShadeBed(PlayState* play) {
     }
     for (i = 0; i < FISHMOD_BEDSHADE_COUNT; i++) {
         const FishmodBedShade* shade = &sFishmodBedShade[i];
+        u32 offset = SEGMENT_OFFSET(shade->vtx) + offsetof(Vtx_tn, n);
 
-        room[shade->offset + 0] = shade->normal[0];
-        room[shade->offset + 1] = shade->normal[1];
-        room[shade->offset + 2] = shade->normal[2];
-        last = MAX(last, shade->offset + 3);
+        room[offset + 0] = shade->normal[0];
+        room[offset + 1] = shade->normal[1];
+        room[offset + 2] = shade->normal[2];
+        last = MAX(last, offset + 3);
     }
     osWritebackDCache(room, last);
     sBedShadedRoom = room;

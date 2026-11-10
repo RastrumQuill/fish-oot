@@ -1,8 +1,8 @@
 diff --git a/desktop-ui/program/platform.cpp b/desktop-ui/program/platform.cpp
-index 4f49c5a..590ea80 100644
+index 4f49c5a..8f07c98 100644
 --- a/desktop-ui/program/platform.cpp
 +++ b/desktop-ui/program/platform.cpp
-@@ -84,6 +84,15 @@ auto Program::video(ares::Node::Video::Screen node, const u32* data, u32 pitch,
+@@ -84,6 +84,29 @@ auto Program::video(ares::Node::Video::Screen node, const u32* data, u32 pitch,
      requestScreenshot = false;
      captureScreenshot(data, pitch, width, height);
    }
@@ -13,6 +13,20 @@ index 4f49c5a..590ea80 100644
 +    if((autoshotFrame++ % every) == 0) {
 +      string name{dir, "/frame_", pad(autoshotFrame, 7, '0'), ".png"};
 +      Encode::PNG::RGB8(name, data, pitch, width, height);
++    }
++  }
++  // fish-oot: ARES_FRAMEHASH=<file> appends a hash of every frame (FNV-1a over the pixels): two builds that should
++  // draw the same can be compared by their sequences of distinct frames, whatever their timing
++  if(auto path = getenv("ARES_FRAMEHASH")) {
++    static FILE* hashes = fopen(path, "w");
++    if(hashes) {
++      u64 h = 0xcbf29ce484222325ull;
++      for(u32 y = 0; y < height; y++) {
++        auto row = (const u8*)data + y * pitch;
++        for(u32 x = 0; x < width * 4; x++) h = (h ^ row[x]) * 0x100000001b3ull;
++      }
++      fprintf(hashes, "%ux%u %016llx\n", width, height, (unsigned long long)h);
++      fflush(hashes);
 +    }
 +  }
  

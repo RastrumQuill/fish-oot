@@ -22,6 +22,8 @@
 #                  mod's; outputs get a -clanggame suffix
 #   --clang-opt L  (implies --clang) clang's optimisation level for the mod's code (Os, Oz, O3...; default the GCC
 #                  level, O2); outputs get it in the suffix (-clangOs)
+#   --texpack      lossless CI8 textures and leaner display lists for the RDP (tools/texpack.py): the build reads a
+#                  converted copy of the extracted assets (extracted/VERSION-texpack); outputs get a -texpack suffix
 #   --pgo          (implies --clang) clang optimises with the console's sample profile, PGO_PROFILE (default
 #                  n64prof/profiles/oot-console2.prof; see its README); outputs get a -clang-pgo suffix
 # Uses `flips` on PATH (or FLIPS=/path/to/flips) for the release patch if there is one, else fishmod/tools/bps.py.
@@ -40,6 +42,7 @@ DEBUG=0
 CLANG=0
 CLANG_OPT=""
 CLANG_GAME=0
+TEXPACK=0
 PGO=0
 SCRIPT=""
 F3DEX3=0
@@ -61,6 +64,7 @@ while [ $# -gt 0 ]; do
         --clang) CLANG=1 ;;
         --pgo) CLANG=1; PGO=1 ;;
         --clang-game) CLANG=1; CLANG_GAME=1 ;;
+        --texpack) TEXPACK=1 ;;
         --clang-opt) CLANG=1; CLANG_OPT="$2"; shift ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
@@ -112,7 +116,18 @@ fi
 # (a clang build also rebuilds when its compiler options change: the wrapper's and the profile's contents count)
 CLANG_SUM=""; [ "$CLANG" = 1 ] && CLANG_SUM="$(md5sum < tools/fishmod_clang_cc.sh | cut -c1-8)"
 [ "$PGO" = 1 ] && CLANG_SUM="$CLANG_SUM-$(md5sum < "$PGO_PROFILE" | cut -c1-8)"
-MODE="debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+TEXPACK_ARGS=()
+if [ "$TEXPACK" = 1 ]; then
+    TP_SRC="extracted/$VERSION"
+    TP_OUT="extracted/$VERSION-texpack"
+    TP_SUM="$(md5sum < tools/texpack.py | cut -c1-8)"
+    if [ "$(cat "$TP_OUT/.texpack" 2>/dev/null)" != "$TP_SUM" ]; then
+        python3 tools/texpack.py "$TP_SRC" "$TP_OUT"
+        echo "$TP_SUM" > "$TP_OUT/.texpack"
+    fi
+    TEXPACK_ARGS=(EXTRACTED_DIR="$TP_OUT")
+fi
+MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -166,7 +181,7 @@ elif [ "$CLANG" = 1 ]; then
     echo "error: --clang goes with the GCC build (not --ido)" >&2
     exit 1
 fi
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC FISHMOD_TESTMODE=$TESTMODE \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} ${TEXPACK_ARGS[@]+"${TEXPACK_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC FISHMOD_TESTMODE=$TESTMODE \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -190,6 +205,9 @@ if [ "$CLANG" = 1 ]; then
 fi
 if [ "$PGO" = 1 ]; then
     SUFFIX="$SUFFIX-pgo"
+fi
+if [ "$TEXPACK" = 1 ]; then
+    SUFFIX="$SUFFIX-texpack"
 fi
 
 if [ "$DEBUG" = 1 ]; then

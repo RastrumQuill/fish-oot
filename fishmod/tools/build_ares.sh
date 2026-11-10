@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds ares (N64 core only) from source for the capture tools (harness.py, ares_capture.sh, regress.sh), with
-# ares-autoshot.patch: ARES_AUTOSHOT=<dir> saves a screenshot every ARES_AUTOSHOT_EVERY frames (default 15). Release
+# ares-autoshot.patch: ARES_AUTOSHOT=<dir> saves a screenshot every ARES_AUTOSHOT_EVERY frames (default 15), and
+# ARES_FRAMEHASH=<file> writes a hash of every frame (two builds compared by their sequences of frames). Release
 # v148, without SDL (the test ROMs' scripts drive the game; the audio driver is None). The system's ares (Ubuntu's
 # 134) has no N64 core; ares's development head after v148 needs SDL3 (not packaged on Ubuntu 24.04) and crashed in
 # its new RDRAM emulation even on the unmodified game.

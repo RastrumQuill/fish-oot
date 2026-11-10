@@ -297,6 +297,10 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
   thick raised bed under water was dropped (two textures don't fit in texture memory at full size, and it isn't
   how these plants grow).
 
+- **Caustics on underwater rocks:** the light patterns a moving surface throws on the rocks below it. Has to keep to
+  the RDP's budget (Lake Hylia is RDP-bound): for example a scrolling caustic texture on the underwater rock
+  materials only, rather than an extra full-screen pass.
+
 ### Water current (not a moonshot: small)
 Flowing water, where it actually flows (the Gerudo river's inflow into the lake, the rivers, Zora's River), pushes
 on what's in it; still water next to it doesn't, even where both are one body of water to the game.
