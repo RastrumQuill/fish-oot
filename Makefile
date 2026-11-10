@@ -909,6 +909,11 @@ $(BUILD_DIR)/src/code/fishmod.o $(BUILD_DIR)/src/code/fishmod_%.o: CC := tools/f
 $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/%.o: CC := tools/fishmod_clang_cc.sh
 $(SEGMENTS_DIR)/ovl_En_Fishmod.reloc.o: POSTPROCESS_OBJ := $(PYTHON) tools/reloc_elf_pairing.py
 endif
+# fish-oot: CLANG_GAME=1: the game's own C code too (src/code, every overlay), every overlay's table marked
+ifeq ($(CLANG_GAME),1)
+$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CC := tools/fishmod_clang_cc.sh
+$(SEGMENTS_DIR)/%.reloc.o: POSTPROCESS_OBJ := $(PYTHON) tools/reloc_elf_pairing.py
+endif
 endif
 
 #### Main Targets ###

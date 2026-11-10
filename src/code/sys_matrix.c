@@ -558,10 +558,14 @@ Mtx* Matrix_MtxFToMtx(MtxF* src, Mtx* dest) {
     u32* d = (u32*)dest;
 
     if ((((uintptr_t)dest & 0xF) == 0) && ((uintptr_t)dest >= 0x80000000) && ((uintptr_t)dest < 0xA0000000)) {
-        __asm__ volatile("cache 0x0D, 0(%0)\n\t"
+        // (.set mips3: cache is a MIPS III instruction, and clang builds for MIPS II)
+        __asm__ volatile(".set push\n\t"
+                         ".set mips3\n\t"
+                         "cache 0x0D, 0(%0)\n\t"
                          "cache 0x0D, 16(%0)\n\t"
                          "cache 0x0D, 32(%0)\n\t"
-                         "cache 0x0D, 48(%0)"
+                         "cache 0x0D, 48(%0)\n\t"
+                         ".set pop"
                          :
                          : "r"(dest)
                          : "memory");
