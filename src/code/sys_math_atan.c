@@ -1,6 +1,7 @@
 #include "array_count.h"
 #include "sys_math.h"
 #include "z_math.h"
+#include "fishmod_trig.h"
 
 static u16 sAtan2Tbl[] = {
     0x0000, 0x000A, 0x0014, 0x001F, 0x0029, 0x0033, 0x003D, 0x0047, 0x0051, 0x005C, 0x0066, 0x0070, 0x007A, 0x0084,
@@ -90,12 +91,14 @@ u16 Math_GetAtan2Tbl(f32 y, f32 x) {
     if (x == 0.0f) {
         ret = sAtan2Tbl[0];
     } else {
-        s32 tblIdx = ((y / x) * 1024.0f) + 0.5f;
+        f32 t = y / x;
 
-        if (tblIdx >= ARRAY_COUNT(sAtan2Tbl)) {
+        // fish-oot: the polynomial (fishmod_trig.h) instead of the table, rounded to the nearest binang (the table's
+        // entries were off by up to 5.6); past the table's end as before
+        if ((s32)((t * 1024.0f) + 0.5f) >= ARRAY_COUNT(sAtan2Tbl)) {
             ret = sAtan2Tbl[0];
         } else {
-            ret = sAtan2Tbl[tblIdx];
+            ret = (u16)(Fishmod_AtanUnit(t) * (32768.0f / M_PI) + 0.5f);
         }
     }
 

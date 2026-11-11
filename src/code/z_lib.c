@@ -6,6 +6,7 @@
 #include "sys_math.h"
 #include "rand.h"
 #include "sfx.h"
+#include "fishmod_trig.h"
 
 /**
  * memset: sets `len` bytes to `val` starting at address `dest`.
@@ -35,7 +36,7 @@ void Lib_MemSet(u8* dest, size_t len, u8 val) {
  * @return cos(angle)
  */
 f32 Math_CosS(s16 angle) {
-    return coss(angle) * SHT_MINV;
+    return Fishmod_CosBinang(angle); // fish-oot: a polynomial instead of the sine table (fishmod_trig.h)
 }
 
 /**
@@ -43,7 +44,7 @@ f32 Math_CosS(s16 angle) {
  * @return sin(angle)
  */
 f32 Math_SinS(s16 angle) {
-    return sins(angle) * SHT_MINV;
+    return Fishmod_SinBinang(angle); // fish-oot: a polynomial instead of the sine table (fishmod_trig.h)
 }
 
 /**

@@ -1,25 +1,14 @@
 #include "ultra64.h"
 
-#include "sintable.inc.c"
+#include "fishmod_trig.h"
 
 /**
  * @param angle binang
  * @return sin(angle)*0x7FFF
  */
 s16 sins(u16 angle) {
-    s16 value;
+    // fish-oot: from the polynomial (fishmod_trig.h), rounded, instead of the table (which steps every 16 binangs)
+    f32 s = Fishmod_SinBinang((s16)angle) * 32767.0f;
 
-    angle >>= 4;
-
-    if (angle & 0x400) {
-        value = sintable[0x3FF - (angle & 0x3FF)];
-    } else {
-        value = sintable[angle & 0x3FF];
-    }
-
-    if (angle & 0x800) {
-        return -value;
-    } else {
-        return value;
-    }
+    return (s16)((s >= 0.0f) ? (s + 0.5f) : (s - 0.5f));
 }

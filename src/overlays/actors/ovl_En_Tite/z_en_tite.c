@@ -919,6 +919,18 @@ void EnTite_Update(Actor* thisx, PlayState* play) {
     f32 waterSurfaceY;
 
     EnTite_CheckDamage(thisx, play);
+    // fish-oot: an idle tektite far from Link (it only reacts within 300 units) and settled on the ground or the water
+    // runs its logic and collision one frame in four, each tektite on its own frame; in between only its animation
+    // and idle timer go on. Its hurtbox and push collision are still set every frame (below), so hits are as before.
+    if ((this->actionFunc == EnTite_Idle) && (thisx->xzDistToPlayer > 1000.0f) &&
+        (thisx->colChkInfo.damageReaction == 0) && !(this->collider.base.acFlags & AC_HIT) &&
+        (thisx->bgCheckFlags & (BGCHECKFLAG_GROUND | BGCHECKFLAG_WATER)) && (thisx->velocity.y == 0.0f) &&
+        (((play->gameplayFrames + ((s32)thisx->home.pos.x ^ (s32)thisx->home.pos.z)) & 3) != 0)) {
+        SkelAnime_Update(&this->skelAnime);
+        if (this->vIdleTimer > 0) {
+            this->vIdleTimer--;
+        }
+    } else
     // Stay still if hit by immunity damage type this frame
     if (thisx->colChkInfo.damageReaction != 0xE) {
         this->actionFunc(this, play);
