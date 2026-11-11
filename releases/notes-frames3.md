@@ -43,3 +43,10 @@ nothing there).
   gives; its 5.6-binang error is 0.03 degrees).
 - The floor and ceiling point-in-triangle test reordered and inlined (the same answers: 40 million cases on the PC,
   the collision log in ares).
+
+## frames4-clang, frames4-clang-pgo: the whole game on clang
+frames4 with every C file of the game on clang (`--clang-game`: src/code, every overlay, audio, libultra), and the
+same optimised with the console's sample profile (`--pgo`, `n64prof/profiles/oot-console3.prof`: the pcprof3 run,
+the whole game on clang with line tables, audio included). In the shipped frames builds audio and libultra are still
+on IDO, so this is the first console measurement of audio on a modern compiler. Compare each against frames4.
+`fishmod/build.sh --script pcprof_frames --hw --colpack --clang-game [--pgo]` (PGO_PROFILE=n64prof/profiles/oot-console3.prof)

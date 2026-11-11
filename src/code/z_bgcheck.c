@@ -123,6 +123,9 @@ static void FloorCache_Store(FloorCacheEntry* e, Vec3f* pos, u16 xpFlags, u32 do
  * CollisionPoly_CheckYIntersect and CollisionPoly_CheckYIntersectApprox2 compute (the same vertices, normal and
  * expressions), with the point test inlined and its box test skipped (fishmod_tri.h). The same answers.
  */
+void CollisionPoly_GetNormalF(CollisionPoly* poly, f32* nx, f32* ny, f32* nz);
+void CollisionPoly_GetVertices(CollisionPoly* poly, Vec3s* vtxList, Vec3f* dest);
+
 static s32 StaticPoly_CheckYIntersect(CollisionContext* colCtx, s32 polyId, f32 x, f32 z, f32* yIntersect, f32 detMax,
                                       f32 chkDist) {
     CollisionPoly* poly = &colCtx->colHeader->polyList[polyId];
