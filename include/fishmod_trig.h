@@ -5,13 +5,14 @@
 
 /*
  * fish-oot: trig from short polynomials instead of tables and long series (Math_SinS/CosS, Math_SinF/CosF, sins/coss,
- * Math_Atan2S, Math_FAtanContFracF). Each is more accurate than what it replaces and needs no table (no cache misses
+ * Math_FAtanContFracF). Each is more accurate than what it replaces and needs no table (no cache misses
  * from a 2 KB or 4 KB table) and no long chain of divisions:
  * - sin/cos: by octants, a degree-3 polynomial for sin and a square root for cos (below): error 1.5e-4, against
  *   1.6e-3 for the original table (which steps every 16 binangs).
- * - atan on [0, 1]: an 8-term odd minimax polynomial: error 1.2e-7 rad. Math_Atan2S's table was off by up to 5.6
- *   binangs (now 0.5, the rounding); Math_FAtanContFracF's continued fraction (24 divisions a call, error 1.8e-7) is
- *   matched with none.
+ * - atan on [0, 1]: an 8-term odd minimax polynomial: error 1.2e-7 rad. Math_FAtanContFracF's continued fraction
+ *   (24 divisions a call, error 1.8e-7) is matched with none: 0.71% of the CPU -> 0.10% on the console.
+ *   (Math_Atan2S keeps its table: a division and a lookup in a table that stays in the cache cost less than a division
+ *   and this polynomial (0.54% -> 1.15% on the console), and whole binangs are all it gives.)
  * Checked against double precision on the PC (fishmod/tools/trig_check.c) before use.
  * Static functions, for IDO (libultra) as well as GCC: each file that includes this gets the ones it calls.
  */

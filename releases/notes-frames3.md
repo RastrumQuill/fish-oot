@@ -33,3 +33,13 @@ about a division's cost). The matrix rotations (`Matrix_RotateZYX`, `Matrix_Tran
 (frames3-texpack's first lap: CPU draw +2.4 ms against frames2). In ares: CPU draw 32.4 -> 29.9 ms (frames3: 31.4).
 Run it like the others; compare against frames3 (or frames3-texpack, whose RDP time showed the textures change
 nothing there).
+
+## frames4: frames3b, plus the point test, and Math_Atan2S back on its table
+**`fish-oot-frames4.bps`** (`fishmod/build.sh --script pcprof_frames --hw --colpack`):
+- frames3b's console run (two laps against frames3-texpack, the same laps and legs): CPU draw 27.5 -> 25.7 ms (fish
+  9.0 -> 7.9, props 5.9 -> 5.0), back to frames2's; all trig together 4.41% -> 3.46% of the CPU (the original tables:
+  3.21%). The float arctangent: 0.71% (frames2) -> 0.10%.
+- But Math_Atan2S's 8-term polynomial cost 1.15% against the table's 0.54%: back to the table (whole binangs are all it
+  gives; its 5.6-binang error is 0.03 degrees).
+- The floor and ceiling point-in-triangle test reordered and inlined (the same answers: 40 million cases on the PC,
+  the collision log in ares).
