@@ -67,8 +67,19 @@ int main(void) {
         maxNew = fmax(maxNew, fabs(s - sin(r)));
         maxNewC = fmax(maxNewC, fabs(c - cos(r)));
     }
-    printf("sin, every binang:  table %.2e   polynomial %.2e\n", maxOld, maxNew);
-    printf("cos, every binang:  table %.2e   polynomial %.2e\n", maxOldC, maxNewC);
+    printf("sin, every binang:  table %.2e   octant polynomial %.2e\n", maxOld, maxNew);
+    printf("cos, every binang:  table %.2e   octant polynomial %.2e\n", maxOldC, maxNewC);
+    {
+        long differ = 0;
+
+        for (a = -32768; a < 32768; a++) {
+            f32 s, c;
+
+            Fishmod_SinCosBinang((s16)a, &s, &c);
+            differ += (s != Fishmod_SinBinang((s16)a)) + (c != Fishmod_CosBinang((s16)a));
+        }
+        printf("sin and cos alone against both together: %ld of 131072 values differ\n", differ);
+    }
 
     for (i = -2000000; i <= 2000000; i++) {
         f32 x = i * 0.00005f; /* -100..100 */

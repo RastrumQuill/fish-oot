@@ -1,4 +1,5 @@
 #include "libc64/math64.h"
+#include "fishmod_trig.h"
 #include "gfx.h"
 #if DEBUG_FEATURES
 #include "fault.h"
@@ -317,8 +318,7 @@ void Matrix_RotateZYX(s16 x, s16 y, s16 z, u8 mode) {
     f32 cos;
 
     if (mode == MTXMODE_APPLY) {
-        sin = Math_SinS(z);
-        cos = Math_CosS(z);
+        Fishmod_SinCosBinang(z, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
 
         temp1 = cmf->xx;
         temp2 = cmf->xy;
@@ -341,8 +341,7 @@ void Matrix_RotateZYX(s16 x, s16 y, s16 z, u8 mode) {
         cmf->wy = temp2 * cos - temp1 * sin;
 
         if (y != 0) {
-            sin = Math_SinS(y);
-            cos = Math_CosS(y);
+            Fishmod_SinCosBinang(y, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
 
             temp1 = cmf->xx;
             temp2 = cmf->xz;
@@ -366,8 +365,7 @@ void Matrix_RotateZYX(s16 x, s16 y, s16 z, u8 mode) {
         }
 
         if (x != 0) {
-            sin = Math_SinS(x);
-            cos = Math_CosS(x);
+            Fishmod_SinCosBinang(x, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
 
             temp1 = cmf->xy;
             temp2 = cmf->xz;
@@ -401,11 +399,12 @@ void Matrix_RotateZYX(s16 x, s16 y, s16 z, u8 mode) {
  */
 void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
     MtxF* cmf = sCurrentMatrix;
-    f32 sin = Math_SinS(rotation->z);
-    f32 cos = Math_CosS(rotation->z);
+    f32 sin;
+    f32 cos;
     f32 temp1;
     f32 temp2;
 
+    Fishmod_SinCosBinang(rotation->z, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
     temp1 = cmf->xx;
     temp2 = cmf->xy;
     cmf->xw += temp1 * translation->x + temp2 * translation->y + cmf->xz * translation->z;
@@ -431,8 +430,7 @@ void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
     cmf->wy = temp2 * cos - temp1 * sin;
 
     if (rotation->y != 0) {
-        sin = Math_SinS(rotation->y);
-        cos = Math_CosS(rotation->y);
+        Fishmod_SinCosBinang(rotation->y, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
 
         temp1 = cmf->xx;
         temp2 = cmf->xz;
@@ -456,8 +454,7 @@ void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
     }
 
     if (rotation->x != 0) {
-        sin = Math_SinS(rotation->x);
-        cos = Math_CosS(rotation->x);
+        Fishmod_SinCosBinang(rotation->x, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
 
         temp1 = cmf->xy;
         temp2 = cmf->xz;
@@ -487,11 +484,12 @@ void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
  */
 void Matrix_SetTranslateRotateYXZ(f32 translateX, f32 translateY, f32 translateZ, Vec3s* rot) {
     MtxF* cmf = sCurrentMatrix;
-    f32 temp1 = Math_SinS(rot->y);
-    f32 temp2 = Math_CosS(rot->y);
+    f32 temp1;
+    f32 temp2;
     f32 cos;
     f32 sin;
 
+    Fishmod_SinCosBinang(rot->y, &temp1, &temp2); // fish-oot: both at once (fishmod_trig.h)
     cmf->xx = temp2;
     cmf->zx = -temp1;
     cmf->xw = translateX;
@@ -503,8 +501,7 @@ void Matrix_SetTranslateRotateYXZ(f32 translateX, f32 translateY, f32 translateZ
     cmf->ww = 1.0f;
 
     if (rot->x != 0) {
-        sin = Math_SinS(rot->x);
-        cos = Math_CosS(rot->x);
+        Fishmod_SinCosBinang(rot->x, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
 
         cmf->zz = temp2 * cos;
         cmf->zy = temp2 * sin;
@@ -522,8 +519,7 @@ void Matrix_SetTranslateRotateYXZ(f32 translateX, f32 translateY, f32 translateZ
     }
 
     if (rot->z != 0) {
-        sin = Math_SinS(rot->z);
-        cos = Math_CosS(rot->z);
+        Fishmod_SinCosBinang(rot->z, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
 
         temp1 = cmf->xx;
         temp2 = cmf->xy;

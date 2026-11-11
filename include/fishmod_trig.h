@@ -1,13 +1,14 @@
 #ifndef FISHMOD_TRIG_H
 #define FISHMOD_TRIG_H
 
+#include "libc/math.h" /* sqrtf (an intrinsic: the sqrt.s instruction) */
+
 /*
  * fish-oot: trig from short polynomials instead of tables and long series (Math_SinS/CosS, Math_SinF/CosF, sins/coss,
  * Math_Atan2S, Math_FAtanContFracF). Each is more accurate than what it replaces and needs no table (no cache misses
  * from a 2 KB or 4 KB table) and no long chain of divisions:
- * - sin/cos: the angle (a binang) folded to within 45 degrees of the nearest quarter turn, then the minimax
- *   polynomials for that range (Cephes' sinf/cosf): error 1e-7, against 1.6e-3 for the original table (which steps
- *   every 16 binangs).
+ * - sin/cos: by octants, a degree-3 polynomial for sin and a square root for cos (below): error 1.5e-4, against
+ *   1.6e-3 for the original table (which steps every 16 binangs).
  * - atan on [0, 1]: an 8-term odd minimax polynomial: error 1.2e-7 rad. Math_Atan2S's table was off by up to 5.6
  *   binangs (now 0.5, the rounding); Math_FAtanContFracF's continued fraction (24 divisions a call, error 1.8e-7) is
  *   matched with none.
@@ -17,48 +18,58 @@
 
 #define FISHMOD_TRIG_BINANG_TO_RAD (6.28318530717958647692f / 65536.0f)
 
-/* sin and cos of a binang (0x10000 a turn) */
-static void Fishmod_SinCosBinang(s16 angle, f32* sinOut, f32* cosOut) {
-    s32 quarter = (((s32)angle + 0x2000) >> 14) & 3;
-    f32 t = (s16)(angle - (quarter << 14)) * FISHMOD_TRIG_BINANG_TO_RAD; /* within +-pi/4 */
-    f32 t2 = t * t;
-    f32 s = t + t * t2 * (-1.6666654611e-1f + t2 * (8.3321608736e-3f + t2 * -1.9515295891e-4f));
-    f32 c = 1.0f - 0.5f * t2 + t2 * t2 * (4.166664568298827e-2f + t2 * (-1.388731625493765e-3f + t2 * 2.443315711809948e-5f));
+/*
+ * sin and cos by octants (Kaze Emanuar's folded polynomial): three symmetries fold the angle into 0-45 degrees (the
+ * half turn: the sign; the quarter: sin and cos swap; the octant: mirrored), a degree-3 polynomial gives sin there,
+ * and cos comes from sqrt(1 - sin^2): a square root costs about what a division does on the VR4300, far less than a
+ * second polynomial. Error 1.5e-4 (the table: 1.6e-3). For both of one angle (a rotation), Fishmod_SinCosBinang.
+ */
+#define FISHMOD_TRIG_OCT_SIN(t, t2) ((t) * (0.999031603f + (t2) * -0.160344586f))
 
-    /* (0.0f - x, not -x: a zero comes out +0 as the table gave) */
-    switch (quarter) {
-        case 0:
-            *sinOut = s;
-            *cosOut = c;
-            break;
-        case 1:
-            *sinOut = c;
-            *cosOut = 0.0f - s;
-            break;
-        case 2:
-            *sinOut = 0.0f - s;
-            *cosOut = 0.0f - c;
-            break;
-        default:
-            *sinOut = 0.0f - c;
-            *cosOut = s;
-            break;
+/* the octant's angle in radians (0..pi/4), and whether sin and cos swap */
+#define FISHMOD_TRIG_FOLD(a, oct, t)                       \
+    {                                                      \
+        s32 x_ = (a) & 0x1FFF;                             \
+        (oct) = ((a) >> 13) & 7;                           \
+        if ((oct) & 1) {                                   \
+            x_ = 0x2000 - x_;                              \
+        }                                                  \
+        (t) = x_ * FISHMOD_TRIG_BINANG_TO_RAD;             \
     }
+
+/* sin and cos of a binang (0x10000 a turn), together */
+static void Fishmod_SinCosBinang(s16 angle, f32* sinOut, f32* cosOut) {
+    s32 oct;
+    f32 t;
+    f32 s0;
+    f32 c0;
+
+    FISHMOD_TRIG_FOLD((u16)angle, oct, t);
+    s0 = FISHMOD_TRIG_OCT_SIN(t, t * t);
+    c0 = sqrtf(1.0f - s0 * s0);
+    if (((oct + 1) >> 1) & 1) { /* octants 1, 2, 5, 6: swapped */
+        f32 tmp = s0;
+
+        s0 = c0;
+        c0 = tmp;
+    }
+    /* (0.0f - x, not -x: a zero comes out +0 as the table gave) */
+    *sinOut = (oct & 4) ? (0.0f - s0) : s0;              /* octants 4-7: below the axis */
+    *cosOut = (((oct + 2) >> 2) & 1) ? (0.0f - c0) : c0; /* octants 2-5: behind it */
 }
 
-/* sin of a binang: only the one polynomial its quarter needs (the same values as Fishmod_SinCosBinang) */
+/* sin of a binang alone: the polynomial, and the square root only in the octants where sin is the swapped one */
 static f32 Fishmod_SinBinang(s16 angle) {
-    s32 quarter = (((s32)angle + 0x2000) >> 14) & 3;
-    f32 t = (s16)(angle - (quarter << 14)) * FISHMOD_TRIG_BINANG_TO_RAD;
-    f32 t2 = t * t;
+    s32 oct;
+    f32 t;
     f32 v;
 
-    if (quarter & 1) {
-        v = 1.0f - 0.5f * t2 + t2 * t2 * (4.166664568298827e-2f + t2 * (-1.388731625493765e-3f + t2 * 2.443315711809948e-5f));
-    } else {
-        v = t + t * t2 * (-1.6666654611e-1f + t2 * (8.3321608736e-3f + t2 * -1.9515295891e-4f));
+    FISHMOD_TRIG_FOLD((u16)angle, oct, t);
+    v = FISHMOD_TRIG_OCT_SIN(t, t * t);
+    if (((oct + 1) >> 1) & 1) {
+        v = sqrtf(1.0f - v * v);
     }
-    return (quarter & 2) ? (0.0f - v) : v;
+    return (oct & 4) ? (0.0f - v) : v;
 }
 
 /* cos of a binang: a quarter turn on from sin */

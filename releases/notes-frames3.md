@@ -23,3 +23,13 @@ textures are measured on their own (frames3-texpack against frames3), and the re
 ## Running each
 As frames2: an empty folder per ROM, `sc64deployer debug` running in it, start the ROM on a blank save. It shows
 **`test: frame N, M packets`** at the bottom, and DONE at the end (about an hour). Zip each folder and send it.
+
+## frames3b: the octant sin/cos
+**`fish-oot-frames3b.bps`**: frames3 with sin and cos by octants (Kaze Emanuar's folded polynomial): three symmetries
+fold the angle into 0-45 degrees, a degree-3 polynomial gives sin, and cos comes from `sqrt(1 - sin^2)` (one `sqrt.s`,
+about a division's cost). The matrix rotations (`Matrix_RotateZYX`, `Matrix_TranslateRotateZYX`,
+`Matrix_SetTranslateRotateYXZ`: every skeleton limb) get both of an angle from one call. Error 1.5e-4 (the table:
+1.6e-3); frames3's degree-7/8 polynomials were 1e-7, more than needed, and slower to draw with on the console
+(frames3-texpack's first lap: CPU draw +2.4 ms against frames2). In ares: CPU draw 32.4 -> 29.9 ms (frames3: 31.4).
+Run it like the others; compare against frames3 (or frames3-texpack, whose RDP time showed the textures change
+nothing there).
