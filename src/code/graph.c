@@ -148,6 +148,17 @@ void Graph_UCodeFaultClient(Gfx* workBuf) {
 void Graph_InitTHGA(GraphicsContext* gfxCtx) {
     GfxPool* pool = &gGfxPools[gfxCtx->gfxPoolIdx & 1];
 
+#if FISHMOD_DEBUG
+    {
+        // fishmod: with the graphics log on (collog builds), the pool emptied first: parts of an allocation that nothing
+        // writes (a light block's unused lights) would otherwise hold whatever an earlier frame left there
+        extern u32* gFishmodGfxLog;
+
+        if (gFishmodGfxLog != NULL) {
+            bzero(pool, sizeof(GfxPool));
+        }
+    }
+#endif
     pool->headMagic = GFXPOOL_HEAD_MAGIC;
     pool->tailMagic = GFXPOOL_TAIL_MAGIC;
     THGA_Init(&gfxCtx->polyOpa, pool->polyOpaBuffer, sizeof(pool->polyOpaBuffer));
