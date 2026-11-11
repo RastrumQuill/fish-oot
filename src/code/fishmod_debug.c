@@ -1471,6 +1471,9 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
     if (sScript.flags & FISHMOD_SCRIPT_F_NOTEXT) {
         return; // clean screenshots (the pause-menu mockups)
     }
+#ifdef FISHMOD_COLLOG
+    return; // the graphics log (graph.c) must not see the timings this text shows: they change with the code's speed
+#endif
 #if defined(FISHMOD_BENCH_PLAY) || defined(FISHMOD_BENCH_AREA)
     if (!sTourDebugText
 #if defined(FISHMOD_PCPROF_NORING) || defined(FISHMOD_FRAMELOG_NOSEND) || defined(FISHMOD_FAKE_SC64)
