@@ -769,6 +769,17 @@ s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 
             break;
         }
 
+        // fishmod: the poly's z range (with the radius) first, from its precomputed box: the same test this loop makes
+        // below (the same floats), before the plane distance, its square root and division; the same answers
+        if ((sStaticPolyBox != NULL) && ((resultPos.z < (sStaticPolyBox[polyId].minZ - radius)) ||
+                                         (resultPos.z > (sStaticPolyBox[polyId].maxZ + radius)))) {
+            if (curNode->next == SS_NULL) {
+                break;
+            }
+            curNode = &colCtx->polyNodes.tbl[curNode->next];
+            continue;
+        }
+
         nx = COLPOLY_GET_NORMAL(curPoly->normal.x);
         ny = COLPOLY_GET_NORMAL(curPoly->normal.y);
         nz = COLPOLY_GET_NORMAL(curPoly->normal.z);
@@ -849,6 +860,16 @@ s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 
         if (pos->y < vtxList[COLPOLY_VTX_INDEX(curPoly->flags_vIA)].y &&
             pos->y < vtxList[COLPOLY_VTX_INDEX(curPoly->flags_vIB)].y && pos->y < vtxList[curPoly->vIC].y) {
             break;
+        }
+
+        // fishmod: as the first pass, with the x range
+        if ((sStaticPolyBox != NULL) && ((resultPos.x < (sStaticPolyBox[polyId].minX - radius)) ||
+                                         ((sStaticPolyBox[polyId].maxX + radius) < resultPos.x))) {
+            if (curNode->next == SS_NULL) {
+                break;
+            }
+            curNode = &colCtx->polyNodes.tbl[curNode->next];
+            continue;
         }
 
         nx = COLPOLY_GET_NORMAL(curPoly->normal.x);
@@ -969,7 +990,13 @@ s32 BgCheck_CheckStaticCeiling(StaticLookup* lookup, u16 xpFlags, CollisionConte
         }
         curPoly = &polyList[curPolyId];
 
-        if (CollisionPoly_CheckYIntersectApprox2(curPoly, vtxList, pos->x, pos->z, &ceilingY)) {
+        // fishmod: the poly's box first, as the floor search (CheckYIntersectApprox2's own first test, within 1.0f)
+        if ((sStaticPolyBox != NULL) && !(((sStaticPolyBox[curPolyId].minZ - 1.0f) <= pos->z) &&
+                                          ((sStaticPolyBox[curPolyId].maxZ + 1.0f) >= pos->z) &&
+                                          ((sStaticPolyBox[curPolyId].minX - 1.0f) <= pos->x) &&
+                                          ((sStaticPolyBox[curPolyId].maxX + 1.0f) >= pos->x))) {
+            // (missed: on to the next)
+        } else if (CollisionPoly_CheckYIntersectApprox2(curPoly, vtxList, pos->x, pos->z, &ceilingY)) {
             intersectDist = ceilingY - *outY;
             ny = COLPOLY_GET_NORMAL(curPoly->normal.y);
 
@@ -1828,6 +1855,45 @@ static void ColLog_Begin(s32 fn, Actor* actor) {
     ColLog_Word((actor != NULL) ? actor->id : 0xFFFF);
 }
 
+/*
+ * Repeats: how many of a frame's questions were asked exactly the same way the frame before (the same entry point,
+ * actor and inputs): what an answer cache could serve. A hash of each question's inputs, kept for one frame.
+ */
+#define COLLOG_KEYS 128
+static u32 sColLogKeys[2][COLLOG_KEYS];
+static s32 sColLogKeyCount[2];
+static s32 sColLogKeySet;
+static u32 sColLogRepeats;
+
+static u32 ColLog_KeyWord(u32 h, u32 w) {
+    return (h ^ w) * 16777619u;
+}
+
+static u32 ColLog_KeyF(u32 h, f32 f) {
+    union {
+        f32 f;
+        u32 w;
+    } u;
+
+    u.f = f;
+    return ColLog_KeyWord(h, u.w);
+}
+
+static void ColLog_Key(u32 key) {
+    s32 prev = sColLogKeySet ^ 1;
+    s32 i;
+
+    for (i = 0; i < sColLogKeyCount[prev]; i++) {
+        if (sColLogKeys[prev][i] == key) {
+            sColLogRepeats++;
+            break;
+        }
+    }
+    if (sColLogKeyCount[sColLogKeySet] < COLLOG_KEYS) {
+        sColLogKeys[sColLogKeySet][sColLogKeyCount[sColLogKeySet]++] = key;
+    }
+}
+
 /** Once a play frame (fishmod_debug.c): the frame's hash and counts stored, the next frame begun. */
 void Fishmod_ColLogFrame(u32 frame) {
     if ((gFishmodColLog != NULL) && (gFishmodColLogFrames < gFishmodColLogMax)) {
@@ -1839,10 +1905,13 @@ void Fishmod_ColLogFrame(u32 frame) {
             r[1 + i] = sColLogCalls[i];
         }
         r[6] = frame;
-        r[7] = 0;
+        r[7] = sColLogRepeats; // (not part of the comparison)
     }
     sColLogHash = 2166136261u;
     bzero(sColLogCalls, sizeof(sColLogCalls));
+    sColLogRepeats = 0;
+    sColLogKeySet ^= 1;
+    sColLogKeyCount[sColLogKeySet] = 0;
 }
 #endif
 
@@ -1917,6 +1986,12 @@ f32 BgCheck_RaycastDownImpl(PlayState* play, CollisionContext* colCtx, u16 xpFla
 
 #if FISHMOD_DEBUG
     if (gFishmodColLog != NULL) {
+        ColLog_Key(ColLog_KeyF(ColLog_KeyF(ColLog_KeyF(ColLog_KeyWord(ColLog_KeyWord(ColLog_KeyWord(2166136261u, 0),
+                                                                                         (u32)actor),
+                                                                          xpFlags | (downChkFlags << 16)),
+                                                           pos->x),
+                                            pos->y),
+                             pos->z));
         ColLog_Begin(0, actor);
         ColLog_Word(xpFlags);
         ColLog_Vec(pos);
@@ -2268,6 +2343,15 @@ s32 BgCheck_CheckWallImpl(CollisionContext* colCtx, u16 xpFlags, Vec3f* posResul
 
 #if FISHMOD_DEBUG
     if (gFishmodColLog != NULL) {
+        ColLog_Key(ColLog_KeyF(ColLog_KeyF(ColLog_KeyF(ColLog_KeyF(ColLog_KeyF(ColLog_KeyF(ColLog_KeyWord(
+                                                                                                  2166136261u,
+                                                                                                  1 ^ (u32)actor),
+                                                                                              next.x),
+                                                                                  next.y),
+                                                                      next.z),
+                                                          prev.x),
+                                              prev.z),
+                               radius));
         ColLog_Begin(1, actor);
         ColLog_Word(xpFlags);
         ColLog_Vec(&next);

@@ -24,6 +24,10 @@ def counts(name, recs):
     tot = [sum(r[1 + k] for r in recs) for k in range(5)]
     print(f"{name}: {n} frames; collision questions a frame: " +
           ", ".join(f"{KINDS[k]} {tot[k] / n:.1f}" for k in range(5)) + f"; all {sum(tot) / n:.1f}")
+    rep = sum(r[7] for r in recs)
+    if rep:
+        print(f"  repeats (floor and wall questions asked exactly as the frame before): {rep / n:.1f} a frame, "
+              f"{100 * rep / max(tot[0] + tot[1], 1):.0f}% of floor and wall")
 
 
 def main():
