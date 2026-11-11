@@ -909,6 +909,21 @@ $(BUILD_DIR)/src/code/fishmod.o $(BUILD_DIR)/src/code/fishmod_%.o: CC := tools/f
 $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/%.o: CC := tools/fishmod_clang_cc.sh
 $(SEGMENTS_DIR)/ovl_En_Fishmod.reloc.o: POSTPROCESS_OBJ := $(PYTHON) tools/reloc_elf_pairing.py
 endif
+# fish-oot: CLANG_AUDIO=1: the audio driver alone on clang (IDO otherwise), to measure or check it apart from the rest
+# (fishmod/scripts/audlog.inc.c proves it sounds the same); CLANG_GAME=1 below includes it
+ifeq ($(CLANG_AUDIO),1)
+$(BUILD_DIR)/src/audio/%.o: CC := tools/fishmod_clang_cc.sh
+$(BUILD_DIR)/src/audio/%.o: CC_CHECK := @:
+$(BUILD_DIR)/src/audio/%.o: PREPROCESS :=
+$(BUILD_DIR)/src/audio/%.o: CFLAGS = $(CPP_DEFINES) -DCOMPILER_GCC $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) \
+  -march=vr4300 -mabi=32 -mno-abicalls -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
+  -fno-builtin-sinf -fno-builtin-cosf -w
+$(BUILD_DIR)/src/audio/%.o: MIPS_VERSION :=
+$(BUILD_DIR)/src/audio/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing
+ifeq ($(FISHMOD_DEBUG),1)
+$(BUILD_DIR)/src/audio/%.o: OPTFLAGS += -g
+endif
+endif
 # fish-oot: CLANG_GAME=1: the game's own C code too (src/code, every overlay), every overlay's table marked
 ifeq ($(CLANG_GAME),1)
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CC := tools/fishmod_clang_cc.sh

@@ -50,3 +50,8 @@ same optimised with the console's sample profile (`--pgo`, `n64prof/profiles/oot
 the whole game on clang with line tables, audio included). In the shipped frames builds audio and libultra are still
 on IDO, so this is the first console measurement of audio on a modern compiler. Compare each against frames4.
 `fishmod/build.sh --script pcprof_frames --hw --colpack --clang-game [--pgo]` (PGO_PROFILE=n64prof/profiles/oot-console3.prof)
+
+## frames4-clangaudio: only the audio driver on clang
+frames4 (GCC for the game) with the audio driver alone on clang (`--clang-audio`; IDO in frames4). The audio check
+(`fishmod/scripts/audlog.inc.c`) proved clang's audio makes exactly the same sound as IDO's: the same samples in all
+8,130 output buffers compared over the route. Against frames4, this run says what the compiler alone saves in audio.

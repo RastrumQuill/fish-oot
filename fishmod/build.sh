@@ -20,6 +20,8 @@
 #                  a -clang suffix. CLANG_EXTRA (in the environment) passes it more options
 #   --clang-game   (implies --clang) the whole game's C code with clang (src/code and every overlay), not just the
 #                  mod's; outputs get a -clanggame suffix
+#   --clang-audio  the audio driver alone on clang (IDO otherwise; --clang-game includes it): to measure it, or prove it
+#                  sounds the same (the audlog script); outputs get a -clangaudio suffix
 #   --clang-opt L  (implies --clang) clang's optimisation level for the mod's code (Os, Oz, O3...; default the GCC
 #                  level, O2); outputs get it in the suffix (-clangOs)
 #   --texpack      lossless CI8 textures and leaner display lists for the RDP (tools/texpack.py): the build reads a
@@ -44,6 +46,7 @@ DEBUG=0
 CLANG=0
 CLANG_OPT=""
 CLANG_GAME=0
+CLANG_AUDIO=0
 TEXPACK=0
 COLPACK=0
 PGO=0
@@ -67,6 +70,7 @@ while [ $# -gt 0 ]; do
         --clang) CLANG=1 ;;
         --pgo) CLANG=1; PGO=1 ;;
         --clang-game) CLANG=1; CLANG_GAME=1 ;;
+        --clang-audio) CLANG_AUDIO=1 ;;
         --texpack) TEXPACK=1 ;;
         --colpack) COLPACK=1 ;;
         --clang-opt) CLANG=1; CLANG_OPT="$2"; shift ;;
@@ -142,7 +146,7 @@ if [ "$COLPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$CP_OUT")
 fi
-MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -188,7 +192,7 @@ python3 fishmod/tools/gen_watermap.py
 
 GCC_ARGS=()
 if [ -n "$GCC" ]; then
-    GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC")
+    GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC" CLANG_AUDIO=$CLANG_AUDIO)
     if [ "$CLANG" = 1 ]; then
         GCC_ARGS+=(CLANG_MOD=1 CLANG_GAME=$CLANG_GAME)
     fi
@@ -226,6 +230,9 @@ if [ "$TEXPACK" = 1 ]; then
 fi
 if [ "$COLPACK" = 1 ]; then
     SUFFIX="$SUFFIX-colpack"
+fi
+if [ "$CLANG_AUDIO" = 1 ]; then
+    SUFFIX="$SUFFIX-clangaudio"
 fi
 
 if [ "$DEBUG" = 1 ]; then
