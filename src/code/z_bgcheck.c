@@ -1720,7 +1720,74 @@ s32 BgCheck_PosInStaticBoundingBox(CollisionContext* colCtx, Vec3f* pos) {
  * returns the yIntersect of the nearest poly found directly below `pos`, or BGCHECK_Y_MIN if no floor detected
  * returns the poly found in `outPoly`, and the bgId of the entity in `outBgId`
  */
-f32 BgCheck_RaycastDownImpl(PlayState* play, CollisionContext* colCtx, u16 xpFlags, CollisionPoly** outPoly,
+/*
+ * fish-oot: the collision log (debug builds; on when gFishmodColLog is set, by the collog script): every question to the
+ * five entry points below and its answer, folded into a hash a frame. Two builds playing the same route must give the
+ * same hashes frame by frame when their collision gives the same answers (fishmod/tools/collog_compare.py). Triangles
+ * go in as their index, actors as their id: no addresses, which move between builds.
+ */
+#if FISHMOD_DEBUG
+u32* gFishmodColLog;      // [frame][8]: hash, then calls to floor, wall, ceiling, line, sphere; the frame; 0
+u32 gFishmodColLogFrames; // frames stored
+u32 gFishmodColLogMax;
+static u32 sColLogHash = 2166136261u;
+static u32 sColLogCalls[5];
+
+static void ColLog_Word(u32 w) {
+    sColLogHash = (sColLogHash ^ w) * 16777619u;
+}
+
+static void ColLog_F(f32 f) {
+    union {
+        f32 f;
+        u32 w;
+    } u;
+
+    u.f = f;
+    ColLog_Word(u.w);
+}
+
+static void ColLog_Vec(Vec3f* v) {
+    ColLog_F(v->x);
+    ColLog_F(v->y);
+    ColLog_F(v->z);
+}
+
+static u32 ColLog_Poly(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId) {
+    if (poly == NULL) {
+        return 0xFFFFFFFF;
+    }
+    if (bgId == BGCHECK_SCENE) {
+        return (u32)(poly - colCtx->colHeader->polyList);
+    }
+    return ((u32)bgId << 16) | (u32)(poly - colCtx->dyna.polyList);
+}
+
+static void ColLog_Begin(s32 fn, Actor* actor) {
+    sColLogCalls[fn]++;
+    ColLog_Word(fn);
+    ColLog_Word((actor != NULL) ? actor->id : 0xFFFF);
+}
+
+/** Once a play frame (fishmod_debug.c): the frame's hash and counts stored, the next frame begun. */
+void Fishmod_ColLogFrame(u32 frame) {
+    if ((gFishmodColLog != NULL) && (gFishmodColLogFrames < gFishmodColLogMax)) {
+        u32* r = &gFishmodColLog[gFishmodColLogFrames++ * 8];
+        s32 i;
+
+        r[0] = sColLogHash;
+        for (i = 0; i < 5; i++) {
+            r[1 + i] = sColLogCalls[i];
+        }
+        r[6] = frame;
+        r[7] = 0;
+    }
+    sColLogHash = 2166136261u;
+    bzero(sColLogCalls, sizeof(sColLogCalls));
+}
+#endif
+
+static f32 BgCheck_RaycastDownImplBody(PlayState* play, CollisionContext* colCtx, u16 xpFlags, CollisionPoly** outPoly,
                             s32* outBgId, Vec3f* pos, Actor* actor, u32 downChkFlags, f32 chkDist) {
     f32 yIntersectDyna;
     STACK_PAD(s32);
@@ -1783,6 +1850,25 @@ f32 BgCheck_RaycastDownImpl(PlayState* play, CollisionContext* colCtx, u16 xpFla
         yIntersect -= 1.0f;
     }
     return yIntersect;
+}
+
+f32 BgCheck_RaycastDownImpl(PlayState* play, CollisionContext* colCtx, u16 xpFlags, CollisionPoly** outPoly,
+                            s32* outBgId, Vec3f* pos, Actor* actor, u32 downChkFlags, f32 chkDist) {
+    f32 y = BgCheck_RaycastDownImplBody(play, colCtx, xpFlags, outPoly, outBgId, pos, actor, downChkFlags, chkDist);
+
+#if FISHMOD_DEBUG
+    if (gFishmodColLog != NULL) {
+        ColLog_Begin(0, actor);
+        ColLog_Word(xpFlags);
+        ColLog_Vec(pos);
+        ColLog_Word(downChkFlags);
+        ColLog_F(chkDist);
+        ColLog_F(y);
+        ColLog_Word(*outBgId);
+        ColLog_Word(ColLog_Poly(colCtx, *outPoly, *outBgId));
+    }
+#endif
+    return y;
 }
 
 /**
@@ -1960,7 +2046,7 @@ f32 BgCheck_EntityRaycastDown9(CollisionContext* colCtx, CollisionPoly** outPoly
  * returns true if a collision is detected, else false
  * `outPoly` returns the closest poly detected, while `outBgId` returns the poly owner
  */
-s32 BgCheck_CheckWallImpl(CollisionContext* colCtx, u16 xpFlags, Vec3f* posResult, Vec3f* posNext, Vec3f* posPrev,
+static s32 BgCheck_CheckWallImplBody(CollisionContext* colCtx, u16 xpFlags, Vec3f* posResult, Vec3f* posNext, Vec3f* posPrev,
                           f32 radius, CollisionPoly** outPoly, s32* outBgId, Actor* actor, f32 checkHeight, u8 argA) {
     StaticLookup* lookupTbl;
     f32 temp_f0;
@@ -2112,6 +2198,33 @@ s32 BgCheck_CheckWallImpl(CollisionContext* colCtx, u16 xpFlags, Vec3f* posResul
     return result;
 }
 
+s32 BgCheck_CheckWallImpl(CollisionContext* colCtx, u16 xpFlags, Vec3f* posResult, Vec3f* posNext, Vec3f* posPrev,
+                          f32 radius, CollisionPoly** outPoly, s32* outBgId, Actor* actor, f32 checkHeight, u8 argA) {
+#if FISHMOD_DEBUG
+    Vec3f next = *posNext; // (posResult may be posNext)
+    Vec3f prev = *posPrev;
+#endif
+    s32 result = BgCheck_CheckWallImplBody(colCtx, xpFlags, posResult, posNext, posPrev, radius, outPoly, outBgId,
+                                           actor, checkHeight, argA);
+
+#if FISHMOD_DEBUG
+    if (gFishmodColLog != NULL) {
+        ColLog_Begin(1, actor);
+        ColLog_Word(xpFlags);
+        ColLog_Vec(&next);
+        ColLog_Vec(&prev);
+        ColLog_F(radius);
+        ColLog_F(checkHeight);
+        ColLog_Word(argA);
+        ColLog_Word(result);
+        ColLog_Vec(posResult);
+        ColLog_Word(*outBgId);
+        ColLog_Word(ColLog_Poly(colCtx, *outPoly, *outBgId));
+    }
+#endif
+    return result;
+}
+
 /**
  * Public. Tests if moving from `posPrev` to `posNext` will collide with a "wall"
  * `radius` is used to form a sphere for collision detection purposes
@@ -2176,7 +2289,7 @@ s32 BgCheck_EntitySphVsWall4(CollisionContext* colCtx, Vec3f* posResult, Vec3f* 
  * `outPoly` returns the poly collided with, while `outBgId` returns the owner of the poly
  * `outY` returns the y coordinate of pos needed to not collide with `outPoly`
  */
-s32 BgCheck_CheckCeilingImpl(CollisionContext* colCtx, u16 xpFlags, f32* outY, Vec3f* pos, f32 checkHeight,
+static s32 BgCheck_CheckCeilingImplBody(CollisionContext* colCtx, u16 xpFlags, f32* outY, Vec3f* pos, f32 checkHeight,
                              CollisionPoly** outPoly, s32* outBgId, Actor* actor) {
     StaticLookup* lookupTbl;
     StaticLookup* lookup;
@@ -2214,6 +2327,25 @@ s32 BgCheck_CheckCeilingImpl(CollisionContext* colCtx, u16 xpFlags, f32* outY, V
     return result;
 }
 
+s32 BgCheck_CheckCeilingImpl(CollisionContext* colCtx, u16 xpFlags, f32* outY, Vec3f* pos, f32 checkHeight,
+                             CollisionPoly** outPoly, s32* outBgId, Actor* actor) {
+    s32 result = BgCheck_CheckCeilingImplBody(colCtx, xpFlags, outY, pos, checkHeight, outPoly, outBgId, actor);
+
+#if FISHMOD_DEBUG
+    if (gFishmodColLog != NULL) {
+        ColLog_Begin(2, actor);
+        ColLog_Word(xpFlags);
+        ColLog_Vec(pos);
+        ColLog_F(checkHeight);
+        ColLog_Word(result);
+        ColLog_F(*outY);
+        ColLog_Word(*outBgId);
+        ColLog_Word(result ? ColLog_Poly(colCtx, *outPoly, *outBgId) : 0); // (the poly is only set on a hit)
+    }
+#endif
+    return result;
+}
+
 /**
  * Tests for collision with any ceiling poly
  * `checkHeight` must be a positive value
@@ -2244,7 +2376,7 @@ s32 BgCheck_EntityCheckCeiling(CollisionContext* colCtx, f32* outY, Vec3f* pos, 
  * `posB`? `posResult` returns the point of intersection
  * `outPoly` returns the pointer to the intersected poly, while `outBgId` returns the entity the poly belongs to
  */
-s32 BgCheck_CheckLineImpl(CollisionContext* colCtx, u16 xpFlags1, u16 xpFlags2, Vec3f* posA, Vec3f* posB,
+static s32 BgCheck_CheckLineImplBody(CollisionContext* colCtx, u16 xpFlags1, u16 xpFlags2, Vec3f* posA, Vec3f* posB,
                           Vec3f* posResult, CollisionPoly** outPoly, s32* outBgId, Actor* actor, f32 chkDist,
                           u32 bccFlags) {
     StaticLookup* lookupTbl = colCtx->lookupTbl;
@@ -2344,6 +2476,36 @@ s32 BgCheck_CheckLineImpl(CollisionContext* colCtx, u16 xpFlags1, u16 xpFlags2, 
                                      chkDist, bccFlags)) {
         result = true;
     }
+    return result;
+}
+
+s32 BgCheck_CheckLineImpl(CollisionContext* colCtx, u16 xpFlags1, u16 xpFlags2, Vec3f* posA, Vec3f* posB,
+                          Vec3f* posResult, CollisionPoly** outPoly, s32* outBgId, Actor* actor, f32 chkDist,
+                          u32 bccFlags) {
+#if FISHMOD_DEBUG
+    Vec3f a = *posA;
+    Vec3f b = *posB;
+#endif
+    s32 result = BgCheck_CheckLineImplBody(colCtx, xpFlags1, xpFlags2, posA, posB, posResult, outPoly, outBgId, actor,
+                                           chkDist, bccFlags);
+
+#if FISHMOD_DEBUG
+    if (gFishmodColLog != NULL) {
+        ColLog_Begin(3, actor);
+        ColLog_Word(xpFlags1);
+        ColLog_Word(xpFlags2);
+        ColLog_Vec(&a);
+        ColLog_Vec(&b);
+        ColLog_F(chkDist);
+        ColLog_Word(bccFlags);
+        ColLog_Word(result);
+        if (result) { // (the result's point and poly are only meaningful on a hit)
+            ColLog_Vec(posResult);
+            ColLog_Word(*outBgId);
+            ColLog_Word(ColLog_Poly(colCtx, *outPoly, *outBgId));
+        }
+    }
+#endif
     return result;
 }
 
@@ -2477,7 +2639,7 @@ s32 BgCheck_AnyLineTest3(CollisionContext* colCtx, Vec3f* posA, Vec3f* posB, Vec
  * `outPoly` returns the pointer of the first poly found that intersects
  * @bug `outBgId` always returns BGCHECK_SCENE due to a bug in `BgCheck_SphVsFirstDynaPoly`
  */
-s32 BgCheck_SphVsFirstPolyImpl(CollisionContext* colCtx, u16 xpFlags, CollisionPoly** outPoly, s32* outBgId,
+static s32 BgCheck_SphVsFirstPolyImplBody(CollisionContext* colCtx, u16 xpFlags, CollisionPoly** outPoly, s32* outBgId,
                                Vec3f* center, f32 radius, Actor* actor, u16 bciFlags) {
     StaticLookup* lookup;
 
@@ -2499,6 +2661,27 @@ s32 BgCheck_SphVsFirstPolyImpl(CollisionContext* colCtx, u16 xpFlags, CollisionP
         return true;
     }
     return false;
+}
+
+s32 BgCheck_SphVsFirstPolyImpl(CollisionContext* colCtx, u16 xpFlags, CollisionPoly** outPoly, s32* outBgId,
+                               Vec3f* center, f32 radius, Actor* actor, u16 bciFlags) {
+    s32 result = BgCheck_SphVsFirstPolyImplBody(colCtx, xpFlags, outPoly, outBgId, center, radius, actor, bciFlags);
+
+#if FISHMOD_DEBUG
+    if (gFishmodColLog != NULL) {
+        ColLog_Begin(4, actor);
+        ColLog_Word(xpFlags);
+        ColLog_Vec(center);
+        ColLog_F(radius);
+        ColLog_Word(bciFlags);
+        ColLog_Word(result);
+        if (result) {
+            ColLog_Word(*outBgId);
+            ColLog_Word(ColLog_Poly(colCtx, *outPoly, *outBgId));
+        }
+    }
+#endif
+    return result;
 }
 
 /**

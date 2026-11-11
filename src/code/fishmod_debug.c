@@ -892,6 +892,20 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #ifdef FISHMOD_SCRIPT
     StateHash_Update(play);
 #endif
+#ifdef FISHMOD_COLLOG
+    // the collision log (z_bgcheck.c): each frame's questions and answers as a hash, for comparing two builds
+    {
+        extern u32* gFishmodColLog;
+        extern u32 gFishmodColLogMax;
+        void Fishmod_ColLogFrame(u32 frame);
+
+        if (gFishmodColLog == NULL) {
+            gFishmodColLog = SYSTEM_ARENA_MALLOC(COLLOG_FRAMES * 8 * sizeof(u32), "../fishmod_debug.c", __LINE__);
+            gFishmodColLogMax = (gFishmodColLog != NULL) ? COLLOG_FRAMES : 0;
+        }
+        Fishmod_ColLogFrame(sPlayFrames);
+    }
+#endif
     if ((sScript.flags & FISHMOD_SCRIPT_F_WALK) && (player != NULL) && sPlacedPlayer && (sPlayFrames > 60)) {
         f32 dx = sScript.walkTo.x - player->actor.world.pos.x;
         f32 dz = sScript.walkTo.z - player->actor.world.pos.z;
