@@ -611,12 +611,12 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
 
         if (species != lastSpecies) {
 #if FISHMOD_DEBUG
-            profStart = osGetTime();
+            profStart = FISHMOD_CLOCK();
 #endif
             Gfx_SetupDL_25Opa(play->state.gfxCtx);
             EnFishmod_SetSpeciesTextures(fish, play);
 #if FISHMOD_DEBUG
-            gFishmodProf[FISHMOD_PROF_D_SETUP] += osGetTime() - profStart;
+            gFishmodProf[FISHMOD_PROF_D_SETUP] += FISHMOD_SINCE(profStart);
             gFishmodProfCount[FISHMOD_PROF_D_SETUP]++;
 #endif
             lastSpecies = species;

@@ -276,6 +276,12 @@ typedef struct FishmodSaveData {
  *     ROD       LURE 1    LURE 2    LURE 3    adult trade child trade
  *     bottle 1  bottle 2  bottle 3  bottle 4  BOTTLE 5    BOTTLE 6
  */
+// The debug timers' clock: the CPU's count register, read directly (osGetTime turns interrupts off and on and adds the
+// 64-bit time to it every call: hundreds of calls a frame cost a few percent of the CPU in the bench builds). Only
+// differences are taken, so its wrapping every 91 seconds doesn't matter: the same differences as osGetTime's.
+#define FISHMOD_CLOCK() ((OSTime)osGetCount())
+#define FISHMOD_SINCE(start) ((u32)(osGetCount() - (u32)(start)))
+
 // A seed from the clock, except in scripted debug runs, which must replay exactly (fishmod/tools/state_hash.py)
 #ifdef FISHMOD_SCRIPT
 #define FISHMOD_TIME_SEED() ((u32)0x46495348)
@@ -464,9 +470,9 @@ extern u8 gFishmodActorCount[FISHMOD_ACTOR_IDS];   // and how many of it updated
 extern u32 gFishmodCatCycles[FISHMOD_ACTOR_CATS];
 #define FISHMOD_SECT(slot, stmt)                          \
     {                                                     \
-        OSTime sectStart_ = osGetTime();                  \
+        OSTime sectStart_ = FISHMOD_CLOCK();                  \
         stmt;                                             \
-        gFishmodSect[slot] += osGetTime() - sectStart_;   \
+        gFishmodSect[slot] += FISHMOD_SINCE(sectStart_);   \
     }
 
 // Finer timers for the parts of a fish's update and draw (fishmod/tools/read_stats.py --prof). Nested slots are
@@ -528,9 +534,9 @@ extern u32 gFishmodScatterCmdTime[2];
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 #define FISHMOD_PROF(slot, stmt)                        \
     {                                                   \
-        OSTime profStart_ = osGetTime();                \
+        OSTime profStart_ = FISHMOD_CLOCK();                \
         stmt;                                           \
-        gFishmodProf[slot] += osGetTime() - profStart_; \
+        gFishmodProf[slot] += FISHMOD_SINCE(profStart_); \
         gFishmodProfCount[slot]++;                      \
     }
 extern Vec3f gFishmodDebugFocus; // the fish nearest to Link, for the follow camera

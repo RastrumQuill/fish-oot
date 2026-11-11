@@ -852,7 +852,7 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
     s16 prev;
     s32 b;
 #if FISHMOD_DEBUG
-    OSTime profStart = osGetTime();
+    OSTime profStart = FISHMOD_CLOCK();
 #endif
 
     // sprints and thrashing beat faster, not much wider
@@ -877,9 +877,9 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
     Rig_Translate(&root, -pivot.x, -pivot.y, -pivot.z);
     Rig_Mul(&root, &root, &rig->headFrame);
 #if FISHMOD_DEBUG
-    gFishmodProf[FISHMOD_PROF_D_ROOT] += osGetTime() - profStart;
+    gFishmodProf[FISHMOD_PROF_D_ROOT] += FISHMOD_SINCE(profStart);
     gFishmodProfCount[FISHMOD_PROF_D_ROOT]++;
-    profStart = osGetTime();
+    profStart = FISHMOD_CLOCK();
 #endif
 
     // the head turns about the pivot against the tail (recoil); the body bones follow the wave from the pivot back
@@ -976,7 +976,7 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
     }
     CLOSE_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
 #if FISHMOD_DEBUG
-    gFishmodProf[FISHMOD_PROF_D_POSE] += osGetTime() - profStart;
+    gFishmodProf[FISHMOD_PROF_D_POSE] += FISHMOD_SINCE(profStart);
     gFishmodProfCount[FISHMOD_PROF_D_POSE]++;
 #endif
 }

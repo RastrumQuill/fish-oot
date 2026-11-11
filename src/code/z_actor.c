@@ -2489,11 +2489,16 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                 // fishmod: not for the mod's fish (dozens of them, and they never read these: a square root and an
                 // arctangent each, every frame)
                 if (!((actor->id == ACTOR_EN_FISHMOD) && (FISHMOD_GET_TYPE(actor->params) == FISHMOD_TYPE_FISH))) {
-                    actor->xzDistToPlayer = Actor_WorldDistXZToActor(actor, &player->actor);
-                    actor->yDistToPlayer = Actor_HeightDiff(actor, &player->actor);
+                    // (Actor_WorldDistXZToActor, Actor_HeightDiff and Actor_WorldYawTowardActor, their expressions
+                    // here: the differences once, no calls; the same values)
+                    f32 dx = player->actor.world.pos.x - actor->world.pos.x;
+                    f32 dz = player->actor.world.pos.z - actor->world.pos.z;
+
+                    actor->xzDistToPlayer = sqrtf(SQ(dx) + SQ(dz));
+                    actor->yDistToPlayer = player->actor.world.pos.y - actor->world.pos.y;
                     actor->xyzDistToPlayerSq = SQ(actor->xzDistToPlayer) + SQ(actor->yDistToPlayer);
 
-                    actor->yawTowardsPlayer = Actor_WorldYawTowardActor(actor, &player->actor);
+                    actor->yawTowardsPlayer = Math_Atan2S(dz, dx);
                 }
                 actor->flags &= ~ACTOR_FLAG_SFX_FOR_PLAYER_BODY_HIT;
 
@@ -2516,7 +2521,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
 #if FISHMOD_DEBUG
                     {
                         // each kind's update timed, for the area bench
-                        OSTime start = osGetTime();
+                        OSTime start = FISHMOD_CLOCK();
                         u32 cycles;
 
                         if (actor->id == ACTOR_EN_FISHMOD) {
@@ -2524,7 +2529,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                         } else {
                             actor->update(actor, play);
                         }
-                        cycles = (u32)(osGetTime() - start);
+                        cycles = FISHMOD_SINCE(start);
                         if ((u32)actor->id < FISHMOD_ACTOR_IDS) {
                             gFishmodActorCycles[actor->id] += cycles;
                             if (gFishmodActorCount[actor->id] < 255) {

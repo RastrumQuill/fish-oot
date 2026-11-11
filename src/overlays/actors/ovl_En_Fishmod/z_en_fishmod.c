@@ -2026,20 +2026,20 @@ static void EnFishmod_UpdateImpl(Actor* thisx, PlayState* play);
 static void EnFishmod_DrawImpl(Actor* thisx, PlayState* play);
 
 void EnFishmod_Update(Actor* thisx, PlayState* play) {
-    OSTime start = osGetTime();
+    OSTime start = FISHMOD_CLOCK();
 
     EnFishmod_UpdateImpl(thisx, play);
     gFishmodCpuTime[(((EnFishmod*)thisx)->type == FISHMOD_TYPE_ROD) ? FISHMOD_CPU_ROD_UPDATE
                                                                     : FISHMOD_CPU_FISH_UPDATE] +=
-        osGetTime() - start;
+        FISHMOD_SINCE(start);
 }
 
 void EnFishmod_Draw(Actor* thisx, PlayState* play) {
-    OSTime start = osGetTime();
+    OSTime start = FISHMOD_CLOCK();
 
     EnFishmod_DrawImpl(thisx, play);
     gFishmodCpuTime[(((EnFishmod*)thisx)->type == FISHMOD_TYPE_ROD) ? FISHMOD_CPU_ROD_DRAW : FISHMOD_CPU_FISH_DRAW] +=
-        osGetTime() - start;
+        FISHMOD_SINCE(start);
 }
 
 #define EnFishmod_Update EnFishmod_UpdateImpl
@@ -2118,7 +2118,7 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
 #if FISHMOD_DEBUG
     // (not in the benches: they time the game as it ships, and this cost 2.4 ms a frame there)
     if (!gFishmodTimingAsShipped) {
-    OSTime debugStart = osGetTime();
+    OSTime debugStart = FISHMOD_CLOCK();
     {
         // nearest fish to the camera focus, for testing
         static const char* sStateNames[] = { "wander", "approach", "inspect", "nibble", "bite",
@@ -2189,7 +2189,7 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
             Fishmod_DebugPrintf(6, " %d %d %d w%d f%d hh%d hl%d b%d", (s32)this->actor.world.pos.x, (s32)this->actor.world.pos.y, (s32)this->actor.world.pos.z, (s32)this->waterY, (s32)this->floorY, (s32)this->halfHeight, (s32)this->halfLength, this->blocked);
         }
     }
-    gFishmodProf[FISHMOD_PROF_U_DEBUG] += osGetTime() - debugStart;
+    gFishmodProf[FISHMOD_PROF_U_DEBUG] += FISHMOD_SINCE(debugStart);
     gFishmodProfCount[FISHMOD_PROF_U_DEBUG]++;
     }
 #endif
@@ -2806,7 +2806,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     }
 
 #if FISHMOD_DEBUG
-    profStart = osGetTime();
+    profStart = FISHMOD_CLOCK();
 #endif
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
 
@@ -2836,9 +2836,9 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
 
     shape = this->species->shape;
 #if FISHMOD_DEBUG
-    gFishmodProf[FISHMOD_PROF_D_SETUP] += osGetTime() - profStart;
+    gFishmodProf[FISHMOD_PROF_D_SETUP] += FISHMOD_SINCE(profStart);
     gFishmodProfCount[FISHMOD_PROF_D_SETUP]++;
-    profStart = osGetTime();
+    profStart = FISHMOD_CLOCK();
 #endif
 
     Matrix_Translate(this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z, MTXMODE_NEW);
@@ -2866,7 +2866,7 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
 
     this->lastTintPart = 0xFE;
 #if FISHMOD_DEBUG
-    gFishmodProf[FISHMOD_PROF_D_ROOT] += osGetTime() - profStart;
+    gFishmodProf[FISHMOD_PROF_D_ROOT] += FISHMOD_SINCE(profStart);
     gFishmodProfCount[FISHMOD_PROF_D_ROOT]++;
 #endif
     // its own pattern (the patched display lists take their render tiles from it)
