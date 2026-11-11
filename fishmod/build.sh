@@ -24,6 +24,8 @@
 #                  level, O2); outputs get it in the suffix (-clangOs)
 #   --texpack      lossless CI8 textures and leaner display lists for the RDP (tools/texpack.py): the build reads a
 #                  converted copy of the extracted assets (extracted/VERSION-texpack); outputs get a -texpack suffix
+#   --colpack      fewer collision triangles, the same surfaces (tools/colpack.py): the build reads a merged copy of the
+#                  extracted assets (after --texpack's, if both); outputs get a -colpack suffix
 #   --pgo          (implies --clang) clang optimises with the console's sample profile, PGO_PROFILE (default
 #                  n64prof/profiles/oot-console2.prof; see its README); outputs get a -clang-pgo suffix
 # Uses `flips` on PATH (or FLIPS=/path/to/flips) for the release patch if there is one, else fishmod/tools/bps.py.
@@ -43,6 +45,7 @@ CLANG=0
 CLANG_OPT=""
 CLANG_GAME=0
 TEXPACK=0
+COLPACK=0
 PGO=0
 SCRIPT=""
 F3DEX3=0
@@ -65,6 +68,7 @@ while [ $# -gt 0 ]; do
         --pgo) CLANG=1; PGO=1 ;;
         --clang-game) CLANG=1; CLANG_GAME=1 ;;
         --texpack) TEXPACK=1 ;;
+        --colpack) COLPACK=1 ;;
         --clang-opt) CLANG=1; CLANG_OPT="$2"; shift ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
@@ -127,7 +131,18 @@ if [ "$TEXPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$TP_OUT")
 fi
-MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+if [ "$COLPACK" = 1 ]; then
+    CP_SRC="extracted/$VERSION"
+    [ "$TEXPACK" = 1 ] && CP_SRC="$TP_OUT"
+    CP_OUT="$CP_SRC-colpack"
+    CP_SUM="$({ cat tools/colpack.py; cat "$CP_SRC/.texpack" 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    if [ "$(cat "$CP_OUT/.colpack" 2>/dev/null)" != "$CP_SUM" ]; then
+        python3 tools/colpack.py "$CP_SRC" "$CP_OUT"
+        echo "$CP_SUM" > "$CP_OUT/.colpack"
+    fi
+    TEXPACK_ARGS=(EXTRACTED_DIR="$CP_OUT")
+fi
+MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -208,6 +223,9 @@ if [ "$PGO" = 1 ]; then
 fi
 if [ "$TEXPACK" = 1 ]; then
     SUFFIX="$SUFFIX-texpack"
+fi
+if [ "$COLPACK" = 1 ]; then
+    SUFFIX="$SUFFIX-colpack"
 fi
 
 if [ "$DEBUG" = 1 ]; then

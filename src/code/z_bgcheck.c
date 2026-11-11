@@ -59,6 +59,63 @@ typedef struct {
 } StaticPolyBox;
 static StaticPolyBox* sStaticPolyBox;
 
+// fishmod: answers of the scene's floor search kept for questions asked again exactly (BgCheck_RaycastDownImplBody);
+// emptied when a scene's collision is made (a new generation)
+#define FLOOR_CACHE_SIZE 64
+typedef struct {
+    u32 x;
+    u32 y;
+    u32 z;
+    u32 chkDist;
+    u32 downChkFlags;
+    u16 xpFlags;
+    u16 gen;
+    f32 result;
+    CollisionPoly* poly;
+} FloorCacheEntry;
+static FloorCacheEntry sFloorCache[FLOOR_CACHE_SIZE];
+static u16 sFloorCacheGen = 1;
+
+typedef union {
+    f32 f;
+    u32 w;
+} FloorCacheBits;
+
+static u32 FloorCache_Bits(f32 f) {
+    FloorCacheBits b;
+
+    b.f = f;
+    return b.w;
+}
+
+static s32 FloorCache_Slot(Vec3f* pos, u16 xpFlags, u32 downChkFlags, f32 chkDist) {
+    u32 h = FloorCache_Bits(pos->x) * 0x9E3779B1u;
+
+    h ^= FloorCache_Bits(pos->y) * 0x85EBCA77u;
+    h ^= FloorCache_Bits(pos->z) * 0xC2B2AE3Du;
+    h ^= (FloorCache_Bits(chkDist) + xpFlags + (downChkFlags << 8)) * 0x27D4EB2Fu;
+    return (h >> 26) & (FLOOR_CACHE_SIZE - 1);
+}
+
+static s32 FloorCache_Same(FloorCacheEntry* e, Vec3f* pos, u16 xpFlags, u32 downChkFlags, f32 chkDist) {
+    return (e->x == FloorCache_Bits(pos->x)) && (e->y == FloorCache_Bits(pos->y)) &&
+           (e->z == FloorCache_Bits(pos->z)) && (e->chkDist == FloorCache_Bits(chkDist)) &&
+           (e->downChkFlags == downChkFlags) && (e->xpFlags == xpFlags);
+}
+
+static void FloorCache_Store(FloorCacheEntry* e, Vec3f* pos, u16 xpFlags, u32 downChkFlags, f32 chkDist, f32 result,
+                             CollisionPoly* poly) {
+    e->x = FloorCache_Bits(pos->x);
+    e->y = FloorCache_Bits(pos->y);
+    e->z = FloorCache_Bits(pos->z);
+    e->chkDist = FloorCache_Bits(chkDist);
+    e->downChkFlags = downChkFlags;
+    e->xpFlags = xpFlags;
+    e->gen = sFloorCacheGen;
+    e->result = result;
+    e->poly = poly;
+}
+
 // bccFlags
 #define BGCHECK_CHECK_WALL (1 << 0)
 #define BGCHECK_CHECK_FLOOR (1 << 1)
@@ -1624,6 +1681,11 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
     s32 i;
 
     colCtx->colHeader = colHeader;
+    // fishmod: a new scene's collision: the floor answers kept so far no longer hold
+    if (++sFloorCacheGen == 0) {
+        bzero(sFloorCache, sizeof(sFloorCache));
+        sFloorCacheGen = 1;
+    }
     // fishmod: the scene's vertices as floats, once (CollisionPoly_GetVertices)
     sStaticVtxS = colHeader->vtxList;
     sStaticVtxF = GAME_STATE_ALLOC(&play->state, colHeader->numVertices * sizeof(Vec3f), "../z_bgcheck.c", __LINE__);
@@ -1844,7 +1906,16 @@ static u32 ColLog_Poly(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId) 
         return 0xFFFFFFFF;
     }
     if (bgId == BGCHECK_SCENE) {
-        return (u32)(poly - colCtx->colHeader->polyList);
+        // the poly as what it is (its surface type, flags and plane), not its index: merged collision (colpack)
+        // renumbers the scene's polys, and an answer from a merged poly is the same answer
+        u32 h = poly->type;
+
+        h = h * 31 + (poly->flags_vIA & ~COLPOLY_VTX_INDEX(0xFFFF));
+        h = h * 31 + (poly->flags_vIB & ~COLPOLY_VTX_INDEX(0xFFFF));
+        h = h * 31 + (u16)poly->normal.x;
+        h = h * 31 + (u16)poly->normal.y;
+        h = h * 31 + (u16)poly->normal.z;
+        return h * 31 + (u16)poly->dist;
     }
     return ((u32)bgId << 16) | (u32)(poly - colCtx->dyna.polyList);
 }
@@ -1931,30 +2002,43 @@ static f32 BgCheck_RaycastDownImplBody(PlayState* play, CollisionContext* colCtx
     yIntersect = BGCHECK_Y_MIN;
     checkPos = *pos;
 
-    while (true) {
-        if (checkPos.y < colCtx->minBounds.y) {
-            break;
-        }
+    // fishmod: the scene's part of the answer depends only on these inputs while the scene's collision stays as it was
+    // made (it does, within a scene): a question asked again exactly (an actor standing still, a check repeated in a
+    // frame) gets the stored answer. The moving platforms' part below always runs.
+    {
+        FloorCacheEntry* e = &sFloorCache[FloorCache_Slot(pos, xpFlags, downChkFlags, chkDist)];
+
+        if ((e->gen == sFloorCacheGen) && FloorCache_Same(e, pos, xpFlags, downChkFlags, chkDist)) {
+            yIntersect = e->result;
+            *outPoly = e->poly;
+        } else {
+            while (true) {
+                if (checkPos.y < colCtx->minBounds.y) {
+                    break;
+                }
 
 #if DEBUG_FEATURES
-        if (BgCheck_PosErrorCheck(&checkPos, "../z_bgcheck.c", 4410)) {
-            if (actor != NULL) {
-                PRINTF(T("こいつ,pself_actor->name %d\n", "This guy, pself_actor->name %d\n"), actor->id);
-            }
-        }
+                if (BgCheck_PosErrorCheck(&checkPos, "../z_bgcheck.c", 4410)) {
+                    if (actor != NULL) {
+                        PRINTF(T("こいつ,pself_actor->name %d\n", "This guy, pself_actor->name %d\n"), actor->id);
+                    }
+                }
 #endif
 
-        lookup = BgCheck_GetStaticLookup(colCtx, lookupTbl, &checkPos);
-        if (lookup == NULL) {
-            checkPos.y -= colCtx->subdivLength.y;
-            continue;
+                lookup = BgCheck_GetStaticLookup(colCtx, lookupTbl, &checkPos);
+                if (lookup == NULL) {
+                    checkPos.y -= colCtx->subdivLength.y;
+                    continue;
+                }
+                yIntersect = BgCheck_RaycastDownStatic(lookup, colCtx, xpFlags, outPoly, pos, downChkFlags, chkDist,
+                                                       BGCHECK_Y_MIN);
+                if (yIntersect > BGCHECK_Y_MIN) {
+                    break;
+                }
+                checkPos.y -= colCtx->subdivLength.y;
+            }
+            FloorCache_Store(e, pos, xpFlags, downChkFlags, chkDist, yIntersect, *outPoly);
         }
-        yIntersect =
-            BgCheck_RaycastDownStatic(lookup, colCtx, xpFlags, outPoly, pos, downChkFlags, chkDist, BGCHECK_Y_MIN);
-        if (yIntersect > BGCHECK_Y_MIN) {
-            break;
-        }
-        checkPos.y -= colCtx->subdivLength.y;
     }
 
     dynaRaycastDown.play = play;
