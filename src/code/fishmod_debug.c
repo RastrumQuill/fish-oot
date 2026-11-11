@@ -284,6 +284,30 @@ static void Fishmod_ViewUpdate(PlayState* play) {
 #endif
 static s32 sEdgeAbPhase = -1; // -1 not ready, 0 the default edge mode on screen, 1 the other
 #endif
+#ifdef FISHMOD_VIEW_BENCH
+/*
+ * The view bench (fishmod/scripts/pcprof_views.inc.c): at each tour stop, once the camera has settled, the scene is
+ * frozen and these take turns, VIEW_BENCH_FRAMES each, so what each part of the mod costs the RSP, the RDP and the CPU
+ * is measured on the same picture. Every frame goes to the frame log tagged with its stop and variant
+ * (fishmod_debug_pcprof.inc.c); fishmod/tools/viewbench.py reads it.
+ */
+#define VIEW_BENCH_FRAMES 60
+#define VIEW_BENCH_SETTLE 20 // frames after each switch left out (the new setting's first frames)
+#ifndef FISHMOD_VIEW_LAPS
+#define FISHMOD_VIEW_LAPS 2
+#endif
+static const u32 sViewBenchFlags[] = {
+    0,                                                // as shipped
+    FISHMOD_BENCH_NOFISH,                             // no fish
+    FISHMOD_BENCH_NOPROPS,                            // no props (or bed cards)
+    FISHMOD_BENCH_NOBEDCARD,                          // bed cards off: those clumps drawn plant by plant
+    FISHMOD_BENCH_NOROOMXLU,                          // no water surface (the room's translucent part)
+    FISHMOD_BENCH_NOSKY,                              // no skybox
+    FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOPROPS,     // neither fish nor props
+};
+static u32 sViewTag;   // the frame log's tag: stop << 24 | lap << 16 | variant << 8 | 1 if counted
+static s32 sViewLaps;
+#endif
 static s16 sTourCamId = SUB_CAM_ID_DONE;
 static s32 sTourStop;
 static s32 sTourFrame;
@@ -408,6 +432,53 @@ static void Fishmod_TourUpdate(PlayState* play) {
             play->haltAllActors = false;
             gFishmodBench = 0;
             sEdgeAbPhase = -1;
+        }
+    }
+#endif
+#ifdef FISHMOD_VIEW_BENCH
+    {
+        static s32 sFrozenFrames;
+        static s32 sFrozenTime;
+        static s16 sFrozenSky;
+        static s32 sFrozenState;
+        s32 since = sTourFrame - (TOUR_GLIDE + 40);
+        s32 n = ARRAY_COUNT(sViewBenchFlags);
+
+        sViewTag = 0;
+        if (sViewLaps >= FISHMOD_VIEW_LAPS) {
+            play->haltAllActors = false;
+            gFishmodBench = 0;
+            gFishmodBenchDone = true; // (the profiler sends its last counts and stops)
+            Fishmod_DebugPrintf(2, "VIEW BENCH DONE: %d laps", sViewLaps);
+        } else if (since >= 0) {
+            s32 variant = since / VIEW_BENCH_FRAMES;
+
+            if (since == 0) {
+                sFrozenFrames = play->gameplayFrames;
+                sFrozenTime = gSaveContext.save.dayTime;
+                sFrozenSky = play->skyboxCtx.rot.y;
+                sFrozenState = play->state.frames;
+            }
+            play->gameplayFrames = sFrozenFrames;
+            gSaveContext.save.dayTime = sFrozenTime;
+            play->skyboxCtx.rot.y = sFrozenSky;
+            play->state.frames = sFrozenState;
+            play->haltAllActors = true;
+            if (variant >= n) {
+                gFishmodBench = 0;
+                play->haltAllActors = false;
+                if (sTourStop + 1 >= (s32)ARRAY_COUNT(sTourStops)) {
+                    sViewLaps++;
+                }
+                Fishmod_TourGo(sTourStop + 1);
+            } else {
+                gFishmodBench = sViewBenchFlags[variant];
+                sViewTag = ((u32)sTourStop << 24) | ((u32)sViewLaps << 16) | ((u32)variant << 8) |
+                           (((since % VIEW_BENCH_FRAMES) >= VIEW_BENCH_SETTLE) ? 1 : 0);
+            }
+        } else {
+            play->haltAllActors = false;
+            gFishmodBench = 0;
         }
     }
 #endif

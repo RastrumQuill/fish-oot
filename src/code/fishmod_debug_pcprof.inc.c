@@ -225,6 +225,8 @@ static void PcProf_FrameEnd(void) {
     r[1] = ((u32)(sPbLeg & 0xFF) << 24) | ((u32)(sBench.laps & 0xFF) << 16) | ((u32)(sPbCond & 0xFF) << 8) |
            (sBenchCounted ? 1 : 0); // (bit 0: a frame the bench counted, inside a block)
     sBenchCounted = false;
+#elif defined(FISHMOD_VIEW_BENCH)
+    r[1] = sViewTag; // (stop << 24 | lap << 16 | variant << 8 | bit 0: counted)
 #endif
     r[2] = period;
     r[3] = sLastCpu[FISHMOD_CPU_UPDATE];
