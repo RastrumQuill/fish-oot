@@ -44,6 +44,13 @@ void BgCheck_ResetPolyCheckTbl(SSNodeList* nodeList, s32 numPolys);
 
 #define SS_NULL 0xFFFF
 
+// fishmod: the current line test's number in polyCheckTbl (BgCheck_ResetPolyCheckTbl)
+static u8 sPolyCheckStamp;
+
+// fishmod: the scene's collision vertices, and the same as floats (made once by BgCheck_Allocate)
+static Vec3s* sStaticVtxS;
+static Vec3f* sStaticVtxF;
+
 // bccFlags
 #define BGCHECK_CHECK_WALL (1 << 0)
 #define BGCHECK_CHECK_FLOOR (1 << 1)
@@ -309,6 +316,14 @@ f32 CollisionPoly_GetPointDistanceFromPlane(CollisionPoly* poly, Vec3f* point) {
  * Get Poly Vertices
  */
 void CollisionPoly_GetVertices(CollisionPoly* poly, Vec3s* vtxList, Vec3f* dest) {
+    // fishmod: the scene's vertices are converted to floats once (BgCheck_Allocate); the same values, a 16-bit
+    // integer being exact as a float
+    if ((vtxList == sStaticVtxS) && (sStaticVtxF != NULL)) {
+        dest[0] = sStaticVtxF[COLPOLY_VTX_INDEX(poly->flags_vIA)];
+        dest[1] = sStaticVtxF[COLPOLY_VTX_INDEX(poly->flags_vIB)];
+        dest[2] = sStaticVtxF[poly->vIC];
+        return;
+    }
     BgCheck_Vec3sToVec3f(&vtxList[COLPOLY_VTX_INDEX(poly->flags_vIA)], &dest[0]);
     BgCheck_Vec3sToVec3f(&vtxList[COLPOLY_VTX_INDEX(poly->flags_vIB)], &dest[1]);
     BgCheck_Vec3sToVec3f(&vtxList[poly->vIC], &dest[2]);
@@ -989,7 +1004,7 @@ s32 BgCheck_CheckLineAgainstSSList(SSList* ssList, CollisionContext* colCtx, u16
 
         checkedPoly = &colCtx->polyNodes.polyCheckTbl[polyId];
 
-        if (*checkedPoly == true || COLPOLY_VTX_CHECK_FLAGS_ANY(polyList[polyId].flags_vIA, xpFlags1) ||
+        if (*checkedPoly == sPolyCheckStamp || COLPOLY_VTX_CHECK_FLAGS_ANY(polyList[polyId].flags_vIA, xpFlags1) ||
             !(xpFlags2 == 0 || COLPOLY_VTX_CHECK_FLAGS_ANY(polyList[polyId].flags_vIA, xpFlags2))) {
 
             if (curNode->next == SS_NULL) {
@@ -999,7 +1014,7 @@ s32 BgCheck_CheckLineAgainstSSList(SSList* ssList, CollisionContext* colCtx, u16
                 continue;
             }
         }
-        *checkedPoly = true;
+        *checkedPoly = sPolyCheckStamp;
         curPoly = &polyList[polyId];
         minY = CollisionPoly_GetMinY(curPoly, colCtx->colHeader->vtxList);
         if (posA->y < minY && posB->y < minY) {
@@ -1566,6 +1581,16 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
     s32 i;
 
     colCtx->colHeader = colHeader;
+    // fishmod: the scene's vertices as floats, once (CollisionPoly_GetVertices)
+    sStaticVtxS = colHeader->vtxList;
+    sStaticVtxF = GAME_STATE_ALLOC(&play->state, colHeader->numVertices * sizeof(Vec3f), "../z_bgcheck.c", __LINE__);
+    if (sStaticVtxF != NULL) {
+        s32 i;
+
+        for (i = 0; i < colHeader->numVertices; i++) {
+            BgCheck_Vec3sToVec3f(&colHeader->vtxList[i], &sStaticVtxF[i]);
+        }
+    }
     customNodeListMax = -1;
 
     PRINTF(T("/*---------------- BGCheck バッファーメモリサイズ -------------*/\n",
@@ -2731,6 +2756,9 @@ void SSNodeList_Alloc(PlayState* play, SSNodeList* this, s32 tblMax, s32 numPoly
     this->polyCheckTbl = GAME_STATE_ALLOC(&play->state, numPolys, "../z_bgcheck.c", 5979);
 
     ASSERT(this->polyCheckTbl != NULL, "this->polygon_check != NULL", "../z_bgcheck.c", 5981);
+    // fishmod: the table holds check numbers now (BgCheck_ResetPolyCheckTbl): it starts clear
+    bzero(this->polyCheckTbl, numPolys);
+    sPolyCheckStamp = 0;
 }
 
 /**
@@ -4132,8 +4160,13 @@ void func_800418D0(CollisionContext* colCtx, PlayState* play) {
  * Reset SSNodeList polyCheckTbl
  */
 void BgCheck_ResetPolyCheckTbl(SSNodeList* nodeList, s32 numPolys) {
-    // fishmod: same result, cleared in large chunks instead of a byte at a time
-    bzero(nodeList->polyCheckTbl, numPolys);
+    // fishmod: the same result without clearing the table for every line test. A poly has been tested in this test
+    // when its byte holds this test's number; a new test takes the next number. Cleared once in 255 tests (and when
+    // the table is made), so an old number is never mistaken for the current one.
+    if (++sPolyCheckStamp == 0) {
+        bzero(nodeList->polyCheckTbl, numPolys);
+        sPolyCheckStamp = 1;
+    }
 }
 
 /**
