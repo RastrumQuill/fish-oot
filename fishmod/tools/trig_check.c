@@ -8,6 +8,7 @@
  */
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 
 #include "ultra64/ultratypes.h"
@@ -79,6 +80,30 @@ int main(void) {
             differ += (s != Fishmod_SinBinang((s16)a)) + (c != Fishmod_CosBinang((s16)a));
         }
         printf("sin and cos alone against both together: %ld of 131072 values differ\n", differ);
+    }
+    {
+        /* the cached Math_SinS/CosS: random sequences of calls (repeats, pairs, lone calls) against the plain ones */
+        long differ = 0, calls;
+        unsigned int x = 12345;
+        s16 prev = 0;
+
+        for (calls = 0; calls < 20000000; calls++) {
+            s16 a2;
+            f32 got, want;
+
+            x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+            a2 = (x & 3) ? prev : (s16)(x >> 8); /* often the same angle again */
+            if ((x >> 4) & 1) {
+                got = Fishmod_SinCached(a2);
+                want = Fishmod_SinBinang(a2);
+            } else {
+                got = Fishmod_CosCached(a2);
+                want = Fishmod_CosBinang(a2);
+            }
+            differ += (memcmp(&got, &want, sizeof(f32)) != 0); /* (bit for bit: u32 is 8 bytes on the PC) */
+            prev = a2;
+        }
+        printf("cached sin/cos against plain, 20,000,000 calls in random order: %ld differ\n", differ);
     }
 
     for (i = -2000000; i <= 2000000; i++) {

@@ -49,6 +49,10 @@ void BgCheck_ResetPolyCheckTbl(SSNodeList* nodeList, s32 numPolys);
 static u8 sPolyCheckStamp;
 
 // fishmod: the scene's collision vertices, and the same as floats (made once by BgCheck_Allocate)
+// fishmod: one past the highest BgActor slot used since DynaPoly_Alloc: no slot above it is in use, so the loops over
+// the slots that only act on used ones stop there (the same slots visited; there are 50, a scene uses a few)
+static s32 sDynaHighWater;
+
 static Vec3s* sStaticVtxS;
 static Vec3f* sStaticVtxF;
 // fishmod: each scene poly's box on the ground (z and x), for the floor check's early out (BgCheck_Allocate)
@@ -3187,6 +3191,7 @@ void DynaPoly_Alloc(PlayState* play, DynaCollisionContext* dyna) {
         BgActor_Initialize(play, &dyna->bgActors[i]);
         dyna->bgActorFlags[i] = 0;
     }
+    sDynaHighWater = 0;
     DynaPoly_NullPolyList(&dyna->polyList);
     DynaPoly_AllocPolyList(play, &dyna->polyList, dyna->polyListMax);
 
@@ -3208,6 +3213,9 @@ s32 DynaPoly_SetBgActor(UNUSED PlayState* play, DynaCollisionContext* dyna, Acto
     for (bgId = 0; bgId < BG_ACTOR_MAX; bgId++) {
         if (!(dyna->bgActorFlags[bgId] & BGACTOR_IN_USE)) {
             dyna->bgActorFlags[bgId] |= BGACTOR_IN_USE;
+            if (bgId + 1 > sDynaHighWater) { // fishmod: the loops over the slots stop past the last one used
+                sDynaHighWater = bgId + 1;
+            }
             foundSlot = true;
             break;
         }
@@ -3514,7 +3522,7 @@ void DynaPoly_UnsetAllInteractFlags(PlayState* play, DynaCollisionContext* dyna,
     DynaPolyActor* dynaActor;
     s32 i;
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (dyna->bgActorFlags[i] & BGACTOR_IN_USE) {
             dynaActor = DynaPoly_GetActor(&play->colCtx, i);
             if (dynaActor != NULL && &dynaActor->actor == actor) {
@@ -3540,7 +3548,7 @@ void DynaPoly_UpdateContext(PlayState* play, DynaCollisionContext* dyna) {
         DynaLookup_ResetLists(&dyna->bgActors[i].dynaLookup);
     }
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (dyna->bgActorFlags[i] & BGACTOR_1) {
             // Initialize BgActor
             PRINTF_COLOR_GREEN();
@@ -3569,7 +3577,7 @@ void DynaPoly_UpdateContext(PlayState* play, DynaCollisionContext* dyna) {
     }
     vtxStartIndex = 0;
     polyStartIndex = 0;
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (dyna->bgActorFlags[i] & BGACTOR_IN_USE) {
             DynaPoly_AddBgActorToLookup(play, dyna, i, &vtxStartIndex, &polyStartIndex);
         }
@@ -3583,7 +3591,7 @@ void DynaPoly_UpdateContext(PlayState* play, DynaCollisionContext* dyna) {
 void DynaPoly_UpdateBgActorTransforms(PlayState* play, DynaCollisionContext* dyna) {
     s32 i;
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (dyna->bgActorFlags[i] & BGACTOR_IN_USE) {
             DynaPoly_SetBgActorPrevTransform(play, &dyna->bgActors[i]);
         }
@@ -3676,7 +3684,7 @@ f32 BgCheck_RaycastDownDyna(DynaRaycastDown* dynaRaycastDown) {
     result = BGCHECK_Y_MIN;
     *dynaRaycastDown->bgId = BGCHECK_SCENE;
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (!(dynaRaycastDown->colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE)) {
             continue;
         }
@@ -3984,7 +3992,7 @@ s32 BgCheck_SphVsDynaWall(CollisionContext* colCtx, u16 xpFlags, f32* outX, f32*
     result = false;
     resultPos = *pos;
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (!(colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE)) {
             continue;
         }
@@ -4103,7 +4111,7 @@ s32 BgCheck_CheckDynaCeiling(CollisionContext* colCtx, u16 xpFlags, f32* outY, V
 
     resultY = tempY;
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (!(colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE)) {
             continue;
         }
@@ -4238,7 +4246,7 @@ s32 BgCheck_CheckLineAgainstDyna(CollisionContext* colCtx, u16 xpFlags, Vec3f* p
     f32 ay;
     f32 by;
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE) {
             if (actor != colCtx->dyna.bgActors[i].actor) {
                 ay = posA->y;
@@ -4343,7 +4351,7 @@ s32 BgCheck_SphVsFirstDynaPoly(CollisionContext* colCtx, u16 xpFlags, CollisionP
     s32 i = 0;
     Sphere16 testSphere;
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         if (!(colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE)) {
             continue;
         }
@@ -4391,7 +4399,7 @@ void func_800418D0(CollisionContext* colCtx, PlayState* play) {
     s32 i;
     u16 flag;
 
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < sDynaHighWater; i++) {
         flag = dyna->bgActorFlags[i];
         if ((flag & BGACTOR_IN_USE) && !(flag & BGACTOR_1)) {
             Actor_SetObjectDependency(play, dyna->bgActors[i].actor);
@@ -5019,7 +5027,7 @@ void BgCheck_DrawBgActor(PlayState* play, CollisionContext* colCtx, s32 bgId) {
 void BgCheck_DrawDynaCollision(PlayState* play, CollisionContext* colCtx) {
     s32 bgId;
 
-    for (bgId = 0; bgId < BG_ACTOR_MAX; bgId++) {
+    for (bgId = 0; bgId < sDynaHighWater; bgId++) {
 
         if (!(colCtx->dyna.bgActorFlags[bgId] & BGACTOR_IN_USE)) {
             continue;

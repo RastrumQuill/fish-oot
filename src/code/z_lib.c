@@ -36,7 +36,7 @@ void Lib_MemSet(u8* dest, size_t len, u8 val) {
  * @return cos(angle)
  */
 f32 Math_CosS(s16 angle) {
-    return Fishmod_CosBinang(angle); // fish-oot: a polynomial instead of the sine table (fishmod_trig.h)
+    return Fishmod_CosCached(angle); // fish-oot: a polynomial instead of the sine table, the last angle kept (fishmod_trig.h)
 }
 
 /**
@@ -44,7 +44,7 @@ f32 Math_CosS(s16 angle) {
  * @return sin(angle)
  */
 f32 Math_SinS(s16 angle) {
-    return Fishmod_SinBinang(angle); // fish-oot: a polynomial instead of the sine table (fishmod_trig.h)
+    return Fishmod_SinCached(angle); // fish-oot: a polynomial instead of the sine table, the last angle kept (fishmod_trig.h)
 }
 
 /**

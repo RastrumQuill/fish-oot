@@ -78,6 +78,53 @@ static f32 Fishmod_CosBinang(s16 angle) {
     return Fishmod_SinBinang((s16)(angle + 0x4000));
 }
 
+/*
+ * Math_SinS and Math_CosS with the last angle remembered (the game thread's only: nothing else calls them): its octant,
+ * its polynomial, and its square root once needed. Math_CosS(a) after Math_SinS(a), as most movement and rotation code
+ * does, costs a compare; a lone call costs what Fishmod_SinBinang does. The same expressions as the pair: the same values
+ * (fishmod/tools/trig_check.c checks sequences of calls).
+ */
+static s16 sFishmodTrigAngle = 0;
+static s32 sFishmodTrigOct = 0;
+static f32 sFishmodTrigS0 = 0.0f;
+static f32 sFishmodTrigC0 = 1.0f;
+static s32 sFishmodTrigHaveC0 = 1;
+
+static void Fishmod_TrigPrep(s16 angle) {
+    f32 t;
+
+    if (angle != sFishmodTrigAngle) {
+        FISHMOD_TRIG_FOLD((u16)angle, sFishmodTrigOct, t);
+        sFishmodTrigS0 = FISHMOD_TRIG_OCT_SIN(t, t * t);
+        sFishmodTrigHaveC0 = 0;
+        sFishmodTrigAngle = angle;
+    }
+}
+
+static f32 Fishmod_TrigC0(void) {
+    if (!sFishmodTrigHaveC0) {
+        sFishmodTrigC0 = sqrtf(1.0f - sFishmodTrigS0 * sFishmodTrigS0);
+        sFishmodTrigHaveC0 = 1;
+    }
+    return sFishmodTrigC0;
+}
+
+static f32 Fishmod_SinCached(s16 angle) {
+    f32 v;
+
+    Fishmod_TrigPrep(angle);
+    v = (((sFishmodTrigOct + 1) >> 1) & 1) ? Fishmod_TrigC0() : sFishmodTrigS0;
+    return (sFishmodTrigOct & 4) ? (0.0f - v) : v;
+}
+
+static f32 Fishmod_CosCached(s16 angle) {
+    f32 v;
+
+    Fishmod_TrigPrep(angle);
+    v = (((sFishmodTrigOct + 1) >> 1) & 1) ? sFishmodTrigS0 : Fishmod_TrigC0();
+    return (((sFishmodTrigOct + 2) >> 2) & 1) ? (0.0f - v) : v;
+}
+
 /* atan(t) for t in [0, 1], radians */
 static f32 Fishmod_AtanUnit(f32 t) {
     f32 z = t * t;
