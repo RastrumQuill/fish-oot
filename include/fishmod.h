@@ -521,6 +521,10 @@ extern s32 gFishmodBenchDone; // the bench route's last lap is over (the profile
 extern s32 gFishmodStress;
 extern s32 gFishmodStressCount;
 extern s32 gFishmodScatterDrawn; // props drawn in the last frame
+extern u32 gFishmodScatterCacheUsed;
+extern u32 gFishmodScatterCacheMismatch;
+extern u32 gFishmodScatterCacheDiff[8];
+extern u32 gFishmodScatterCmdTime[2];
 extern u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 #define FISHMOD_PROF(slot, stmt)                        \
     {                                                   \

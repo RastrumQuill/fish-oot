@@ -688,6 +688,10 @@ static u32 sLastCpu[FISHMOD_CPU_MAX];
 OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // the profile timers over the last frame (before they're cleared)
 s32 gFishmodBench;                         // FISHMOD_BENCH_* flags (the hardware bench switches things off)
 s32 gFishmodScatterDrawn;                  // props drawn in the last frame
+u32 gFishmodScatterCacheUsed;     // frames the prop commands were copied from the last (or checked: SCATTER_VERIFY)
+u32 gFishmodScatterCacheMismatch; // SCATTER_VERIFY: frames the copy differed from the commands made afresh
+u32 gFishmodScatterCmdTime[2];    // the prop draw's per-frame commands: time (OSTime, low word) and frames
+u32 gFishmodScatterCacheDiff[8];  // SCATTER_VERIFY: the last difference (list, index, fresh w0 w1, copied w0 w1, lengths)
 OSTime gFishmodProf[FISHMOD_PROF_MAX];
 u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 

@@ -346,6 +346,7 @@ typedef struct ScatterFrame {
     Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96]; // (and the dock, and the far edge mode's material)
     Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4];
     Mtx sway[SWAY_MAX];
+    Lights lights; // the scene's lights, this frame's (here so the kept commands' address for them stays the same)
 } ScatterFrame;
 // What's drawn and the props' matrices: made when the camera has moved, and kept while it holds still (fishing,
 // mostly), so most frames only send the commands again. Two sets: a new one is made while the RSP may still be
@@ -376,10 +377,40 @@ static s32 sSetAge = 1000;
 #define REUSE_TURN_COS 0.9996f
 #define REUSE_FRAMES 10
 
+/**
+ * The props' commands kept (fish-oot). While the set, the light on the props and the mode stay the same, the commands
+ * for the set's props up to the first one fading out (the single cards, which fade with the camera's every move) are
+ * the same every frame, and each frame's buffer still holds what it was given two frames ago: those commands are left
+ * where they are, and only the fading props after them are made again. The addresses in them (the matrices, this
+ * buffer's sway matrices and scene lights) are this buffer's own, so they hold too. The same commands, byte for byte
+ * (SCATTER_VERIFY checks it every frame).
+ */
+typedef struct ScatterKeep {
+    s32 opaLen;  // the kept commands (0: none kept)
+    s32 xluLen;
+    s32 opaFrom; // where they start in the buffer
+    s32 xluFrom;
+    s32 until;   // the props they cover: the set's first so many
+    u32 setGen;  // the set they were made from (its generation)
+    u32 light[3];
+    s32 oneCycle;
+    s32 numLights;
+    u32 bench;
+    s32 lastOpa; // the loop's state where they end
+    s32 lastXlu;
+    s32 lastNear;
+    s32 edgeNear;
+} ScatterKeep;
+static ScatterKeep sKeep[2]; // a frame buffer's each
+static s32 sSwayInit[2];     // a frame buffer's sway matrices have their fixed entries
+static u32 sSetGen; // a new set every Scatter_Build
+
 static void Scatter_AllocBuffers(void) {
     if (sBufs == NULL) {
         sBufs = ZeldaArena_Malloc(sizeof(ScatterBuffers));
     }
+    sKeep[0].opaLen = sKeep[1].opaLen = 0;
+    sSwayInit[0] = sSwayInit[1] = false;
     sSetAge = 1000;
 }
 
@@ -388,7 +419,10 @@ static void Scatter_FreeBuffers(void) {
         ZeldaArena_Free(sBufs);
         sBufs = NULL;
     }
+    sKeep[0].opaLen = sKeep[1].opaLen = 0;
+    sSwayInit[0] = sSwayInit[1] = false;
 }
+
 
 static void BedCard_Load(PlayState* play);
 
@@ -807,6 +841,55 @@ static void Scatter_UpdateDry(PlayState* play) {
 
 static Lights* sSceneLights; // this frame's scene lights (1-cycle: put back for the lit materials and after the props)
 
+#ifdef SCATTER_VERIFY
+// (F3DEX3's gDPPipeSync, 0xE7, writes only its first word: the second is whatever the list held, and unused. The check
+// skips it.)
+static Gfx sCheckOpa[ARRAY_COUNT(((ScatterFrame*)0)->opa)];
+static Gfx sCheckXlu[ARRAY_COUNT(((ScatterFrame*)0)->xlu)];
+
+static s32 Scatter_CheckSame(Gfx* a, Gfx* b, s32 n, s32 list) {
+    s32 i;
+
+    for (i = 0; i < n; i++) {
+        if ((a[i].words.w0 != b[i].words.w0) ||
+            ((a[i].words.w1 != b[i].words.w1) && (((a[i].words.w0 >> 24) & 0xFF) != 0xE7))) {
+            gFishmodScatterCacheDiff[0] = list;
+            gFishmodScatterCacheDiff[1] = i;
+            gFishmodScatterCacheDiff[2] = a[i].words.w0;
+            gFishmodScatterCacheDiff[3] = a[i].words.w1;
+            gFishmodScatterCacheDiff[4] = b[i].words.w0;
+            gFishmodScatterCacheDiff[5] = b[i].words.w1;
+            return false;
+        }
+    }
+    return true;
+}
+#endif
+
+/** Where the kept part ends (the first fading prop, or the end): noted if it was made, checked if verifying. */
+static void Scatter_KeepAt(ScatterKeep* keep, s32 kept, Gfx* opa0, Gfx* opa, Gfx* xlu0, Gfx* xlu, ScatterKeep* now,
+                           s32 lastOpa, s32 lastXlu, s32 lastNear) {
+    if (!kept) {
+        *keep = *now;
+        keep->opaLen = (opa - opa0) + 1; // (+1: 0 is none kept)
+        keep->xluLen = xlu - xlu0;
+        keep->lastOpa = lastOpa;
+        keep->lastXlu = lastXlu;
+        keep->lastNear = lastNear;
+        keep->edgeNear = sEdgeNear;
+        return;
+    }
+#ifdef SCATTER_VERIFY
+    if (((opa - opa0) != keep->opaLen - 1) || ((xlu - xlu0) != keep->xluLen) || (lastOpa != keep->lastOpa) ||
+        (lastXlu != keep->lastXlu) || (lastNear != keep->lastNear) || (sEdgeNear != keep->edgeNear)) {
+        gFishmodScatterCacheDiff[0] = 3; // the lengths or the loop's state
+        gFishmodScatterCacheMismatch++;
+    } else if (!Scatter_CheckSame(opa0, sCheckOpa, opa - opa0, 1) || !Scatter_CheckSame(xlu0, sCheckXlu, xlu - xlu0, 2)) {
+        gFishmodScatterCacheMismatch++;
+    }
+#endif
+}
+
 /** The scene's lights again, as Lights_Draw sets them (the 1-cycle props' ambient-only light replaced them). */
 static Gfx* Scatter_SceneLights(Gfx* gfx) {
 #if ENABLE_F3DEX3
@@ -917,7 +1000,9 @@ static void Scatter_Sway(PlayState* play, ScatterFrame* frame) {
     s32 kind;
     s32 ph;
     s32 t = play->gameplayFrames;
+    s32 init = !sSwayInit[sFrame]; // (the buffer's first frame: its matrices' fixed entries too)
 
+    sSwayInit[sFrame] = true;
     for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
         FishmodPropKindInfo* info = &sKinds[kind];
 
@@ -931,23 +1016,43 @@ static void Scatter_Sway(PlayState* play, ScatterFrame* frame) {
             s32 a = (s32)(Math_SinS(ang) * amp);
             s32 b = (s32)(Math_CosS((s16)(ang * 7 / 10 + 0x1000)) * amp * 0.4f);
 
-            // identity, but the y axis leans: x += a * y, z += b * y
-            MTX_SET(mtx, 0, 0, 0x10000);
-            MTX_SET(mtx, 0, 1, 0);
-            MTX_SET(mtx, 0, 2, 0);
-            MTX_SET(mtx, 0, 3, 0);
+            // identity, but the y axis leans: x += a * y, z += b * y (the identity's entries written once: the
+            // buffer keeps them, and only these two change)
+            if (init) {
+                MTX_SET(mtx, 0, 0, 0x10000);
+                MTX_SET(mtx, 0, 1, 0);
+                MTX_SET(mtx, 0, 2, 0);
+                MTX_SET(mtx, 0, 3, 0);
+                MTX_SET(mtx, 1, 1, 0x10000);
+                MTX_SET(mtx, 1, 3, 0);
+                MTX_SET(mtx, 2, 0, 0);
+                MTX_SET(mtx, 2, 1, 0);
+                MTX_SET(mtx, 2, 2, 0x10000);
+                MTX_SET(mtx, 2, 3, 0);
+                MTX_SET(mtx, 3, 0, 0);
+                MTX_SET(mtx, 3, 1, 0);
+                MTX_SET(mtx, 3, 2, 0);
+                MTX_SET(mtx, 3, 3, 0x10000);
+            }
             MTX_SET(mtx, 1, 0, a);
-            MTX_SET(mtx, 1, 1, 0x10000);
             MTX_SET(mtx, 1, 2, b);
-            MTX_SET(mtx, 1, 3, 0);
-            MTX_SET(mtx, 2, 0, 0);
-            MTX_SET(mtx, 2, 1, 0);
-            MTX_SET(mtx, 2, 2, 0x10000);
-            MTX_SET(mtx, 2, 3, 0);
-            MTX_SET(mtx, 3, 0, 0);
-            MTX_SET(mtx, 3, 1, 0);
-            MTX_SET(mtx, 3, 2, 0);
-            MTX_SET(mtx, 3, 3, 0x10000);
+#ifdef SCATTER_VERIFY
+            {
+                // the entries kept from before: still the identity's
+                s32 r;
+                s32 c;
+
+                for (r = 0; r < 4; r++) {
+                    for (c = 0; c < 4; c++) {
+                        if (!((r == 1) && ((c == 0) || (c == 2))) &&
+                            ((mtx->intPart[r][c] != ((r == c) ? 1 : 0)) || (mtx->fracPart[r][c] != 0))) {
+                            gFishmodScatterCacheMismatch++;
+                            gFishmodScatterCacheDiff[0] = 4;
+                        }
+                    }
+                }
+            }
+#endif
         }
     }
 }
@@ -1333,6 +1438,12 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     u32 light[3];
     ScatterFrame* frame;
     ScatterSet* set;
+    s32 cacheUntil;
+    s32 cacheStart;
+    s32 cacheValid;
+    Gfx* cacheOpa0;
+    Gfx* cacheXlu0;
+    ScatterKeep keepNow;
 #if FISHMOD_DEBUG
     static OSTime sT0, sT1, sT2;
     static s32 sBuilt;
@@ -1401,6 +1512,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         ((SQ(eye.x - sSetEye.x) + SQ(eye.y - sSetEye.y) + SQ(eye.z - sSetEye.z)) > SQ(REUSE_MOVE)) ||
         ((lookX * sSetLook.x + lookY * sSetLook.y + lookZ * sSetLook.z) < REUSE_TURN_COS)) {
         Scatter_Build(play, &eye, lookX, lookY, lookZ);
+        sSetGen++;
 #if FISHMOD_DEBUG
         sSetBench = gFishmodBench;
 #endif
@@ -1428,11 +1540,81 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     set = &sBufs->set[sSet];
     opa = frame->opa;
     xlu = frame->xlu;
+    if (sSceneLights != NULL) {
+        frame->lights = *sSceneLights;
+        sSceneLights = &frame->lights;
+    }
     Scatter_Sway(play, frame);
 #if FISHMOD_DEBUG
     gFishmodScatterDrawn = set->count;
 #endif
-    for (n = 0; n < set->count; n++) {
+    // the commands up to the first fading prop: left as they are in the buffer if nothing they depend on has changed
+    {
+        ScatterKeep* keep = &sKeep[sFrame];
+        s32 k;
+
+        cacheUntil = set->count;
+        for (k = 0; k < set->count; k++) {
+            if (set->tier[k] == TIER_IMP) {
+                cacheUntil = k;
+                break;
+            }
+        }
+        cacheOpa0 = opa;
+        cacheXlu0 = xlu;
+        keepNow.opaFrom = opa - frame->opa;
+        keepNow.xluFrom = xlu - frame->xlu;
+        keepNow.until = cacheUntil;
+        keepNow.setGen = sSetGen;
+        keepNow.light[0] = light[0];
+        keepNow.light[1] = light[1];
+        keepNow.light[2] = light[2];
+        keepNow.oneCycle = SCATTER_ONE_CYCLE();
+        keepNow.numLights = (sSceneLights != NULL) ? sSceneLights->numLights : -1;
+#if FISHMOD_DEBUG
+        keepNow.bench = (u32)gFishmodBench;
+#else
+        keepNow.bench = 0;
+#endif
+        cacheValid = (keep->opaLen != 0) && (keep->opaFrom == keepNow.opaFrom) && (keep->xluFrom == keepNow.xluFrom) &&
+                     (keep->until == keepNow.until) && (keep->setGen == keepNow.setGen) &&
+                     (keep->light[0] == keepNow.light[0]) && (keep->light[1] == keepNow.light[1]) &&
+                     (keep->light[2] == keepNow.light[2]) && (keep->oneCycle == keepNow.oneCycle) &&
+                     (keep->numLights == keepNow.numLights) && (keep->bench == keepNow.bench)
+#if FISHMOD_DEBUG
+                     && !gFishmodLodTest.active
+#endif
+#ifdef SCATTER_NOCACHE
+                     && false
+#endif
+            ;
+        cacheStart = 0;
+        if (!cacheValid) {
+            keep->opaLen = 0; // (the buffer is about to be written over: nothing kept until this frame's are noted)
+        } else {
+#if FISHMOD_DEBUG
+            gFishmodScatterCacheUsed++;
+#endif
+#ifdef SCATTER_VERIFY
+            // the check: the kept commands set aside, then made afresh over them as before, and the two compared
+            for (k = 0; k < keep->opaLen - 1; k++) {
+                sCheckOpa[k] = opa[k];
+            }
+            for (k = 0; k < keep->xluLen; k++) {
+                sCheckXlu[k] = xlu[k];
+            }
+#else
+            opa += keep->opaLen - 1;
+            xlu += keep->xluLen;
+            lastOpa = keep->lastOpa;
+            lastXlu = keep->lastXlu;
+            lastNear = keep->lastNear;
+            sEdgeNear = keep->edgeNear;
+            cacheStart = cacheUntil;
+#endif
+        }
+    }
+    for (n = cacheStart; n < set->count; n++) {
         FishmodProp* prop = &sProps[set->prop[n]];
         FishmodPropKindInfo* info;
         Gfx** disp;
@@ -1440,6 +1622,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         s32 tier;
         s32 key;
 
+        if (n == cacheUntil) {
+            Scatter_KeepAt(&sKeep[sFrame], cacheValid, cacheOpa0, opa, cacheXlu0, xlu, &keepNow, lastOpa, lastXlu,
+                           lastNear);
+        }
         kind = prop->kind;
         info = &sKinds[kind];
         dSq = SQ(prop->x - eye.x) + SQ(prop->z - eye.z);
@@ -1506,6 +1692,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                                   : (tier == TIER_HALF) ? info->modelHalf
                                   : (tier == TIER_FAR)  ? info->modelFar
                                                         : info->model);
+    }
+    if (cacheUntil == set->count) { // (no fading prop: the whole loop is the part kept)
+        Scatter_KeepAt(&sKeep[sFrame], cacheValid, cacheOpa0, opa, cacheXlu0, xlu, &keepNow, lastOpa, lastXlu,
+                       lastNear);
     }
     if (lastOpa >= 0) {
         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
@@ -1621,6 +1811,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     gSPEndDisplayList(opa++);
     gSPEndDisplayList(xlu++);
 #if FISHMOD_DEBUG
+    gFishmodScatterCmdTime[0] += (u32)(osGetTime() - tStart);
+    gFishmodScatterCmdTime[1]++;
     sT1 += osGetTime() - tStart;
     sT2++;
     if ((play->gameplayFrames & 15) == 0) { // (printing is slow: not every frame)
