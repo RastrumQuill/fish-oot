@@ -305,6 +305,15 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
   shrinking them saves next to nothing: the bed draws in two-cycle mode for fog anyway (2 RDP cycles a pixel either
   way, the second tile's texel fetched in the second cycle regardless); only one 2 KB texture load a frame goes. If
   they look wrong in murky water, fading them (the scene's env alpha toward 255) is free either way: a look choice.
+  **Plan (not started):** caustics only in shallow water. The blend weight is one value for the whole draw (env
+  alpha) and the shade alpha carries the fog, so they can't fade by depth per vertex: split the bed's display list at
+  build time into shallow triangles (the caustic material) and deep ones (the bed texture alone, same two-cycle
+  cost), with the cut in the shallows so the edge sits where the murk already hides it.
+- **Moss on the lake bed (backburner):** the second texture slot the caustics use, reused where they're dropped: a
+  low-res black-and-white mask stretched over the whole lake (e.g. 64x64 4-bit, 2 KB) fading the sand to a flat moss
+  colour, `(PRIM - sand) x mask + sand`, then shade and fog as now: no extra RDP cost. Needs a mask (from depth and
+  slope, or painted), lake-wide flat texture coordinates for the bed (the bed-shade tool), a mockup first. The RDP
+  filters from three samples, so a mask stretched this far may show faint diagonal steps: a bigger or softened mask.
 
 ### Quality-of-life ideas (later; from another mod's list)
 - Center the "Navi" text in the C-Up button properly.
