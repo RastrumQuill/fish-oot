@@ -434,13 +434,17 @@ void Graph_Update(GraphicsContext* gfxCtx, GameState* gameState) {
 
 #if FISHMOD_DEBUG
     // fishmod: the graphics log (beside the collision log): a hash of everything this frame hands the RSP (each
-    // display list's commands and everything allocated for them: matrices, lights, vertices), one a frame, to prove a
-    // change draws exactly the same (fishmod/tools/collog.sh --gfx, collog_compare.py --gfx)
+    // display list's commands and everything allocated for them: matrices, lights, vertices), to prove a change draws
+    // exactly the same (fishmod/tools/collog.sh with a fifth argument). Nine words a frame: the whole, then each arena's
+    // commands and allocations (work, opa, xlu, overlay). One frame's whole pool can be kept too (gFishmodGfxDumpAt).
     {
         extern u32* gFishmodGfxLog;
         extern u32 gFishmodGfxLogCount;
+        extern u32 gFishmodGfxDumpAt;
+        extern u8* gFishmodGfxDump;
         TwoHeadGfxArena* arenas[4];
         u32 h = 2166136261u;
+        u32 part[8];
         s32 k;
 
         arenas[0] = &gfxCtx->work;
@@ -449,19 +453,21 @@ void Graph_Update(GraphicsContext* gfxCtx, GameState* gameState) {
         arenas[3] = &gfxCtx->overlay;
         for (k = 0; (gFishmodGfxLog != NULL) && (k < 4); k++) {
             TwoHeadGfxArena* a = arenas[k];
+            u32 hc = 2166136261u;
+            u32 ha = 2166136261u;
             u32* w;
             u32* end;
 
             // the commands (F3DEX3's pipe sync, 0xE7, writes only its first word: the second is left out). Addresses
             // in RAM (0x80xxxxxx) count as 0: a change in the code moves where overlays and the heap's blocks lie, so
             // two builds that draw alike can point at different places; what's allocated here (matrices, lights,
-            // vertices) is hashed below by its content instead.
-            // Commands that carry an address may also hold it physical (0x00xxxxxx: segments, images): likewise.
+            // vertices) is hashed below by its content instead. Commands that carry an address may also hold it
+            // physical (0x00xxxxxx: segments, images): likewise.
             for (w = (u32*)a->start, end = (u32*)a->p; w < end; w += 2) {
                 u32 op = w[0] >> 24;
                 u32 w1 = w[1];
 
-                h = (h ^ w[0]) * 16777619u;
+                hc = (hc ^ w[0]) * 16777619u;
                 if (op == 0xE7) {
                     continue;
                 }
@@ -471,15 +477,27 @@ void Graph_Update(GraphicsContext* gfxCtx, GameState* gameState) {
                                                  (op == 0xDE) || (op == 0xFD) || (op == 0xFE) || (op == 0xFF))) {
                     w1 = 0;
                 }
-                h = (h ^ w1) * 16777619u;
+                hc = (hc ^ w1) * 16777619u;
             }
             // what was allocated for them, from the arena's other end (addresses in it likewise)
             for (w = (u32*)a->d, end = (u32*)((u8*)a->start + a->size); w < end; w++) {
-                h = (h ^ (((*w >> 23) == (0x80000000u >> 23)) ? 0 : *w)) * 16777619u;
+                ha = (ha ^ (((*w >> 23) == (0x80000000u >> 23)) ? 0 : *w)) * 16777619u;
             }
+            part[2 * k] = hc;
+            part[2 * k + 1] = ha;
+            h = ((h ^ hc) * 16777619u ^ ha) * 16777619u;
         }
-        if ((gFishmodGfxLog != NULL) && (gFishmodGfxLogCount < 16000)) {
-            gFishmodGfxLog[gFishmodGfxLogCount++] = h;
+        if ((gFishmodGfxLog != NULL) && (gFishmodGfxLogCount < 4000)) {
+            u32* rec = &gFishmodGfxLog[gFishmodGfxLogCount * 9];
+
+            rec[0] = h;
+            for (k = 0; k < 8; k++) {
+                rec[1 + k] = part[k];
+            }
+            if ((gFishmodGfxLogCount == gFishmodGfxDumpAt) && (gFishmodGfxDump != NULL)) {
+                bcopy(&gGfxPools[gfxCtx->gfxPoolIdx & 1], gFishmodGfxDump, sizeof(GfxPool));
+            }
+            gFishmodGfxLogCount++;
         }
     }
 #endif

@@ -690,8 +690,10 @@ s32 gFishmodBench;                         // FISHMOD_BENCH_* flags (the hardwar
 s32 gFishmodScatterDrawn;                  // props drawn in the last frame
 u32 gFishmodScatterCacheUsed;     // frames the prop commands were copied from the last (or checked: SCATTER_VERIFY)
 u32 gFishmodScatterCacheMismatch; // SCATTER_VERIFY: frames the copy differed from the commands made afresh
-u32* gFishmodGfxLog; // graph.c: each frame's graphics hash (the collog script's builds)
+u32* gFishmodGfxLog; // graph.c: each frame's graphics hashes, nine words (the collog script's builds)
 u32 gFishmodGfxLogCount;
+u32 gFishmodGfxDumpAt = 5; // graph.c: the frame whose whole graphics pool is kept in gFishmodGfxDump
+u8* gFishmodGfxDump;
 u32 gFishmodScatterCmdTime[2];    // the prop draw's per-frame commands: time (OSTime, low word) and frames
 u32 gFishmodScatterCacheDiff[8];  // SCATTER_VERIFY: the last difference (list, index, fresh w0 w1, copied w0 w1, lengths)
 OSTime gFishmodProf[FISHMOD_PROF_MAX];
@@ -921,7 +923,8 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         if (gFishmodGfxLog == NULL) {
             extern u32* gFishmodGfxLog;
 
-            gFishmodGfxLog = SYSTEM_ARENA_MALLOC(16000 * sizeof(u32), "../fishmod_debug.c", __LINE__);
+            gFishmodGfxLog = SYSTEM_ARENA_MALLOC(4000 * 9 * sizeof(u32), "../fishmod_debug.c", __LINE__);
+            gFishmodGfxDump = SYSTEM_ARENA_MALLOC(sizeof(GfxPool), "../fishmod_debug.c", __LINE__);
         }
         Fishmod_ColLogFrame(sPlayFrames);
     }

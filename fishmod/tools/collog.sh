@@ -27,7 +27,8 @@ APID=$!
 GFXARGS=()
 if [ -n "$GFXOUT" ]; then
     GFXARGS=(-ex "set \$g = *(unsigned int*)0x$(sym gFishmodGfxLog)" -ex "set \$m = *(unsigned int*)0x$(sym gFishmodGfxLogCount)"
-             -ex "printf \"gfx frames %u\\n\", \$m" -ex "dump binary memory $GFXOUT \$g \$g + \$m * 4")
+             -ex "printf \"gfx frames %u\\n\", \$m" -ex "dump binary memory $GFXOUT \$g \$g + \$m * 36"
+             -ex "dump binary memory $GFXOUT.pool *(unsigned int*)0x$(sym gFishmodGfxDump) *(unsigned int*)0x$(sym gFishmodGfxDump) + 0x12410")
 fi
 sleep "$SECS"
 gdb-multiarch -q -batch -ex "set architecture mips:4000" -ex "set endian big" -ex "target remote 127.0.0.1:9123" \
