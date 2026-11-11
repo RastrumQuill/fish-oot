@@ -127,16 +127,29 @@ static s32 StaticPoly_CheckYIntersect(CollisionContext* colCtx, s32 polyId, f32 
                                       f32 chkDist) {
     CollisionPoly* poly = &colCtx->colHeader->polyList[polyId];
     Vec3f verts[3];
+    Vec3f* v0;
+    Vec3f* v1;
+    Vec3f* v2;
     f32 nx;
     f32 ny;
     f32 nz;
 
-    CollisionPoly_GetVertices(poly, colCtx->colHeader->vtxList, verts);
     CollisionPoly_GetNormalF(poly, &nx, &ny, &nz);
     if (IS_ZERO(ny)) {
         return false;
     }
-    if (Fishmod_TriChkPointParaY(&verts[0], &verts[1], &verts[2], z, x, detMax, chkDist, ny, true)) {
+    if ((colCtx->colHeader->vtxList == sStaticVtxS) && (sStaticVtxF != NULL)) {
+        // (the float copy of the scene's vertices, read in place)
+        v0 = &sStaticVtxF[COLPOLY_VTX_INDEX(poly->flags_vIA)];
+        v1 = &sStaticVtxF[COLPOLY_VTX_INDEX(poly->flags_vIB)];
+        v2 = &sStaticVtxF[poly->vIC];
+    } else {
+        CollisionPoly_GetVertices(poly, colCtx->colHeader->vtxList, verts);
+        v0 = &verts[0];
+        v1 = &verts[1];
+        v2 = &verts[2];
+    }
+    if (Fishmod_TriChkPointParaY(v0, v1, v2, z, x, detMax, chkDist, ny, true)) {
         *yIntersect = (f32)((((-nx * x) - (nz * z)) - (f32)poly->dist) / ny);
         return true;
     }
