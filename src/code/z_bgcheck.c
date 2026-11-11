@@ -50,6 +50,14 @@ static u8 sPolyCheckStamp;
 // fishmod: the scene's collision vertices, and the same as floats (made once by BgCheck_Allocate)
 static Vec3s* sStaticVtxS;
 static Vec3f* sStaticVtxF;
+// fishmod: each scene poly's box on the ground (z and x), for the floor check's early out (BgCheck_Allocate)
+typedef struct {
+    f32 minZ;
+    f32 maxZ;
+    f32 minX;
+    f32 maxX;
+} StaticPolyBox;
+static StaticPolyBox* sStaticPolyBox;
 
 // bccFlags
 #define BGCHECK_CHECK_WALL (1 << 0)
@@ -619,8 +627,16 @@ f32 BgCheck_RaycastDownStaticList(CollisionContext* colCtx, u16 xpFlags, SSList*
             break;
         }
 
-        if (CollisionPoly_CheckYIntersect(&colCtx->colHeader->polyList[polyId], colCtx->colHeader->vtxList, pos->x,
-                                          pos->z, &yIntersect, chkDist) == true) {
+        // fishmod: the poly's box against the point first, the same test Math3D_TriChkPointParaYImpl starts with
+        // (Math3D_CirSquareVsTriSquare, the same floats compared the same way), so a miss costs four compares instead
+        // of fetching the poly; the same answers
+        if ((sStaticPolyBox != NULL) && !(((sStaticPolyBox[polyId].minZ - chkDist) <= pos->z) &&
+                                          ((sStaticPolyBox[polyId].maxZ + chkDist) >= pos->z) &&
+                                          ((sStaticPolyBox[polyId].minX - chkDist) <= pos->x) &&
+                                          ((sStaticPolyBox[polyId].maxX + chkDist) >= pos->x))) {
+            // (missed: on to the next)
+        } else if (CollisionPoly_CheckYIntersect(&colCtx->colHeader->polyList[polyId], colCtx->colHeader->vtxList,
+                                                 pos->x, pos->z, &yIntersect, chkDist) == true) {
             // if poly is closer to pos without going over
             if (yIntersect < pos->y && result < yIntersect) {
                 result = yIntersect;
@@ -1589,6 +1605,24 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
 
         for (i = 0; i < colHeader->numVertices; i++) {
             BgCheck_Vec3sToVec3f(&colHeader->vtxList[i], &sStaticVtxF[i]);
+        }
+    }
+    // fishmod: each poly's box on the ground (the floor check's early out)
+    sStaticPolyBox =
+        GAME_STATE_ALLOC(&play->state, colHeader->numPolygons * sizeof(StaticPolyBox), "../z_bgcheck.c", __LINE__);
+    if (sStaticPolyBox != NULL) {
+        s32 i;
+
+        for (i = 0; i < colHeader->numPolygons; i++) {
+            CollisionPoly* poly = &colHeader->polyList[i];
+            Vec3s* va = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIA)];
+            Vec3s* vb = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIB)];
+            Vec3s* vc = &colHeader->vtxList[poly->vIC];
+
+            sStaticPolyBox[i].minZ = MIN(MIN(va->z, vb->z), vc->z);
+            sStaticPolyBox[i].maxZ = MAX(MAX(va->z, vb->z), vc->z);
+            sStaticPolyBox[i].minX = MIN(MIN(va->x, vb->x), vc->x);
+            sStaticPolyBox[i].maxX = MAX(MAX(va->x, vb->x), vc->x);
         }
     }
     customNodeListMax = -1;

@@ -12,6 +12,8 @@ rewritten to match:
   (when the next one isn't converted, or at the list's end), the mode back to none, so nothing after it is looked up;
 - textures drawn together in one material share one palette (TMEM holds one 256-colour palette): together they must
   stay within 256 colours, else they stay as they are;
+- only where it gains: the textures at 8 bits a texel plus the palette and its load must come to fewer bytes than the
+  16-bit textures (a small texture with many colours stays);
 - a texture converts only if every use of its name anywhere is a load this pass rewrites (not one used by code, an
   animated-material table or a load it doesn't know), and a list only if it calls no other list and nothing skips its
   end (a cull before its first load is fine);
@@ -40,6 +42,7 @@ CALLS = ("gsSPDisplayList", "gsSPBranchList", "gsSPBranchLessZ", "gsSPBranchLess
 TEXDEF = re.compile(r"u64 (\w+)\[TEX_LEN\(u64, \1_WIDTH, \1_HEIGHT, 16\)\] = \{\n#include \"([^\"]+)\.rgba16\.inc\.c\"\n\};")
 DLDEF = re.compile(r"Gfx (\w+)\[(\d+)\] = \{\n#include \"([^\"]+\.inc\.c)\"\n\};")
 WORD = re.compile(r"\b\w+\b")
+PALETTE_COST = 64  # bytes: the palette load's commands (texture image, tiles, the load, the lookup mode on and off)
 
 
 def parse_commands(text):
@@ -171,6 +174,7 @@ def main():
     # a texture can convert when it's defined as rgba16, has <= 256 colours and a width that's a multiple of 8, and
     # every use of its name is its definition, its extern, or a load (rgba16) in a list this pass reads
     colours = {}
+    texels = {}
     eligible = set()
     for name, (cfile, stem) in texdefs.items():
         lds = by_tex.get(name)
@@ -187,6 +191,7 @@ def main():
         cs = set(im.getdata())
         if len(cs) <= 256:
             colours[name] = cs
+            texels[name] = im.width * im.height
             eligible.add(name)
 
     # material groups: the loads between two draws, per list; a list qualifies if it calls nothing, and nothing
@@ -256,7 +261,11 @@ def main():
         for t in eligible:
             comps[find(t)].append(t)
         for members in comps.values():
-            if len(set().union(*(colours[t] for t in members))) > 256:
+            n_colours = len(set().union(*(colours[t] for t in members)))
+            # only where it gains: the textures at 8 bits a texel, plus the palette (2 bytes a colour) and its load's
+            # commands (about 64 bytes), against 16 bits a texel now; a small texture with many colours stays
+            gains = sum(texels[t] for t in members) + 2 * n_colours + PALETTE_COST < sum(2 * texels[t] for t in members)
+            if n_colours > 256 or not gains:
                 for t in members:
                     eligible.discard(t)
                 changed = True
