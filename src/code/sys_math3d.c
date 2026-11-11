@@ -7,6 +7,7 @@
 #include "ultra64.h"
 #include "z_lib.h"
 #include "z_math.h"
+#include "fishmod_tri.h"
 
 #pragma increment_block_number "gc-eu:76 gc-eu-mq:76 gc-jp:76 gc-jp-ce:76 gc-jp-mq:76 gc-us:76 gc-us-mq:76 ique-cn:66" \
                                "ntsc-1.0:64 ntsc-1.1:64 ntsc-1.2:64 pal-1.0:64 pal-1.1:64"
@@ -966,51 +967,9 @@ f32 Math3D_DistPlaneToPos(f32 nx, f32 ny, f32 nz, f32 originDist, Vec3f* p) {
  * Checks if the point defined by (`z`,`x`) is within distance of the triangle defined from `v0`,`v1`, and `v2`
  */
 s32 Math3D_TriChkPointParaYImpl(Vec3f* v0, Vec3f* v1, Vec3f* v2, f32 z, f32 x, f32 detMax, f32 chkDist, f32 ny) {
-    f32 detv0v1;
-    f32 detv1v2;
-    f32 detv2v0;
-    f32 distToEdgeSq;
-    f32 chkDistSq;
-
-    // first check if the point is within range of the triangle.
-    if (!Math3D_CirSquareVsTriSquare(v0->z, v0->x, v1->z, v1->x, v2->z, v2->x, z, x, chkDist)) {
-        return false;
-    }
-
-    // check if the point is within `chkDist` units of any vertex of the triangle.
-    chkDistSq = SQ(chkDist);
-    if (((SQ(v0->z - z) + SQ(v0->x - x)) < chkDistSq) || ((SQ(v1->z - z) + SQ(v1->x - x)) < chkDistSq) ||
-        ((SQ(v2->z - z) + SQ(v2->x - x)) < chkDistSq)) {
-
-        return true;
-    }
-
-    // Calculate the determinant of each face of the triangle to the point.
-    // If all the of determinants are within abs(`detMax`), return true.
-    detv0v1 = ((v0->z - z) * (v1->x - x)) - ((v0->x - x) * (v1->z - z));
-    detv1v2 = ((v1->z - z) * (v2->x - x)) - ((v1->x - x) * (v2->z - z));
-    detv2v0 = ((v2->z - z) * (v0->x - x)) - ((v2->x - x) * (v0->z - z));
-
-    if (((detMax >= detv0v1) && (detMax >= detv1v2) && (detMax >= detv2v0)) ||
-        ((-detMax <= detv0v1) && (-detMax <= detv1v2) && (-detMax <= detv2v0))) {
-        return true;
-    }
-
-    if (fabsf(ny) > 0.5f) {
-        // Do a check on each edge of the triangle, if the point is within `chkDist` units return true.
-        if (Math3D_PointDistSqToLine2D(z, x, v0->z, v0->x, v1->z, v1->x, &distToEdgeSq) && (distToEdgeSq < chkDistSq)) {
-            return true;
-        }
-
-        if (Math3D_PointDistSqToLine2D(z, x, v1->z, v1->x, v2->z, v2->x, &distToEdgeSq) && (distToEdgeSq < chkDistSq)) {
-            return true;
-        }
-
-        if (Math3D_PointDistSqToLine2D(z, x, v2->z, v2->x, v0->z, v0->x, &distToEdgeSq) && (distToEdgeSq < chkDistSq)) {
-            return true;
-        }
-    }
-    return false;
+    // fish-oot: the same test, cheaper (fishmod_tri.h): the determinants before the corner distances, an edge's
+    // distance only when the point is beside it; the same answers
+    return Fishmod_TriChkPointParaY(v0, v1, v2, z, x, detMax, chkDist, ny, false);
 }
 
 s32 Math3D_TriChkPointParaYDeterminate(Vec3f* v0, Vec3f* v1, Vec3f* v2, f32 z, f32 x, f32 detMax, f32 ny) {

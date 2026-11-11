@@ -1,4 +1,5 @@
 #include "fishmod.h"
+#include "fishmod_tri.h"
 #include "ultra64/libc.h"
 #include "libu64/debug.h"
 #include "array_count.h"
@@ -114,6 +115,32 @@ static void FloorCache_Store(FloorCacheEntry* e, Vec3f* pos, u16 xpFlags, u32 do
     e->gen = sFloorCacheGen;
     e->result = result;
     e->poly = poly;
+}
+
+/*
+ * fishmod: a scene poly's height under (x, z) if the point is within chkDist of it seen from above, for the floor
+ * (detMax 0) and ceiling (detMax 300, chkDist 1) searches, which have already tested its box: what
+ * CollisionPoly_CheckYIntersect and CollisionPoly_CheckYIntersectApprox2 compute (the same vertices, normal and
+ * expressions), with the point test inlined and its box test skipped (fishmod_tri.h). The same answers.
+ */
+static s32 StaticPoly_CheckYIntersect(CollisionContext* colCtx, s32 polyId, f32 x, f32 z, f32* yIntersect, f32 detMax,
+                                      f32 chkDist) {
+    CollisionPoly* poly = &colCtx->colHeader->polyList[polyId];
+    Vec3f verts[3];
+    f32 nx;
+    f32 ny;
+    f32 nz;
+
+    CollisionPoly_GetVertices(poly, colCtx->colHeader->vtxList, verts);
+    CollisionPoly_GetNormalF(poly, &nx, &ny, &nz);
+    if (IS_ZERO(ny)) {
+        return false;
+    }
+    if (Fishmod_TriChkPointParaY(&verts[0], &verts[1], &verts[2], z, x, detMax, chkDist, ny, true)) {
+        *yIntersect = (f32)((((-nx * x) - (nz * z)) - (f32)poly->dist) / ny);
+        return true;
+    }
+    return false;
 }
 
 // bccFlags
@@ -692,8 +719,7 @@ f32 BgCheck_RaycastDownStaticList(CollisionContext* colCtx, u16 xpFlags, SSList*
                                           ((sStaticPolyBox[polyId].minX - chkDist) <= pos->x) &&
                                           ((sStaticPolyBox[polyId].maxX + chkDist) >= pos->x))) {
             // (missed: on to the next)
-        } else if (CollisionPoly_CheckYIntersect(&colCtx->colHeader->polyList[polyId], colCtx->colHeader->vtxList,
-                                                 pos->x, pos->z, &yIntersect, chkDist) == true) {
+        } else if (StaticPoly_CheckYIntersect(colCtx, polyId, pos->x, pos->z, &yIntersect, 0.0f, chkDist)) {
             // if poly is closer to pos without going over
             if (yIntersect < pos->y && result < yIntersect) {
                 result = yIntersect;
@@ -1053,7 +1079,7 @@ s32 BgCheck_CheckStaticCeiling(StaticLookup* lookup, u16 xpFlags, CollisionConte
                                           ((sStaticPolyBox[curPolyId].minX - 1.0f) <= pos->x) &&
                                           ((sStaticPolyBox[curPolyId].maxX + 1.0f) >= pos->x))) {
             // (missed: on to the next)
-        } else if (CollisionPoly_CheckYIntersectApprox2(curPoly, vtxList, pos->x, pos->z, &ceilingY)) {
+        } else if (StaticPoly_CheckYIntersect(colCtx, curPolyId, pos->x, pos->z, &ceilingY, 300.0f, 1.0f)) {
             intersectDist = ceilingY - *outY;
             ny = COLPOLY_GET_NORMAL(curPoly->normal.y);
 
