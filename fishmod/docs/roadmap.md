@@ -300,6 +300,11 @@ planes, triangle snakes, voxel or distance-field navigation, full boids for big 
 - **Caustics on underwater rocks:** the light patterns a moving surface throws on the rocks below it. Has to keep to
   the RDP's budget (Lake Hylia is RDP-bound): for example a scrolling caustic texture on the underwater rock
   materials only, rather than an extra full-screen pass.
+- **The lake bed's own caustics (vanilla):** one display list (about 100 large triangles across the whole lake) blends
+  a scrolling 32x32 caustic texture with the bed's texture (`TEXEL1, TEXEL0, ENV_ALPHA`, then x shade). Removing or
+  shrinking them saves next to nothing: the bed draws in two-cycle mode for fog anyway (2 RDP cycles a pixel either
+  way, the second tile's texel fetched in the second cycle regardless); only one 2 KB texture load a frame goes. If
+  they look wrong in murky water, fading them (the scene's env alpha toward 255) is free either way: a look choice.
 
 ### Quality-of-life ideas (later; from another mod's list)
 - Center the "Navi" text in the C-Up button properly.
