@@ -55,3 +55,16 @@ on IDO, so this is the first console measurement of audio on a modern compiler. 
 frames4 (GCC for the game) with the audio driver alone on clang (`--clang-audio`; IDO in frames4). The audio check
 (`fishmod/scripts/audlog.inc.c`) proved clang's audio makes exactly the same sound as IDO's: the same samples in all
 8,130 output buffers compared over the route. Against frames4, this run says what the compiler alone saves in audio.
+
+## frames4-gcc: the whole game's C on GCC
+frames4 with the audio driver and libultra's C (os, io, gu) on GCC too (`--gcc-all`; IDO in frames4): every C file
+of the game on GCC but boot and libc. Audio without -ffast-math, libultra without builtins. The audio check: the same
+samples as IDO's audio in all 8,130 buffers compared. ares, the same 4,759 frames as the others (CPU only):
+
+| ms a frame | frames4 | audio on clang | whole game clang | clang + PGO | whole game GCC |
+|---|---|---|---|---|---|
+| frame | 64.7 | 61.3 | 67.8 | 61.8 | 56.4 |
+| CPU update | 33.6 | 31.9 | 35.8 | 31.6 | 28.6 |
+| CPU draw | 28.3 | 26.5 | 29.2 | 27.4 | 24.3 |
+| fps | 15.5 | 16.3 | 14.8 | 16.2 | 17.7 |
+| audio's share of the CPU | 32.2% | 31.3% | 30.9% | 29.2% | 27.5% |

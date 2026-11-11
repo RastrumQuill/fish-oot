@@ -909,6 +909,37 @@ $(BUILD_DIR)/src/code/fishmod.o $(BUILD_DIR)/src/code/fishmod_%.o: CC := tools/f
 $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/%.o: CC := tools/fishmod_clang_cc.sh
 $(SEGMENTS_DIR)/ovl_En_Fishmod.reloc.o: POSTPROCESS_OBJ := $(PYTHON) tools/reloc_elf_pairing.py
 endif
+# fish-oot: GCC_AUDIO=1, GCC_LIBULTRA=1: the audio driver, and libultra's C (os, io, gu), on GCC too (IDO otherwise), so the
+# whole game's C is GCC's. No -ffast-math here: audio's floats stay as IDO computes them (the audlog script checks)
+GCC_PLAIN_OPT = -$(GCC_OPT) -fno-strict-aliasing
+# (recursive, so each file's own defines, MML_VERSION and the like, still reach it)
+GCC_PLAIN_CFLAGS = $(CPP_DEFINES) -DCOMPILER_GCC $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 \
+  -mabi=32 -mno-abicalls -mdivide-breaks -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
+  -fno-builtin-sinf -fno-builtin-cosf -fexec-charset=euc-jp -w
+ifeq ($(GCC_AUDIO),1)
+$(BUILD_DIR)/src/audio/%.o: CC := tools/fishmod_gcc_cc.sh
+$(BUILD_DIR)/src/audio/%.o: CC_CHECK := @:
+$(BUILD_DIR)/src/audio/%.o: PREPROCESS :=
+$(BUILD_DIR)/src/audio/%.o: CFLAGS = $(GCC_PLAIN_CFLAGS)
+$(BUILD_DIR)/src/audio/%.o: MIPS_VERSION := -mips3
+$(BUILD_DIR)/src/audio/%.o: OPTFLAGS := $(GCC_PLAIN_OPT)
+ifeq ($(FISHMOD_DEBUG),1)
+$(BUILD_DIR)/src/audio/%.o: OPTFLAGS += -g
+endif
+endif
+ifeq ($(GCC_LIBULTRA),1)
+GCC_LIBULTRA_OBJS := $(BUILD_DIR)/src/libultra/os/%.o $(BUILD_DIR)/src/libultra/io/%.o $(BUILD_DIR)/src/libultra/gu/%.o
+$(GCC_LIBULTRA_OBJS): CC := tools/fishmod_gcc_cc.sh
+$(GCC_LIBULTRA_OBJS): CC_CHECK := @:
+$(GCC_LIBULTRA_OBJS): PREPROCESS :=
+$(GCC_LIBULTRA_OBJS): CFLAGS = $(GCC_PLAIN_CFLAGS) -fno-builtin
+# (-fno-builtin: GCC would turn libultra's own byte compares into calls to memcmp, which the game doesn't have)
+$(GCC_LIBULTRA_OBJS): MIPS_VERSION := -mips3
+$(GCC_LIBULTRA_OBJS): OPTFLAGS := $(GCC_PLAIN_OPT)
+ifeq ($(FISHMOD_DEBUG),1)
+$(GCC_LIBULTRA_OBJS): OPTFLAGS += -g
+endif
+endif
 # fish-oot: CLANG_AUDIO=1: the audio driver alone on clang (IDO otherwise), to measure or check it apart from the rest
 # (fishmod/scripts/audlog.inc.c proves it sounds the same); CLANG_GAME=1 below includes it
 ifeq ($(CLANG_AUDIO),1)

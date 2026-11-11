@@ -6,7 +6,9 @@ skip=0
 for a in "$@"; do
     if [ "$skip" = 1 ]; then skip=0; continue; fi
     case "$a" in
-        -trapuv|-signed|-use_readwrite_const|-fullwarn|-verbose|-non_shared|-Xcpluscomm|-Wab,*|-o32) ;;
+        # (IDO's -signed: plain char is signed in that file; GCC's default here, like IDO's, is unsigned)
+        -signed) args+=(-fsigned-char) ;;
+        -trapuv|-use_readwrite_const|-fullwarn|-verbose|-non_shared|-Xcpluscomm|-Wab,*|-o32) ;;
         -woff) skip=1 ;;
         *) args+=("$a") ;;
     esac
