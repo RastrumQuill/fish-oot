@@ -46,20 +46,24 @@ static void Fishmod_SinCosBinang(s16 angle, f32* sinOut, f32* cosOut) {
     }
 }
 
+/* sin of a binang: only the one polynomial its quarter needs (the same values as Fishmod_SinCosBinang) */
 static f32 Fishmod_SinBinang(s16 angle) {
-    f32 s;
-    f32 c;
+    s32 quarter = (((s32)angle + 0x2000) >> 14) & 3;
+    f32 t = (s16)(angle - (quarter << 14)) * FISHMOD_TRIG_BINANG_TO_RAD;
+    f32 t2 = t * t;
+    f32 v;
 
-    Fishmod_SinCosBinang(angle, &s, &c);
-    return s;
+    if (quarter & 1) {
+        v = 1.0f - 0.5f * t2 + t2 * t2 * (4.166664568298827e-2f + t2 * (-1.388731625493765e-3f + t2 * 2.443315711809948e-5f));
+    } else {
+        v = t + t * t2 * (-1.6666654611e-1f + t2 * (8.3321608736e-3f + t2 * -1.9515295891e-4f));
+    }
+    return (quarter & 2) ? (0.0f - v) : v;
 }
 
+/* cos of a binang: a quarter turn on from sin */
 static f32 Fishmod_CosBinang(s16 angle) {
-    f32 s;
-    f32 c;
-
-    Fishmod_SinCosBinang(angle, &s, &c);
-    return c;
+    return Fishmod_SinBinang((s16)(angle + 0x4000));
 }
 
 /* atan(t) for t in [0, 1], radians */
