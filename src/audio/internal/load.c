@@ -128,6 +128,10 @@ void AudioLoad_DecreaseSampleDmaTtls(void) {
 static u32 sSampleDmaDevAddr[0x100];
 
 /** The first of buffers [from, to) holding devAddr..+size (they share one size), or -1. */
+#if FISHMOD_DEBUG
+extern s32 gFishmodAudioLockstep; /* fish-oot: the audio check (code/audio_thread_manager.c) */
+#endif
+
 static s32 AudioLoad_FindSampleDma(u32 devAddr, u32 size, u32 from, u32 to) {
     u32 lim;
     u32 i;
@@ -1880,7 +1884,13 @@ void AudioLoad_ProcessAsyncLoad(AudioAsyncLoad* asyncLoad, s32 resetStatus) {
         osRecvMesg(&asyncLoad->msgQueue, NULL, OS_MESG_BLOCK);
         asyncLoad->status = 0;
         return;
-    } else if (osRecvMesg(&asyncLoad->msgQueue, NULL, OS_MESG_NOBLOCK) == -1) {
+    } else if (osRecvMesg(&asyncLoad->msgQueue, NULL,
+#if FISHMOD_DEBUG
+                          /* fish-oot: the audio check waits for the chunk, so a load ends on the same update in
+                             every build (a chunk is always in flight here) */
+                          gFishmodAudioLockstep ? OS_MESG_BLOCK :
+#endif
+                                                OS_MESG_NOBLOCK) == -1) {
         // If the previous DMA step isn't done, return.
         return;
     }

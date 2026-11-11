@@ -539,6 +539,14 @@ void Graph_ThreadEntry(UNUSED void* arg) {
 
         while (GameState_IsRunning(gameState)) {
             Graph_Update(&gfxCtx, gameState);
+#if FISHMOD_DEBUG
+            {
+                void AudioMgr_LockstepTick(u32 gameFrame);
+
+                // (fish-oot: the audio check's lockstep; nothing otherwise)
+                AudioMgr_LockstepTick(((u32)(ovl - gGameStateOverlayTable) << 24) | (gameState->frames & 0xFFFFFF));
+            }
+#endif
         }
 
         nextOvl = Graph_GetNextGameState(gameState);

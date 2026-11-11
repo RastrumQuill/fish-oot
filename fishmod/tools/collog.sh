@@ -3,23 +3,30 @@
 # frame: the hash of every collision question and answer, and the calls of each kind) from the emulator's memory
 # through ares' GDB server. Compare two with fishmod/tools/collog_compare.py.
 #
-# Usage: fishmod/tools/collog.sh ROM ELF SECONDS OUT.bin
+# Usage: fishmod/tools/collog.sh [--audio] ROM ELF SECONDS OUT.bin
+#   --audio: the audio check's log instead (fishmod/scripts/audlog.inc.c; compare with audlog_compare.py)
 # Needs: ares built by fishmod/tools/build_ares.sh (ARES=...), gdb-multiarch, an X display (Xvfb) in DISPLAY.
 set -euo pipefail
+REC=32 PTRSYM=gFishmodColLog CNTSYM=gFishmodColLogFrames
+if [ "${1:-}" = "--audio" ]; then
+    REC=16 PTRSYM=gFishmodAudLog CNTSYM=gFishmodAudLogCount
+    shift
+fi
 ROM=$1 ELF=$2 SECS=$3 OUT=$4
 ARES=${ARES:-/opt/src/ares/build/rundir/bin/ares}
 HERE="$(cd "$(dirname "$0")" && pwd)"
 sym() { mips-linux-gnu-nm "$ELF" | awk -v n="$1" '$3==n{print $1}'; }
-PTR=$(sym gFishmodColLog) CNT=$(sym gFishmodColLogFrames)
-[ -n "$PTR" ] && [ -n "$CNT" ] || { echo "no collision log in $ELF (build with --script collog)"; exit 1; }
+PTR=$(sym $PTRSYM) CNT=$(sym $CNTSYM)
+[ -n "$PTR" ] && [ -n "$CNT" ] || { echo "no $PTRSYM in $ELF (build with --script collog or audlog)"; exit 1; }
+xdpyinfo >/dev/null 2>&1 || { echo "no X display in DISPLAY ($DISPLAY): start Xvfb"; exit 1; }
 timeout $((SECS + 60)) "$ARES" --settings-file "$HERE/ares_debug.bml" --system "Nintendo 64" --no-file-prompt "$ROM" \
     >/dev/null 2>&1 &
 APID=$!
 sleep "$SECS"
 gdb-multiarch -q -batch -ex "set architecture mips:4000" -ex "set endian big" -ex "target remote 127.0.0.1:9123" \
     -ex "set \$p = *(unsigned int*)0x$PTR" -ex "set \$n = *(unsigned int*)0x$CNT" \
-    -ex "printf \"frames %u\\n\", \$n" \
-    -ex "dump binary memory $OUT \$p \$p + \$n * 32" 2>&1 | grep -E "^frames|rror" || true
+    -ex "printf \"records %u\\n\", \$n" \
+    -ex "dump binary memory $OUT \$p \$p + \$n * $REC" 2>&1 | grep -E "^records|rror" || true
 kill $APID 2>/dev/null || true
 wait $APID 2>/dev/null || true
 ls -l "$OUT"

@@ -892,6 +892,15 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #ifdef FISHMOD_SCRIPT
     StateHash_Update(play);
 #endif
+#ifdef FISHMOD_AUDLOG_DELAY
+    // the audio check's own test: this build runs slower (about 5 ms of busy work a frame) and must hear the same
+    {
+        volatile u32 spin;
+
+        for (spin = 0; spin < 60000; spin++) {
+        }
+    }
+#endif
 #ifdef FISHMOD_COLLOG
     // the collision log (z_bgcheck.c): each frame's questions and answers as a hash, for comparing two builds
     {
@@ -1334,6 +1343,11 @@ static void Watchdog_Start(void) {
  */
 struct Actor* gFishmodDrawingActor;
 s32 gFishmodBenchDone = false;
+#ifdef FISHMOD_AUDLOG
+s32 gFishmodAudioLockstep = true; // the audio check: from boot (audio_thread_manager.c)
+#else
+s32 gFishmodAudioLockstep = false;
+#endif
 #if defined(FISHMOD_HWBENCH) || defined(FISHMOD_PCPROF)
 s32 gFishmodTimingAsShipped = true;
 #else

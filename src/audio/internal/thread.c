@@ -13,12 +13,40 @@
 #define EXTRA_BUFFERED_AI_SAMPLES_TARGET 0x80
 
 AudioTask* AudioThread_UpdateImpl(void);
+#if FISHMOD_DEBUG
+extern s32 gFishmodAudioLockstep; /* fish-oot: the audio check (code/audio_thread_manager.c) */
+extern u8* gFishmodAudNoise;
+void Fishmod_AudLog_Buffer(s16* buf, s32 samples);
+#endif
 void AudioThread_SetFadeInTimer(s32 seqPlayerIndex, s32 fadeTimer);
 void AudioThread_SetFadeOutTimer(s32 seqPlayerIndex, s32 fadeTimer);
 void AudioThread_ProcessCmds(u32);
 void AudioThread_ProcessSeqPlayerCmd(SequencePlayer* seqPlayer, AudioCmd* cmd);
 void AudioThread_ProcessChannelCmd(SequenceChannel* channel, AudioCmd* cmd);
 s32 func_800E66C0(s32 flags);
+
+#if FISHMOD_DEBUG
+/*
+ * fish-oot: the audio check (lockstep): before the last update's RSP task is sent, its sample DMAs are waited for (the
+ * game's own wait comes after the send: in play the DMAs are long done by the next refresh; updates back to back can
+ * outrun them). The done messages go back on the queue, so the update's own wait finds them as before.
+ */
+void AudioThread_LockstepWaitDmas(void) {
+    OSMesg msg[64];
+    s32 n = gAudioCtx.curAudioFrameDmaCount;
+    s32 i;
+
+    if (n > 64) {
+        n = 64;
+    }
+    for (i = 0; i < n; i++) {
+        osRecvMesg(&gAudioCtx.curAudioFrameDmaQueue, &msg[i], OS_MESG_BLOCK);
+    }
+    for (i = 0; i < n; i++) {
+        osSendMesg(&gAudioCtx.curAudioFrameDmaQueue, msg[i], OS_MESG_NOBLOCK);
+    }
+}
+#endif
 
 // AudioMgr_Retrace
 AudioTask* AudioThread_Update(void) {
@@ -72,9 +100,20 @@ AudioTask* AudioThread_UpdateImpl(void) {
     gAudioCtx.curAiBufIndex %= 3;
     index = (gAudioCtx.curAiBufIndex - 2 + 3) % 3;
     samplesRemainingInAi = osAiGetLength() / 4;
+#if FISHMOD_DEBUG
+    if (gFishmodAudioLockstep) {
+        /* fish-oot: the audio check: as many samples every update, not what the hardware still holds */
+        samplesRemainingInAi = EXTRA_BUFFERED_AI_SAMPLES_TARGET;
+    }
+#endif
 
     if (gAudioCtx.resetTimer < 16) {
         if (gAudioCtx.aiBufLengths[index] != 0) {
+#if FISHMOD_DEBUG
+            if (gFishmodAudioLockstep) {
+                Fishmod_AudLog_Buffer(gAudioCtx.aiBuffers[index], gAudioCtx.aiBufLengths[index]);
+            }
+#endif
             osAiSetNextBuffer(gAudioCtx.aiBuffers[index], gAudioCtx.aiBufLengths[index] * 4);
             if (gAudioCtx.aiBuffers[index]) {}
             if (gAudioCtx.aiBufLengths[index]) {}
@@ -164,13 +203,24 @@ AudioTask* AudioThread_UpdateImpl(void) {
         AudioSynth_Update(gAudioCtx.curAbiCmdBuf, &abiCmdCnt, curAiBuffer, gAudioCtx.aiBufLengths[index]);
 
     // Update audioRandom to the next random number
-    gAudioCtx.audioRandom = (gAudioCtx.audioRandom + gAudioCtx.totalTaskCount) * osGetCount();
-    gAudioCtx.audioRandom = gAudioCtx.audioRandom + gAudioCtx.aiBuffers[index][gAudioCtx.totalTaskCount & 0xFF];
+#if FISHMOD_DEBUG
+    if (gFishmodAudioLockstep) {
+        /* fish-oot: the audio check: the cycle count and the code's bytes vary between builds; fixed stand-ins */
+        gAudioCtx.audioRandom =
+            (gAudioCtx.audioRandom + gAudioCtx.totalTaskCount) * (gAudioCtx.totalTaskCount * 0x9E3779B1 + 1);
+        gAudioCtx.audioRandom = gAudioCtx.audioRandom + gAudioCtx.aiBuffers[index][gAudioCtx.totalTaskCount & 0xFF];
+        gWaveSamples[8] = (s16*)(gFishmodAudNoise + (gAudioCtx.audioRandom & 0xFFF0));
+    } else
+#endif
+    {
+        gAudioCtx.audioRandom = (gAudioCtx.audioRandom + gAudioCtx.totalTaskCount) * osGetCount();
+        gAudioCtx.audioRandom = gAudioCtx.audioRandom + gAudioCtx.aiBuffers[index][gAudioCtx.totalTaskCount & 0xFF];
 
-    // gWaveSamples[8] interprets compiled assembly code as s16 samples as a way to generate sound with noise.
-    // Start with the address of AudioThread_Update, and offset it by a random number between 0 - 0xFFF0
-    // Use the resulting address as the starting address to interpret an array of samples i.e. `s16 samples[]`
-    gWaveSamples[8] = (s16*)((u8*)AudioThread_Update + (gAudioCtx.audioRandom & 0xFFF0));
+        // gWaveSamples[8] interprets compiled assembly code as s16 samples as a way to generate sound with noise.
+        // Start with the address of AudioThread_Update, and offset it by a random number between 0 - 0xFFF0
+        // Use the resulting address as the starting address to interpret an array of samples i.e. `s16 samples[]`
+        gWaveSamples[8] = (s16*)((u8*)AudioThread_Update + (gAudioCtx.audioRandom & 0xFFF0));
+    }
 
     index = gAudioCtx.rspTaskIndex;
     gAudioCtx.curTask->msgQueue = NULL;
@@ -945,6 +995,11 @@ s32 func_800E66C0(s32 flags) {
 u32 AudioThread_NextRandom(void) {
     static u32 sAudioRandom = 0x12345678;
 
+#if FISHMOD_DEBUG
+    if (gFishmodAudioLockstep) { /* fish-oot: the audio check: no cycle count (it varies between builds) */
+        sAudioRandom = (((sAudioRandom * 0x9E3779B1) + 0x1234567) * (sAudioRandom + gAudioCtx.totalTaskCount));
+    } else
+#endif
     sAudioRandom = ((osGetCount() + 0x1234567) * (sAudioRandom + gAudioCtx.totalTaskCount));
     sAudioRandom += gAudioCtx.audioRandom;
 

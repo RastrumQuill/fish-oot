@@ -13,6 +13,78 @@
 #include "speed_meter.h"
 #include "translation.h"
 #include "dma.h"
+#include "libc64/malloc.h"
+
+#if FISHMOD_DEBUG
+/*
+ * fish-oot: the audio check (the audlog script). The audio thread normally runs on the TV's refresh, unaligned with the
+ * game's frames, so two builds of different speed hear the same game differently. In lockstep the game hands it
+ * exactly three updates a frame (AudioMgr_LockstepTick, after each frame) and waits for them; with the thread's other
+ * timing dependencies fixed (audio/internal/thread.c, load.c), the audio it makes depends only on the game. Each output
+ * buffer's samples are hashed (Fishmod_AudLog_Buffer): two builds whose audio code gives the same sound give the same
+ * hashes, buffer by buffer. fishmod/tools/collog.sh saves the log, audlog_compare.py compares two.
+ */
+extern s32 gFishmodAudioLockstep; // (fishmod_debug.c: set by the audlog script)
+u32* gFishmodAudLog;               // [buffer][4]: hash of its samples, its length, the update, the game's state and frame
+u32 gFishmodAudLogCount;
+u32 gFishmodAudLogMax;
+u8* gFishmodAudNoise; // a fixed 64 KB of noise for gWaveSamples[8] (which the game points into its own code)
+static OSMesgQueue sAudTickQueue;
+static OSMesg sAudTickMsg[4];
+static OSMesgQueue sAudDoneQueue;
+static OSMesg sAudDoneMsg[4];
+static u32 sAudUpdates;
+static u32 sAudGameFrame; // the game state (its overlay's index) << 24 | its frame, as the update was handed over
+
+void Fishmod_AudLog_Buffer(s16* buf, s32 samples) {
+    u32 h = 2166136261u;
+    u32* w = (u32*)buf;
+    s32 i;
+
+    if ((gFishmodAudLog == NULL) || (gFishmodAudLogCount >= gFishmodAudLogMax)) {
+        return;
+    }
+    for (i = 0; i < samples; i++) { // (a stereo sample is one word)
+        h = (h ^ w[i]) * 16777619u;
+    }
+    gFishmodAudLog[gFishmodAudLogCount * 4 + 0] = h;
+    gFishmodAudLog[gFishmodAudLogCount * 4 + 1] = samples;
+    gFishmodAudLog[gFishmodAudLogCount * 4 + 2] = sAudUpdates;
+    gFishmodAudLog[gFishmodAudLogCount * 4 + 3] = sAudGameFrame;
+    gFishmodAudLogCount++;
+}
+
+/** After every game frame (graph.c): three audio updates, waited for. gameFrame: the state and frame it was. */
+void AudioMgr_LockstepTick(u32 gameFrame) {
+    s32 i;
+
+    if (!gFishmodAudioLockstep) {
+        return;
+    }
+    if (gFishmodAudLog == NULL) {
+        // (the scripts skip the title screen, which is what turns the RSP's audio on: CIC6105_EnableAudio)
+        R_AUDIOMGR_ACTIVITY_LEVEL = AUDIOMGR_ACTIVITY_LEVEL_ALL;
+        gFishmodAudLogMax = 24000; // (about a lap of the play route at three updates a frame)
+        gFishmodAudLog = SYSTEM_ARENA_MALLOC(gFishmodAudLogMax * 4 * sizeof(u32), "../audio_thread_manager.c", __LINE__);
+        gFishmodAudNoise = SYSTEM_ARENA_MALLOC(0x10000 + 0x100, "../audio_thread_manager.c", __LINE__);
+        if (gFishmodAudNoise != NULL) {
+            u32 x = 0x2545F491;
+
+            for (i = 0; i < 0x10000 + 0x100; i++) {
+                x ^= x << 13;
+                x ^= x >> 17;
+                x ^= x << 5;
+                gFishmodAudNoise[i] = x;
+            }
+        }
+    }
+    sAudGameFrame = gameFrame;
+    for (i = 0; i < 3; i++) {
+        osSendMesg(&sAudTickQueue, NULL, OS_MESG_BLOCK);
+        osRecvMesg(&sAudDoneQueue, NULL, OS_MESG_BLOCK);
+    }
+}
+#endif
 
 void AudioMgr_NotifyTaskDone(AudioMgr* audioMgr) {
     AudioTask* task = audioMgr->rspTask;
@@ -81,6 +153,38 @@ void AudioMgr_HandleRetrace(AudioMgr* audioMgr) {
     audioMgr->rspTask = rspTask;
 }
 
+#if FISHMOD_DEBUG
+/*
+ * fish-oot: the audio check's update: AudioMgr_HandleRetrace with nothing running at once. The last update's samples
+ * are waited for (AudioThread_LockstepWaitDmas), its RSP task is sent and waited for, and only then is the next update
+ * made (in play the next update overlaps the task, which is long done by the next refresh; back to back, the CPU
+ * could change a note's buffers while the RSP still reads them).
+ */
+static void AudioMgr_HandleRetraceLockstep(AudioMgr* audioMgr) {
+    static s32 sTokenTaken;
+    void AudioThread_LockstepWaitDmas(void);
+
+    if (!sTokenTaken) { // (the queue starts with a message, for the first wait: here every wait is for its own task)
+        osRecvMesg(&audioMgr->taskDoneQueue, NULL, OS_MESG_NOBLOCK);
+        sTokenTaken = true;
+    }
+    AudioThread_LockstepWaitDmas();
+    if (audioMgr->rspTask != NULL) {
+        audioMgr->audioTask.next = NULL;
+        audioMgr->audioTask.flags = OS_SC_NEEDS_RSP;
+        audioMgr->audioTask.framebuffer = NULL;
+        audioMgr->audioTask.list = audioMgr->rspTask->task;
+        audioMgr->audioTask.msgQueue = &audioMgr->taskDoneQueue;
+        audioMgr->audioTask.msg = NULL;
+        osSendMesg(&audioMgr->sched->cmdQueue, (OSMesg)&audioMgr->audioTask, OS_MESG_BLOCK);
+        Sched_Notify(audioMgr->sched);
+        osRecvMesg(&audioMgr->taskDoneQueue, NULL, OS_MESG_BLOCK);
+        AudioMgr_NotifyTaskDone(audioMgr);
+    }
+    audioMgr->rspTask = AudioThread_Update();
+}
+#endif
+
 /**
  * Handle Pre-NMI event.
  * Implemented by the audio driver.
@@ -112,6 +216,15 @@ void AudioMgr_ThreadEntry(void* arg) {
 
     // Spin waiting for events
     for (;;) {
+#if FISHMOD_DEBUG
+        if (gFishmodAudioLockstep) { // (the audio check: an update when the game hands one over)
+            osRecvMesg(&sAudTickQueue, NULL, OS_MESG_BLOCK);
+            sAudUpdates++;
+            AudioMgr_HandleRetraceLockstep(audioMgr);
+            osSendMesg(&sAudDoneQueue, NULL, OS_MESG_BLOCK);
+            continue;
+        }
+#endif
         osRecvMesg(&audioMgr->interruptQueue, (OSMesg*)&msg, OS_MESG_BLOCK);
 
         switch (*msg) {
@@ -167,6 +280,10 @@ void AudioMgr_Init(AudioMgr* audioMgr, void* stack, OSPri pri, OSId id, Schedule
     osCreateMesgQueue(&audioMgr->taskDoneQueue, &audioMgr->taskDoneMsg, 1);
     osCreateMesgQueue(&audioMgr->interruptQueue, audioMgr->interruptMsgBuf, ARRAY_COUNT(audioMgr->interruptMsgBuf));
     osCreateMesgQueue(&audioMgr->initQueue, &audioMgr->initMsg, 1);
+#if FISHMOD_DEBUG
+    osCreateMesgQueue(&sAudTickQueue, sAudTickMsg, ARRAY_COUNT(sAudTickMsg));
+    osCreateMesgQueue(&sAudDoneQueue, sAudDoneMsg, ARRAY_COUNT(sAudDoneMsg));
+#endif
 
     // Send a message to the task done queue so it is initially full
     osSendMesg(&audioMgr->taskDoneQueue, NULL, OS_MESG_BLOCK);
