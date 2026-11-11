@@ -7,6 +7,7 @@
 #include "console_logo_state.h"
 #include "controller.h"
 #include "gfx.h"
+#include "thga.h"
 #include "fault.h"
 #include "file_select_state.h"
 #include "line_numbers.h"
@@ -416,6 +417,44 @@ void Graph_Update(GraphicsContext* gfxCtx, GameState* gameState) {
 
         if (R_UCODE_DISAS_TOGGLE < 0) {
             R_UCODE_DISAS_TOGGLE = 0;
+        }
+    }
+#endif
+
+#if FISHMOD_DEBUG
+    // fishmod: the graphics log (beside the collision log): a hash of everything this frame hands the RSP (each
+    // display list's commands and everything allocated for them: matrices, lights, vertices), one a frame, to prove a
+    // change draws exactly the same (fishmod/tools/collog.sh --gfx, collog_compare.py --gfx)
+    {
+        extern u32* gFishmodGfxLog;
+        extern u32 gFishmodGfxLogCount;
+        TwoHeadGfxArena* arenas[4];
+        u32 h = 2166136261u;
+        s32 k;
+
+        arenas[0] = &gfxCtx->work;
+        arenas[1] = &gfxCtx->polyOpa;
+        arenas[2] = &gfxCtx->polyXlu;
+        arenas[3] = &gfxCtx->overlay;
+        for (k = 0; (gFishmodGfxLog != NULL) && (k < 4); k++) {
+            TwoHeadGfxArena* a = arenas[k];
+            u32* w;
+            u32* end;
+
+            // the commands (F3DEX3's pipe sync, 0xE7, writes only its first word: the second is left out)
+            for (w = (u32*)a->start, end = (u32*)a->p; w < end; w += 2) {
+                h = (h ^ w[0]) * 16777619u;
+                if ((w[0] >> 24) != 0xE7) {
+                    h = (h ^ w[1]) * 16777619u;
+                }
+            }
+            // what was allocated for them, from the arena's other end
+            for (w = (u32*)a->d, end = (u32*)((u8*)a->start + a->size); w < end; w++) {
+                h = (h ^ *w) * 16777619u;
+            }
+        }
+        if ((gFishmodGfxLog != NULL) && (gFishmodGfxLogCount < 16000)) {
+            gFishmodGfxLog[gFishmodGfxLogCount++] = h;
         }
     }
 #endif
