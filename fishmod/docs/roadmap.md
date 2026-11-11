@@ -262,6 +262,22 @@ shakes; failure messages that name the cause; rare fish gated by knowledge (time
 **Not now:** inline assembly, fixed-point matrices, resolution tricks, engine-wide collision rewrites, occlusion
 planes, triangle snakes, voxel or distance-field navigation, full boids for big fish, line wear as a consumable.
 
+**Game-wide build options (small gains, but anywhere; each optional and checked):**
+- **Texture packing (`--texpack`, in test):** lossless palettes and empty-sync removal. Also: textures stored as
+  colour that are really greyscale (R = G = B in every texel) to greyscale formats (I or IA, same values exactly),
+  instead of a lossless palette; less memory and TMEM, the same pixels.
+- **Collision merge:** neighbouring collision triangles in exactly the same stored plane with the same surface type
+  and flags merged, the vertices left in the middle of their edges dropped, the region re-cut into the fewest
+  triangles: the same surfaces exactly. 3,786 of the game's 87,215 scene triangles (4.3%; Jabu-Jabu 11.7%, Gerudo
+  Training Ground 11.5%, Fire Temple boss 18%, Lake Hylia 2.5%). A build step on the extracted data (the tool in the
+  repository, never the data); checked by floor and wall answers on a grid of points in every scene.
+
+**Collision (in progress):** Lake Hylia's is 1,050 triangles, light; its cost (about 21% of the CPU on the play route
+in vanilla) is the number of checks and each one's fixed work. In order, each checked by recording every collision
+question and answer in ares (FISHMOD_COLLOG) against the unchanged build: stamps instead of clearing the line test's
+table, the level's vertices converted to floats once, distant idle Tektites at a lower rate (the one deliberate
+behaviour change), answers cached for the static level, then cheaper checks (per-triangle bounds, precomputed edges).
+
 
 ### Done
 
