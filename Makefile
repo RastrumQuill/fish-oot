@@ -911,7 +911,7 @@ $(SEGMENTS_DIR)/ovl_En_Fishmod.reloc.o: POSTPROCESS_OBJ := $(PYTHON) tools/reloc
 endif
 # fish-oot: GCC_AUDIO=1, GCC_LIBULTRA=1: the audio driver, and libultra's C (os, io, gu), on GCC too (IDO otherwise), so the
 # whole game's C is GCC's. No -ffast-math here: audio's floats stay as IDO computes them (the audlog script checks)
-GCC_PLAIN_OPT = -$(GCC_OPT) -fno-strict-aliasing
+GCC_PLAIN_OPT = -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno
 # (recursive, so each file's own defines, MML_VERSION and the like, still reach it)
 GCC_PLAIN_CFLAGS = $(CPP_DEFINES) -DCOMPILER_GCC $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 \
   -mabi=32 -mno-abicalls -mdivide-breaks -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \

@@ -12,6 +12,16 @@
 
 EffectSsInfo sEffectSsInfo = { 0 }; // "EffectSS2Info"
 
+// fishmod: one past the highest slot that may be alive: the update and draw loops stop there (every slot above it is
+// free, and a free slot does nothing in either loop). Raised when a slot is filled, lowered after each update.
+static s32 sEffectSsHigh = 0;
+
+static void EffectSs_RaiseHigh(s32 index) {
+    if (index + 1 > sEffectSsHigh) {
+        sEffectSsHigh = index + 1;
+    }
+}
+
 void EffectSs_InitInfo(PlayState* play, s32 tableSize) {
     u32 i;
     EffectSs* effectSs;
@@ -32,6 +42,7 @@ void EffectSs_InitInfo(PlayState* play, s32 tableSize) {
 
     sEffectSsInfo.searchStartIndex = 0;
     sEffectSsInfo.tableSize = tableSize;
+    sEffectSsHigh = tableSize; // (until the first update has looked)
 
     for (effectSs = &sEffectSsInfo.table[0]; effectSs < &sEffectSsInfo.table[sEffectSsInfo.tableSize]; effectSs++) {
         EffectSs_Reset(effectSs);
@@ -53,6 +64,7 @@ void EffectSs_ClearAll(UNUSED PlayState* play) {
     sEffectSsInfo.table = NULL;
     sEffectSsInfo.searchStartIndex = 0;
     sEffectSsInfo.tableSize = 0;
+    sEffectSsHigh = 0;
 
     // This code doesn't actually work, since table was just set to NULL and tableSize to 0
     for (effectSs = &sEffectSsInfo.table[0]; effectSs < &sEffectSsInfo.table[sEffectSsInfo.tableSize]; effectSs++) {
@@ -172,6 +184,7 @@ void EffectSs_Insert(PlayState* play, EffectSs* effectSs) {
         if (EffectSs_FindSlot(effectSs->priority, &index) == 0) {
             sEffectSsInfo.searchStartIndex = index + 1;
             sEffectSsInfo.table[index] = *effectSs;
+            EffectSs_RaiseHigh(index);
         }
     }
 }
@@ -193,6 +206,7 @@ void EffectSs_Spawn(PlayState* play, s32 type, s32 priority, void* initParams) {
     }
 
     sEffectSsInfo.searchStartIndex = index + 1;
+    EffectSs_RaiseHigh(index);
     overlaySize = (uintptr_t)overlayEntry->vramEnd - (uintptr_t)overlayEntry->vramStart;
 
     if (overlayEntry->vramStart == NULL) {
@@ -284,7 +298,8 @@ void EffectSs_Update(PlayState* play, s32 index) {
 void EffectSs_UpdateAll(PlayState* play) {
     s32 i;
 
-    for (i = 0; i < sEffectSsInfo.tableSize; i++) {
+    // (to the highest slot that may be alive, read again each time round: an update can fill a slot)
+    for (i = 0; i < MIN(sEffectSsHigh, sEffectSsInfo.tableSize); i++) {
         if (sEffectSsInfo.table[i].life > -1) {
             sEffectSsInfo.table[i].life--;
 
@@ -296,6 +311,10 @@ void EffectSs_UpdateAll(PlayState* play) {
         if (sEffectSsInfo.table[i].life > -1) {
             EffectSs_Update(play, i);
         }
+    }
+    sEffectSsHigh = MIN(sEffectSsHigh, sEffectSsInfo.tableSize);
+    while ((sEffectSsHigh > 0) && (sEffectSsInfo.table[sEffectSsHigh - 1].life == -1)) {
+        sEffectSsHigh--;
     }
 }
 
@@ -315,7 +334,7 @@ void EffectSs_DrawAll(PlayState* play) {
     Lights_BindAll(lights, play->lightCtx.listHead, NULL);
     Lights_Draw(lights, play->state.gfxCtx);
 
-    for (i = 0; i < sEffectSsInfo.tableSize; i++) {
+    for (i = 0; i < MIN(sEffectSsHigh, sEffectSsInfo.tableSize); i++) {
         if (sEffectSsInfo.table[i].life > -1) {
             if ((sEffectSsInfo.table[i].pos.x > 32000.0f) || (sEffectSsInfo.table[i].pos.x < -32000.0f) ||
                 (sEffectSsInfo.table[i].pos.y > 32000.0f) || (sEffectSsInfo.table[i].pos.y < -32000.0f) ||

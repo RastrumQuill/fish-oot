@@ -404,30 +404,36 @@ void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
     f32 temp1;
     f32 temp2;
 
-    Fishmod_SinCosBinang(rotation->z, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
-    temp1 = cmf->xx;
-    temp2 = cmf->xy;
-    cmf->xw += temp1 * translation->x + temp2 * translation->y + cmf->xz * translation->z;
-    cmf->xx = temp1 * cos + temp2 * sin;
-    cmf->xy = temp2 * cos - temp1 * sin;
+    // the translation (as it was, before the z rotation changes the first two columns)
+    cmf->xw += cmf->xx * translation->x + cmf->xy * translation->y + cmf->xz * translation->z;
+    cmf->yw += cmf->yx * translation->x + cmf->yy * translation->y + cmf->yz * translation->z;
+    cmf->zw += cmf->zx * translation->x + cmf->zy * translation->y + cmf->zz * translation->z;
+    cmf->ww += cmf->wx * translation->x + cmf->wy * translation->y + cmf->wz * translation->z;
 
-    temp1 = cmf->yx;
-    temp2 = cmf->yy;
-    cmf->yw += temp1 * translation->x + temp2 * translation->y + cmf->yz * translation->z;
-    cmf->yx = temp1 * cos + temp2 * sin;
-    cmf->yy = temp2 * cos - temp1 * sin;
+    // fish-oot: no z rotation, nothing to turn (as the y and x rotations below already did: cos 1 and sin 0 would only
+    // add zeros)
+    if (rotation->z != 0) {
+        Fishmod_SinCosBinang(rotation->z, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)
+        temp1 = cmf->xx;
+        temp2 = cmf->xy;
+        cmf->xx = temp1 * cos + temp2 * sin;
+        cmf->xy = temp2 * cos - temp1 * sin;
 
-    temp1 = cmf->zx;
-    temp2 = cmf->zy;
-    cmf->zw += temp1 * translation->x + temp2 * translation->y + cmf->zz * translation->z;
-    cmf->zx = temp1 * cos + temp2 * sin;
-    cmf->zy = temp2 * cos - temp1 * sin;
+        temp1 = cmf->yx;
+        temp2 = cmf->yy;
+        cmf->yx = temp1 * cos + temp2 * sin;
+        cmf->yy = temp2 * cos - temp1 * sin;
 
-    temp1 = cmf->wx;
-    temp2 = cmf->wy;
-    cmf->ww += temp1 * translation->x + temp2 * translation->y + cmf->wz * translation->z;
-    cmf->wx = temp1 * cos + temp2 * sin;
-    cmf->wy = temp2 * cos - temp1 * sin;
+        temp1 = cmf->zx;
+        temp2 = cmf->zy;
+        cmf->zx = temp1 * cos + temp2 * sin;
+        cmf->zy = temp2 * cos - temp1 * sin;
+
+        temp1 = cmf->wx;
+        temp2 = cmf->wy;
+        cmf->wx = temp1 * cos + temp2 * sin;
+        cmf->wy = temp2 * cos - temp1 * sin;
+    }
 
     if (rotation->y != 0) {
         Fishmod_SinCosBinang(rotation->y, &sin, &cos); // fish-oot: both at once (fishmod_trig.h)

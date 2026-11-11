@@ -956,6 +956,8 @@ static s32 EnFishmod_SwimTowardImpl(EnFishmod* this, PlayState* play, Vec3f* tar
     s16 yaw;
     s16 pitch;
     f32 horiz;
+    f32 sinYaw;
+    f32 cosYaw;
 
     // the water here: only when it enters another cell (the floor is the cell's highest corner)
     cell = EnFishmod_WaterCell(play, pos->x, pos->z);
@@ -1012,13 +1014,16 @@ static s32 EnFishmod_SwimTowardImpl(EnFishmod* this, PlayState* play, Vec3f* tar
         Math_SmoothStepToS(&this->actor.shape.rot.x, -pitch, 4, 0x300, 0x40);
         Math_ApproachF(&this->speed, speed, 1.0f, 0.08f);
 
+        // (the heading's sin and cos once: the same values as the calls they replace, each taken once)
+        sinYaw = Math_SinS(this->actor.shape.rot.y);
+        cosYaw = Math_CosS(this->actor.shape.rot.y);
         // the way ahead, every 4th frame (staggered by fish): one point in front of the nose
         if (((this->timer + this->depthPref) & 3) == 0) {
             f32 reach = this->halfLength + 4.0f + this->speed * 6.0f;
             f32 surface;
             f32 floor;
-            f32 ax = pos->x + Math_SinS(this->actor.shape.rot.y) * reach;
-            f32 az = pos->z + Math_CosS(this->actor.shape.rot.y) * reach;
+            f32 ax = pos->x + sinYaw * reach;
+            f32 az = pos->z + cosYaw * reach;
 
             if (!EnFishmod_WaterFloor(play, ax, az, &surface, &floor, true) ||
                 ((surface - floor) < clearance * 2.0f + 2.0f)) {
@@ -1041,8 +1046,8 @@ static s32 EnFishmod_SwimTowardImpl(EnFishmod* this, PlayState* play, Vec3f* tar
             }
         }
         horiz = this->speed * Math_CosS(this->actor.shape.rot.x);
-        pos->x += Math_SinS(this->actor.shape.rot.y) * horiz;
-        pos->z += Math_CosS(this->actor.shape.rot.y) * horiz;
+        pos->x += sinYaw * horiz;
+        pos->z += cosYaw * horiz;
         pos->y -= this->speed * Math_SinS(this->actor.shape.rot.x);
     }
     pos->y = EnFishmod_ClampY(this, pos->y);

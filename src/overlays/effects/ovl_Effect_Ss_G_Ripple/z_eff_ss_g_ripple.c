@@ -73,8 +73,6 @@ void EffectSsGRipple_DrawRipple(PlayState* play2, EffectSs* this, void* segment)
     PlayState* play = play2;
     f32 radius;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
-    MtxF mfTrans;
-    MtxF mfScale;
     MtxF mfResult;
     Mtx* mtx;
     f32 yPos;
@@ -89,9 +87,25 @@ void EffectSsGRipple_DrawRipple(PlayState* play2, EffectSs* this, void* segment)
         yPos = this->pos.y;
     }
 
-    SkinMatrix_SetTranslate(&mfTrans, this->pos.x, yPos, this->pos.z);
-    SkinMatrix_SetScale(&mfScale, radius, radius, radius);
-    SkinMatrix_MtxFMtxFMult(&mfTrans, &mfScale, &mfResult);
+    // fishmod: the translation times the scale, written as the product comes out (the scale on the diagonal, the
+    // position in the last column) instead of two matrices and a 64-multiply product: the same matrix once converted
+    // to fixed point (the product's zeros can only differ from these in sign)
+    mfResult.xx = radius;
+    mfResult.yx = 0.0f;
+    mfResult.zx = 0.0f;
+    mfResult.wx = 0.0f;
+    mfResult.xy = 0.0f;
+    mfResult.yy = radius;
+    mfResult.zy = 0.0f;
+    mfResult.wy = 0.0f;
+    mfResult.xz = 0.0f;
+    mfResult.yz = 0.0f;
+    mfResult.zz = radius;
+    mfResult.wz = 0.0f;
+    mfResult.xw = this->pos.x;
+    mfResult.yw = yPos;
+    mfResult.zw = this->pos.z;
+    mfResult.ww = 1.0f;
 
     mtx = SkinMatrix_MtxFToNewMtx(gfxCtx, &mfResult);
 

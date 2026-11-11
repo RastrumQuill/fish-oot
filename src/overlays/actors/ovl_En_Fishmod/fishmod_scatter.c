@@ -203,6 +203,9 @@ static void Scatter_TunedDistances(s32 under) {
 #if FISHMOD_DEBUG
 static u32 sSetBench; // the bench flags the set was last made with
 #endif
+static f32 sBedViewSin[FISHMOD_BEDCARD_VIEWS]; // the bed cards' views: sin and cos of each one's angle
+static f32 sBedViewCos[FISHMOD_BEDCARD_VIEWS];
+static s32 sBedViewTrigMade;
 static s32 sEdgeNear; // the props being drawn are within PROP_EDGE_RA_DIST
 #if FISHMOD_DEBUG
 // what the LOD calibration (fishmod_debug.c, FISHMOD_LOD_CALIBRATE) draws everything out to
@@ -1735,9 +1738,18 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             }
             // the view looking most nearly along the camera's direction to the card: view v looks along
             // (sin t, -cos t) with t = v x 45 degrees
+            if (!sBedViewTrigMade) {
+                // (each view's sin and cos, worked out once: the same calls, the same values, as each frame made them)
+                for (v = 0; v < FISHMOD_BEDCARD_VIEWS; v++) {
+                    f32 t = v * (M_PI / FISHMOD_BEDCARD_VIEWS);
+
+                    sBedViewSin[v] = sinf(t);
+                    sBedViewCos[v] = cosf(t);
+                }
+                sBedViewTrigMade = true;
+            }
             for (v = 0; v < FISHMOD_BEDCARD_VIEWS; v++) {
-                f32 t = v * (M_PI / FISHMOD_BEDCARD_VIEWS);
-                f32 d = fabsf(dx * sinf(t) - dz * cosf(t));
+                f32 d = fabsf(dx * sBedViewSin[v] - dz * sBedViewCos[v]);
 
                 if (d > best) {
                     best = d;
@@ -1745,8 +1757,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 }
             }
             // the card's width along the view's right (cos t, sin t)
-            rx = cosf(view * (M_PI / FISHMOD_BEDCARD_VIEWS)) * bc->reach;
-            rz = sinf(view * (M_PI / FISHMOD_BEDCARD_VIEWS)) * bc->reach;
+            rx = sBedViewCos[view] * bc->reach;
+            rz = sBedViewSin[view] * bc->reach;
             mtx = GRAPH_ALLOC(play->state.gfxCtx, sizeof(Mtx));
             vtx = GRAPH_ALLOC(play->state.gfxCtx, 4 * sizeof(Vtx));
             guTranslate(mtx, bc->x, bc->y, bc->z);

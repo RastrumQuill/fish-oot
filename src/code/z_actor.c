@@ -3535,8 +3535,10 @@ void Attention_FindActorInCategory(PlayState* play, ActorContext* actorCtx, Play
     playerFocusActor = player->focusActor;
 
     while (actor != NULL) {
-        if ((actor->update != NULL) && ((Player*)actor != player) &&
-            ACTOR_FLAGS_CHECK_ALL(actor, ACTOR_FLAG_ATTENTION_ENABLED)) {
+        // fishmod: the flag first (the same test: no side effects; the flags share the actor's first cache line, its
+        // update pointer is far down it, and most actors here, the fish among them, fail on the flag)
+        if (ACTOR_FLAGS_CHECK_ALL(actor, ACTOR_FLAG_ATTENTION_ENABLED) && (actor->update != NULL) &&
+            ((Player*)actor != player)) {
             if ((actorCategory == ACTORCAT_ENEMY) &&
                 ACTOR_FLAGS_CHECK_ALL(actor, ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE) &&
                 (actor->xyzDistToPlayerSq < SQ(500.0f)) && (actor->xyzDistToPlayerSq < sBgmEnemyDistSq)) {

@@ -476,16 +476,32 @@ void SkinMatrix_SetTranslate(MtxF* mf, f32 x, f32 y, f32 z) {
 /**
  * Produces a matrix which scales, then rotates (using ZYX Tait-Bryan angles), then translates.
  */
+/*
+ * fishmod: the translate-rotate(-scale) matrices written as the products come out, without the products: a translation
+ * times a rotation is the rotation with the translation in its last column, and that times a scale is each of the
+ * first three columns times its scale. The same values (the products only add zeros, which can change the sign of a
+ * zero and nothing else; fishmod/tools/skin_check.c compares them).
+ */
+static void SkinMatrix_PlaceAndScale(MtxF* dest, f32 scaleX, f32 scaleY, f32 scaleZ, f32 translateX, f32 translateY,
+                                     f32 translateZ) {
+    dest->xx *= scaleX;
+    dest->yx *= scaleX;
+    dest->zx *= scaleX;
+    dest->xy *= scaleY;
+    dest->yy *= scaleY;
+    dest->zy *= scaleY;
+    dest->xz *= scaleZ;
+    dest->yz *= scaleZ;
+    dest->zz *= scaleZ;
+    dest->xw = translateX;
+    dest->yw = translateY;
+    dest->zw = translateZ;
+}
+
 void SkinMatrix_SetTranslateRotateZYXScale(MtxF* dest, f32 scaleX, f32 scaleY, f32 scaleZ, s16 rotX, s16 rotY, s16 rotZ,
                                            f32 translateX, f32 translateY, f32 translateZ) {
-    MtxF mft1;
-    MtxF mft2;
-
-    SkinMatrix_SetTranslate(dest, translateX, translateY, translateZ);
-    SkinMatrix_SetRotateZYX(&mft1, rotX, rotY, rotZ);
-    SkinMatrix_MtxFMtxFMult(dest, &mft1, &mft2);
-    SkinMatrix_SetScale(&mft1, scaleX, scaleY, scaleZ);
-    SkinMatrix_MtxFMtxFMult(&mft2, &mft1, dest);
+    SkinMatrix_SetRotateZYX(dest, rotX, rotY, rotZ);
+    SkinMatrix_PlaceAndScale(dest, scaleX, scaleY, scaleZ, translateX, translateY, translateZ);
 }
 
 /**
@@ -493,14 +509,8 @@ void SkinMatrix_SetTranslateRotateZYXScale(MtxF* dest, f32 scaleX, f32 scaleY, f
  */
 void SkinMatrix_SetTranslateRotateYXZScale(MtxF* dest, f32 scaleX, f32 scaleY, f32 scaleZ, s16 rotX, s16 rotY, s16 rotZ,
                                            f32 translateX, f32 translateY, f32 translateZ) {
-    MtxF mft1;
-    MtxF mft2;
-
-    SkinMatrix_SetTranslate(dest, translateX, translateY, translateZ);
-    SkinMatrix_SetRotateYXZ(&mft1, rotX, rotY, rotZ);
-    SkinMatrix_MtxFMtxFMult(dest, &mft1, &mft2);
-    SkinMatrix_SetScale(&mft1, scaleX, scaleY, scaleZ);
-    SkinMatrix_MtxFMtxFMult(&mft2, &mft1, dest);
+    SkinMatrix_SetRotateYXZ(dest, rotX, rotY, rotZ);
+    SkinMatrix_PlaceAndScale(dest, scaleX, scaleY, scaleZ, translateX, translateY, translateZ);
 }
 
 /**
@@ -508,12 +518,10 @@ void SkinMatrix_SetTranslateRotateYXZScale(MtxF* dest, f32 scaleX, f32 scaleY, f
  */
 void SkinMatrix_SetTranslateRotateZYX(MtxF* dest, s16 rotX, s16 rotY, s16 rotZ, f32 translateX, f32 translateY,
                                       f32 translateZ) {
-    MtxF rotation;
-    MtxF translation;
-
-    SkinMatrix_SetTranslate(&translation, translateX, translateY, translateZ);
-    SkinMatrix_SetRotateZYX(&rotation, rotX, rotY, rotZ);
-    SkinMatrix_MtxFMtxFMult(&translation, &rotation, dest);
+    SkinMatrix_SetRotateZYX(dest, rotX, rotY, rotZ);
+    dest->xw = translateX;
+    dest->yw = translateY;
+    dest->zw = translateZ;
 }
 
 void SkinMatrix_Vec3fToVec3s(Vec3f* src, Vec3s* dest) {

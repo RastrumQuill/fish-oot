@@ -829,8 +829,8 @@ s32 BgCheck_ComputeWallDisplacement(CollisionContext* colCtx, CollisionPoly* pol
  * `outX` `outZ` return the displaced x,z coordinates,
  * `outPoly` returns the pointer to the nearest poly collided with, or NULL
  */
-s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 xpFlags, f32* outX, f32* outZ,
-                            Vec3f* pos, f32 radius, CollisionPoly** outPoly) {
+static s32 BgCheck_SphVsStaticWallImpl(StaticLookup* lookup, CollisionContext* colCtx, u16 xpFlags, f32* outX,
+                                       f32* outZ, Vec3f* pos, f32 radius, CollisionPoly** outPoly) {
     Vec3f resultPos;
     f32 zTemp;
     f32 xTemp;
@@ -1049,6 +1049,76 @@ s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 
 
     *outX = resultPos.x;
     *outZ = resultPos.z;
+    return result;
+}
+
+/*
+ * fishmod: the scene's wall answers kept for questions asked again exactly (an actor standing still or pressed against
+ * a wall asks the same one every frame), like the floor's (sFloorCache): the static part of a wall test depends only on
+ * its inputs (the cell, the sphere, the flags and the wall already found, which decides between two) while the scene's
+ * collision stays as it was made. Emptied with the floor's (a new generation). The answer: the result, the place pushed
+ * out to (written whenever the cell has walls, hit or not) and the wall.
+ */
+#define WALL_CACHE_SIZE 32
+typedef struct {
+    StaticLookup* lookup;
+    CollisionPoly* inPoly;
+    u32 px;
+    u32 py;
+    u32 pz;
+    u32 radius;
+    u16 xpFlags;
+    u16 gen;
+    s16 result;
+    s16 wrote;
+    u32 outX;
+    u32 outZ;
+    CollisionPoly* outPoly;
+} WallCacheEntry;
+static WallCacheEntry sWallCache[WALL_CACHE_SIZE];
+
+s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 xpFlags, f32* outX, f32* outZ,
+                            Vec3f* pos, f32 radius, CollisionPoly** outPoly) {
+    u32 px = FloorCache_Bits(pos->x);
+    u32 py = FloorCache_Bits(pos->y);
+    u32 pz = FloorCache_Bits(pos->z);
+    u32 r = FloorCache_Bits(radius);
+    u32 h = (px * 0x9E3779B1u) ^ (pz * 0x85EBCA77u) ^ (py * 0xC2B2AE3Du) ^
+            ((r + xpFlags + (u32)lookup + (u32)*outPoly) * 0x27D4EB2Fu);
+    WallCacheEntry* e = &sWallCache[(h >> 27) & (WALL_CACHE_SIZE - 1)];
+    u32 inX = FloorCache_Bits(*outX);
+    u32 inZ = FloorCache_Bits(*outZ);
+    CollisionPoly* inPoly = *outPoly;
+    s32 result;
+
+    if ((e->gen == sFloorCacheGen) && (e->lookup == lookup) && (e->inPoly == inPoly) && (e->px == px) &&
+        (e->py == py) && (e->pz == pz) && (e->radius == r) && (e->xpFlags == xpFlags)) {
+        if (e->wrote) {
+            FloorCacheBits b;
+
+            b.w = e->outX;
+            *outX = b.f;
+            b.w = e->outZ;
+            *outZ = b.f;
+        }
+        *outPoly = e->outPoly;
+        return e->result;
+    }
+    result = BgCheck_SphVsStaticWallImpl(lookup, colCtx, xpFlags, outX, outZ, pos, radius, outPoly);
+    e->gen = sFloorCacheGen;
+    e->lookup = lookup;
+    e->inPoly = inPoly;
+    e->px = px;
+    e->py = py;
+    e->pz = pz;
+    e->radius = r;
+    e->xpFlags = xpFlags;
+    e->result = result;
+    // (whether it wrote the place: the cell has walls, or the value changed; a write of the same value is the same)
+    e->wrote = (lookup->wall.head != SS_NULL) || (FloorCache_Bits(*outX) != inX) || (FloorCache_Bits(*outZ) != inZ);
+    e->outX = FloorCache_Bits(*outX);
+    e->outZ = FloorCache_Bits(*outZ);
+    e->outPoly = *outPoly;
     return result;
 }
 
@@ -1730,6 +1800,7 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
     // fishmod: a new scene's collision: the floor answers kept so far no longer hold
     if (++sFloorCacheGen == 0) {
         bzero(sFloorCache, sizeof(sFloorCache));
+        bzero(sWallCache, sizeof(sWallCache));
         sFloorCacheGen = 1;
     }
     // fishmod: the scene's vertices as floats, once (CollisionPoly_GetVertices)
