@@ -443,42 +443,45 @@ typedef struct SequenceChannel {
     } changes;
     /* 0x02 */ u8 noteAllocPolicy;
     /* 0x03 */ u8 muteBehavior;
-    /* 0x04 */ u8 targetReverbVol;
-    /* 0x05 */ u8 notePriority; // 0-3
-    /* 0x06 */ u8 someOtherPriority;
-    /* 0x07 */ u8 fontId;
-    /* 0x08 */ u8 reverbIndex;
-    /* 0x09 */ u8 bookOffset;
-    /* 0x0A */ u8 newPan;
-    /* 0x0B */ u8 panChannelWeight;  // proportion of pan that comes from the channel (0..128)
-    /* 0x0C */ u8 gain; // Increases volume by a multiplicative scaling factor. Represented as a UQ4.4 number
-    /* 0x0D */ u8 velocityRandomVariance;
-    /* 0x0E */ u8 gateTimeRandomVariance;
-    /* 0x0F */ u8 combFilterSize;
-    /* 0x10 */ u16 vibratoRateStart;
-    /* 0x12 */ u16 vibratoDepthStart;
-    /* 0x14 */ u16 vibratoRateTarget;
-    /* 0x16 */ u16 vibratoDepthTarget;
-    /* 0x18 */ u16 vibratoRateChangeDelay;
-    /* 0x1A */ u16 vibratoDepthChangeDelay;
-    /* 0x1C */ u16 vibratoDelay;
-    /* 0x1E */ u16 delay;
-    /* 0x20 */ u16 combFilterGain;
-    /* 0x22 */ u16 unk_22;
-    /* 0x24 */ s16 instOrWave; // either 0 (none), instrument index + 1, or
+    // fish-oot: what every tick reads of every enabled channel (its delay, its player, its layers) packed after the flags,
+    // a cache line or two instead of four (were: seqPlayer at 0x4C, layers at 0x50, delay at 0x1E; the rest in their
+    // order after them)
+    /* 0x04 */ SequencePlayer* seqPlayer;
+    /* 0x08 */ struct SequenceLayer* layers[4];
+    /* 0x18 */ u16 delay;
+    /* 0x1A */ u8 targetReverbVol;
+    /* 0x1B */ u8 notePriority; // 0-3
+    /* 0x1C */ u8 someOtherPriority;
+    /* 0x1D */ u8 fontId;
+    /* 0x1E */ u8 reverbIndex;
+    /* 0x1F */ u8 bookOffset;
+    /* 0x20 */ u8 newPan;
+    /* 0x21 */ u8 panChannelWeight;  // proportion of pan that comes from the channel (0..128)
+    /* 0x22 */ u8 gain; // Increases volume by a multiplicative scaling factor. Represented as a UQ4.4 number
+    /* 0x23 */ u8 velocityRandomVariance;
+    /* 0x24 */ u8 gateTimeRandomVariance;
+    /* 0x25 */ u8 combFilterSize;
+    /* 0x26 */ u16 vibratoRateStart;
+    /* 0x28 */ u16 vibratoDepthStart;
+    /* 0x2A */ u16 vibratoRateTarget;
+    /* 0x2C */ u16 vibratoDepthTarget;
+    /* 0x2E */ u16 vibratoRateChangeDelay;
+    /* 0x30 */ u16 vibratoDepthChangeDelay;
+    /* 0x32 */ u16 vibratoDelay;
+    /* 0x34 */ u16 combFilterGain;
+    /* 0x36 */ u16 unk_22;
+    /* 0x38 */ s16 instOrWave; // either 0 (none), instrument index + 1, or
                              // 0x80..0x83 for sawtooth/triangle/sine/square waves.
-    /* 0x26 */ s16 transposition;
-    /* 0x28 */ f32 volumeScale;
-    /* 0x2C */ f32 volume;
-    /* 0x30 */ s32 pan;
-    /* 0x34 */ f32 appliedVolume;
-    /* 0x38 */ f32 freqScale;
-    /* 0x3C */ u8 (*dynTable)[][2];
-    /* 0x40 */ struct Note* noteUnused;
-    /* 0x44 */ struct SequenceLayer* layerUnused;
-    /* 0x48 */ Instrument* instrument;
-    /* 0x4C */ SequencePlayer* seqPlayer;
-    /* 0x50 */ struct SequenceLayer* layers[4];
+    /* 0x3A */ s16 transposition;
+    /* 0x3C */ f32 volumeScale;
+    /* 0x40 */ f32 volume;
+    /* 0x44 */ s32 pan;
+    /* 0x48 */ f32 appliedVolume;
+    /* 0x4C */ f32 freqScale;
+    /* 0x50 */ u8 (*dynTable)[][2];
+    /* 0x54 */ struct Note* noteUnused;
+    /* 0x58 */ struct SequenceLayer* layerUnused;
+    /* 0x5C */ Instrument* instrument;
     /* 0x60 */ SeqScriptState scriptState;
     /* 0x7C */ AdsrSettings adsr;
     /* 0x84 */ NotePool notePool;
