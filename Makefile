@@ -1201,7 +1201,10 @@ $(BUILD_DIR)/data/gspF3DEX3.fifo.o: $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Text 
   $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_Data \
   $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PA_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PA_Data \
   $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PB_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PB_Data \
-  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PC_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PC_Data
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PC_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PC_Data \
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_PA_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_PA_Data \
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_PB_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_PB_Data \
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_PC_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_PC_Data
 
 $(BUILD_DIR)/src/makerom/ipl3.o: $(EXTRACTED_DIR)/incbin/ipl3
 	$(OBJCOPY) -I binary -O $(LD_OFORMAT) --rename-section .data=.text $< $@
