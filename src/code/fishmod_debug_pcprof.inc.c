@@ -45,6 +45,7 @@ static s32 sPcStopped; // the route is over: the last counts sent, then nothing
 #define SC64_CMD_ERROR (1u << 30)
 #define SC64_USB_WRITE 'M'
 #define SC64_USB_WRITE_STATUS 'U'
+#define SC64_DATATYPE_TEXT 1 // sc64deployer debug prints these
 #define SC64_DATATYPE_RAW 2 // sc64deployer debug saves these as binaryout-*.bin
 
 #define PCPROF_USB_HASH 16384           // buckets in each of the two tables (one counting, one being sent)
@@ -151,6 +152,229 @@ static s32 Sc64_UsbSend(void* buf, u32 len) {
     osEPiStartDma(&sSc64Handle, &sSc64IoMesg, OS_WRITE);
     osRecvMesg(&sSc64Queue, &msg, OS_MESG_BLOCK);
     return Sc64_Command(SC64_USB_WRITE, SC64_BUFFER, (SC64_DATATYPE_RAW << 24) | len, NULL);
+}
+
+/** Sends a line of text: `sc64deployer debug` prints it (the morning script watches for its lines). */
+static void Sc64_UsbText(const char* text) {
+    u32 len = strlen(text);
+
+#ifdef FISHMOD_FAKE_SC64
+    return;
+#endif
+    if (!sPcUsb || (sPcOut == NULL) || (len >= SC64_BUFFER_SIZE)) {
+        return;
+    }
+    while (Sc64_UsbBusy()) {}
+    bcopy(text, sPcOut, len);
+    osWritebackDCache(sPcOut, (len + 7) & ~7);
+    sSc64IoMesg.hdr.pri = OS_MESG_PRI_NORMAL;
+    sSc64IoMesg.hdr.retQueue = &sSc64Queue;
+    sSc64IoMesg.dramAddr = sPcOut;
+    sSc64IoMesg.devAddr = 0;
+    sSc64IoMesg.size = (len + 7) & ~7;
+    {
+        OSMesg msg;
+
+        osEPiStartDma(&sSc64Handle, &sSc64IoMesg, OS_WRITE);
+        osRecvMesg(&sSc64Queue, &msg, OS_MESG_BLOCK);
+    }
+    Sc64_Command(SC64_USB_WRITE, SC64_BUFFER, (SC64_DATATYPE_TEXT << 24) | len, NULL);
+}
+
+/*
+ * `sc64deployer upload --reboot`: the PC loads the next ROM into a running game. It sends Halt over the cart's AUX
+ * register (the game answers with the same word, then stops touching the cart), uploads the ROM, then sends Reboot (the
+ * game answers, then starts the new ROM's boot code as the console's boot ROM would after a reset). fish-oot's own code
+ * from the SummerCart64's register docs (docs/01_memory_map.md) and the console's documented boot state.
+ */
+#define SC64_IRQ 0x10014
+#define SC64_AUX 0x10018
+#define SC64_AUX_PENDING (1u << 23) // (SCR)
+#define SC64_AUX_CLEAR (1u << 28)   // (IRQ)
+#define SC64_AUX_HALT 0xFF000001
+#define SC64_AUX_REBOOT 0xFF000002
+
+// with interrupts off, the PI by hand (osEPi* could wait on a thread that will never run again)
+static u32 Sc64Raw_Read(u32 addr) {
+    while (IO_READ(PI_STATUS_REG) & (PI_STATUS_DMA_BUSY | PI_STATUS_IO_BUSY)) {}
+    return *(vu32*)OS_PHYSICAL_TO_K1(addr);
+}
+
+static void Sc64Raw_Write(u32 addr, u32 value) {
+    while (IO_READ(PI_STATUS_REG) & (PI_STATUS_DMA_BUSY | PI_STATUS_IO_BUSY)) {}
+    *(vu32*)OS_PHYSICAL_TO_K1(addr) = value;
+}
+
+#ifdef __GNUC__
+/** Starts the cart's boot code (its IPL3) afresh, as after the reset button: never returns. Interrupts are off. */
+static void Fishmod_Reboot(void) {
+    u32 cic = osCicId;
+    u32 tvType = osTvType & 3;
+    u32 seed = (cic == 6103) ? 0x78 : (cic == 6105) ? 0x91 : (cic == 6106) ? 0x85 : 0x3F;
+    u32 version = (tvType == OS_TV_PAL) ? 6 : (tvType == OS_TV_MPAL) ? 4 : 1;
+    u32 header;
+    s32 i;
+
+    // the RSP stopped, its flags clear; the RDP left to finish what it has
+    IO_WRITE(SP_STATUS_REG, SP_SET_HALT);
+    while (!(IO_READ(SP_STATUS_REG) & SP_STATUS_HALT)) {}
+    while (IO_READ(SP_DMA_BUSY_REG)) {}
+    IO_WRITE(SP_STATUS_REG, SP_CLR_INTR | SP_CLR_SSTEP | SP_CLR_INTR_BREAK | SP_CLR_BROKE | SP_CLR_SIG0 | SP_CLR_SIG1 |
+                                SP_CLR_SIG2 | SP_CLR_SIG3 | SP_CLR_SIG4 | SP_CLR_SIG5 | SP_CLR_SIG6 | SP_CLR_SIG7);
+    IO_WRITE(SP_SEMAPHORE_REG, 0);
+    IO_WRITE(SP_PC_REG, 0);
+    for (i = 0; (i < 1000000) && (IO_READ(DPC_STATUS_REG) & DPC_STATUS_PIPE_BUSY); i++) {}
+
+    // no interrupt from anything: audio and the other interfaces quiet, the picture blank from the top
+    IO_WRITE(MI_INTR_MASK_REG, MI_INTR_MASK_CLR_SP | MI_INTR_MASK_CLR_SI | MI_INTR_MASK_CLR_AI | MI_INTR_MASK_CLR_VI |
+                                   MI_INTR_MASK_CLR_PI | MI_INTR_MASK_CLR_DP);
+    IO_WRITE(AI_CONTROL_REG, 0);
+    IO_WRITE(AI_DRAM_ADDR_REG, 0);
+    IO_WRITE(AI_LEN_REG, 0);
+    while (IO_READ(VI_CURRENT_REG) > 1) {}
+    IO_WRITE(VI_INTR_REG, 0x3FF);
+    IO_WRITE(VI_H_START_REG, 0);
+    IO_WRITE(VI_CURRENT_REG, 0);
+    IO_WRITE(PI_STATUS_REG, PI_STATUS_RESET | PI_STATUS_CLR_INTR);
+    IO_WRITE(SI_STATUS_REG, 0);
+
+    // the cart's bus timings from its header (read at the slowest), as the boot ROM sets them
+    IO_WRITE(PI_BSD_DOM1_LAT_REG, 0xFF);
+    IO_WRITE(PI_BSD_DOM1_PWD_REG, 0xFF);
+    IO_WRITE(PI_BSD_DOM1_PGS_REG, 0x0F);
+    IO_WRITE(PI_BSD_DOM1_RLS_REG, 0x03);
+    header = Sc64Raw_Read(0x10000000);
+    IO_WRITE(PI_BSD_DOM1_LAT_REG, header & 0xFF);
+    IO_WRITE(PI_BSD_DOM1_PWD_REG, (header >> 8) & 0xFF);
+    IO_WRITE(PI_BSD_DOM1_PGS_REG, (header >> 16) & 0x0F);
+    IO_WRITE(PI_BSD_DOM1_RLS_REG, (header >> 20) & 0x03);
+
+    // its boot code (ROM 0x40-0xFFF) into the RSP's data memory, where the boot ROM puts it
+    for (i = 0x40; i < 0x1000; i += 4) {
+        *(vu32*)(0xA4000000 + i) = Sc64Raw_Read(0x10000000 + i);
+    }
+
+    {
+    register u32 rBootDevice __asm__("s3") = osRomType & 1; // (0: the cart)
+    register u32 rTvType __asm__("s4") = tvType;
+    register u32 rResetType __asm__("s5") = 1; // a warm start (memory already set up, as after the reset button)
+    register u32 rSeed __asm__("s6") = seed;   // the CIC's seed
+    register u32 rVersion __asm__("s7") = version; // the boot ROM's version
+
+    // then: the caches written back and emptied (the new game is copied in under them), the boot ROM's registers on
+    // leaving (the boot code's checks read some of them), and in
+    __asm__ volatile(".set push\n"
+                     ".set noreorder\n"
+                     ".set noat\n"
+                     "    li    $t0, 0x34000000\n" // Status: coprocessors 0 and 1 usable, 64-bit FPU, interrupts off
+                     "    mtc0  $t0, $12\n"
+                     "    nop\n"
+                     "    lui   $t0, 0x8000\n"
+                     "    addiu $t1, $t0, 0x2000\n"
+                     "1:  cache 0x01, 0($t0)\n" // D-cache: index write back and invalidate
+                     "    addiu $t0, $t0, 16\n"
+                     "    bne   $t0, $t1, 1b\n"
+                     "    nop\n"
+                     "    lui   $t0, 0x8000\n"
+                     "    addiu $t1, $t0, 0x4000\n"
+                     "2:  cache 0x00, 0($t0)\n" // I-cache: index invalidate
+                     "    addiu $t0, $t0, 32\n"
+                     "    bne   $t0, $t1, 2b\n"
+                     "    nop\n"
+                     "    lui   $t5, 0xBFC0\n" // the PIF: wait until it isn't busy (bit 7 of its last byte); read
+                     "3:  lw    $t0, 0x7FC($t5)\n" // its word 0x24 last, as the boot ROM does before leaving
+                     "    andi  $t0, $t0, 0x80\n"
+                     "    bnez  $t0, 3b\n"
+                     "    nop\n"
+                     "    lw    $t0, 0x7E4($t5)\n"
+                     "    lui   $sp, 0xA400\n"
+                     "    ori   $sp, $sp, 0x1FF0\n"
+                     "    lui   $ra, 0xA400\n"
+                     "    li    $t1, 1\n"
+                     "    beq   $s4, $t1, 4f\n"
+                     "    ori   $ra, $ra, 0x1550\n" // (NTSC: 0xA4001550; the others 0xA4001554)
+                     "    ori   $ra, $ra, 0x1554\n"
+                     "4:  move  $at, $zero\n"
+                     "    move  $v0, $zero\n"
+                     "    move  $v1, $zero\n"
+                     "    move  $a0, $zero\n"
+                     "    move  $a1, $zero\n"
+                     "    move  $a2, $zero\n"
+                     "    move  $a3, $zero\n"
+                     "    move  $t0, $zero\n"
+                     "    move  $t1, $zero\n"
+                     "    li    $t2, 0x40\n"
+                     "    move  $t4, $zero\n"
+                     "    move  $t5, $zero\n"
+                     "    move  $t6, $zero\n"
+                     "    move  $t7, $zero\n"
+                     "    move  $s0, $zero\n"
+                     "    move  $s1, $zero\n"
+                     "    move  $s2, $zero\n"
+                     "    move  $t8, $zero\n"
+                     "    move  $t9, $zero\n"
+                     "    move  $k0, $zero\n"
+                     "    move  $k1, $zero\n"
+                     "    move  $gp, $zero\n"
+                     "    move  $fp, $zero\n"
+                     "    lui   $t3, 0xA400\n"
+                     "    ori   $t3, $t3, 0x0040\n"
+                     "    jr    $t3\n"
+                     "    nop\n"
+                     ".set pop\n"
+                     :
+                     : "r"(rBootDevice), "r"(rTvType), "r"(rResetType), "r"(rSeed), "r"(rVersion)
+                     : "memory");
+    }
+    for (;;) {}
+}
+#endif
+
+/** Halt: answered, then nothing touches the cart again (interrupts off: no thread runs) until Reboot comes. */
+static void Sc64_Halt(void) {
+    __osDisableInt();
+    for (;;) {
+        u32 scr;
+
+        Sc64Raw_Write(SC64_BUFFER + SC64_KEY, 0x5F554E4C); // (unlocked again: the upload may have reset the cart)
+        Sc64Raw_Write(SC64_BUFFER + SC64_KEY, 0x4F434B5F);
+        scr = Sc64Raw_Read(SC64_BUFFER + SC64_SCR);
+        if (scr & SC64_AUX_PENDING) {
+            u32 msg = Sc64Raw_Read(SC64_BUFFER + SC64_AUX);
+
+            Sc64Raw_Write(SC64_BUFFER + SC64_IRQ, SC64_AUX_CLEAR);
+            Sc64Raw_Write(SC64_BUFFER + SC64_AUX, msg);
+#ifdef __GNUC__
+            if (msg == SC64_AUX_REBOOT) {
+                Fishmod_Reboot();
+            }
+#endif
+        }
+    }
+}
+
+/** Once a frame: anything from the PC on the AUX channel? (Ping is answered; Halt and Reboot as above.) */
+static void Sc64_AuxPoll(void) {
+    u32 msg;
+
+#ifdef FISHMOD_FAKE_SC64
+    return;
+#endif
+    if (!(Sc64_Read(SC64_SCR) & SC64_AUX_PENDING)) {
+        return;
+    }
+    msg = Sc64_Read(SC64_AUX);
+    Sc64_Write(SC64_IRQ, SC64_AUX_CLEAR);
+    Sc64_Write(SC64_AUX, msg);
+    if ((msg == SC64_AUX_HALT) || (msg == SC64_AUX_REBOOT)) {
+        __osDisableInt();
+#ifdef __GNUC__
+        if (msg == SC64_AUX_REBOOT) {
+            Fishmod_Reboot();
+        }
+#endif
+        Sc64_Halt();
+    }
 }
 
 /*
@@ -379,6 +603,7 @@ static void PcProf_Update(void) {
                 }
             }
 #endif
+            Sc64_UsbText("FISHMOD-START\n"); // (for fishmod/tools/morning: the new ROM is running)
         }
         PcProf_Ranges();
         gFishmodTimerHook = PcProf_Hook;
@@ -397,7 +622,9 @@ static void PcProf_Update(void) {
 #endif
     if (sPcUsb) {
         u32 user[6] = { 0x464D4F44 /* 'FMOD' */, 0, 0, 0, 0, 0 };
+        static s32 sDoneSaid;
 
+        Sc64_AuxPoll();
         user[1] = sPlayFrames;
         user[2] = FISHMOD_PROFILE_HW;
         // the route over (the bench's last lap): stop sampling, send what's counted, and mark the last packets
@@ -414,6 +641,10 @@ static void PcProf_Update(void) {
             user[3] = 1;
             if (sPcSending == NULL) {
                 Fishmod_DebugPrintf(5, "pcprof usb: DONE, %u packets: stop sc64deployer", sPcPackets);
+                if (!sDoneSaid && !Sc64_UsbBusy()) { // (for fishmod/tools/morning: the run is over)
+                    sDoneSaid = true;
+                    Sc64_UsbText("FISHMOD-DONE\n");
+                }
                 return;
             }
         }
