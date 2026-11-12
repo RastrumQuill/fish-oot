@@ -1202,6 +1202,39 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     ScatterSet* set;
     f32 viewCos = Scatter_ViewCos(play); // the view cone (and the tuned distances, under water)
     f32 viewRoom = 0.0f;     // extra room round each prop and chunk for it
+    // the screen's own edges (inside the cone, which reaches the corners: the cone takes in a band above and below the
+    // picture, about 40% more than the screen at any distance): the camera's right and up, and the half-width and
+    // half-height as tangents, each with the cone's margin; a prop's sphere wholly outside one edge isn't drawn
+    s32 useEdges = true;
+    f32 rightX, rightY, rightZ, upX, upY, upZ;
+    f32 tanH, tanV, secH, secV;
+
+    {
+        f32 t = sinf(DEG_TO_RAD(play->view.fovy * 0.5f)) / cosf(DEG_TO_RAD(play->view.fovy * 0.5f));
+        f32 th = t * ((f32)SCREEN_WIDTH / SCREEN_HEIGHT);
+        f32 len;
+
+        tanV = (t + VIEW_MARGIN_TAN) / (1.0f - t * VIEW_MARGIN_TAN);
+        tanH = (th + VIEW_MARGIN_TAN) / (1.0f - th * VIEW_MARGIN_TAN);
+        secV = sqrtf(1.0f + SQ(tanV));
+        secH = sqrtf(1.0f + SQ(tanH));
+        // right = look x the view's up; up = right x look
+        rightX = lookY * play->view.up.z - lookZ * play->view.up.y;
+        rightY = lookZ * play->view.up.x - lookX * play->view.up.z;
+        rightZ = lookX * play->view.up.y - lookY * play->view.up.x;
+        len = sqrtf(SQ(rightX) + SQ(rightY) + SQ(rightZ));
+        if ((len < 0.01f) || (tanV <= 0.0f) || (tanH <= 0.0f) || (t * VIEW_MARGIN_TAN >= 1.0f) ||
+            (th * VIEW_MARGIN_TAN >= 1.0f)) {
+            useEdges = false; // (looking straight along the up vector, or a view wider than a right angle)
+        } else {
+            rightX /= len;
+            rightY /= len;
+            rightZ /= len;
+            upX = rightY * lookZ - rightZ * lookY;
+            upY = rightZ * lookX - rightX * lookZ;
+            upZ = rightX * lookY - rightY * lookX;
+        }
+    }
 
     Scatter_TunedDistances(under);
 #if FISHMOD_DEBUG
@@ -1209,6 +1242,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     if (gFishmodLodTest.active && gFishmodLodTest.wide) {
         viewCos = 0.3f;
         viewRoom = 400.0f;
+        useEdges = false;
     }
     if (gFishmodLodTest.active && !gFishmodLodTest.asGame) {
         distFar = DIST_CALIBRATE;
@@ -1373,6 +1407,17 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                     front = dx * lookX + dy * lookY + dz * lookZ + room;
                     if (((front < 0.0f) || (SQ(front) < SQ(viewCos) * (dSq + SQ(dy)))) && (dSq > SQ(room * 2.0f))) {
                         continue;
+                    }
+                    // wholly beyond the screen's left or right, top or bottom edge (the sphere's distance outside the
+                    // edge's plane: (|x| - tan * z) / sec > room)
+                    if (useEdges && (dSq > SQ(room * 2.0f))) {
+                        f32 z = front - room;
+                        f32 x = dx * rightX + dy * rightY + dz * rightZ;
+                        f32 y = dx * upX + dy * upY + dz * upZ;
+
+                        if ((fabsf(x) > (tanH * z + room * secH)) || (fabsf(y) > (tanV * z + room * secV))) {
+                            continue;
+                        }
                     }
                 }
                 if (candCount < VISIBLE_MAX) {
