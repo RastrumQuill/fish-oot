@@ -349,6 +349,13 @@ void Graph_TaskSet00(GraphicsContext* gfxCtx) {
 #endif
         cfb->unk_10 = 0;
         cfb->updateRate = R_UPDATE_RATE;
+#if FISHMOD_DEBUG
+        {
+            extern u32 gFishmodFrameInputCount;
+
+            cfb->inputCount = gFishmodFrameInputCount;
+        }
+#endif
 
         scTask->framebuffer = cfb;
     }
@@ -377,6 +384,15 @@ void Graph_Update(GraphicsContext* gfxCtx, GameState* gameState) {
 #endif
 
     GameState_ReqPadData(gameState);
+#if FISHMOD_DEBUG
+    {
+        // fish-oot: the controller read this frame's input came from (the latency: carried to its picture below)
+        extern u32 gFishmodPadReadCount;
+        extern u32 gFishmodFrameInputCount;
+
+        gFishmodFrameInputCount = gFishmodPadReadCount;
+    }
+#endif
     GameState_Update(gameState);
 
 #if DEBUG_FEATURES

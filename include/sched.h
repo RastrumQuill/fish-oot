@@ -32,6 +32,9 @@ typedef struct CfbInfo {
     /* 0x14 */ f32 xScale;
     /* 0x18 */ f32 yScale;
 #endif
+#if FISHMOD_DEBUG
+    u32 inputCount; // fish-oot: the count register when the controller read this frame used was taken (the latency)
+#endif
 } CfbInfo; // size = 0x1C
 
 typedef struct OSScTask {

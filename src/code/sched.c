@@ -585,6 +585,17 @@ void Sched_HandleRetrace(Scheduler* sc) {
             gFishmodShown[3]++;
             gFishmodShown[4] += (held >= 4);
             gFishmodShown[5] += held;
+            if (sc->pendingSwapBuf1 != NULL) {
+                // press to picture: from the controller read its frame used to the refresh it goes up at (the
+                // TV's own delay not included); and whether another finished frame is already waiting behind it
+                extern u32 gFishmodLatency[4];
+                u32 us = (u32)OS_CYCLES_TO_USEC(osGetCount() - sc->pendingSwapBuf1->inputCount);
+
+                gFishmodLatency[0] += us;
+                gFishmodLatency[1] = MAX(gFishmodLatency[1], us);
+                gFishmodLatency[2]++;
+                gFishmodLatency[3] += (sc->pendingSwapBuf2 != NULL);
+            }
         }
 #endif
         // Advance buffers

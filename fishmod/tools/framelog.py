@@ -59,10 +59,13 @@ def records(folder):
         words = 56 if (version & 0xFF) >= 2 else WORDS  # (version 2: F3DEX3's counters in 52-55; bits 8-15: which set)
         if version & 0x10000:
             words = 58  # (bit 16: 56-57 the pictures shown: kept as 57 and 58 here, after the counters' set at 56)
+        if version & 0x20000:
+            words = 60  # (bit 17: 58-59 the press-to-picture latency: kept as 59 and 60 here)
         for i in range(count):
             rec = struct.unpack_from(f">{words}I", d, 16 + 4 * words * i)
-            extra = rec[56:58] if words == 58 else (0, 0)
-            rec = rec[:56] if words == 58 else rec
+            extra = tuple(rec[56:words]) if words > 56 else ()
+            extra = extra + (0,) * (4 - len(extra))
+            rec = rec[:56] if words > 56 else rec
             # (word 56: which set of F3DEX3's counters, 0 default, 1-3 its profiling builds A-C; -1 none)
             if (version & 0xFF) >= 3:
                 cset = (rec[1] >> 1) & 3  # (version 3: each record's own set, in word 1 bits 1-2)
@@ -122,6 +125,18 @@ def main():
               f"up 4 refreshes or more (a visible hitch).** In the frames that made them late: "
               + ", ".join(f"{k} {100 * v / max(len(hitch), 1):.0f}%" for k, v in kinds.most_common()) + "\n")
         print("(The 'slow frames' below are by frame period, over 52 ms: with run-ahead, not all of them are hitches.)\n")
+    # press to picture (version bit 17): from the controller read a frame used to the refresh its picture went up at
+    lat = [r for r in recs if len(r) > 60 and (r[60] & 0xFF)]
+    if lat:
+        n = sum(r[60] & 0xFF for r in lat)
+        mean = sum(r[59] * (r[60] & 0xFF) for r in lat) / n / 1000
+        worst = max(r[60] >> 16 for r in lat)
+        waited = sum((r[60] >> 8) & 0xFF for r in lat)
+        per = sorted(r[59] / 1000 for r in lat)
+        print(f"**Press to picture** (the controller read to the refresh the picture went up at; the TV's own delay "
+              f"not included): mean {mean:.0f} ms, 90% under {per[int(len(per) * 0.9)]:.0f} ms, the most "
+              f"{worst} ms; {100 * waited / n:.0f}% of the pictures went up with another finished frame waiting "
+              f"behind them\n")
 
     def mean(rs, i):
         return sum(r[i] for r in rs) / max(len(rs), 1) / 1000.0

@@ -417,7 +417,8 @@ static void Sc64_AuxPoll(void) {
  * frame as they're counted: 1 for a frame over 52 ms, 2 otherwise (n64prof_frame_end; n64prof.py --frames).
  */
 #ifdef FISHMOD_FRAMELOG
-#define FRAMELOG_WORDS 58 // (56, 57: the pictures shown since the last record, and how long: version bit 16)
+#define FRAMELOG_WORDS 60 // (56, 57: the pictures shown since the last record, and how long: version bit 16; 58, 59: the
+                          // press-to-picture latency: version bit 17)
 #define FRAMELOG_PER_PACKET ((SC64_BUFFER_SIZE - 16) / (FRAMELOG_WORDS * 4))
 #define PCPROF_RING 1024 // samples a frame can hold (about 290 ms at 3,500 a second)
 #define FRAMELOG_SLOW_US 52000
@@ -524,11 +525,11 @@ static void PcProf_FrameEnd(void) {
     if (pk->count == 0) {
         pk->magic = 0x4646524D; // 'FFRM'
 #if defined(F3DEX3_ALL)
-        pk->version = 3 | 0x10000; // (58 words; each record's set of F3DEX3's counters in r[1] bits 1-2)
+        pk->version = 3 | 0x30000; // (58 words; each record's set of F3DEX3's counters in r[1] bits 1-2)
 #elif defined(F3DEX3_PROF)
-        pk->version = 2 | (F3DEX3_PROF << 8) | 0x10000; // (58 words: 52-55 F3DEX3's counters; which set: 1-3 A-C)
+        pk->version = 2 | (F3DEX3_PROF << 8) | 0x30000; // (58 words: 52-55 F3DEX3's counters; which set: 1-3 A-C)
 #else
-        pk->version = 2 | 0x10000; // (58 words a record: 52-55 F3DEX3's counters, the default set; 56-57 the screen)
+        pk->version = 2 | 0x30000; // (58 words a record: 52-55 F3DEX3's counters, the default set; 56-57 the screen)
 #endif
         pk->first = sPlayFrames;
     }
@@ -577,6 +578,16 @@ static void PcProf_FrameEnd(void) {
         r[56] = (gFishmodShown[0] << 16) | (gFishmodShown[1] & 0xFFFF);
         r[57] = gFishmodShown[2];
         gFishmodShown[0] = gFishmodShown[1] = gFishmodShown[2] = 0;
+        {
+            // press to picture since the last record (sched.c): r[58] the mean (us) << 0, r[59] the most (ms) << 16 |
+            // pictures that waited behind another << 8 | pictures (version bit 17)
+            extern u32 gFishmodLatency[4];
+            u32 n = gFishmodLatency[2];
+
+            r[58] = (n != 0) ? gFishmodLatency[0] / n : 0;
+            r[59] = (MIN(gFishmodLatency[1] / 1000, 0xFFFF) << 16) | (MIN(gFishmodLatency[3], 0xFF) << 8) | MIN(n, 0xFF);
+            gFishmodLatency[0] = gFishmodLatency[1] = gFishmodLatency[2] = gFishmodLatency[3] = 0;
+        }
         __osRestoreInt(prevInt);
 #ifdef F3DEX3_ALL
         {

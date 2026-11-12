@@ -45,7 +45,7 @@ def frame_records(folder):
         if d[:4] != b"FFRM":
             continue
         _, version, count, _ = struct.unpack(">4I", d[:16])
-        words = 58 if version & 0x10000 else (56 if (version & 0xFF) >= 2 else 52)
+        words = 60 if version & 0x20000 else 58 if version & 0x10000 else (56 if (version & 0xFF) >= 2 else 52)
         for i in range(count):
             rec = struct.unpack_from(f">{words}I", d, 16 + 4 * words * i)
             if rec[0] + 200 < last:

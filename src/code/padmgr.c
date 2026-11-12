@@ -363,6 +363,14 @@ void PadMgr_HandleRetrace(PadMgr* padMgr) {
     // Wait for controller data
     osRecvMesg(serialEventQueue, NULL, OS_MESG_BLOCK);
     osContGetReadData(padMgr->pads);
+#if FISHMOD_DEBUG
+    {
+        // fish-oot: when the controllers were read (the press-to-picture latency starts here: graph.c, sched.c)
+        extern u32 gFishmodPadReadCount;
+
+        gFishmodPadReadCount = osGetCount();
+    }
+#endif
 
 #if !DEBUG_FEATURES
     // Clear controllers 2 and 4
