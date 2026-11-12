@@ -205,6 +205,39 @@ void func_800DB03C(s32 updateIndex) {
 /**
  * original name: Nas_smzAudioFrame
  */
+/*
+ * fish-oot: the command list's lines claimed in the data cache before they're written. A store to a line not in the
+ * cache first reads the line from RDRAM (write-allocate), only for all of it to be overwritten by commands; the
+ * VR4300's Create Dirty Exclusive (cache op 0x0D) makes the line without the read. Lines are claimed from the first
+ * line not yet written to (never one holding commands already: the rest of its bytes would be lost), up to
+ * CMD_CLAIM_AHEAD bytes past the writer and never past the buffer. What's claimed and never written is past the
+ * list's end, which the RSP doesn't read. The scheduler writes the whole cache back before the RSP runs the task
+ * (sched.c), as it always has. The commands are the same, so the sound is.
+ */
+#define CMD_CLAIM_AHEAD 512
+static u32 sCmdClaimed; // the first line not yet claimed
+static u32 sCmdClaimEnd; // the buffer's end (its last whole line)
+
+static void AudioSynth_ClaimCmdLines(Acmd* cmd) {
+#ifdef __GNUC__
+    u32 p = ALIGN16((u32)cmd);
+    u32 lim = ((u32)cmd + CMD_CLAIM_AHEAD) & ~0xF;
+
+    if (lim > sCmdClaimEnd) {
+        lim = sCmdClaimEnd;
+    }
+    if (p < sCmdClaimed) {
+        p = sCmdClaimed;
+    }
+    for (; p < lim; p += 16) {
+        __asm__ volatile("cache 0x0D, 0(%0)" : : "r"(p) : "memory");
+    }
+    if (p > sCmdClaimed) {
+        sCmdClaimed = p;
+    }
+#endif
+}
+
 Acmd* AudioSynth_Update(Acmd* cmdStart, s32* cmdCnt, s16* aiStart, s32 aiBufLen) {
     s32 chunkLen;
     s16* aiBufP;
@@ -213,6 +246,13 @@ Acmd* AudioSynth_Update(Acmd* cmdStart, s32* cmdCnt, s16* aiStart, s32 aiBufLen)
     s32 j;
 
     cmdP = cmdStart;
+    // (cached addresses only: KSEG0)
+    if (((u32)cmdStart >> 29) == (0x80000000 >> 29)) {
+        sCmdClaimed = ALIGN16((u32)cmdStart);
+        sCmdClaimEnd = ((u32)(cmdStart + gAudioCtx.maxAudioCmds)) & ~0xF;
+    } else {
+        sCmdClaimed = sCmdClaimEnd = 0;
+    }
     for (i = gAudioCtx.audioBufferParameters.ticksPerUpdate; i > 0; i--) {
         AudioSeq_ProcessSequences(i - 1);
         func_800DB03C(gAudioCtx.audioBufferParameters.ticksPerUpdate - i);
@@ -238,6 +278,7 @@ Acmd* AudioSynth_Update(Acmd* cmdStart, s32* cmdCnt, s16* aiStart, s32 aiBufLen)
             }
         }
 
+        AudioSynth_ClaimCmdLines(cmdP);
         cmdP = AudioSynth_DoOneAudioUpdate(aiBufP, chunkLen, cmdP, gAudioCtx.audioBufferParameters.ticksPerUpdate - i);
         aiBufLen -= chunkLen;
         aiBufP += 2 * chunkLen;
@@ -794,6 +835,7 @@ Acmd* AudioSynth_DoOneAudioUpdate(s16* aiBuf, s32 aiBufLen, Acmd* cmd, s32 updat
         while (i < count) {
             sampleState2 = &gAudioCtx.sampleStates[noteIndices[i] + t];
             if (sampleState2->bitField1.reverbIndex == reverbIndex) {
+                AudioSynth_ClaimCmdLines(cmd);
                 cmd = AudioSynth_ProcessNote(noteIndices[i], sampleState2,
                                              &gAudioCtx.notes[noteIndices[i]].synthesisState, aiBuf, aiBufLen, cmd,
                                              updateIndex);
@@ -821,6 +863,7 @@ Acmd* AudioSynth_DoOneAudioUpdate(s16* aiBuf, s32 aiBufLen, Acmd* cmd, s32 updat
     }
 
     while (i < count) {
+        AudioSynth_ClaimCmdLines(cmd);
         cmd =
             AudioSynth_ProcessNote(noteIndices[i], &gAudioCtx.sampleStates[t + noteIndices[i]],
                                    &gAudioCtx.notes[noteIndices[i]].synthesisState, aiBuf, aiBufLen, cmd, updateIndex);
