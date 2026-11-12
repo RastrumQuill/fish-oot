@@ -13,6 +13,7 @@ changes below. It runs the same route and sends the same USB frame log and profi
 | Audio: a byte for each note's "enabled" bit, so the per-buffer scans read one byte, not a 224-byte note | audio check: every sample alike (8,253 buffers) |
 | Audio: each sequence channel's per-tick fields (player, layers, delay) packed at the front, in one or two cache lines instead of four | audio check: every sample alike (8,253 buffers) |
 | Audio: the sample store. The 870 KB between the frame buffers (unused since frames6) keeps a copy of each sample played from the cart, loaded in the background, then played from RAM | audio check: every sample alike (7,593 buffers). ares bench: cart sample reads 1,812,521 -> 1,476; 61 samples, 632 KB of the store; frame 52.0 -> 50.6 ms, slow frames 28% -> 13% |
+| Audio: the command list's cache lines claimed before they're written (the CPU's Create Dirty Exclusive), so a new line of commands isn't first read from memory | audio check: every sample alike (8,253 buffers). The console profile put these misses at about 1.5% of the CPU |
 
 ## Memory over the bench route (ares, the lowest free at any frame)
 
