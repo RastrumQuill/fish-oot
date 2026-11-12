@@ -455,6 +455,33 @@ SkyboxFaceParams sSkybox128FaceParams[6] = {
  * Computes the display list for a skybox with up to 6 faces, where the sides are 128x64 CI8 textures and the
  * top/bottom faces are 128x128 CI8 textures.
  */
+// fish-oot: the 128 skyboxes' face lists without the second sky's texture loads, for drawing in 1-cycle while the two
+// skies aren't being blended (blend 0: the 2-cycle combiner's (TEXEL1 - TEXEL0) * 0 + TEXEL0 is exactly TEXEL0, and the
+// render mode reads nothing back): the same picture, half the texture loads, one cycle a pixel (Skybox_Draw)
+Gfx (*gFishmodSkyOneTex)[150];
+
+/** Copies a face list leaving out the loads of the second sky's texture (segment 8): each from its SETTIMG to its
+ * SETTILESIZE (gDPLoadMultiTile's commands). */
+static void Skybox_CopyOneTex(Gfx* src, Gfx* dst) {
+    s32 skipping = false;
+
+    for (;; src++) {
+        u32 op = src->words.w0 >> 24;
+
+        if ((op == G_SETTIMG) && ((src->words.w1 >> 24) == 0x08)) {
+            skipping = true;
+        }
+        if (!skipping) {
+            *dst++ = *src;
+        } else if (op == G_SETTILESIZE) {
+            skipping = false;
+        }
+        if (op == G_ENDDL) {
+            break;
+        }
+    }
+}
+
 void Skybox_Calculate128(SkyboxContext* skyboxCtx, s32 nFaces) {
     s32 roomVtxStartIndex = 0;
     s32 faceNum;
@@ -1032,6 +1059,7 @@ void Skybox_Setup(PlayState* play, SkyboxContext* skyboxCtx, s16 skyboxId) {
 }
 
 void Skybox_Init(GameState* state, SkyboxContext* skyboxCtx, s16 skyboxId) {
+    gFishmodSkyOneTex = NULL; // (fish-oot: made again below for a 128 skybox)
     skyboxCtx->drawType = SKYBOX_DRAW_128;
     skyboxCtx->rot.x = skyboxCtx->rot.y = skyboxCtx->rot.z = 0.0f;
 
@@ -1068,6 +1096,17 @@ void Skybox_Init(GameState* state, SkyboxContext* skyboxCtx, s16 skyboxId) {
                 ASSERT(skyboxCtx->roomVtx != NULL, "vr_box->roomVtx != NULL", "../z_vr_box.c", 1654);
 
                 Skybox_Calculate128(skyboxCtx, 5); // compute 5 faces, excludes the bottom face
+            }
+            // fish-oot: the one-texture copies (see gFishmodSkyOneTex)
+            gFishmodSkyOneTex = GAME_STATE_ALLOC(state, 12 * 150 * sizeof(Gfx), "../z_vr_box.c", 0);
+            if (gFishmodSkyOneTex != NULL) {
+                s32 face;
+
+                for (face = 0; face < 6; face++) {
+                    if ((face < 5) || (skyboxId == SKYBOX_CUTSCENE_MAP)) {
+                        Skybox_CopyOneTex(skyboxCtx->dListBuf[2 * face], gFishmodSkyOneTex[2 * face]);
+                    }
+                }
             }
         }
         PRINTF_RST();

@@ -518,6 +518,7 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NODISSOLVE (1 << 14) // the single cards pop at the cutoff instead of dissolving
 #define FISHMOD_BENCH_SKYUNDER (1 << 16)   // the skybox drawn with the camera under water too, as vanilla
 #define FISHMOD_BENCH_NOFISHAI (1 << 20)   // the fish frozen: no thinking or swimming (still drawn)
+#define FISHMOD_BENCH_OLDSKY (1 << 21)     // the frame's clears and the sky as before frames11 (the sky A/B: sky_ab)
 #define FISHMOD_BENCH_NOSKY (1 << 7)      // no skybox
 #define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)

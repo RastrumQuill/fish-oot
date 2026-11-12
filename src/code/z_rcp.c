@@ -1503,6 +1503,12 @@ Gfx* Gfx_EnvColor(GraphicsContext* gfxCtx, s32 r, s32 g, s32 b, s32 a) {
  * The whole screen is filled with the color supplied as arguments.
  * Letterbox is also applied here, and will share the color of the screen base.
  */
+// fish-oot: the frame's buffer clears and the sky (Play_Draw, Gfx_SetupFrame)
+Gfx* gFishmodColorFill;     // the colour fill's command this frame, or NULL
+s32 gFishmodZClearByRsp;    // set by Play_Draw for its frame: the Z clear left to it (the RSP, after the sky)
+u8* gFishmodZClear;         // then: where it starts, or NULL once done
+u32 gFishmodZClearSize;     // and its size in bytes
+
 void Gfx_SetupFrame(GraphicsContext* gfxCtx, u8 r, u8 g, u8 b) {
     OPEN_DISPS(gfxCtx, "../z_rcp.c", 2386);
 
@@ -1577,12 +1583,23 @@ void Gfx_SetupFrame(GraphicsContext* gfxCtx, u8 r, u8 g, u8 b) {
 
         // Set the whole z buffer to maximum depth
         // Don't bother with pixels that are being covered by the letterbox
+#if ENABLE_F3DEX3
+        // fish-oot: in play, the RSP clears it instead (F3DEX3's memset), right after the sky's commands, while the
+        // RDP draws the sky (Play_Draw: gFishmodZClear); the same rows, the same value
+        if (gFishmodZClearByRsp) {
+            gFishmodZClearByRsp = false;
+            gFishmodZClear = (u8*)gZBuffer + letterboxSize * gScreenWidth * sizeof(u16);
+            gFishmodZClearSize = (gScreenHeight - 2 * letterboxSize) * gScreenWidth * sizeof(u16);
+        } else
+#endif
+        {
         gDPSetColorImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, gScreenWidth, gZBuffer);
         gDPSetCycleType(POLY_OPA_DISP++, G_CYC_FILL);
         gDPSetRenderMode(POLY_OPA_DISP++, G_RM_NOOP, G_RM_NOOP2);
         gDPSetFillColor(POLY_OPA_DISP++, (GPACK_ZDZ(G_MAXFBZ, 0) << 16) | GPACK_ZDZ(G_MAXFBZ, 0));
         gDPFillRectangle(POLY_OPA_DISP++, 0, letterboxSize, gScreenWidth - 1, gScreenHeight - letterboxSize - 1);
         gDPPipeSync(POLY_OPA_DISP++);
+        }
 
         // Fill the whole screen with the base color
         // Don't bother with pixels that are being covered by the letterbox
@@ -1590,8 +1607,12 @@ void Gfx_SetupFrame(GraphicsContext* gfxCtx, u8 r, u8 g, u8 b) {
         gDPSetCycleType(POLY_OPA_DISP++, G_CYC_FILL);
         gDPSetRenderMode(POLY_OPA_DISP++, G_RM_NOOP, G_RM_NOOP2);
         gDPSetFillColor(POLY_OPA_DISP++, (GPACK_RGBA5551(r, g, b, 1) << 16) | GPACK_RGBA5551(r, g, b, 1));
+        gFishmodColorFill = POLY_OPA_DISP; // (fish-oot: Play_Draw leaves it out where the sky covers the screen)
         gDPFillRectangle(POLY_OPA_DISP++, 0, letterboxSize, gScreenWidth - 1, gScreenHeight - letterboxSize - 1);
         gDPPipeSync(POLY_OPA_DISP++);
+#if ENABLE_F3DEX3
+        gSPFlush(POLY_OPA_DISP++); // (the RDP starts on the fill now, not after dozens more commands)
+#endif
 
         // Draw the letterbox if applicable (uses the same color as the screen base)
         if (letterboxSize > 0) {

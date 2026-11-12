@@ -1,3 +1,4 @@
+#include "fishmod.h"
 #include "skybox.h"
 
 #include "gfx.h"
@@ -17,6 +18,8 @@ Mtx* Skybox_UpdateMatrix(SkyboxContext* skyboxCtx, f32 x, f32 y, f32 z) {
     Matrix_RotateZ(skyboxCtx->rot.z, MTXMODE_APPLY);
     return MATRIX_TO_MTX(sSkyboxDrawMatrix, "../z_vr_box_draw.c", 42);
 }
+
+extern Gfx (*gFishmodSkyOneTex)[150]; // z_vr_box.c
 
 void Skybox_Draw(SkyboxContext* skyboxCtx, GraphicsContext* gfxCtx, s16 skyboxId, s16 blend, f32 x, f32 y, f32 z) {
     OPEN_DISPS(gfxCtx, "../z_vr_box_draw.c", 52);
@@ -81,6 +84,20 @@ void Skybox_Draw(SkyboxContext* skyboxCtx, GraphicsContext* gfxCtx, s16 skyboxId
                     gSPDisplayList(POLY_OPA_DISP++, skyboxCtx->dListBuf[7]); // -x face lower
                 }
             }
+        }
+    } else if ((blend == 0) && (gFishmodSkyOneTex != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY)) {
+        // fish-oot: not blending two skies: 1-cycle, one texture (the same picture: see gFishmodSkyOneTex)
+        gDPPipeSync(POLY_OPA_DISP++);
+        gDPSetCycleType(POLY_OPA_DISP++, G_CYC_1CYCLE);
+        gDPSetCombineMode(POLY_OPA_DISP++, G_CC_DECALRGBA, G_CC_DECALRGBA);
+        gDPSetRenderMode(POLY_OPA_DISP++, G_RM_OPA_SURF, G_RM_OPA_SURF2);
+        gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[0]); // -z face
+        gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[2]); // +z face
+        gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[4]); // -x face
+        gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[6]); // +x face
+        gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[8]); // +y face
+        if (skyboxId == SKYBOX_CUTSCENE_MAP) {
+            gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[10]); // -y face
         }
     } else {
         // 128x128 and 128x64 textures

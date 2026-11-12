@@ -1186,6 +1186,26 @@ void Play_DrawOverlayElements(PlayState* this) {
     }
 }
 
+// fish-oot: the frame's buffer clears (z_rcp.c's Gfx_SetupFrame)
+extern Gfx* gFishmodColorFill;
+extern s32 gFishmodZClearByRsp;
+extern u8* gFishmodZClear;
+extern u32 gFishmodZClearSize;
+
+/** The Z clear Gfx_SetupFrame left for the RSP: F3DEX3's memset, once a frame, after a flush so the RDP has the sky's
+ * commands to draw meanwhile. */
+static void FishmodPlay_ClearZ(GraphicsContext* gfxCtx) {
+#if ENABLE_F3DEX3
+    if (gFishmodZClear != NULL) {
+        OPEN_DISPS(gfxCtx, "../z_play.c", 0);
+        gSPFlush(POLY_OPA_DISP++);
+        gSPMemset(POLY_OPA_DISP++, gFishmodZClear, GPACK_ZDZ(G_MAXFBZ, 0), gFishmodZClearSize);
+        CLOSE_DISPS(gfxCtx, "../z_play.c", 0);
+        gFishmodZClear = NULL;
+    }
+#endif
+}
+
 void Play_Draw(PlayState* this) {
     GraphicsContext* gfxCtx = this->state.gfxCtx;
     Lights* sp228;
@@ -1213,11 +1233,16 @@ void Play_Draw(PlayState* this) {
     gSPSegment(POLY_XLU_DISP++, 0x02, this->sceneSegment);
     gSPSegment(OVERLAY_DISP++, 0x02, this->sceneSegment);
 
+    gFishmodColorFill = NULL;
+#if ENABLE_F3DEX3
+    gFishmodZClearByRsp = !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY); // (the Z clear by the RSP, after the sky)
+#endif
     if (FISHMOD_NO_SKY()) {
         Gfx_SetupFrame(gfxCtx, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2]);
     } else {
         Gfx_SetupFrame(gfxCtx, 0, 0, 0);
     }
+    gFishmodZClearByRsp = false; // (taken or not: only for this call)
 #if FISHMOD_DEBUG
     if (Fishmod_RdpBenchDraw(this)) {
         goto Play_Draw_skip; // (the RDP calibration bench drew its test instead: fishmod_debug_rdpbench.inc.c)
@@ -1323,12 +1348,22 @@ void Play_Draw(PlayState* this) {
                     Environment_UpdateSkybox(this->skyboxId, &this->envCtx, &this->skyboxCtx);
                     Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, this->envCtx.skyboxBlend, this->view.eye.x,
                                 this->view.eye.y, this->view.eye.z);
+                    // fish-oot: at Lake Hylia the sky and the scene cover the whole screen, and the sky's render mode
+                    // reads nothing back: the colour clear under it changes nothing (and costs the RDP 0.9 ms)
+                    if ((this->sceneId == SCENE_LAKE_HYLIA) && (gFishmodColorFill != NULL) &&
+                        !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY)) {
+                        Gfx noop = gsDPNoOp();
+
+                        *gFishmodColorFill = noop;
+                    }
                 } else if (this->skyboxCtx.drawType == SKYBOX_DRAW_128) {
                     Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, 0, this->view.eye.x, this->view.eye.y,
                                 this->view.eye.z);
                 }
             }
         }
+
+        FishmodPlay_ClearZ(gfxCtx); // (fish-oot: after the sky, before anything that uses depth)
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) ||
             (R_PLAY_DRAW_ENV_FLAGS & PLAY_ENV_DRAW_SUN_AND_MOON)) {
@@ -1455,12 +1490,14 @@ void Play_Draw(PlayState* this) {
         }
 
     Play_Draw_DrawOverlayElements:
+        FishmodPlay_ClearZ(gfxCtx); // (fish-oot: the frames that skip the scene still get it)
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_DRAW_OVERLAY_ELEMENTS) {
             Play_DrawOverlayElements(this);
         }
     }
 
 Play_Draw_skip:
+    FishmodPlay_ClearZ(gfxCtx); // (fish-oot: never left pending into the next frame)
 
     if (this->view.unk_124 != 0) {
         Camera_Update(GET_ACTIVE_CAM(this));

@@ -329,6 +329,19 @@ s32 Fishmod_RdpBenchDraw(PlayState* play) {
     s32 i;
     char line[96];
 
+    {
+        // (the frame's Z clear first: in play it waits until after the sky, which this frame doesn't draw)
+        extern u8* gFishmodZClear;
+        extern u32 gFishmodZClearSize;
+
+        if (gFishmodZClear != NULL) {
+            OPEN_DISPS(play->state.gfxCtx, "../fishmod_debug_rdpbench.inc.c", 0);
+            gSPMemset(POLY_OPA_DISP++, gFishmodZClear, GPACK_ZDZ(G_MAXFBZ, 0), gFishmodZClearSize);
+            CLOSE_DISPS(play->state.gfxCtx, "../fishmod_debug_rdpbench.inc.c", 0);
+            gFishmodZClear = NULL;
+        }
+    }
+
     sRdpTag = 0;
     Fishmod_SampleRdp(); // (the RDP's counters for the frame log, once a frame: the play bench does this for itself)
     if (sRbFrame < 0) {

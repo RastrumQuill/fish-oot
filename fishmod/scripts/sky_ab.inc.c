@@ -1,7 +1,5 @@
-// A/B of the skybox under water (FISHMOD_NO_SKY): mode A as now (no skybox with the camera under water, the frame
-// cleared to the fog colour), mode B the skybox drawn as vanilla. At the 16 diving views of shots.inc.c.
-// Captured by fishmod/tools/edge_ab_capture.py --stops 16: the diff table says whether any pixel changes.
-#define FISHMOD_EDGE_AB 1
-#define FISHMOD_TOUR_AUTO 400
-#define FISHMOD_EDGE_AB_FLAGS FISHMOD_BENCH_SKYUNDER
-#include "shots.inc.c"
+// An exact A/B of frames11's frame clears and sky (no colour clear under Lake Hylia's sky, the Z clear by the RSP, the
+// sky in 1-cycle at blend 0) against the old way (FISHMOD_BENCH_OLDSKY) at every tour stop, the scene frozen, taking
+// turns every 60 frames: the pictures must be the same. Captured by fishmod/tools/edge_ab_capture.py.
+#define FISHMOD_EDGE_AB_FLAGS FISHMOD_BENCH_OLDSKY
+#include "edge_ab.inc.c"
