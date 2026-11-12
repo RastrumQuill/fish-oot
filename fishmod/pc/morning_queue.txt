@@ -4,3 +4,5 @@
 releases/fish-oot-frames9.bps 12 frames9-a
 releases/fish-oot-frames8b.bps 12 frames8b
 releases/fish-oot-frames9.bps 12 frames9-b
+# the fish and plant stress benches, profiled (about 25 minutes; it ends itself)
+releases/fish-oot-stress2.bps 40 stress2
