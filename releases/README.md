@@ -11,8 +11,8 @@ results are in [history/](history/), and its patch is in the repository's histor
 | Patch | What it is | Notes |
 |---|---|---|
 | `fish-oot-qol6-testmode.bps`, `fish-oot-qol6-hw-testmode.bps` | The newest test build to play: equipment on a button swaps at any time, and pressing what's worn puts the default back | [notes](notes-qol6.md) |
-| `fish-oot-rdpbench2.bps` | The RDP calibration bench (console timing of controlled drawing, for the RDP cost model), with the RDP's counters | [notes](notes-rdpbench2.md) |
-| `fish-oot-frames8b.bps`, `-nostore`, `-noaux` | The bench route (frames8 that a stuck USB link can't freeze), and two variants to find what froze frames7 | [notes](notes-frames8b.md) |
+| `fish-oot-frames9.bps` | The bench route with the first fish AI work (cheaper far schools, no repeated shore raycasts) | [notes](notes-frames9.md) |
+| `fish-oot-frames8b.bps` | The bench route, the baseline for frames9 | [notes](notes-frames8b.md) |
 
 The bench patches are run by `fishmod\pc\morning.bat` (see `fishmod/pc/MORNING.md`).
 
