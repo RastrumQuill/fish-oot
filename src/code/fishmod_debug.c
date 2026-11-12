@@ -1389,6 +1389,22 @@ static void CodeGuard_Update(void) {
             sRec.now = now;
             bcopy((void*)sRec.addr, sRec.words, CODEGUARD_BLOCK);
             SsSram_ReadWrite(FISHMOD_SRAM_ADDR(FISHMOD_SRAM_CODEGUARD), &sRec, sizeof(sRec), OS_WRITE);
+#ifdef FISHMOD_PCPROF
+            {
+                // and over USB (the morning runner's debug log): the block as it is now, so what wrote it can be told
+                // from its contents (samples, pixels, display list commands...)
+                static char sLine[40 + CODEGUARD_BLOCK * 9 / 4];
+                char* o = sLine;
+                s32 k;
+
+                o += sprintf(o, "FISHMOD-CODEGUARD %08X frame %u:", (u32)sRec.addr, sPlayFrames);
+                for (k = 0; k < CODEGUARD_BLOCK / 4; k++) {
+                    o += sprintf(o, " %08X", sRec.words[k]);
+                }
+                sprintf(o, "\n");
+                Sc64_UsbText(sLine);
+            }
+#endif
             sprintf(sMsg, "code changed at %08X", (u32)sRec.addr);
             Fault_AddHungupAndCrashImpl(sMsg, "(code guard; SRAM FCOD)");
         }

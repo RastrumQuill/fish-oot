@@ -333,7 +333,12 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
                 wait = 3 * 3600
             else:
                 log("  the last game stopped answering: waiting %d s in case it restarts anyway" % wait)
-        if not dbg.started.wait(wait):
+        # (started: the game said FISHMOD-START, or, for builds before that message, its packets are arriving)
+        t_wait = time.time()
+        while not (dbg.started.is_set() or dbg.last_packet) and time.time() - t_wait < wait:
+            time.sleep(1)
+            packer.step()
+        if not (dbg.started.is_set() or dbg.last_packet):
             info["error"] = "the new ROM never said FISHMOD-START"
             log("  " + info["error"])
             return info, False

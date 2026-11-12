@@ -1,7 +1,5 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# The RDP calibration bench (with its counters), then frames8b, then the two variants that tell what froze frames7.
-# frames8b-noaux runs last: without the per-frame poll the runner can't reboot the console out of it.
-releases/fish-oot-rdpbench2.bps 15 rdpbench2
-releases/fish-oot-frames8b.bps 25 frames8b
-releases/fish-oot-frames8b-nostore.bps 25 nostore
-releases/fish-oot-frames8b-noaux.bps 25 noaux
+# The console's code corruption: frames6 (which ran for hours before) as the baseline under today's loading path, then
+# frames8b with the code guard on. Neither can be rebooted by the runner after a crash: power-cycle when it beeps.
+releases/fish-oot-frames6.bps 25 frames6-baseline
+releases/fish-oot-frames8b-guard.bps 25 guard
