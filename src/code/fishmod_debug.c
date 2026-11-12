@@ -1029,7 +1029,11 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #ifdef FISHMOD_HWBENCH
     sWatchdogBeat = sPlayFrames;
     Watchdog_Start();
+#ifdef FISHMOD_CODEGUARD
+    // (only when asked: it read 8 KB of code a frame, 1.9% of the CPU in frames5, and pushed the whole data cache out
+    // each time, a cost the benches measured as the game's)
     CodeGuard_Update();
+#endif
 #endif
     Fishmod_DebugTiming();
 #ifdef FISHMOD_STRESS

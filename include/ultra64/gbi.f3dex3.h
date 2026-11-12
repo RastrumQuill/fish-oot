@@ -5589,8 +5589,15 @@ _DW({                                                   \
 #define gDPNoOpTag(pkt, tag)    gDPParam(pkt,   G_NOOP, tag)
 #define gsDPNoOpTag(tag)        gsDPParam(      G_NOOP, tag)
 
+#if defined(DEBUG_FEATURES) && !DEBUG_FEATURES
+/* fish-oot: the debugger's labels (no-op commands naming each actor and the like) emit nothing without the game's
+   debug features: nothing reads them, and the RSP fetched and skipped two for every actor drawn each frame */
+#define gDPNoOpHere(pkt, file, line)        (void)0
+#define gDPNoOpString(pkt, data, n)         (void)0
+#else
 #define gDPNoOpHere(pkt, file, line)        gDma1p(pkt, G_NOOP, file, line, 1)
 #define gDPNoOpString(pkt, data, n)         gDma1p(pkt, G_NOOP, data, n, 2)
+#endif
 #define gDPNoOpWord(pkt, data, n)           gDma1p(pkt, G_NOOP, data, n, 3)
 #define gDPNoOpFloat(pkt, data, n)          gDma1p(pkt, G_NOOP, data, n, 4)
 #define gDPNoOpQuiet(pkt)                   gDma1p(pkt, G_NOOP, 0, 0, 5)
