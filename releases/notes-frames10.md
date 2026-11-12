@@ -1,7 +1,7 @@
 # frames10: the Guays' and Tektites' collision checks, the fish manager's travel
 
 **`fish-oot-frames10.bps`** (`fishmod/build.sh --script pcprof_frames --hw --colpack --gcc-all`): frames9 (see
-[its notes](notes-frames9.md)) plus what its console run found:
+[its notes](history/notes-frames9.md)) plus what its console run found:
 
 - **Guays:** circling idle, more than 60 units over the ground, away from walls and more than 300 units from Link
   (they only dive within 300), a Guay checks its collision one frame in four. frames9 measured 2.1 ms a frame of

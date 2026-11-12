@@ -1,8 +1,8 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
 # The short bench (one lap, clear dawn, legs 1-11 and 21, about 4 minutes; it ends itself).
-# frames10 (Guays' and Tektites' collision, the fish manager's travel) against frames9.
-releases/fish-oot-frames10.bps 12 frames10-a
-releases/fish-oot-frames9.bps 12 frames9
-releases/fish-oot-frames10.bps 12 frames10-b
-# the stress benches judged by the screen (to find the real fish limit; about 15-25 minutes; it ends itself)
-releases/fish-oot-stress3.bps 45 stress3
+# frames11 with and without run-ahead, against frames10.
+releases/fish-oot-frames11.bps 12 frames11-a
+releases/fish-oot-frames11-norun.bps 12 frames11-norun-a
+releases/fish-oot-frames10.bps 12 frames10
+releases/fish-oot-frames11.bps 12 frames11-b
+releases/fish-oot-frames11-norun.bps 12 frames11-norun-b

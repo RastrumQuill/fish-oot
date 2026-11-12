@@ -1,7 +1,7 @@
 # qol7: the fish's new behaviour, to play
 
 **`fish-oot-qol7-testmode.bps`** (emulators), **`fish-oot-qol7-hw-testmode.bps`** (console): qol6 (see
-[its notes](history/notes-qol6.md)) plus the fish AI work (the same as frames9's, see [its notes](notes-frames9.md)):
+[its notes](history/notes-qol6.md)) plus the fish AI work (the same as frames9's, see [its notes](history/notes-frames9.md)):
 
 - **Schools:** one fish takes the bait, not the school. A fish that goes to the bobber, gets hooked or is caught leaves
   its school, and the next fish leads the rest; it rejoins when it's free. Members keep a little room between them.
