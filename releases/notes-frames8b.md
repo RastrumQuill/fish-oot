@@ -18,3 +18,10 @@ can't be rebooted by the runner: it runs last).
 
 Which of these completes the route says what froze frames7: the per-frame poll, the sample store's background loading
 from the cart, or neither (then the stall report says what the cart was doing).
+
+## The short bench (from now on)
+
+`fish-oot-frames8b.bps` now runs the **short bench**: one lap (clear dawn) of the legs that stutter, 1-11 and 21, about
+4 minutes, then it says `FISHMOD-DONE` and the runner moves on. Legs 12-20 hold 20 fps in every build so far. The frame
+log keeps each leg's own number, so results compare with full-route runs leg by leg. The whole route (every leg, two
+laps, about 11 minutes) is `fishmod/build.sh --script pcprof_frames_full`, for checking a build before calling it done.

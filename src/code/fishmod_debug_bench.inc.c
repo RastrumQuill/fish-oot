@@ -456,6 +456,13 @@ static u16 PlayBench_Angle(void) {
     return 0;
 }
 
+#ifdef FISHMOD_BENCH_SHORT
+// the short bench: one lap of the legs that stutter (1-11 and 21; 12-20 hold 20 fps in every build so far), in their
+// route order; each leg still runs from its own stop to the next, as in the full route
+static const u8 sPbLegSet[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20 };
+static s32 sPbLegIdx;
+#endif
+
 static void Fishmod_PlayBenchUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 #ifdef FISHMOD_BENCH_LEGS
@@ -520,7 +527,11 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     }
 
     from = &sTourStops[sPbLeg];
+#ifdef FISHMOD_BENCH_SHORT
+    to = &sTourStops[(sPbLeg + 1) % ARRAY_COUNT(sTourStops)]; // (sPbLeg is the leg's own number)
+#else
     to = &sTourStops[(sPbLeg + 1) % n];
+#endif
     mode = sPbBlock;
     switch (sPbState) {
         case 0: // a new lap: this lap's time and weather, set in place (as the Song of Storms brings rain)
@@ -530,6 +541,10 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
             sPbState = 1;
             sPbFrame = 0;
             sPbLeg = 0;
+#ifdef FISHMOD_BENCH_SHORT
+            sPbLegIdx = 0;
+            sPbLeg = sPbLegSet[0];
+#endif
             sPbBlock = 0;
             break;
 
@@ -633,12 +648,22 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
                 sBench.visits++;
                 sPbBlock = 0;
                 sPbFrame = 0;
+#ifdef FISHMOD_BENCH_SHORT
+                if (++sPbLegIdx >= (s32)ARRAY_COUNT(sPbLegSet)) {
+                    sBench.laps++;
+                    sPbState = 0;
+                } else {
+                    sPbLeg = sPbLegSet[sPbLegIdx];
+                    sPbState = 2;
+                }
+#else
                 if (++sPbLeg >= n) {
                     sBench.laps++;
                     sPbState = 0;
                 } else {
                     sPbState = 2;
                 }
+#endif
                 Bench_Save();
             }
             break;

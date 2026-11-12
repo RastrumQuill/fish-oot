@@ -10,5 +10,13 @@
 #ifndef FISHMOD_FRAME_TAGS
 #define FISHMOD_PCPROF_NORING 1
 #endif
-#define PB_BLOCKS 1 // each leg walked once (the first pass, as in play): about an hour for the eight laps
+#define PB_BLOCKS 1 // each leg walked once (the first pass, as in play)
+#ifndef FISHMOD_BENCH_FULL
+// the short bench (the default): one lap, clear dawn, of the legs that stutter (1-11 and 21), about 4 minutes, then
+// FISHMOD-DONE; pcprof_frames_full has the whole route, two laps (clear dawn, rain at midday)
+#define FISHMOD_BENCH_SHORT 1
+#define FISHMOD_BENCH_LAPS 1
+#else
+#define FISHMOD_BENCH_LAPS 2
+#endif
 #include "hwbench_play.inc.c"

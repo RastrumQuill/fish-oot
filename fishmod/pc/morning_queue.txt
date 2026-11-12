@@ -1,3 +1,4 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# frames6 once more, now with the upload read back from the cart and compared (upload.log says "read back: ...").
-releases/fish-oot-frames6.bps 25 frames6-checked
+# frames8b on the short bench (one lap, clear dawn, legs 1-11 and 21, about 4 minutes; it ends itself), twice.
+releases/fish-oot-frames8b.bps 12 frames8b-a
+releases/fish-oot-frames8b.bps 12 frames8b-b

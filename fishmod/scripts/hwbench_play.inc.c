@@ -7,5 +7,7 @@
 #define FISHMOD_HWBENCH 1
 #define FISHMOD_BENCH_PLAY 1
 #define FISHMOD_SCRIPT_ADULT 1 // as the test build warps him to the lake
+#ifndef FISHMOD_BENCH_LAPS
 #define FISHMOD_BENCH_LAPS 8 // one of each time and weather: about an hour a lap
+#endif
 #include "tour.inc.c"
