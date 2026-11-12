@@ -21,14 +21,16 @@ the first minute.
    runner beeps and asks you to **press RESET** once. After that it needs nobody: each run ends with the game saying
    it's done, and the next ROM is loaded with `sc64deployer upload --reboot`.
 
-The queue is `fishmod\pc\morning_queue.txt`, one run a line (patch, most minutes, label). You can also drop .bps
+The queue is `fishmod\pc\morning_queue.txt` (now: the RDP calibration bench, then frames7, frames7 without the cache
+claiming, and frames8, twice round: about 90 minutes), one run a line (patch, most minutes, label). You can also drop .bps
 files onto `morning.bat` to run just those.
 
 ## The results
 
 Each morning gets a folder, `fishmod\pc\results\morning\runs\<date-time>\`. It holds a folder per run with
-`upload.log`, `debug.log`, `framelog.txt` (the frame log's summary) and `packets.zip` (everything the game sent), plus
-a `summary.txt` for the whole morning.
+`upload.log`, `debug.log`, `framelog.txt` (the frame log's summary) and `packets-001.zip` and on (everything the game
+sent, packed as it arrives, each pack under 29 MB, so no folder ever holds thousands of files), plus a `summary.txt` for
+the whole morning. The RDP calibration run also gets `rdpbench.txt` and `rdpbench.csv`.
 
 The folder is committed to the `morning-results` branch and pushed, without touching your checkout, so I can read it
 there. `fishmod\pc\results\morning_<date-time>.zip` is made either way: if the push fails (no git login, say), send
