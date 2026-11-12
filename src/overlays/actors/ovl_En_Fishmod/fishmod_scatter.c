@@ -325,6 +325,10 @@ static void Scatter_InitKinds(void) {
 
 static FishmodScatterHeader* sScatter;
 static u16* sChunkStart;
+// each non-empty chunk's kind boundaries (where each kind's props start in it: they're sorted by kind), made once at
+// load instead of by a pass over the chunk's props in every build; sChunkKindRow[c] its row in sChunkKindPool
+static u16* sChunkKindRow;
+static u16* sChunkKindPool;
 static s16* sChunkSurface;
 static FishmodProp* sProps;
 // Per chunk: the water there is lower than the props were placed for (the drained lake). Placement is all done at
@@ -443,6 +447,50 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sProps = (FishmodProp*)((u8*)sScatter + sScatter->propsOffset);
     sChunkDry = ZeldaArena_Malloc(sScatter->width * sScatter->depth);
     sDryMade = false;
+    {
+        s32 chunks = sScatter->width * sScatter->depth;
+        s32 rows = 0;
+        s32 c;
+
+        for (c = 0; c < chunks; c++) {
+            rows += (sChunkStart[c] != sChunkStart[c + 1]);
+        }
+        sChunkKindRow = ZeldaArena_Malloc(chunks * sizeof(u16));
+        sChunkKindPool = ZeldaArena_Malloc(rows * (FISHMOD_PROP_KIND_MAX + 1) * sizeof(u16));
+        if ((sChunkKindRow == NULL) || (sChunkKindPool == NULL) || (rows >= 0xFFFF)) {
+            if (sChunkKindRow != NULL) {
+                ZeldaArena_Free(sChunkKindRow);
+            }
+            if (sChunkKindPool != NULL) {
+                ZeldaArena_Free(sChunkKindPool);
+            }
+            sChunkKindRow = sChunkKindPool = NULL; // (each build finds them as before)
+        } else {
+            rows = 0;
+            for (c = 0; c < chunks; c++) {
+                u16* row;
+                s32 i = sChunkStart[c];
+                s32 end = sChunkStart[c + 1];
+                s32 k = 0;
+
+                if (i == end) {
+                    sChunkKindRow[c] = 0xFFFF;
+                    continue;
+                }
+                sChunkKindRow[c] = rows;
+                row = &sChunkKindPool[rows++ * (FISHMOD_PROP_KIND_MAX + 1)];
+                // (the same pass as Scatter_Build's was)
+                for (; i < end; i++) {
+                    while (k <= sProps[i].kind) {
+                        row[k++] = i;
+                    }
+                }
+                while (k <= FISHMOD_PROP_KIND_MAX) {
+                    row[k++] = end;
+                }
+            }
+        }
+    }
     sBedShadedRoom = NULL;
     Scatter_AllocBuffers();
     if (osMemSize >= 0x800000) {
@@ -665,6 +713,14 @@ void EnFishmod_ScatterUnload(void) {
     if (sChunkDry != NULL) {
         ZeldaArena_Free(sChunkDry);
         sChunkDry = NULL;
+    }
+    if (sChunkKindRow != NULL) {
+        ZeldaArena_Free(sChunkKindRow);
+        sChunkKindRow = NULL;
+    }
+    if (sChunkKindPool != NULL) {
+        ZeldaArena_Free(sChunkKindPool);
+        sChunkKindPool = NULL;
     }
     Scatter_FreeBuffers();
     if (sPropMtx != NULL) {
@@ -1300,6 +1356,12 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         s32 end = sChunkStart[c + 1];
         s32 k = 0;
 
+        if ((sChunkKindRow != NULL) && (sChunkKindRow[c] != 0xFFFF)) {
+            // (made at load: fishmod_scatter's load)
+            bcopy(&sChunkKindPool[sChunkKindRow[c] * (FISHMOD_PROP_KIND_MAX + 1)], sKindStart[v],
+                  (FISHMOD_PROP_KIND_MAX + 1) * sizeof(u16));
+            continue;
+        }
         for (; i < end; i++) {
             while (k <= sProps[i].kind) {
                 sKindStart[v][k++] = i;
