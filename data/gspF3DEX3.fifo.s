@@ -37,3 +37,25 @@ glabel gspF3DEX3_fifoDataStart
     .incbin "incbin/F3DEX3_BrW_NOC_Data"
 #endif
 glabel gspF3DEX3_fifoDataEnd
+
+#ifdef F3DEX3_ALL
+/* fish-oot: F3DEX3's three profiling builds too, for the bench to switch to (sys_ucode.c, Fishmod_SetUcodeSet) */
+.balign 16
+glabel gspF3DEX3_PA_fifoTextStart
+    .incbin "incbin/F3DEX3_BrW_PA_Text"
+.balign 16
+glabel gspF3DEX3_PA_fifoDataStart
+    .incbin "incbin/F3DEX3_BrW_PA_Data"
+.balign 16
+glabel gspF3DEX3_PB_fifoTextStart
+    .incbin "incbin/F3DEX3_BrW_PB_Text"
+.balign 16
+glabel gspF3DEX3_PB_fifoDataStart
+    .incbin "incbin/F3DEX3_BrW_PB_Data"
+.balign 16
+glabel gspF3DEX3_PC_fifoTextStart
+    .incbin "incbin/F3DEX3_BrW_PC_Text"
+.balign 16
+glabel gspF3DEX3_PC_fifoDataStart
+    .incbin "incbin/F3DEX3_BrW_PC_Data"
+#endif

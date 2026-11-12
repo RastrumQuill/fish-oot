@@ -217,7 +217,9 @@ static void PcProf_FrameEnd(void) {
     }
     if (pk->count == 0) {
         pk->magic = 0x4646524D; // 'FFRM'
-#ifdef F3DEX3_PROF
+#if defined(F3DEX3_ALL)
+        pk->version = 3; // (56 words; each record's set of F3DEX3's counters in r[1] bits 1-2)
+#elif defined(F3DEX3_PROF)
         pk->version = 2 | (F3DEX3_PROF << 8); // (56 words a record: 52-55 F3DEX3's counters; which set: 1-3 A-C)
 #else
         pk->version = 2; // (56 words a record: 52-55 F3DEX3's counters, the default set)
@@ -255,6 +257,13 @@ static void PcProf_FrameEnd(void) {
         r[53] = gFishmodRspCounters[1];
         r[54] = gFishmodRspCounters[2];
         r[55] = gFishmodRspCounters[3];
+#ifdef F3DEX3_ALL
+        {
+            extern u32 gFishmodRspCountersSet;
+
+            r[1] |= (gFishmodRspCountersSet & 3) << 1; // (version 3: the counters' set, per record)
+        }
+#endif
     }
     for (i = 0; i < FISHMOD_SECT_MAX; i++) {
         r[16 + i] = (u32)OS_CYCLES_TO_USEC(gFishmodSect[i]);

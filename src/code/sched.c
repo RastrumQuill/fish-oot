@@ -50,6 +50,9 @@
 #include "regs.h"
 #include "sched.h"
 #include "buffers.h"
+#ifdef F3DEX3_ALL
+s32 Fishmod_UcodeSetOf(void* ucode);
+#endif
 #include "speed_meter.h"
 #include "translation.h"
 #include "versions.h"
@@ -409,6 +412,13 @@ u32 Sched_TaskComplete(Scheduler* sc, OSScTask* task) {
             gFishmodRspCounters[1] = footer[1]; // rspInTriCount << 14 | rectCount
             gFishmodRspCounters[2] = footer[2]; // stallRDPFifoFullCycles (RCP cycles, 62.5 MHz)
             gFishmodRspCounters[3] = footer[3];
+#ifdef F3DEX3_ALL
+            {
+                extern u32 gFishmodRspCountersSet;
+
+                gFishmodRspCountersSet = Fishmod_UcodeSetOf(task->list.t.ucode);
+            }
+#endif
             osInvalDCache(footer, 0x10);
         }
 #endif
@@ -467,8 +477,12 @@ void Sched_RunTask(Scheduler* sc, OSScTask* spTask, OSScTask* dpTask) {
         }
 
         // Run RSP
-#ifdef F3DEX3_PROF
-        if ((spTask->list.t.type == M_GFXTASK) && !(spTask->list.t.flags & OS_TASK_YIELDED)) {
+#if defined(F3DEX3_PROF) || defined(F3DEX3_ALL)
+        if ((spTask->list.t.type == M_GFXTASK) && !(spTask->list.t.flags & OS_TASK_YIELDED)
+#ifdef F3DEX3_ALL
+            && (Fishmod_UcodeSetOf(spTask->list.t.ucode) != 0) // (only the profiling builds time themselves)
+#endif
+        ) {
             // fishmod: F3DEX3's profiling builds time themselves with the RDP's clock counter: cleared (all four) as
             // the graphics task starts, as their docs ask (not when it resumes after the audio task took the RSP)
             IO_WRITE(DPC_STATUS_REG, DPC_CLR_CLOCK_CTR | DPC_CLR_CMD_CTR | DPC_CLR_PIPE_CTR | DPC_CLR_TMEM_CTR);

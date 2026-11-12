@@ -231,6 +231,9 @@ ifeq ($(F3DEX3),1)
     CPP_DEFINES += -DF3DEX3_PROF=2
   else ifeq ($(F3DEX3_PROF),C)
     CPP_DEFINES += -DF3DEX3_PROF=3
+  else ifeq ($(F3DEX3_PROF),ALL)
+    # (all four in the ROM, the bench switching between them: F3DEX3_ALL)
+    CPP_DEFINES += -DF3DEX3_ALL=1
   endif
   ifeq ($(F3DEX3_OCC),1)
     CPP_DEFINES += -DF3DEX3_OCCLUSION=1

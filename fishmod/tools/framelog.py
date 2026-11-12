@@ -60,7 +60,11 @@ def records(folder):
         for i in range(count):
             rec = struct.unpack_from(f">{words}I", d, 16 + 4 * words * i)
             # (word 56: which set of F3DEX3's counters, 0 default, 1-3 its profiling builds A-C; -1 none)
-            out.append((rec if words == 56 else rec + (0, 0, 0, 0)) + ((version >> 8) & 0xFF if words == 56 else -1,))
+            if (version & 0xFF) >= 3:
+                cset = (rec[1] >> 1) & 3  # (version 3: each record's own set, in word 1 bits 1-2)
+            else:
+                cset = (version >> 8) & 0xFF if words == 56 else -1
+            out.append((rec if words == 56 else rec + (0, 0, 0, 0)) + (cset,))
     out.sort(key=lambda r: r[0])
     return out
 

@@ -847,7 +847,15 @@ void Fishmod_SampleRdp(void) {
     gFishmodRdp.buf = IO_READ(DPC_BUFBUSY_REG) & 0xFFFFFF;
     gFishmodRdp.pipe = IO_READ(DPC_PIPEBUSY_REG) & 0xFFFFFF;
     gFishmodRdp.tmem = IO_READ(DPC_TMEM_REG) & 0xFFFFFF;
-#ifndef F3DEX3_PROF
+#if defined(F3DEX3_ALL)
+    {
+        extern u32 gFishmodRspCountersSet;
+
+        if (gFishmodRspCountersSet == 0) {
+            IO_WRITE(DPC_STATUS_REG, DPC_CLR_CLOCK_CTR | DPC_CLR_CMD_CTR | DPC_CLR_PIPE_CTR | DPC_CLR_TMEM_CTR);
+        }
+    }
+#elif !defined(F3DEX3_PROF)
     IO_WRITE(DPC_STATUS_REG, DPC_CLR_CLOCK_CTR | DPC_CLR_CMD_CTR | DPC_CLR_PIPE_CTR | DPC_CLR_TMEM_CTR);
 #endif
     // (F3DEX3's profiling builds time themselves with the clock counter: sched.c clears them all as each graphics

@@ -762,6 +762,7 @@ s32 gFishmodScatterDrawn;                  // props drawn in the last frame
 u32 gFishmodScatterCacheUsed;     // frames the prop commands were copied from the last (or checked: SCATTER_VERIFY)
 u32 gFishmodScatterCacheMismatch; // SCATTER_VERIFY: frames the copy differed from the commands made afresh
 u32 gFishmodRspCounters[4]; // sched.c: F3DEX3's counters for the last graphics task
+u32 gFishmodRspCountersSet; // sched.c: which set they are (F3DEX3_ALL: 0 plain, 1-3 profiling A-C)
 u32* gFishmodGfxLog; // graph.c: each frame's graphics hashes, nine words (the collog script's builds)
 u32 gFishmodGfxLogCount;
 u32 gFishmodGfxDumpAt = 5; // graph.c: the frame whose whole graphics pool is kept in gFishmodGfxDump
@@ -971,6 +972,15 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     sPlayFrames++;
 #ifdef FISHMOD_SCRIPT
     StateHash_Update(play);
+#endif
+#if defined(F3DEX3_ALL) && defined(FISHMOD_BENCH_PLAY)
+    {
+        // all four of F3DEX3's builds in one run: each leg drawn by the set (leg + lap) mod 4, so over four laps every
+        // set measures every leg (the frame log tags each record with its set)
+        void Fishmod_SetUcodeSet(s32 set);
+
+        Fishmod_SetUcodeSet((sPbLeg + sBench.laps) & 3);
+    }
 #endif
 #ifdef FISHMOD_AUDLOG_DELAY
     // the audio check's own test: this build runs slower (about 5 ms of busy work a frame) and must hear the same
