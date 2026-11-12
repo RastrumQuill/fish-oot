@@ -179,6 +179,31 @@ def main():
             n_slow = sum(1 for r in rs if r[2] > SLOW_US)
             cname = CONDS[cond] if cond < len(CONDS) else str(cond)
             print(f"| {lap + 1} | {cname} | {leg + 1} | {len(rs)} | {len(rs) / t:.1f} | {100 * n_slow / len(rs):.0f}% |")
+    # the screen's pacing (records of 58 words): how long each picture stayed (3 refreshes at 20 fps; 4 or more a visible
+    # hitch), for judging consistency (run-ahead's aim) rather than speed
+    paced = [r for r in recs if len(r) > 58 and (r[57] >> 16)]
+    if paced:
+        held = collections.Counter(min(r[57] & 0xFFFF, 6) for r in paced)
+        pics = sum(r[57] >> 16 for r in paced)
+        refreshes = sum(r[58] for r in paced)
+        streaks = collections.Counter()
+        run = 0
+        for r in paced:
+            if (r[57] & 0xFFFF) > 3:
+                run += 1
+            elif run:
+                streaks[min(run, 6)] += 1
+                run = 0
+        if run:
+            streaks[min(run, 6)] += 1
+        print("\n## The screen's pacing (how long each picture stayed)\n")
+        print(f"{pics} pictures over {refreshes} refreshes: {60 * pics / max(refreshes, 1):.2f} fps on screen")
+        print("| longest a picture stayed in the record | records | share |")
+        print("|---|---|---|")
+        for k in sorted(held):
+            label = f"{k} refreshes" + (" or more" if k == 6 else "") + (" (on time)" if k <= 3 else " (a hitch)")
+            print(f"| {label} | {held[k]} | {100 * held[k] / len(paced):.1f}% |")
+        print("Hitches in a row: " + ", ".join(f"{('6+' if k == 6 else k)}: {streaks[k]}" for k in sorted(streaks)))
     if args.spikes:
         spikes(recs, rows, actors)
     if args.csv:
