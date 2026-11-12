@@ -1235,7 +1235,7 @@ void Play_Draw(PlayState* this) {
 
     gFishmodColorFill = NULL;
 #if ENABLE_F3DEX3
-    gFishmodZClearByRsp = !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY); // (the Z clear by the RSP, after the sky)
+    gFishmodZClearByRsp = !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY_Z); // (the Z clear by the RSP, after the sky)
 #endif
     if (FISHMOD_NO_SKY()) {
         Gfx_SetupFrame(gfxCtx, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2]);
@@ -1351,7 +1351,7 @@ void Play_Draw(PlayState* this) {
                     // fish-oot: at Lake Hylia the sky and the scene cover the whole screen, and the sky's render mode
                     // reads nothing back: the colour clear under it changes nothing (and costs the RDP 0.9 ms)
                     if ((this->sceneId == SCENE_LAKE_HYLIA) && (gFishmodColorFill != NULL) &&
-                        !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY)) {
+                        !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY_FILL)) {
                         Gfx noop = gsDPNoOp();
 
                         *gFishmodColorFill = noop;

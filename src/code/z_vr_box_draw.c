@@ -43,6 +43,13 @@ void Skybox_Draw(SkyboxContext* skyboxCtx, GraphicsContext* gfxCtx, s16 skyboxId
     MATRIX_TO_MTX(sSkyboxDrawMatrix, "../z_vr_box_draw.c", 76);
     gSPMatrix(POLY_OPA_DISP++, sSkyboxDrawMatrix, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 
+    // fish-oot (frames11): the sky writes full coverage outright (CVG_DST_FULL), not added to what's there (the
+    // setup's CVG_DST_CLAMP): with the colour fill under it (full coverage everywhere) the two are the same, and
+    // without it (Lake Hylia: Play_Draw leaves the fill out) the coverage left from an older frame doesn't come
+    // through into the edges drawn over the sky
+    gDPSetRenderMode(POLY_OPA_DISP++, (G_RM_OPA_SURF & ~CVG_DST_CLAMP) | CVG_DST_FULL,
+                     (G_RM_OPA_SURF2 & ~CVG_DST_CLAMP) | CVG_DST_FULL);
+
     // Enable magic square RGB dithering and bilinear filtering
     gDPSetColorDither(POLY_OPA_DISP++, G_CD_MAGICSQ);
     gDPSetTextureFilter(POLY_OPA_DISP++, G_TF_BILERP);
@@ -85,12 +92,13 @@ void Skybox_Draw(SkyboxContext* skyboxCtx, GraphicsContext* gfxCtx, s16 skyboxId
                 }
             }
         }
-    } else if ((blend == 0) && (gFishmodSkyOneTex != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY)) {
+    } else if ((blend == 0) && (gFishmodSkyOneTex != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY_1CYC)) {
         // fish-oot: not blending two skies: 1-cycle, one texture (the same picture: see gFishmodSkyOneTex)
         gDPPipeSync(POLY_OPA_DISP++);
         gDPSetCycleType(POLY_OPA_DISP++, G_CYC_1CYCLE);
         gDPSetCombineMode(POLY_OPA_DISP++, G_CC_DECALRGBA, G_CC_DECALRGBA);
-        gDPSetRenderMode(POLY_OPA_DISP++, G_RM_OPA_SURF, G_RM_OPA_SURF2);
+        gDPSetRenderMode(POLY_OPA_DISP++, (G_RM_OPA_SURF & ~CVG_DST_CLAMP) | CVG_DST_FULL,
+                         (G_RM_OPA_SURF2 & ~CVG_DST_CLAMP) | CVG_DST_FULL);
         gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[0]); // -z face
         gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[2]); // +z face
         gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[4]); // -x face
