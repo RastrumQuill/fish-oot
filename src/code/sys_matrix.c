@@ -403,12 +403,22 @@ void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
     f32 cos;
     f32 temp1;
     f32 temp2;
+    // fish-oot (frames11): an affine matrix (its bottom row 0, 0, 0, 1: every model matrix a limb is drawn with) keeps
+    // that row through translations and rotations, so its four products a step are skipped. The full maths would only
+    // leave the zeros' signs to chance (+0 or -0), and both make the same fixed-point matrix.
+#ifndef FISHMOD_NO_AFFINE
+    s32 affine = (cmf->wx == 0.0f) && (cmf->wy == 0.0f) && (cmf->wz == 0.0f) && (cmf->ww == 1.0f);
+#else
+    s32 affine = false; // (the check that it changes nothing: the graphics logs with and without)
+#endif
 
     // the translation (as it was, before the z rotation changes the first two columns)
     cmf->xw += cmf->xx * translation->x + cmf->xy * translation->y + cmf->xz * translation->z;
     cmf->yw += cmf->yx * translation->x + cmf->yy * translation->y + cmf->yz * translation->z;
     cmf->zw += cmf->zx * translation->x + cmf->zy * translation->y + cmf->zz * translation->z;
-    cmf->ww += cmf->wx * translation->x + cmf->wy * translation->y + cmf->wz * translation->z;
+    if (!affine) {
+        cmf->ww += cmf->wx * translation->x + cmf->wy * translation->y + cmf->wz * translation->z;
+    }
 
     // fish-oot: no z rotation, nothing to turn (as the y and x rotations below already did: cos 1 and sin 0 would only
     // add zeros)
@@ -429,10 +439,12 @@ void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
         cmf->zx = temp1 * cos + temp2 * sin;
         cmf->zy = temp2 * cos - temp1 * sin;
 
-        temp1 = cmf->wx;
-        temp2 = cmf->wy;
-        cmf->wx = temp1 * cos + temp2 * sin;
-        cmf->wy = temp2 * cos - temp1 * sin;
+        if (!affine) {
+            temp1 = cmf->wx;
+            temp2 = cmf->wy;
+            cmf->wx = temp1 * cos + temp2 * sin;
+            cmf->wy = temp2 * cos - temp1 * sin;
+        }
     }
 
     if (rotation->y != 0) {
@@ -453,10 +465,12 @@ void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
         cmf->zx = temp1 * cos - temp2 * sin;
         cmf->zz = temp1 * sin + temp2 * cos;
 
-        temp1 = cmf->wx;
-        temp2 = cmf->wz;
-        cmf->wx = temp1 * cos - temp2 * sin;
-        cmf->wz = temp1 * sin + temp2 * cos;
+        if (!affine) {
+            temp1 = cmf->wx;
+            temp2 = cmf->wz;
+            cmf->wx = temp1 * cos - temp2 * sin;
+            cmf->wz = temp1 * sin + temp2 * cos;
+        }
     }
 
     if (rotation->x != 0) {
@@ -477,10 +491,12 @@ void Matrix_TranslateRotateZYX(Vec3f* translation, Vec3s* rotation) {
         cmf->zy = temp1 * cos + temp2 * sin;
         cmf->zz = temp2 * cos - temp1 * sin;
 
-        temp1 = cmf->wy;
-        temp2 = cmf->wz;
-        cmf->wy = temp1 * cos + temp2 * sin;
-        cmf->wz = temp2 * cos - temp1 * sin;
+        if (!affine) {
+            temp1 = cmf->wy;
+            temp2 = cmf->wz;
+            cmf->wy = temp1 * cos + temp2 * sin;
+            cmf->wz = temp2 * cos - temp1 * sin;
+        }
     }
 }
 

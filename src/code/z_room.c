@@ -1,3 +1,4 @@
+#include "fishmod.h"
 #include "room.h"
 
 #include "versions.h"
@@ -767,6 +768,7 @@ void Room_Draw(PlayState* play, Room* room, u32 flags) {
         gSegments[3] = OS_K0_TO_PHYSICAL(room->segment);
         ASSERT(room->roomShape->base.type < ARRAY_COUNTU(sRoomDrawHandlers),
                "this->ground_shape->polygon.type < number(Room_Draw_Proc)", "../z_room.c", 1125);
+        Fishmod_ClaimDisplayLists(play->state.gfxCtx); // (fish-oot: the lists' next lines, before they're written)
         sRoomDrawHandlers[room->roomShape->base.type](play, room, flags);
     }
 }

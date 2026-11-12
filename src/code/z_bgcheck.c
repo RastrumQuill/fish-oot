@@ -1108,8 +1108,81 @@ typedef struct {
 } WallCacheEntry;
 static WallCacheEntry sWallCache[WALL_CACHE_SIZE];
 
+/*
+ * fishmod (frames11): a clearance bound for the scene's wall tests. After a test of a cell that found no wall, how far
+ * the position could move before any of the cell's walls could pass the test's rejections (each wall's z range for the
+ * first pass and x range for the second, or its plane distance: each changes by no more than the distance moved).
+ * Within that (less the radius and a margin), the answer is certainly "no wall" again: the place unchanged, the poly
+ * untouched, false, without walking the list. Every wall in the cell counts, whatever its height or flags (more than
+ * the test looks at: the bound only gets smaller). Emptied with the floor cache (a new generation). The exact answers:
+ * fishmod/tools/collog.sh compares the collision logs with FISHMOD_NO_WALLCLEAR.
+ */
+#define WALL_CLEAR_SIZE 64
+typedef struct {
+    StaticLookup* lookup;
+    f32 x;
+    f32 y;
+    f32 z;
+    f32 clear; // (distance from the wall's rejections at the anchor, the radius not taken off: see WallClear_Measure)
+    u16 gen;
+    u8 misses;
+} WallClear;
+static WallClear sWallClear[WALL_CLEAR_SIZE];
+
+/** The least, over the cell's walls, of how far each stays rejected by both passes' tests (the radius not counted). */
+static f32 WallClear_Measure(StaticLookup* lookup, CollisionContext* colCtx, Vec3f* pos) {
+    CollisionPoly* polyList = colCtx->colHeader->polyList;
+    SSNode* curNode = &colCtx->polyNodes.tbl[lookup->wall.head];
+    f32 clear = 1.0e9f;
+
+    while (true) {
+        s32 polyId = curNode->polyId;
+        CollisionPoly* curPoly = &polyList[polyId];
+        StaticPolyBox* box = &sStaticPolyBox[polyId];
+        f32 nx = COLPOLY_GET_NORMAL(curPoly->normal.x);
+        f32 ny = COLPOLY_GET_NORMAL(curPoly->normal.y);
+        f32 nz = COLPOLY_GET_NORMAL(curPoly->normal.z);
+        f32 plane = fabsf(Math3D_DistPlaneToPos(nx, ny, nz, curPoly->dist, pos));
+        f32 sepZ = MAX(box->minZ - pos->z, pos->z - box->maxZ);
+        f32 sepX = MAX(box->minX - pos->x, pos->x - box->maxX);
+        f32 normalXZ = sqrtf(SQ(nx) + SQ(nz));
+        f32 pass1 = MAX(sepZ, plane);
+        f32 pass2 = MAX(sepX, plane);
+
+        // (a wall too far from facing z, or x, never passes that pass: as the test's 0.4)
+        if ((normalXZ > 0.0f) && ((fabsf(nz) / normalXZ) < 0.39f)) {
+            pass1 = 1.0e9f;
+        }
+        if ((normalXZ > 0.0f) && ((fabsf(nx) / normalXZ) < 0.39f)) {
+            pass2 = 1.0e9f;
+        }
+        clear = MIN(clear, MIN(pass1, pass2));
+        if (curNode->next == SS_NULL) {
+            break;
+        }
+        curNode = &colCtx->polyNodes.tbl[curNode->next];
+    }
+    return clear;
+}
+
 s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 xpFlags, f32* outX, f32* outZ,
                             Vec3f* pos, f32 radius, CollisionPoly** outPoly) {
+#ifndef FISHMOD_NO_WALLCLEAR
+    WallClear* c = &sWallClear[((u32)lookup >> 2) & (WALL_CLEAR_SIZE - 1)];
+
+    if ((sStaticPolyBox != NULL) && (lookup->wall.head != SS_NULL) && (c->gen == sFloorCacheGen) &&
+        (c->lookup == lookup)) {
+        f32 d = sqrtf(SQ(pos->x - c->x) + SQ(pos->y - c->y) + SQ(pos->z - c->z));
+
+        // (the normals' length is 1 to 1 part in 30,000; 1.001 and a unit cover it and the tests' rounding)
+        if ((d * 1.001f + radius + 1.0f) < c->clear) {
+            *outX = pos->x;
+            *outZ = pos->z;
+            return false;
+        }
+    }
+#endif
+    {
     u32 px = FloorCache_Bits(pos->x);
     u32 py = FloorCache_Bits(pos->y);
     u32 pz = FloorCache_Bits(pos->z);
@@ -1150,7 +1223,20 @@ s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 
     e->outX = FloorCache_Bits(*outX);
     e->outZ = FloorCache_Bits(*outZ);
     e->outPoly = *outPoly;
+#ifndef FISHMOD_NO_WALLCLEAR
+    // nothing found: how far from here nothing can be (at most every 4th time for a cell that keeps missing)
+    if (!result && (sStaticPolyBox != NULL) && (lookup->wall.head != SS_NULL) &&
+        ((c->gen != sFloorCacheGen) || (c->lookup != lookup) || ((++c->misses & 3) == 0))) {
+        c->lookup = lookup;
+        c->gen = sFloorCacheGen;
+        c->x = pos->x;
+        c->y = pos->y;
+        c->z = pos->z;
+        c->clear = WallClear_Measure(lookup, colCtx, pos);
+    }
+#endif
     return result;
+    }
 }
 
 /**

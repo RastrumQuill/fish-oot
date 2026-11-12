@@ -865,6 +865,8 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         EnFishmod* fish = full[i].fish;
         s32 species = fish->species - gFishmodSpecies;
 
+        Fishmod_ClaimDisplayLists(play->state.gfxCtx); // (the lists' next lines, before this fish is written)
+
         if (species != lastSpecies) {
 #if FISHMOD_DEBUG
             profStart = FISHMOD_CLOCK();

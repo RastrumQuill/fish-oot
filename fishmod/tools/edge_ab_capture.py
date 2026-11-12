@@ -18,7 +18,7 @@ from PIL import Image
 
 SETTINGS = ["Audio/Driver=None", "Input/Defocus=Allow", "Video/Output=IntegerFixed", "Video/FixedScale=1",
             "Video/Shader=None", "Video/InterframeBlending=false", "Video/ColorEmulation=false",
-            "Video/ColorBleed=false", "Nintendo64/Quality=SD", "Nintendo64/Supersampling=false"]
+            "Video/ColorBleed=false", "Video/Quality=SD", "Video/Supersampling=false"]
 
 
 def read_marker(img):

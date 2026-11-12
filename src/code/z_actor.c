@@ -2706,6 +2706,7 @@ void Actor_Draw(PlayState* play, Actor* actor) {
 #endif
 
     OPEN_DISPS(play->state.gfxCtx, "../z_actor.c", 6035);
+    Fishmod_ClaimDisplayLists(play->state.gfxCtx); // (fish-oot: the lists' next lines, before it writes them)
 
     lights = LightContext_NewLights(&play->lightCtx, play->state.gfxCtx);
 

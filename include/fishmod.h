@@ -395,6 +395,8 @@ s32 Fishmod_UseItem(struct PlayState* play, s32 item, s32 button);
 void Fishmod_ResetRodInfo(void);
 s32 Fishmod_SceneHasFish(struct PlayState* play);
 void Fishmod_SizeCollision(s16 sceneId, u32* memSize, Vec3i* subdivAmount);
+struct GraphicsContext;
+void Fishmod_ClaimDisplayLists(struct GraphicsContext* gfxCtx);
 // The icon texture (in RAM) for fishmod's items, or NULL for a vanilla item
 void* Fishmod_ItemIcon(s32 item);
 // The item whose name the pause menu shows for `item`

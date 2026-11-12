@@ -569,11 +569,14 @@ static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
     // changes (a vertex load that spans bones is split)
     out = base->dl;
     k = 0; // load index
+    {
+    // (frames11) the bone whose matrix is loaded, kept from one limb to the next: a limb that starts on it loads none
+    s32 curBone = -1;
+
     for (i = 0; i < base->dlCount; i++) {
         s32 limbIndex = base->dlLimb[i];
         Gfx* g = Rig_LimbDL(model, SEGMENTED_TO_VIRTUAL(limbs[limbIndex]));
         u8 part = partMap[limbIndex];
-        s32 curBone = -1;
 
         if ((part != FISHMOD_PART_NONE) && (part != lastPart)) {
             gSPDisplayList(out++, SEGMENT_ADDR(RIG_SEG_TINT, part * 2 * sizeof(Gfx)));
@@ -588,27 +591,68 @@ static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
             if (op == G_VTX) {
                 FishRigVtxLoad* load = &base->loads[k++];
                 s32 v0 = ((g->words.w0 >> 1) & 0x7F) - load->n;
-                s32 a = 0;
+                u8 done[64];
+                s32 a;
 
-                while (a < load->n) {
-                    s32 bone = base->vtxBone[load->dst + a];
-                    s32 b = a + 1;
+                // (frames11) the load's runs of vertices grouped by bone: the bone already loaded first, then each
+                // other bone once with all its runs (A B A B was four matrix loads, now two). Every vertex still
+                // goes to its own slot under its own bone's matrix: the same vertices, the same picture.
+                bzero(done, sizeof(done));
+                while (true) {
+                    s32 bone = -1;
 
-                    while ((b < load->n) && (base->vtxBone[load->dst + b] == bone)) {
-                        b++;
+                    for (a = 0; a < load->n; a++) {
+                        if (!done[a] && (base->vtxBone[load->dst + a] == curBone)) {
+                            bone = curBone;
+                            break;
+                        }
+                    }
+                    if (bone < 0) {
+                        for (a = 0; a < load->n; a++) {
+                            if (!done[a]) {
+                                bone = base->vtxBone[load->dst + a];
+                                break;
+                            }
+                        }
+                    }
+                    if (bone < 0) {
+                        break;
                     }
                     if (bone != curBone) {
                         gSPMatrix(out++, SEGMENT_ADDR(RIG_SEG_MTX, bone * sizeof(Mtx)),
                                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
                         curBone = bone;
                     }
-                    gSPVertex(out++, SEGMENT_ADDR(RIG_SEG_VTX, (load->dst + a) * sizeof(Vtx)), b - a, v0 + a);
-                    a = b;
+                    for (a = 0; a < load->n; a++) {
+                        s32 b;
+
+                        if (done[a] || (base->vtxBone[load->dst + a] != bone)) {
+                            continue;
+                        }
+                        b = a + 1;
+                        while ((b < load->n) && !done[b] && (base->vtxBone[load->dst + b] == bone)) {
+                            b++;
+                        }
+                        gSPVertex(out++, SEGMENT_ADDR(RIG_SEG_VTX, (load->dst + a) * sizeof(Vtx)), b - a, v0 + a);
+                        for (; a < b; a++) {
+                            done[a] = true;
+                        }
+                        a--;
+                    }
                 }
                 continue;
             }
             *out++ = *g;
+#ifndef FISHMOD_NO_FISH_RA
+            // (frames11) the fish's anti-aliased opaque mode without reading the colour buffer back (IM_RD off: the
+            // RA_ZB_OPA_SURF of the near props, which saved 10-13% of their RDP time; the VI smooths the edges from
+            // coverage): G_SETOTHERMODE_L for the render mode (shift 3, 29 bits)
+            if ((op == G_SETOTHERMODE_L) && ((g->words.w0 & 0xFFFF) == ((32 - G_MDSFT_RENDERMODE - 29) << 8 | 28))) {
+                out[-1].words.w1 &= ~IM_RD;
+            }
+#endif
         }
+    }
     }
     gSPEndDisplayList(out++);
     base->ready = true;

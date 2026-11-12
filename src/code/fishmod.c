@@ -14,6 +14,8 @@
 #include "actor.h"
 #include "object.h"
 #include "play_state.h"
+#include "gfx.h"
+#include "thga.h"
 #include "player.h"
 #include "segmented_address.h"
 #include "actor_profile.h"
@@ -1506,3 +1508,44 @@ float __floatundisf(unsigned long long l) {
     return __ull_to_f(l);
 }
 #endif
+
+/**
+ * The display lists' next cache lines claimed before they're written (frames11): a store to a line that isn't in the
+ * data cache first reads it from RDRAM, for nothing when the whole line is about to be written. The VR4300's Create
+ * Dirty Exclusive (cache op 0x0D) makes the line without the read, as the matrices (sys_matrix.c) and the audio's
+ * command list (synthesis.c) already do. Called before each big writer (an actor's draw, a room, the fish, the props).
+ *
+ * Only lines strictly ahead of each list's write pointer (none of their bytes written yet) and wholly below its arena's
+ * tail (where GRAPH_ALLOC'd matrices and vertices live, already written): a claimed line holds garbage until written,
+ * and would put it back over anything real in RDRAM. CLAIM_AHEAD bytes at a time, each list's watermark kept so a line
+ * is claimed once.
+ */
+#define CLAIM_AHEAD 256
+
+static void Fishmod_ClaimArena(TwoHeadGfxArena* arena, u32* claimed) {
+#if defined(__GNUC__) && !defined(FISHMOD_NO_CLAIM)
+    u32 head = ((u32)arena->p + 15) & ~15; // (the first line none of whose bytes is written)
+    u32 tail = (u32)arena->d & ~15;         // (lines from here up hold allocations)
+    u32 end = head + CLAIM_AHEAD;
+    u32 p = *claimed;
+
+    if ((p < head) || (p > tail)) {
+        p = head; // (a new frame, another buffer, or the tail came down past it)
+    }
+    if (end > tail) {
+        end = tail;
+    }
+    for (; p < end; p += 16) {
+        __asm__ volatile("cache 0x0D, 0(%0)" : : "r"(p) : "memory");
+    }
+    *claimed = p; // (only ever moves on within a frame's list, or starts again at its head)
+#endif
+}
+
+void Fishmod_ClaimDisplayLists(GraphicsContext* gfxCtx) {
+    static u32 sClaimed[3];
+
+    Fishmod_ClaimArena(&gfxCtx->polyOpa, &sClaimed[0]);
+    Fishmod_ClaimArena(&gfxCtx->polyXlu, &sClaimed[1]);
+    Fishmod_ClaimArena(&gfxCtx->overlay, &sClaimed[2]);
+}
