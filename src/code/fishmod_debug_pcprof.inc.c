@@ -393,7 +393,7 @@ static void Sc64_AuxPoll(void) {
  * frame as they're counted: 1 for a frame over 52 ms, 2 otherwise (n64prof_frame_end; n64prof.py --frames).
  */
 #ifdef FISHMOD_FRAMELOG
-#define FRAMELOG_WORDS 56
+#define FRAMELOG_WORDS 58 // (56, 57: the pictures shown since the last record, and how long: version bit 16)
 #define FRAMELOG_PER_PACKET ((SC64_BUFFER_SIZE - 16) / (FRAMELOG_WORDS * 4))
 #define PCPROF_RING 1024 // samples a frame can hold (about 290 ms at 3,500 a second)
 #define FRAMELOG_SLOW_US 52000
@@ -442,11 +442,11 @@ static void PcProf_FrameEnd(void) {
     if (pk->count == 0) {
         pk->magic = 0x4646524D; // 'FFRM'
 #if defined(F3DEX3_ALL)
-        pk->version = 3; // (56 words; each record's set of F3DEX3's counters in r[1] bits 1-2)
+        pk->version = 3 | 0x10000; // (58 words; each record's set of F3DEX3's counters in r[1] bits 1-2)
 #elif defined(F3DEX3_PROF)
-        pk->version = 2 | (F3DEX3_PROF << 8); // (56 words a record: 52-55 F3DEX3's counters; which set: 1-3 A-C)
+        pk->version = 2 | (F3DEX3_PROF << 8) | 0x10000; // (58 words: 52-55 F3DEX3's counters; which set: 1-3 A-C)
 #else
-        pk->version = 2; // (56 words a record: 52-55 F3DEX3's counters, the default set)
+        pk->version = 2 | 0x10000; // (58 words a record: 52-55 F3DEX3's counters, the default set; 56-57 the screen)
 #endif
         pk->first = sPlayFrames;
     }
@@ -483,6 +483,17 @@ static void PcProf_FrameEnd(void) {
         r[53] = gFishmodRspCounters[1];
         r[54] = gFishmodRspCounters[2];
         r[55] = gFishmodRspCounters[3];
+    }
+    {
+        // the pictures the scheduler put on screen since the last record (sched.c): r[56] = how many << 16 | the most
+        // refreshes one stayed; r[57] = refreshes in all (3 a picture at 20 fps; a hitch holds one for 4 or more)
+        extern u32 gFishmodShown[3];
+        u32 prevInt = __osDisableInt();
+
+        r[56] = (gFishmodShown[0] << 16) | (gFishmodShown[1] & 0xFFFF);
+        r[57] = gFishmodShown[2];
+        gFishmodShown[0] = gFishmodShown[1] = gFishmodShown[2] = 0;
+        __osRestoreInt(prevInt);
 #ifdef F3DEX3_ALL
         {
             extern u32 gFishmodRspCountersSet;

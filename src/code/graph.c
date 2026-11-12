@@ -178,7 +178,7 @@ void Graph_InitTHGA(GraphicsContext* gfxCtx) {
     //!
     //! This isn't an issue in practice. In the worst case scenario with the game operating at a consistent 60 FPS,
     //! it would take approximately 414.25 days of continuous operation for fbIdx to overflow.
-    gfxCtx->curFrameBuffer = SysCfb_GetFbPtr(gfxCtx->fbIdx % 2);
+    gfxCtx->curFrameBuffer = SysCfb_GetFbPtr(gfxCtx->fbIdx % SysCfb_GetFbCount()); // (fish-oot: 2 or 3)
     gfxCtx->unk_014 = 0;
 }
 

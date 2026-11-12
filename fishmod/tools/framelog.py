@@ -57,14 +57,18 @@ def records(folder):
             continue
         _, version, count, _ = struct.unpack(">4I", d[:16])
         words = 56 if (version & 0xFF) >= 2 else WORDS  # (version 2: F3DEX3's counters in 52-55; bits 8-15: which set)
+        if version & 0x10000:
+            words = 58  # (bit 16: 56-57 the pictures shown: kept as 57 and 58 here, after the counters' set at 56)
         for i in range(count):
             rec = struct.unpack_from(f">{words}I", d, 16 + 4 * words * i)
+            extra = rec[56:58] if words == 58 else (0, 0)
+            rec = rec[:56] if words == 58 else rec
             # (word 56: which set of F3DEX3's counters, 0 default, 1-3 its profiling builds A-C; -1 none)
             if (version & 0xFF) >= 3:
                 cset = (rec[1] >> 1) & 3  # (version 3: each record's own set, in word 1 bits 1-2)
             else:
                 cset = (version >> 8) & 0xFF if words == 56 else -1
-            out.append((rec if words == 56 else rec + (0, 0, 0, 0)) + (cset,))
+            out.append((rec if len(rec) == 56 else rec + (0, 0, 0, 0)) + (cset,) + tuple(extra))
     out.sort(key=lambda r: r[0])
     return out
 
@@ -182,7 +186,8 @@ def main():
             names = (["frame", "route", "period", "cpu_update", "cpu_draw", "rsp", "rsp_audio", "rdp", "dp_clock",
                       "dp_buf", "dp_pipe", "dp_tmem", "fish_update", "fish_draw", "props_draw", "props"]
                      + [f"sect_{n}" for n in sects] + [""] * (20 - len(sects))
-                     + [f"cat_{n}" for n in cats] + [""] * (12 - len(cats)) + ["top1", "top2", "top3", "top4"])
+                     + [f"cat_{n}" for n in cats] + [""] * (12 - len(cats)) + ["top1", "top2", "top3", "top4"]
+                     + ["rsp0", "rsp1", "rsp2", "rsp3", "cset", "shown", "shown_total"])
             f.write(",".join(names) + "\n")
             for r in recs:
                 f.write(",".join(str(v) for v in r) + "\n")

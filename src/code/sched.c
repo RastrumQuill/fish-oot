@@ -562,6 +562,22 @@ void Sched_HandleRetrace(Scheduler* sc) {
         if (sc->pendingSwapBuf1 != NULL) {
             sc->pendingSwapBuf1->unk_10 = 0;
         }
+#if FISHMOD_DEBUG
+        {
+            // fish-oot: a new picture on screen: how many refreshes the last one stayed (3 at 20 fps; more, a visible
+            // hitch), for the frame log (fishmod_debug_pcprof.inc.c): pictures shown, the longest held, refreshes in all
+            extern u32 gFishmodShown[3];
+            static u32 sLastShownRetrace;
+            u32 held = sc->retraceCount - sLastShownRetrace;
+
+            sLastShownRetrace = sc->retraceCount;
+            gFishmodShown[0]++;
+            if (held > gFishmodShown[1]) {
+                gFishmodShown[1] = held;
+            }
+            gFishmodShown[2] += held;
+        }
+#endif
         // Advance buffers
         sc->curBuf = sc->pendingSwapBuf1;
         sc->pendingSwapBuf1 = sc->pendingSwapBuf2;

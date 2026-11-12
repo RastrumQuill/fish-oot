@@ -10,7 +10,8 @@
 #pragma increment_block_number "gc-eu:128 gc-eu-mq:128 gc-jp:128 gc-jp-ce:128 gc-jp-mq:128 gc-us:128 gc-us-mq:128" \
                                "pal-1.1:128"
 
-uintptr_t sSysCfbFbPtr[2];
+uintptr_t sSysCfbFbPtr[3];
+s32 sSysCfbCount = 2; // fish-oot: three with the Expansion Pak (the CPU and RCP a frame ahead when they can)
 uintptr_t sSysCfbEnd;
 
 u32 gFishmodSampleStoreStart; // fish-oot: RAM no one else uses, for the audio driver's sample store (0: none)
@@ -64,9 +65,14 @@ void SysCfb_Init(s32 n64dd) {
         // ends at the lower frame buffer, gives up the 870 KB between them.
         sSysCfbFbPtr[0] = 0x80700000 - (screenSize * 2);
         sSysCfbFbPtr[1] = 0x80800000 - (screenSize * 2);
+        // a third, just below the second: with three, a frame can be drawn while the last waits its turn on screen, so
+        // the CPU and the RCP can get a frame ahead, and a fast frame's spare time goes to a slow one after it instead of
+        // to waiting (graph.c); the game runs the same frames either way
+        sSysCfbFbPtr[2] = sSysCfbFbPtr[1] - (screenSize * 2);
+        sSysCfbCount = 3;
         // the space between them goes to the audio driver: copies of the samples being played (audio/internal/load.c)
         gFishmodSampleStoreStart = 0x80700000;
-        gFishmodSampleStoreEnd = sSysCfbFbPtr[1];
+        gFishmodSampleStoreEnd = sSysCfbFbPtr[2];
     }
 #endif
     PRINTF(T("フレームバッファのアドレスは %08x と %08x です\n", "Frame buffer addresses are %08x and %08x\n"),
@@ -76,11 +82,17 @@ void SysCfb_Init(s32 n64dd) {
 void SysCfb_Reset(void) {
     sSysCfbFbPtr[0] = 0;
     sSysCfbFbPtr[1] = 0;
+    sSysCfbFbPtr[2] = 0;
+    sSysCfbCount = 2;
     sSysCfbEnd = 0;
 }
 
+s32 SysCfb_GetFbCount(void) {
+    return sSysCfbCount;
+}
+
 void* SysCfb_GetFbPtr(s32 idx) {
-    if (idx < 2) {
+    if (idx < sSysCfbCount) {
         return (void*)sSysCfbFbPtr[idx];
     }
     return NULL;
