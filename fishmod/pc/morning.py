@@ -280,6 +280,36 @@ class Debug:
         self.log.close()
 
 
+
+def verify_upload(deployer, rom_path, log_path):
+    """Reads the uploaded ROM back from the cart's SDRAM (address 0) and compares it with what was sent: "ok", or
+    what differs."""
+    size = os.path.getsize(rom_path)
+    dump = os.path.join(WORK, "readback.bin")
+    if os.path.exists(dump):
+        os.remove(dump)
+    code, text = run_capture([deployer, "dump", "0", hex(size), dump], log_path, 600)
+    if code != 0 or not os.path.exists(dump):
+        return "read-back failed"
+    sent = open(rom_path, "rb").read()
+    got = open(dump, "rb").read()
+    os.remove(dump)
+    if len(got) != len(sent):
+        return "read back %d bytes of %d" % (len(got), len(sent))
+    if got == sent:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write("read back: the same, all %d bytes\n" % size)
+        return "ok"
+    diffs = [i for i in range(0, size, 4096) if got[i:i + 4096] != sent[i:i + 4096]]
+    first = diffs[0]
+    k = next(j for j in range(first, min(first + 4096, size)) if got[j] != sent[j])
+    msg = "%d of %d 4 KB blocks differ; first at 0x%X (sent %02X, read %02X)" % (len(diffs), size // 4096, k, sent[k],
+                                                                                    got[k])
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write("read back: DIFFERENT: %s; blocks %s\n" % (msg, ", ".join("0x%X" % d for d in diffs[:50])))
+    return msg
+
+
 # --- one run ---
 
 def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
@@ -307,7 +337,15 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
         code, text = run_capture([deployer, "upload", "--reboot", rom_out], upload_log, 300)
         if code == 0:
             answered = "no response for [Halt]" not in text and "no response for [Reboot]" not in text
-            break
+            # the deployer doesn't check what it wrote: read the ROM back out of the cart and compare, byte for byte
+            # (a few bytes wrong in the game's code crash it later, somewhere different each time)
+            bad = verify_upload(deployer, rom_out, upload_log)
+            info["upload_check"] = bad
+            if bad == "ok":
+                break
+            log("  the ROM in the cart differs from what was sent (%s): uploading again" % bad)
+            code = 1
+            continue
         log("  upload failed (exit %d): %s" % (code, text.strip().splitlines()[-1:] or ""))
         if attempt == 0:
             beep()
