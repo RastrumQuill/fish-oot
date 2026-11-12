@@ -86,35 +86,67 @@ s32 gAudioContextInitialized = false;
 /**
  * original name: Nas_WaveDmaFrameWork
  */
+/*
+ * fish-oot: the buffers whose ttl is counting down, one bit each (sSampleDmaLive), so the update below only visits
+ * those instead of every buffer: set wherever a ttl is set (the three in AudioLoad_DmaSampleData), cleared as it
+ * reaches 0 and when the buffers are made. Visited in index order, list 1 then list 2, as the original loops: the
+ * reuse queues fill in the same order.
+ */
+static u32 sSampleDmaLive[0x100 / 32];
+
+#define SAMPLE_DMA_LIVE(i) (sSampleDmaLive[(u32)(i) >> 5] |= 1u << ((u32)(i) & 31))
+
+static void AudioLoad_DecreaseSampleDmaTtlsIn(u32 from, u32 to, u8* queue, u8* wrPos) {
+    u32 w;
+
+    for (w = from >> 5; (w << 5) < to; w++) {
+        u32 bits = sSampleDmaLive[w];
+        u32 b;
+
+        if (bits == 0) {
+            continue;
+        }
+        for (b = 0; bits != 0; b++, bits >>= 1) {
+            u32 i = (w << 5) + b;
+            SampleDma* dma;
+
+            if (!(bits & 1) || (i < from) || (i >= to)) {
+                continue;
+            }
+            dma = &gAudioCtx.sampleDmas[i];
+            // (as the original: a live buffer's ttl is not 0)
+            dma->ttl--;
+            if (dma->ttl == 0) {
+                dma->reuseIndex = *wrPos;
+                queue[*wrPos] = i;
+                (*wrPos)++;
+                sSampleDmaLive[w] &= ~(1u << b);
+            }
+        }
+    }
+}
+
 void AudioLoad_DecreaseSampleDmaTtls(void) {
-    u32 i;
+    AudioLoad_DecreaseSampleDmaTtlsIn(0, gAudioCtx.sampleDmaListSize1, gAudioCtx.sampleDmaReuseQueue1,
+                                      &gAudioCtx.sampleDmaReuseQueue1WrPos);
+    AudioLoad_DecreaseSampleDmaTtlsIn(gAudioCtx.sampleDmaListSize1, gAudioCtx.sampleDmaCount,
+                                      gAudioCtx.sampleDmaReuseQueue2, &gAudioCtx.sampleDmaReuseQueue2WrPos);
+#if FISHMOD_DEBUG
+    {
+        // the check (not in the benches, timed as shipped): every buffer counting down is in the set
+        extern s32 gFishmodTimingAsShipped;
+        extern u32 gFishmodAudioDmaMismatches;
+        u32 i;
 
-    for (i = 0; i < gAudioCtx.sampleDmaListSize1; i++) {
-        SampleDma* dma = &gAudioCtx.sampleDmas[i];
-
-        if (dma->ttl != 0) {
-            dma->ttl--;
-            if (dma->ttl == 0) {
-                dma->reuseIndex = gAudioCtx.sampleDmaReuseQueue1WrPos;
-                gAudioCtx.sampleDmaReuseQueue1[gAudioCtx.sampleDmaReuseQueue1WrPos] = i;
-                gAudioCtx.sampleDmaReuseQueue1WrPos++;
+        if (!gFishmodTimingAsShipped) {
+            for (i = 0; i < gAudioCtx.sampleDmaCount; i++) {
+                if ((gAudioCtx.sampleDmas[i].ttl != 0) && !(sSampleDmaLive[i >> 5] & (1u << (i & 31)))) {
+                    gFishmodAudioDmaMismatches++;
+                }
             }
         }
     }
-
-    for (i = gAudioCtx.sampleDmaListSize1; i < gAudioCtx.sampleDmaCount; i++) {
-        SampleDma* dma = &gAudioCtx.sampleDmas[i];
-
-        if (dma->ttl != 0) {
-            dma->ttl--;
-            if (dma->ttl == 0) {
-                dma->reuseIndex = gAudioCtx.sampleDmaReuseQueue2WrPos;
-                gAudioCtx.sampleDmaReuseQueue2[gAudioCtx.sampleDmaReuseQueue2WrPos] = i;
-                gAudioCtx.sampleDmaReuseQueue2WrPos++;
-            }
-        }
-    }
-
+#endif
     gAudioCtx.unused2628 = 0;
 }
 
@@ -225,6 +257,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
                     gAudioCtx.sampleDmaReuseQueue2RdPos++;
                 }
                 dma->ttl = 32;
+                SAMPLE_DMA_LIVE(i);
                 *dmaIndexRef = (u8)i;
                 return &dma->ramAddr[devAddr - dma->devAddr];
             }
@@ -267,6 +300,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
                 gAudioCtx.sampleDmaReuseQueue1RdPos++;
             }
             dma->ttl = 2;
+            SAMPLE_DMA_LIVE(dma - gAudioCtx.sampleDmas);
             return dma->ramAddr + (devAddr - dma->devAddr);
         }
     }
@@ -284,6 +318,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
     transfer = dma->size;
     dmaDevAddr = devAddr & ~0xF;
     dma->ttl = 3;
+    SAMPLE_DMA_LIVE(dma - gAudioCtx.sampleDmas);
     dma->devAddr = dmaDevAddr;
     sSampleDmaDevAddr[dma - gAudioCtx.sampleDmas] = dmaDevAddr; // (fish-oot: the search's copy)
     dma->sizeUnused = transfer;
@@ -302,6 +337,7 @@ void AudioLoad_InitSampleDmaBuffers(UNUSED s32 numNotes) {
     s32 t2;
     s32 j;
 
+    bzero(sSampleDmaLive, sizeof(sSampleDmaLive)); // (fish-oot: no buffer counting down yet)
     gAudioCtx.sampleDmaBufSize = gAudioCtx.sampleDmaBufSize1;
     gAudioCtx.sampleDmas = AudioHeap_Alloc(&gAudioCtx.miscPool, 4 * gAudioCtx.numNotes * sizeof(SampleDma) *
                                                                     gAudioCtx.audioBufferParameters.specUnk4);

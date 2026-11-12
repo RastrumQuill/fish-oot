@@ -575,11 +575,14 @@ typedef struct NotePlaybackState {
     /* 0x04 */ u8 unk_04;
     /* 0x05 */ u8 stereoHeadsetEffects;
     /* 0x06 */ s16 adsrVolScaleUnused;
-    /* 0x08 */ f32 portamentoFreqScale;
-    /* 0x0C */ f32 vibratoFreqScale;
-    /* 0x10 */ SequenceLayer* prevParentLayer;
-    /* 0x14 */ SequenceLayer* parentLayer;
-    /* 0x18 */ SequenceLayer* wantedParentLayer;
+    // fishmod: the layer pointers first, in the same 16-byte cache line as priority and unk_04 (Note + 0x30): the
+    // update's check of each note (Audio_ProcessNotes) reads those three, and an idle note nothing else. (Were: the two
+    // frequency scales at 0x08 and 0x0C, the layers at 0x10-0x18.)
+    /* 0x08 */ SequenceLayer* prevParentLayer;
+    /* 0x0C */ SequenceLayer* parentLayer;
+    /* 0x10 */ SequenceLayer* wantedParentLayer;
+    /* 0x14 */ f32 portamentoFreqScale;
+    /* 0x18 */ f32 vibratoFreqScale;
     /* 0x1C */ NoteAttributes attributes;
     /* 0x40 */ AdsrState adsr;
     /* 0x60 */ Portamento portamento;

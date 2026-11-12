@@ -932,7 +932,9 @@ $(BUILD_DIR)/src/audio/%.o: CC_CHECK := @:
 $(BUILD_DIR)/src/audio/%.o: PREPROCESS :=
 $(BUILD_DIR)/src/audio/%.o: CFLAGS = $(GCC_PLAIN_CFLAGS)
 $(BUILD_DIR)/src/audio/%.o: MIPS_VERSION := -mips3
-$(BUILD_DIR)/src/audio/%.o: OPTFLAGS := $(GCC_PLAIN_OPT)
+# GCC_AUDIO_OPT: the audio driver's own level (default the game's: GCC_OPT), e.g. Os, for its code's size in the cache
+GCC_AUDIO_OPT ?= $(GCC_OPT)
+$(BUILD_DIR)/src/audio/%.o: OPTFLAGS := -$(GCC_AUDIO_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
 ifeq ($(FISHMOD_DEBUG),1)
 $(BUILD_DIR)/src/audio/%.o: OPTFLAGS += -g
 endif

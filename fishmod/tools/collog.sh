@@ -8,6 +8,7 @@
 #   GFX_OUT.bin: also the graphics log (graph.c: each frame's display lists and their allocations hashed, one word a
 #   frame): two builds that draw exactly the same give the same file (cmp, or collog_compare.py --gfx)
 # Needs: ares built by fishmod/tools/build_ares.sh (ARES=...), gdb-multiarch, an X display (Xvfb) in DISPLAY.
+# ARES_SLOT=0-3 (default 0): which GDB port (9123 + slot), so several runs can go at once.
 set -euo pipefail
 REC=32 PTRSYM=gFishmodColLog CNTSYM=gFishmodColLogFrames
 if [ "${1:-}" = "--audio" ]; then
@@ -21,7 +22,10 @@ sym() { mips-linux-gnu-nm "$ELF" | awk -v n="$1" '$3==n{print $1}'; }
 PTR=$(sym $PTRSYM) CNT=$(sym $CNTSYM)
 [ -n "$PTR" ] && [ -n "$CNT" ] || { echo "no $PTRSYM in $ELF (build with --script collog or audlog)"; exit 1; }
 xdpyinfo >/dev/null 2>&1 || { echo "no X display in DISPLAY ($DISPLAY): start Xvfb"; exit 1; }
-timeout $((SECS + 60)) "$ARES" --settings-file "$HERE/ares_debug.bml" --system "Nintendo 64" --no-file-prompt "$ROM" \
+PORT=$((9123 + ${ARES_SLOT:-0}))
+CONF=$(mktemp --suffix=.bml)
+sed "s/^\(\s*Port:\s*\)9123/\1$PORT/" "$HERE/ares_debug.bml" > "$CONF"
+timeout $((SECS + 60)) "$ARES" --settings-file "$CONF" --system "Nintendo 64" --no-file-prompt "$ROM" \
     >/dev/null 2>&1 &
 APID=$!
 GFXARGS=()
@@ -31,7 +35,7 @@ if [ -n "$GFXOUT" ]; then
              -ex "set \$q = *(unsigned int*)0x$(sym gFishmodGfxDump)" -ex "dump binary memory $GFXOUT.pool \$q \$q + 0x12410")
 fi
 sleep "$SECS"
-gdb-multiarch -q -batch -ex "set architecture mips:4000" -ex "set endian big" -ex "target remote 127.0.0.1:9123" \
+gdb-multiarch -q -batch -ex "set architecture mips:4000" -ex "set endian big" -ex "target remote 127.0.0.1:$PORT" \
     -ex "set \$p = *(unsigned int*)0x$PTR" -ex "set \$n = *(unsigned int*)0x$CNT" \
     -ex "printf \"records %u\\n\", \$n" \
     -ex "dump binary memory $OUT \$p \$p + \$n * $REC" \
@@ -39,4 +43,5 @@ gdb-multiarch -q -batch -ex "set architecture mips:4000" -ex "set endian big" -e
     2>&1 | grep -E "^records|^gfx|rror" || true
 kill $APID 2>/dev/null || true
 wait $APID 2>/dev/null || true
+rm -f "$CONF"
 ls -l "$OUT"

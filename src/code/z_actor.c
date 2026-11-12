@@ -1541,8 +1541,70 @@ Gfx* func_8002E830(Vec3f* object, Vec3f* eye, Vec3f* lightDir, GraphicsContext* 
 
     VIEW_ERROR_CHECK_EYE_POS(correctedEyeX, eye->y, eye->z);
 
-    guLookAtHilite(&D_8015BBA8, lookAt, *hilite, correctedEyeX, eye->y, eye->z, object->x, object->y, object->z, 0.0f,
-                   1.0f, 0.0f, lightDir->x, lightDir->y, lightDir->z, lightDir->x, lightDir->y, lightDir->z, 16, 16);
+    {
+        // fishmod: guLookAtHilite's answers kept for its inputs (two entries: Link asks for the same one twice a frame,
+        // for his opaque and translucent parts, and again every frame he and the camera hold still). Its Mtx output
+        // (D_8015BBA8) is never read; the LookAt and Hilite are copied word for word, as it would write them.
+        static struct {
+            u32 key[9];
+            u32 lookAt[sizeof(LookAt) / sizeof(u32)];
+            u32 hilite[sizeof(Hilite) / sizeof(u32)];
+            s32 valid;
+        } sHiliteCache[2];
+        static s32 sHiliteNext;
+        union {
+            f32 f[9];
+            u32 w[9];
+        } key;
+        s32 e;
+        s32 k;
+
+        key.f[0] = correctedEyeX;
+        key.f[1] = eye->y;
+        key.f[2] = eye->z;
+        key.f[3] = object->x;
+        key.f[4] = object->y;
+        key.f[5] = object->z;
+        key.f[6] = lightDir->x;
+        key.f[7] = lightDir->y;
+        key.f[8] = lightDir->z;
+        for (e = 0; e < 2; e++) {
+            if (sHiliteCache[e].valid) {
+                for (k = 0; k < 9; k++) {
+                    if (sHiliteCache[e].key[k] != key.w[k]) {
+                        break;
+                    }
+                }
+                if (k == 9) {
+                    break;
+                }
+            }
+        }
+        if (e < 2) {
+            for (k = 0; k < (s32)(sizeof(LookAt) / sizeof(u32)); k++) {
+                ((u32*)lookAt)[k] = sHiliteCache[e].lookAt[k];
+            }
+            for (k = 0; k < (s32)(sizeof(Hilite) / sizeof(u32)); k++) {
+                ((u32*)*hilite)[k] = sHiliteCache[e].hilite[k];
+            }
+        } else {
+            guLookAtHilite(&D_8015BBA8, lookAt, *hilite, correctedEyeX, eye->y, eye->z, object->x, object->y,
+                           object->z, 0.0f, 1.0f, 0.0f, lightDir->x, lightDir->y, lightDir->z, lightDir->x, lightDir->y,
+                           lightDir->z, 16, 16);
+            e = sHiliteNext;
+            sHiliteNext ^= 1;
+            for (k = 0; k < 9; k++) {
+                sHiliteCache[e].key[k] = key.w[k];
+            }
+            for (k = 0; k < (s32)(sizeof(LookAt) / sizeof(u32)); k++) {
+                sHiliteCache[e].lookAt[k] = ((u32*)lookAt)[k];
+            }
+            for (k = 0; k < (s32)(sizeof(Hilite) / sizeof(u32)); k++) {
+                sHiliteCache[e].hilite[k] = ((u32*)*hilite)[k];
+            }
+            sHiliteCache[e].valid = true;
+        }
+    }
 
     gSPLookAt(gfx++, lookAt);
     gDPSetHilite1Tile(gfx++, 1, *hilite, 16, 16);
