@@ -58,3 +58,17 @@ single card, and where it switches to the half-size texture.
 - **How many at once:** the pack asks for 6; `--parallel N` overrides it. `--keep-cores` sets how many
   of the first cores are left alone.
 - **Send back** `results_all.zip`. It holds one save per part. Partial results are still useful.
+
+## The capture card viewer (`capture.bat`)
+
+The console's picture and sound from a capture card, with as little delay as possible: the video is read on its own
+thread keeping only the newest frame, and the sound goes from the card's input to the speakers in small blocks
+(WASAPI). `capture.bat --list` shows the devices; `capture.bat --video 1 --audio "part of its name"` picks them (the
+choice is remembered in `capture.json`). The first run installs OpenCV and sounddevice into the environment.
+
+Keys in the window: **S** or **F12** a screenshot to the clipboard (also saved in `fishmod/pc/captures/`), **A** the
+last 10 seconds of sound as a .wav with a screenshot, **F** or **F11** full screen, **M** sound off/on, **L** the
+frame rate and delay, **Q** quit. **Ctrl+Alt+S** takes a screenshot to the clipboard from anywhere.
+
+Other programs on the same PC can read it at `http://127.0.0.1:8765/frame.jpg` (the newest picture), `/frame.png`,
+`/audio.wav?s=5` (the last few seconds of sound) and `/` (a page showing the picture).
