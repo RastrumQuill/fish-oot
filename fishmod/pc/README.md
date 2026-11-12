@@ -63,7 +63,8 @@ single card, and where it switches to the half-size texture.
 
 The console's picture and sound from a capture card, with as little delay as possible: the video is read on its own
 thread keeping only the newest frame, and the sound goes from the card's input to the speakers in small blocks
-(WASAPI). `capture.bat --list` shows the devices; `capture.bat --video 1 --audio "part of its name"` picks them (the
+(WASAPI). `capture.bat --list` shows the devices, `capture.bat --levels` how loud each sound input is right now (the
+card's picture open meanwhile: some cards only send sound while their video is captured); `capture.bat --video 1 --audio "part of its name"` picks them (the
 choice is remembered in `capture.json`). The first run installs OpenCV and sounddevice into the environment.
 
 Keys in the window: **S** or **F12** a screenshot to the clipboard (also saved in `fishmod/pc/captures/`), **A** the

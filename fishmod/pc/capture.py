@@ -4,6 +4,8 @@ through the speakers, plus screenshots to the clipboard, and a local web address
 
   capture.bat                  (or: python fishmod/pc/capture.py)
   capture.bat --list           the video and sound devices it can see
+  capture.bat --levels         how loud each sound input is right now (the picture open meanwhile: some cards only send
+                               sound while their video is being captured): the console's is the one that moves
   capture.bat --video 1 --audio "Cam Link"     pick them (the choice is remembered in capture.json)
 
 Keys (in the window):
@@ -144,6 +146,7 @@ class Audio:
 
         self.sd = sd
         self.muted = False
+        self.peak = 0
         self.ring = np.zeros((RATE * KEEP_SECONDS, CHANNELS), dtype=np.int16)
         self.pos = 0
         self.lock = threading.Lock()
@@ -156,6 +159,7 @@ class Audio:
 
     def callback(self, indata, outdata, frames, timing, status):
         data = indata if self.channels == CHANNELS else np.repeat(indata, CHANNELS, axis=1)
+        self.peak = max(self.peak, int(np.abs(indata.astype(np.int32)).max()) if len(indata) else 0)
         outdata[:] = 0 if self.muted else data
         with self.lock:
             n = len(data)
@@ -217,6 +221,42 @@ def pick_audio(sd, wanted):
     if out_idx is None or out_idx < 0:
         out_idx = sd.default.device[1]
     return in_idx, out_idx
+
+
+def levels(video_index):
+    """Each sound input's loudest sample over about a second, with the capture card's picture open meanwhile."""
+    import sounddevice as sd
+
+    cap = None
+    try:
+        import cv2
+
+        cap = cv2.VideoCapture(video_index, cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY)
+        for _ in range(10):
+            cap.read()  # (the card streaming before the sound is listened to)
+    except Exception as e:
+        print(f"(the picture didn't open: {e})")
+    apis = sd.query_hostapis()
+    print("Sound inputs, the loudest sample in about a second (play something with sound on the console):")
+    for i, d in enumerate(sd.query_devices()):
+        if d["max_input_channels"] <= 0:
+            continue
+        api = apis[d["hostapi"]]["name"]
+        try:
+            rate = int(d["default_samplerate"])
+            data = sd.rec(int(rate * 1.0), samplerate=rate, channels=min(2, d["max_input_channels"]), device=i,
+                          dtype="int16", blocking=True)
+            peak = int(np.abs(data.astype(np.int32)).max())
+            db = 20 * np.log10(max(peak, 1) / 32768)
+            bar = "#" * max(0, int((db + 60) / 3))
+            print(f"  {i:3}: {db:6.1f} dB {bar:20s} {d['name']} [{api}]")
+        except Exception as e:
+            print(f"  {i:3}:  (won't open: {str(e).splitlines()[0][:60]}) {d['name']} [{api}]")
+        if cap is not None:
+            cap.read()
+    if cap is not None:
+        cap.release()
+    print("Silence is about -90 dB; the console's sound should be -40 dB or louder. Then: capture.bat --audio NUMBER")
 
 
 def list_audio():
@@ -332,6 +372,7 @@ def global_hotkey(on_press):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--list", action="store_true", help="show the video and sound devices, then quit")
+    ap.add_argument("--levels", action="store_true", help="how loud each sound input is now, then quit")
     ap.add_argument("--video", type=int, help="the capture card's video device number")
     ap.add_argument("--audio", help="the capture card's sound input: a number, or part of its name")
     ap.add_argument("--no-audio", action="store_true")
@@ -347,9 +388,13 @@ def main():
         list_audio()
         return
 
+    cfg = load_config()
+    if args.levels:
+        levels(args.video if args.video is not None else cfg.get("video", 0))
+        return
+
     import cv2
 
-    cfg = load_config()
     vid = args.video if args.video is not None else cfg.get("video", 0)
     size = args.size or cfg.get("size", "720x480")
     w, h = (int(v) for v in size.lower().split("x"))
@@ -407,7 +452,11 @@ def main():
                     y = 24
                     if overlay:
                         age = 1000 * (time.perf_counter() - stamp)
-                        snd = f", sound {audio.latency_ms():.0f} ms" if audio else ""
+                        snd = ""
+                        if audio:
+                            level = 20 * np.log10(max(audio.peak, 1) / 32768)
+                            audio.peak = 0
+                            snd = f", sound {audio.latency_ms():.0f} ms, in {level:.0f} dB"
                         cv2.putText(frame, f"in {fps_in:.0f} fps, shown {fps_out:.0f} fps, frame age {age:.0f} ms{snd}",
                                     (8, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
                         y += 22
