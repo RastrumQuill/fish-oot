@@ -395,8 +395,10 @@ s32 EnFishmod_WaterFloorImpl(PlayState* play, f32 x, f32 z, f32* surface, f32* f
         }
     }
 
-    // not cached (no grid for this box, or an edge with no floor): raycast it
-    *floor = EnFishmod_RaycastFloor(play, x, *surface + GRID_CAST_HEIGHT, z);
+    // not in the grid (no grid for this box, or a cell with a corner on top of a bank, where the cast found no
+    // floor): measure the spot itself, cached nearby like the bank cells' (these used to be raycast at every
+    // question: along the shore, a fish's look ahead and the line's points asked again and again)
+    *floor = EnFishmod_ExactFloor(play, x, z, *surface);
     return true;
 }
 
