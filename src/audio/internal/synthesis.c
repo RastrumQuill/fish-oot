@@ -1349,7 +1349,7 @@ Acmd* AudioSynth_FinalResample(Acmd* cmd, NoteSynthesisState* synthState, s32 si
 static u32 sRampDivisor;
 static u32 sRampMagic;
 
-static inline s32 AudioSynth_RampDiv(s32 n, s32 d) {
+static s32 AudioSynth_RampDiv(s32 n, s32 d) {
     u32 a;
     u32 q;
 

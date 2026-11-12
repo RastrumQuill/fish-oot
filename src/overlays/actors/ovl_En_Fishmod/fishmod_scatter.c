@@ -2007,7 +2007,9 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     if (SCATTER_ONE_CYCLE()) {
         // what's drawn next: the 2-cycle mode, no packed normals, and the scene's lights
         gDPSetCycleType(opa++, G_CYC_2CYCLE);
+#ifdef G_PACKED_NORMALS // (F3DEX3 only; the emulator profile's microcode never takes this branch)
         gSPClearGeometryMode(opa++, G_PACKED_NORMALS);
+#endif
         opa = Scatter_SceneLights(opa);
         xlu = Scatter_SceneLights(xlu);
     }

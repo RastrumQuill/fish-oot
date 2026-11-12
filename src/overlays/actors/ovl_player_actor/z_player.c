@@ -2711,8 +2711,7 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
                 sHeldItemButtonIsHeldDown = true;
             }
         } else if ((i >= 1) && Fishmod_IsEquipItem(item)) {
-            // fishmod: equipment on a C or D-pad button is put on, not held
-            Fishmod_EquipItem(play, item);
+            // fishmod: equipment on a C or D-pad button is put on, not held (Fishmod_EquipButtons, every frame)
         } else {
             this->heldItemButton = i;
             Player_UseItem(play, this, item);
@@ -11713,6 +11712,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
     STACK_PAD(s32);
 
     sControlInput = input;
+    Fishmod_EquipButtons(play, input); // fishmod: equipment on a button, at any time Link can be controlled
 
     if (this->unk_A86 < 0) {
         this->unk_A86++;

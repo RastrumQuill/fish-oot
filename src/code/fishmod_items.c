@@ -200,6 +200,9 @@ u8* Fishmod_InvSlot(s32 slot) {
 #include "controller.h"
 #include "z_lib.h"
 #include "string.h"
+#include "cutscene.h"
+#include "pause.h"
+#include "message.h"
 
 #define DPAD_AGE() (((void)0, gSaveContext.save.linkAge) == LINK_AGE_CHILD)
 
@@ -262,20 +265,43 @@ s32 Fishmod_DpadItem(PlayState* play, s32 button) {
     return item;
 }
 
-/** Equipment pressed on a button: equip it (a tunic or boots already worn: back to the Kokiri ones). Returns true if
- * anything changed. */
+// Who can wear what (the pause menu's gEquipAgeReqs, which lives in its overlay): 0 either age, else the LINK_AGE_*
+// plus one
+static const u8 sEquipAge[EQUIP_TYPE_MAX][4] = {
+    { 0, LINK_AGE_CHILD + 1, LINK_AGE_ADULT + 1, LINK_AGE_ADULT + 1 }, // swords: Kokiri, Master, Biggoron
+    { 0, LINK_AGE_CHILD + 1, 0, LINK_AGE_ADULT + 1 },                  // shields: Deku, Hylian, Mirror
+    { 0, 0, LINK_AGE_ADULT + 1, LINK_AGE_ADULT + 1 },                  // tunics: Kokiri, Goron, Zora
+    { 0, 0, LINK_AGE_ADULT + 1, LINK_AGE_ADULT + 1 },                  // boots: Kokiri, Iron, Hover
+};
+
+/** The equipment a type goes back to when what's worn is pressed again: the Kokiri tunic and boots; the Kokiri Sword
+ * and Deku Shield as a child, the Master Sword and Hylian Shield as an adult. */
+static s32 Fishmod_EquipDefault(s32 type) {
+    if ((type == EQUIP_TYPE_SWORD) || (type == EQUIP_TYPE_SHIELD)) {
+        return LINK_IS_ADULT ? 2 : 1;
+    }
+    return 1;
+}
+
+/** Equipment pressed on a button: equip it; pressed while it's already worn, back to the default (Fishmod_EquipDefault).
+ * Returns true if anything changed. */
 s32 Fishmod_EquipItem(PlayState* play, s32 item) {
     Player* player = GET_PLAYER(play);
     s32 type = (item - ITEM_SWORD_KOKIRI) / 3;
     s32 value = (item - ITEM_SWORD_KOKIRI) % 3 + 1;
-    s32 owned = CHECK_OWNED_EQUIP(type, value - 1);
+    s32 owned;
 
+    if (CUR_EQUIP_VALUE(type) == value) {
+        value = Fishmod_EquipDefault(type); // (worn already: back to the default)
+    }
+    owned = (value == 1) && ((type == EQUIP_TYPE_TUNIC) || (type == EQUIP_TYPE_BOOTS)) // (always owned)
+                ? true
+                : CHECK_OWNED_EQUIP(type, value - 1);
     if ((type == EQUIP_TYPE_SWORD) && (value == EQUIP_VALUE_SWORD_BIGGORON)) {
         owned = owned || CHECK_OWNED_EQUIP_ALT(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_BROKENGIANTKNIFE);
     }
-    if (((type == EQUIP_TYPE_TUNIC) || (type == EQUIP_TYPE_BOOTS)) && (CUR_EQUIP_VALUE(type) == value)) {
-        value = 1; // (the Kokiri tunic or boots: always owned)
-        owned = true;
+    if ((sEquipAge[type][value] != 0) && (sEquipAge[type][value] != ((void)0, gSaveContext.save.linkAge) + 1)) {
+        owned = false; // (not at this age)
     }
     // (not a sword or shield while one's in his hand: the held model would be the old one's)
     if (!owned || (CUR_EQUIP_VALUE(type) == value) ||
@@ -300,6 +326,39 @@ s32 Fishmod_EquipItem(PlayState* play, s32 item) {
     Player_SetEquipmentData(play, player);
     Sfx_PlaySfxCentered(NA_SE_SY_DECIDE);
     return true;
+}
+
+/**
+ * Equipment on a C or D-pad button, pressed: put on (or, if worn, back to the default) at any time Link can be
+ * controlled, even with the C buttons greyed out (swimming, climbing...), as the pause menu allows. Not while paused,
+ * in a cutscene, with text up, or at a game over. Called from Player_UpdateCommon every frame; the item buttons' own
+ * handling leaves equipment alone.
+ */
+void Fishmod_EquipButtons(PlayState* play, Input* input) {
+    static const u16 sButtons[] = { BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
+    Player* player = GET_PLAYER(play);
+    s32 i;
+
+    if ((input == NULL) || (player == NULL) || (play->pauseCtx.state != PAUSE_STATE_OFF) ||
+        (play->csCtx.state != CS_STATE_IDLE) || (Message_GetState(&play->msgCtx) != TEXT_STATE_NONE) ||
+        (gSaveContext.gameMode != GAMEMODE_NORMAL) || (gSaveContext.save.info.playerData.health <= 0) ||
+        (player->csAction != PLAYER_CSACTION_NONE)) {
+        return;
+    }
+#if FISHMOD_TESTMODE
+    if (CHECK_BTN_ALL(input->cur.button, BTN_L)) {
+        return; // (L + D-pad: the test build's warps)
+    }
+#endif
+    for (i = 0; i < ARRAY_COUNT(sButtons); i++) {
+        if (CHECK_BTN_ALL(input->press.button, sButtons[i])) {
+            s32 slot = Fishmod_ButtonSlot(i + 1);
+
+            if (FISHMOD_IS_EQUIP_SLOT(slot) && (Fishmod_SlotItem(slot) != ITEM_NONE)) {
+                Fishmod_EquipItem(play, Fishmod_SlotItem(slot));
+            }
+        }
+    }
 }
 
 /** A bottle on a D-pad button changed (as Inventory_UpdateBottleItem does for a C button). */
