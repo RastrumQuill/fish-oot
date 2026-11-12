@@ -4,8 +4,8 @@ counters from the frame log, less the empty frame's, and what that comes to per 
 
 Usage: fishmod/tools/rdpbench.py FOLDER [--csv OUT.csv]
 FOLDER: what `sc64deployer debug` saved (binaryout-*.bin; the tests' descriptions are the "RDPTEST" lines in the
-debug.log beside them, or, from ares, in text packets among the binaryouts). The morning runner's packets.zip can be
-unzipped there.
+debug.log beside them, or, from ares, in text packets among the binaryouts). The morning runner's packs (packets-NNN.zip) are
+unpacked there first.
 
 The frame log's RDP time is the scheduler's (from the graphics task's start to the RDP's end: the RSP's own work is
 in it); the RDP's counters (62.5 MHz cycles) are its own: all cycles while it ran (clock), the command buffer busy,
@@ -64,7 +64,7 @@ def main():
 
     folder = args.folder
     for f in os.listdir(folder):
-        if f == "packets.zip":
+        if f == "packets.zip" or (f.startswith("packets-") and f.endswith(".zip")):  # (the morning runner's packs)
             zipfile.ZipFile(os.path.join(folder, f)).extractall(folder)
     desc = descriptions(folder)
     if not desc:

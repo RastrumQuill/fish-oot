@@ -5,7 +5,7 @@ For each line of the queue (fishmod/pc/morning_queue.txt, or patches given on th
 (where it is: nothing is moved; the patched copy is made in fishmod/pc/work/ and deleted after its run), loads it
 into the SummerCart64 with `sc64deployer upload --reboot` (the running game restarts into it: fish-oot's bench builds
 answer the reboot request), records `sc64deployer debug` until the game says the route is done, and moves on. At the
-end the results (the logs, each run's packets zipped, framelog.py's summary) are committed to the morning-results
+end the results (the logs, each run's packets in packs of at most 29 MB, framelog.py's summary) are committed to the morning-results
 branch and pushed, so they can be read from the repository; a results zip is made either way.
 
 The first run: if the console isn't running a fish-oot bench build, nothing answers the reboot request, so it beeps
@@ -153,17 +153,64 @@ def run_capture(cmd, out_path, timeout):
     return code, text
 
 
-class Debug:
-    """`sc64deployer debug` in the run's folder (it saves each packet there), watched for the game's lines."""
+PACK_LIMIT = 29 * 1000 * 1000  # a pack of packets is closed before it reaches this many bytes
+PACK_SETTLE = 2.0  # seconds a packet file must have been left alone before it's packed (sc64deployer done with it)
 
-    def __init__(self, deployer, folder):
+
+class Packer:
+    """Moves `sc64deployer debug`'s packet files (one file a packet, a thousand or more a run) from its spool folder
+    into compressed packs in the run's folder, packets-001.zip and on, none over PACK_LIMIT bytes."""
+
+    def __init__(self, spool, folder):
+        self.spool = spool
+        self.folder = folder
+        self.index = 1
+        self.count = 0
+        self.bytes = 0
+
+    def pack_path(self):
+        return os.path.join(self.folder, "packets-%03d.zip" % self.index)
+
+    def step(self, final=False):
+        now = time.time()
+        files = sorted(glob.glob(os.path.join(self.spool, "binaryout-*.bin")))
+        for f in files:
+            try:
+                st = os.stat(f)
+            except OSError:
+                continue
+            if not final and (now - st.st_mtime) < PACK_SETTLE:
+                continue
+            path = self.pack_path()
+            if os.path.exists(path) and os.path.getsize(path) + st.st_size > PACK_LIMIT:
+                self.index += 1
+                path = self.pack_path()
+            with zipfile.ZipFile(path, "a", zipfile.ZIP_DEFLATED) as z:
+                z.write(f, os.path.basename(f))
+            self.count += 1
+            self.bytes += st.st_size
+            os.remove(f)
+
+    def unpack_to(self, dest):
+        """Every pack's packets in one folder (for the readers, which want a folder of them)."""
+        os.makedirs(dest, exist_ok=True)
+        for p in sorted(glob.glob(os.path.join(self.folder, "packets-*.zip"))):
+            with zipfile.ZipFile(p) as z:
+                z.extractall(dest)
+
+
+class Debug:
+    """`sc64deployer debug` in a spool folder (it saves each packet there as a file), watched for the game's lines."""
+
+    def __init__(self, deployer, folder, spool):
         self.folder = folder
         self.started = threading.Event()
         self.done = threading.Event()
         self.lines = 0
+        self.last_packet = None
         self.log = open(os.path.join(folder, "debug.log"), "a", encoding="utf-8", errors="replace")
         flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-        self.proc = subprocess.Popen([deployer, "debug"], cwd=folder, stdin=subprocess.PIPE,
+        self.proc = subprocess.Popen([deployer, "debug"], cwd=spool, stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=flags)
         self.reader = threading.Thread(target=self._read, daemon=True)
         self.reader.start()
@@ -176,12 +223,11 @@ class Debug:
                 self.started.set()
             if "FISHMOD-DONE" in line:
                 self.done.set()
-            if "Wrote [" not in line:  # (one of those a packet: counted, not logged)
+            if "Wrote [" in line:  # (one of those a packet: noted, not logged)
+                self.last_packet = time.time()
+            else:
                 self.log.write(time.strftime("%H:%M:%S ") + line.rstrip() + "\n")
                 self.log.flush()
-
-    def packets(self):
-        return glob.glob(os.path.join(self.folder, "binaryout-*.bin"))
 
     def alive(self):
         return self.proc.poll() is None
@@ -199,12 +245,6 @@ class Debug:
             self.proc.wait(10)
         self.reader.join(5)
         self.log.close()
-
-
-def newest_packet_age(files):
-    if not files:
-        return None
-    return time.time() - max(os.path.getmtime(f) for f in files)
 
 
 # --- one run ---
@@ -246,7 +286,11 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
         return info, False
     log("  uploaded%s" % ("" if answered else " (the running game didn't answer the reboot request)"))
 
-    dbg = Debug(deployer, folder)
+    spool = os.path.join(WORK, "spool")
+    shutil.rmtree(spool, ignore_errors=True)
+    os.makedirs(spool)
+    packer = Packer(spool, folder)
+    dbg = Debug(deployer, folder, spool)
     try:
         wait = START_SECONDS
         if not answered:
@@ -265,10 +309,11 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
         deadline = t0 + minutes * 60
         while not dbg.done.is_set():
             time.sleep(2)
+            packer.step()
             if time.time() > deadline:
                 info["error"] = "still running after %g minutes: stopped" % minutes
                 break
-            age = newest_packet_age(dbg.packets())
+            age = (time.time() - dbg.last_packet) if dbg.last_packet else None
             if age is not None and age > QUIET_SECONDS:
                 info["error"] = "no packets for %d s: the game stopped" % QUIET_SECONDS
                 break
@@ -284,17 +329,23 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
             info["status"] = "incomplete"
     finally:
         dbg.stop()
+        packer.step(final=True)
+        shutil.rmtree(spool, ignore_errors=True)
         if os.path.exists(rom_out):
             os.remove(rom_out)
-    files = sorted(dbg.packets())
-    info["packets"] = len(files)
-    info["bytes"] = sum(os.path.getsize(f) for f in files)
+    info["packets"] = packer.count
+    info["bytes"] = packer.bytes
+    info["packs"] = packer.index if packer.count else 0
     info["seconds"] = round(time.time() - t0)
-    # framelog.py's summary, then the packets zipped (a thousand small files a run)
-    if files:
+    # framelog.py's summary (and the RDP bench's table), from the packs unpacked into a scratch folder
+    if packer.count:
+        unpack = os.path.join(WORK, "unpack")
+        shutil.rmtree(unpack, ignore_errors=True)
+        packer.unpack_to(unpack)
+        shutil.copy(os.path.join(folder, "debug.log"), unpack)
         fl = os.path.join(ROOT, "fishmod", "tools", "framelog.py")
         try:
-            r = subprocess.run([sys.executable, fl, folder, "--by-leg"], capture_output=True, text=True, timeout=600,
+            r = subprocess.run([sys.executable, fl, unpack, "--by-leg"], capture_output=True, text=True, timeout=600,
                                errors="replace")
             open(os.path.join(folder, "framelog.txt"), "w", encoding="utf-8").write(r.stdout + r.stderr)
         except Exception as e:
@@ -303,16 +354,12 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
         try:
             if "RDPTEST" in open(os.path.join(folder, "debug.log"), encoding="utf-8", errors="replace").read():
                 rb = os.path.join(ROOT, "fishmod", "tools", "rdpbench.py")
-                r = subprocess.run([sys.executable, rb, folder, "--csv", os.path.join(folder, "rdpbench.csv")],
+                r = subprocess.run([sys.executable, rb, unpack, "--csv", os.path.join(folder, "rdpbench.csv")],
                                    capture_output=True, text=True, timeout=600, errors="replace")
                 open(os.path.join(folder, "rdpbench.txt"), "w", encoding="utf-8").write(r.stdout + r.stderr)
         except Exception as e:
             open(os.path.join(folder, "rdpbench.txt"), "w", encoding="utf-8").write("rdpbench.py failed: %s\n" % e)
-        with zipfile.ZipFile(os.path.join(folder, "packets.zip"), "w", zipfile.ZIP_DEFLATED) as z:
-            for f in files:
-                z.write(f, os.path.basename(f))
-        for f in files:
-            os.remove(f)
+        shutil.rmtree(unpack, ignore_errors=True)
     # carry on only if this game is one that answers the next reboot request (it finished, or at least started)
     return info, info["status"] in ("done", "incomplete")
 
