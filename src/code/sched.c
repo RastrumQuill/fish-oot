@@ -387,6 +387,11 @@ void Sched_SetNextFramebufferFromTask(Scheduler* sc, OSScTask* task) {
         if (sc->curBuf == NULL || sc->curBuf->updateTimer <= 0) {
             Sched_SwapFrameBuffer(sc, task->framebuffer);
         }
+    } else if (sc->pendingSwapBuf2 == NULL) {
+        // fish-oot: with three frame buffers (sys_cfb.c) a second frame can finish while the first still waits its
+        // turn on screen; it waits behind it (Sched_HandleRetrace moves it up), where before its swap was lost. (With two
+        // it can't happen: a frame's buffer isn't free until the one before it is on screen.)
+        sc->pendingSwapBuf2 = task->framebuffer;
     }
 }
 
