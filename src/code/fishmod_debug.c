@@ -853,6 +853,11 @@ static void Fishmod_DebugProfile(s32 record) {
 #ifdef FISHMOD_PCPROF
 static void PcProf_FrameEnd(void); // (fishmod_debug_pcprof.inc.c: the frame's profile tag and its log record)
 #endif
+#ifdef FISHMOD_STRESS
+// the stress bench's frame tag, for the frame log: bench (1 fish, 2 plants) << 24 | step << 16 | pass << 8 | bit 0:
+// a measured frame (after the step settled)
+static u32 sStressTag;
+#endif
 
 static void Fishmod_DebugTiming(void) {
     static u32 sSum[2 + FISHMOD_CPU_MAX + 1];

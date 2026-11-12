@@ -543,6 +543,8 @@ static void PcProf_FrameEnd(void) {
     r[1] = sViewTag; // (stop << 24 | lap << 16 | variant << 8 | bit 0: counted)
 #elif defined(FISHMOD_RDP_BENCH)
     r[1] = sRdpTag; // (test << 24 | repetition << 16 | bit 0: counted)
+#elif defined(FISHMOD_STRESS)
+    r[1] = sStressTag; // (bench << 24 | step << 16 | pass << 8 | bit 0: measured)
 #endif
     r[2] = period;
     r[3] = sLastCpu[FISHMOD_CPU_UPDATE];

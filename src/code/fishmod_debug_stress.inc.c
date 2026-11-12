@@ -110,6 +110,10 @@ static void Stress_Update(PlayState* play) {
     }
     if (sStress.passes >= STRESS_PASSES) {
         gFishmodStressCount = STRESS_START;
+        sStressTag = 0;
+#ifdef FISHMOD_PCPROF
+        gFishmodBenchDone = true; // (the profiler sends its last counts, then FISHMOD-DONE)
+#endif
         Fishmod_DebugPrintf(2, "STRESS DONE: %d passes saved", sStress.passes);
         Fishmod_DebugPrintf(3, "You can turn the console off");
         Fishmod_DebugPrintf(4, "and send the .sav file");
@@ -122,6 +126,8 @@ static void Stress_Update(PlayState* play) {
     st = &sStress.step[sStressStep];
     st->count = gFishmodStressCount;
     sStressFrame++;
+    sStressTag = ((u32)gFishmodStress << 24) | ((u32)(sStressStep & 0xFF) << 16) | ((u32)(sStress.passes & 0xFF) << 8) |
+                 ((sStressFrame > STRESS_SETTLE) ? 1 : 0);
     if (sStressFrame > STRESS_SETTLE) {
         u32 period = (u32)OS_CYCLES_TO_USEC(gGraphUpdatePeriod);
 
@@ -147,6 +153,17 @@ static void Stress_Update(PlayState* play) {
         sPassPeriod = st->period - sPassPeriod;
         sPassFrames = st->frames - sPassFrames;
         sPassSlow = st->slow - sPassSlow;
+#ifdef FISHMOD_PCPROF
+        {
+            // the step's result over USB too (the morning runner keeps no save): bench pass step count, then this
+            // pass's frames, mean frame (us) and frames over 52 ms
+            char line[96];
+
+            sprintf(line, "FISHMOD-STRESS %d %d %d %u %u %u %u\n", gFishmodStress, sStress.passes, sStressStep,
+                    st->count, sPassFrames, (sPassFrames != 0) ? sPassPeriod / sPassFrames : 0, sPassSlow);
+            Sc64_UsbText(line);
+        }
+#endif
         // full speed: the mean frame within 20 fps, and no more than 1 frame in 20 slow (the mean alone hides a
         // stutter: slow frames and quick ones after them)
         if ((sPassFrames == 0) || (sPassPeriod / sPassFrames > STRESS_FULL_SPEED_US) ||
