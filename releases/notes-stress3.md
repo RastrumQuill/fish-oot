@@ -14,3 +14,12 @@
 stress2 extrapolated about 75-80 fish (all close and fully drawn) before the RSP reaches the frame; this run should
 find the real number. `fishmod/tools/stress_prof.py FOLDER --elf ELF` (it now shows the on-screen rate and the late
 pictures per step).
+
+## Results (console, 12 Nov, run 20261112-1202)
+
+**72 fish, all close to the camera in the tank, hold 20 fps with no late pictures; 78 within the test (5 late of
+320); 84-90 just under (19.6-19.7 fps); 96 clearly not (17.4 fps).** stress2 had extrapolated 75-80. At 96 the CPU
+(51 ms), the RSP (44 ms) and the RDP (47 ms) all reach the frame together. Per extra fish from 48 to 90: CPU about
++0.4 ms, RSP +0.25, RDP +0.2. Plants: 40 hold 20 fps; past that the RDP alone (as stress2).
+
+The bench's own screen counts (FISHMOD-STRESS-SCREEN) and the frame records agree step by step.

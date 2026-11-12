@@ -14,3 +14,11 @@
 
 Expected: about 2-3 ms a frame less CPU update. What to compare with frames9: the CPU update, the misc and enemy
 categories, the actor report (FISHMOD-BGCHECK En_Crow, En_Tite).
+
+## Results (console, 12 Nov, run 20261112-1202: frames10 twice, frames9 between)
+
+- **On screen: 18.38 fps (both frames10 runs) against frames9's 18.16; visible hitches 28-29% of frames against
+  32-34%.** The CPU's update 1.8 ms a frame less (23.8 against 25.6 ms).
+- Each hitch put down to the frame that made it (the record after it is the one that counts the late picture): in
+  frames10 the RDP alone was over the frame in 49% of them, both in 33%, the CPU alone in 11%, neither in 7%
+  (frames9: 34%, 40%, 17%, 9%). **The RDP is now what limits the route** (over the frame in 82% of the hitches).
