@@ -330,6 +330,7 @@ s32 Fishmod_RdpBenchDraw(PlayState* play) {
     char line[96];
 
     sRdpTag = 0;
+    Fishmod_SampleRdp(); // (the RDP's counters for the frame log, once a frame: the play bench does this for itself)
     if (sRbFrame < 0) {
         sRbFrame++;
         return false;

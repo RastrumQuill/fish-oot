@@ -11,9 +11,8 @@ results are in [history/](history/), and its patch is in the repository's histor
 | Patch | What it is | Notes |
 |---|---|---|
 | `fish-oot-qol5-testmode.bps`, `fish-oot-qol5-hw-testmode.bps` | The newest test build to play: clear a C button by pressing it again; the D-pad hides when empty; the cheaper fish update | [notes](notes-qol5.md) |
-| `fish-oot-rdpbench1.bps` | The RDP calibration bench (console timing of controlled drawing, for the RDP cost model) | [notes](notes-rdpbench1.md) |
-| `fish-oot-frames7.bps`, `fish-oot-frames7-noclaim.bps` | The bench route with the audio work, and the same without the command-list cache claiming | [notes](notes-frames7.md) |
-| `fish-oot-frames8.bps` | frames7 plus run-ahead, the collision record and the props' screen edges | [notes](notes-frames8.md) |
+| `fish-oot-rdpbench2.bps` | The RDP calibration bench (console timing of controlled drawing, for the RDP cost model), with the RDP's counters | [notes](notes-rdpbench2.md) |
+| `fish-oot-frames8b.bps`, `-nostore`, `-noaux` | The bench route (frames8 that a stuck USB link can't freeze), and two variants to find what froze frames7 | [notes](notes-frames8b.md) |
 
 The bench patches are run by `fishmod\pc\morning.bat` (see `fishmod/pc/MORNING.md`).
 

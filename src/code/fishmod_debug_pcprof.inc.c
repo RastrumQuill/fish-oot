@@ -74,13 +74,21 @@ static u32 Sc64_Read(u32 reg) {
 }
 
 /** Runs a command; 0 when it finished without an error (data0 then holds its first result). */
+// a command the cart doesn't finish in SC64_TRIES polls is given up on (a few ms, not the game's frames): counted, and
+// the USB sending backs off a while (see PcProf_Update), so a stuck link can't slow the game to a crawl
+#define SC64_TRIES 3000
+static u32 sUsbTimeouts;     // commands given up on since the last report
+static u32 sUsbTimeoutFrame; // the play frame of the first of them
+static u32 sUsbTimeoutScr;   // the cart's status register then
+static s32 sUsbBackoff;      // frames to leave the USB alone
+
 static s32 Sc64_Command(u8 id, u32 arg0, u32 arg1, u32* data0) {
     s32 tries;
 
     Sc64_Write(SC64_DATA0, arg0);
     Sc64_Write(SC64_DATA1, arg1);
     Sc64_Write(SC64_SCR, id);
-    for (tries = 0; tries < 100000; tries++) {
+    for (tries = 0; tries < SC64_TRIES; tries++) {
         u32 scr = Sc64_Read(SC64_SCR);
 
         if (!(scr & SC64_CMD_BUSY)) {
@@ -91,6 +99,14 @@ static s32 Sc64_Command(u8 id, u32 arg0, u32 arg1, u32* data0) {
                 *data0 = Sc64_Read(SC64_DATA0);
             }
             return 0;
+        }
+        if (tries == SC64_TRIES - 1) {
+            if (sUsbTimeouts == 0) {
+                sUsbTimeoutFrame = sPlayFrames;
+                sUsbTimeoutScr = scr;
+            }
+            sUsbTimeouts++;
+            sUsbBackoff = 30;
         }
     }
     return -1;
@@ -164,7 +180,15 @@ static void Sc64_UsbText(const char* text) {
     if (!sPcUsb || (sPcOut == NULL) || (len >= SC64_BUFFER_SIZE)) {
         return;
     }
-    while (Sc64_UsbBusy()) {}
+    {
+        s32 wait;
+
+        for (wait = 0; Sc64_UsbBusy(); wait++) {
+            if (wait > 200) {
+                return; // (the link is stuck: dropped, not waited on)
+            }
+        }
+    }
     bcopy(text, sPcOut, len);
     osWritebackDCache(sPcOut, (len + 7) & ~7);
     sSc64IoMesg.hdr.pri = OS_MESG_PRI_NORMAL;
@@ -583,6 +607,14 @@ static void PcProf_Update(void) {
 
     if (sPcTable == NULL) {
         s32 hash = PCPROF_HASH;
+#ifdef FISHMOD_NO_SAMPLE_STORE
+        {
+            // (a console test without the audio's sample store: no more samples copied or switched to it)
+            extern u32 gFishmodSampleStoreStart;
+
+            gFishmodSampleStoreStart = 0;
+        }
+#endif
         u32 outSize = PCPROF_SRAM_SIZE;
 
         sPcUsb = Sc64_Init();
@@ -645,7 +677,23 @@ static void PcProf_Update(void) {
         u32 user[6] = { 0x464D4F44 /* 'FMOD' */, 0, 0, 0, 0, 0 };
         static s32 sDoneSaid;
 
+#ifndef FISHMOD_NO_AUX // (a console test without the reboot handshake's per-frame poll of the cart)
         Sc64_AuxPoll();
+#endif
+        if (sUsbBackoff > 0) {
+            sUsbBackoff--; // (the cart didn't finish a command: left alone a while)
+            return;
+        }
+        if (sUsbTimeouts != 0) {
+            // the link works again: say what happened (the morning runner's debug log keeps it)
+            char line[96];
+            u32 n = sUsbTimeouts;
+
+            sUsbTimeouts = 0;
+            sprintf(line, "FISHMOD-USB-STALL %u commands given up, from frame %u, status %08X, now frame %u\n", n,
+                    sUsbTimeoutFrame, sUsbTimeoutScr, sPlayFrames);
+            Sc64_UsbText(line);
+        }
         user[1] = sPlayFrames;
         user[2] = FISHMOD_PROFILE_HW;
         // the route over (the bench's last lap): stop sampling, send what's counted, and mark the last packets
