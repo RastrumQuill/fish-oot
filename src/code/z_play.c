@@ -1218,6 +1218,11 @@ void Play_Draw(PlayState* this) {
     } else {
         Gfx_SetupFrame(gfxCtx, 0, 0, 0);
     }
+#if FISHMOD_DEBUG
+    if (Fishmod_RdpBenchDraw(this)) {
+        goto Play_Draw_skip; // (the RDP calibration bench drew its test instead: fishmod_debug_rdpbench.inc.c)
+    }
+#endif
 
     if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_RUN_DRAW) {
         POLY_OPA_DISP = Play_SetFog(this, POLY_OPA_DISP);

@@ -929,7 +929,11 @@ s32 Fishmod_DebugRosterCount(void) {
 
 #include "fishmod_debug_playlog.inc.c" // the play log (FISHMOD_PLAYLOG)
 
+#ifdef FISHMOD_RDP_BENCH
+static u32 sRdpTag; // (fishmod_debug_rdpbench.inc.c: the frame log's tag)
+#endif
 #include "fishmod_debug_pcprof.inc.c" // the PC-sampling profiler (FISHMOD_PCPROF)
+#include "fishmod_debug_rdpbench.inc.c" // the RDP calibration bench (FISHMOD_RDP_BENCH)
 
 #include "fishmod_debug_vrtime.inc.c" // the VR4300 timing tests (FISHMOD_VRTIME)
 

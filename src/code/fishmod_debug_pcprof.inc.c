@@ -459,6 +459,8 @@ static void PcProf_FrameEnd(void) {
     sBenchCounted = false;
 #elif defined(FISHMOD_VIEW_BENCH)
     r[1] = sViewTag; // (stop << 24 | lap << 16 | variant << 8 | bit 0: counted)
+#elif defined(FISHMOD_RDP_BENCH)
+    r[1] = sRdpTag; // (test << 24 | repetition << 16 | bit 0: counted)
 #endif
     r[2] = period;
     r[3] = sLastCpu[FISHMOD_CPU_UPDATE];
