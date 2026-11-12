@@ -147,14 +147,25 @@ class Audio:
         self.sd = sd
         self.muted = False
         self.peak = 0
-        self.ring = np.zeros((RATE * KEEP_SECONDS, CHANNELS), dtype=np.int16)
         self.pos = 0
         self.lock = threading.Lock()
         info = sd.query_devices(in_dev)
         channels = min(CHANNELS, info["max_input_channels"]) or 1
         self.channels = channels
-        self.stream = sd.Stream(device=(in_dev, out_dev), samplerate=RATE, channels=(channels, CHANNELS),
-                                dtype="int16", latency="low", blocksize=256, callback=self.callback)
+        self.rate = RATE
+        # 48 kHz first; else the input's own rate (a digital input locked to its source, a WASAPI device's mix format)
+        error = None
+        for rate in dict.fromkeys((RATE, int(info["default_samplerate"]))):
+            try:
+                self.stream = sd.Stream(device=(in_dev, out_dev), samplerate=rate, channels=(channels, CHANNELS),
+                                        dtype="int16", latency="low", blocksize=256, callback=self.callback)
+                self.rate = rate
+                break
+            except Exception as e:
+                error = e
+        else:
+            raise error
+        self.ring = np.zeros((self.rate * KEEP_SECONDS, CHANNELS), dtype=np.int16)
         self.stream.start()
 
     def callback(self, indata, outdata, frames, timing, status):
@@ -173,7 +184,7 @@ class Audio:
             self.pos = end % len(self.ring)
 
     def last(self, seconds):
-        n = int(RATE * max(0.1, min(seconds, KEEP_SECONDS)))
+        n = int(self.rate * max(0.1, min(seconds, KEEP_SECONDS)))
         with self.lock:
             out = np.roll(self.ring, -self.pos, axis=0)[-n:].copy()
         return out
@@ -183,7 +194,7 @@ class Audio:
         with wave.open(buf, "wb") as w:
             w.setnchannels(CHANNELS)
             w.setsampwidth(2)
-            w.setframerate(RATE)
+            w.setframerate(self.rate)
             w.writeframes(self.last(seconds).tobytes())
         return buf.getvalue()
 
@@ -196,9 +207,11 @@ class Audio:
         self.stream.close()
 
 
-def pick_audio(sd, wanted):
-    """The capture card's input (by a name it contains; else the first that sounds like a capture device), WASAPI if
-    it has one (the lowest delay on Windows); the default output on the same host API."""
+def pick_audio(sd, wanted, wanted_api=None):
+    """The capture card's input (its number, or a name it contains; else the first that sounds like a capture device),
+    on the same driver as last time or WASAPI if it has one (the lowest delay on Windows); and the speakers on the same
+    driver (PortAudio can't join an input and an output of different drivers): the default output, else the output
+    named like Windows' default one, else the driver's first output."""
     devices = sd.query_devices()
     apis = sd.query_hostapis()
 
@@ -215,11 +228,18 @@ def pick_audio(sd, wanted):
         matches = [(i, d) for i, d in inputs if any(w in d["name"].lower() for w in CAPTURE_WORDS)]
     if not matches:
         return None, None
-    matches.sort(key=lambda m: 0 if "WASAPI" in api_name(m[1]) else 1)
+    matches.sort(key=lambda m: (0 if api_name(m[1]) == wanted_api else 1, 0 if "WASAPI" in api_name(m[1]) else 1))
     in_idx, in_dev = matches[0]
-    out_idx = apis[in_dev["hostapi"]]["default_output_device"]
-    if out_idx is None or out_idx < 0:
-        out_idx = sd.default.device[1]
+    api = in_dev["hostapi"]
+    out_idx = apis[api]["default_output_device"]
+    if out_idx is None or out_idx < 0 or devices[out_idx]["hostapi"] != api:
+        outputs = [i for i, d in enumerate(devices) if d["max_output_channels"] > 0 and d["hostapi"] == api]
+        try:
+            default_name = devices[sd.default.device[1]]["name"].split("(")[0].strip().lower()
+        except Exception:
+            default_name = ""
+        named = [i for i in outputs if default_name and default_name in devices[i]["name"].lower()]
+        out_idx = (named or outputs or [sd.default.device[1]])[0]
     return in_idx, out_idx
 
 
@@ -406,14 +426,17 @@ def main():
         try:
             import sounddevice as sd
 
-            in_idx, out_idx = pick_audio(sd, args.audio or cfg.get("audio"))
+            in_idx, out_idx = pick_audio(sd, args.audio or cfg.get("audio"),
+                                         None if args.audio else cfg.get("audio_api"))
             if in_idx is None:
                 print("no capture card sound input found (capture.bat --list, then --audio NAME): picture only")
             else:
                 audio = Audio(in_idx, out_idx)
-                print(f"sound: {sd.query_devices(in_idx)['name']} -> {sd.query_devices(out_idx)['name']}, "
-                      f"about {audio.latency_ms():.0f} ms")
+                api = sd.query_hostapis(sd.query_devices(in_idx)["hostapi"])["name"]
+                print(f"sound: {sd.query_devices(in_idx)['name']} -> {sd.query_devices(out_idx)['name']} [{api}], "
+                      f"{audio.rate} Hz, about {audio.latency_ms():.0f} ms")
                 cfg["audio"] = sd.query_devices(in_idx)["name"]
+                cfg["audio_api"] = sd.query_hostapis(sd.query_devices(in_idx)["hostapi"])["name"]
         except Exception as e:  # (a device that won't open at this rate: the picture still runs)
             print(f"sound not started: {e}")
             audio = None
