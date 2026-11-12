@@ -42,7 +42,11 @@ WORK = os.path.join(HERE, "work")
 RESULTS = os.path.join(HERE, "results", "morning")
 RESULTS_BRANCH = "morning-results"
 
-START_SECONDS = 120   # from the reboot to the game saying FISHMOD-START
+START_SECONDS = 120
+# the runner's software reboot (sc64deployer upload --reboot): off by default. Every run started by it on 12 Nov 2026
+# failed (froze or crashed); runs started from power-on didn't. Until that's understood, each run is started by
+# switching the console off and on (--soft-reboot puts the old way back, for testing it).
+SOFT_REBOOT = False   # from the reboot to the game saying FISHMOD-START
 QUIET_SECONDS = 240   # no packet for this long: the game has stopped
 DEFAULT_MINUTES = 25  # a run longer than this is stopped (a bench route takes about 11 minutes)
 
@@ -334,7 +338,8 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
     upload_log = os.path.join(folder, "upload.log")
     answered = False
     for attempt in range(3):
-        code, text = run_capture([deployer, "upload", "--reboot", rom_out], upload_log, 300)
+        cmd = [deployer, "upload", "--reboot", rom_out] if SOFT_REBOOT else [deployer, "upload", rom_out]
+        code, text = run_capture(cmd, upload_log, 300)
         if code == 0:
             answered = "no response for [Halt]" not in text and "no response for [Reboot]" not in text
             # the deployer doesn't check what it wrote: read the ROM back out of the cart and compare, byte for byte
@@ -364,7 +369,12 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
     dbg = Debug(deployer, folder, spool)
     try:
         wait = START_SECONDS
-        if not answered:
+        if not SOFT_REBOOT:
+            # (the console restarted by hand, from off: the software reboot left it unsteady, 12 Nov 2026)
+            beep()
+            log("  >>> Switch the console OFF, then ON, to start the new ROM <<<")
+            wait = 3 * 3600
+        elif not answered:
             beep()
             if first:
                 log("  >>> Press RESET on the console (or switch it on) to start the new ROM <<<")
@@ -499,7 +509,11 @@ def main():
     ap.add_argument("--minutes", type=float, default=DEFAULT_MINUTES, help="the longest a run may take")
     ap.add_argument("--no-pull", action="store_true", help="don't git pull first")
     ap.add_argument("--no-push", action="store_true", help="don't push the results")
+    ap.add_argument("--soft-reboot", action="store_true",
+                    help="start each run with the software reboot instead of asking for a power cycle")
     args = ap.parse_args()
+    global SOFT_REBOOT
+    SOFT_REBOOT = args.soft_reboot
 
     if GIT is None:
         log("git not found (not on PATH, and no GitHub Desktop or Git for Windows copy): no pull, and the results are "
