@@ -219,7 +219,7 @@ static u32 sCmdClaimed; // the first line not yet claimed
 static u32 sCmdClaimEnd; // the buffer's end (its last whole line)
 
 static void AudioSynth_ClaimCmdLines(Acmd* cmd) {
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(FISHMOD_NO_CLAIM) // (FISHMOD_NO_CLAIM: a console test without it)
     u32 p = ALIGN16((u32)cmd);
     u32 lim = ((u32)cmd + CMD_CLAIM_AHEAD) & ~0xF;
 

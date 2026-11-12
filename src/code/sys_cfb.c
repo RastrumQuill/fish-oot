@@ -69,10 +69,14 @@ void SysCfb_Init(s32 n64dd) {
         // the CPU and the RCP can get a frame ahead, and a fast frame's spare time goes to a slow one after it instead of
         // to waiting (graph.c); the game runs the same frames either way
         sSysCfbFbPtr[2] = sSysCfbFbPtr[1] - (screenSize * 2);
+#ifndef FISHMOD_NO_RUNAHEAD // (console tests: one new mechanism left out at a time, -D in GCC_EXTRA_OPT)
         sSysCfbCount = 3;
+#endif
+#ifndef FISHMOD_NO_STORE
         // the space between them goes to the audio driver: copies of the samples being played (audio/internal/load.c)
         gFishmodSampleStoreStart = 0x80700000;
         gFishmodSampleStoreEnd = sSysCfbFbPtr[2];
+#endif
     }
 #endif
     PRINTF(T("フレームバッファのアドレスは %08x と %08x です\n", "Frame buffer addresses are %08x and %08x\n"),
