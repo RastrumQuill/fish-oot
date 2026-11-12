@@ -63,8 +63,33 @@ def beep():
     print("\a", end="", flush=True)
 
 
+def find_git():
+    """git: on PATH, or the copy GitHub Desktop or Git for Windows installed (neither always puts it on PATH)."""
+    found = shutil.which("git")
+    if found:
+        return found
+    if os.name == "nt":
+        guesses = []
+        local = os.environ.get("LOCALAPPDATA", "")
+        if local:
+            # GitHub Desktop: %LOCALAPPDATA%\GitHubDesktop\app-<version>\resources\app\git\cmd\git.exe (newest first)
+            guesses += sorted(glob.glob(os.path.join(local, "GitHubDesktop", "app-*", "resources", "app", "git", "cmd",
+                                                     "git.exe")), reverse=True)
+            guesses.append(os.path.join(local, "Programs", "Git", "cmd", "git.exe"))
+        for base in (os.environ.get("ProgramFiles", r"C:\Program Files"),
+                     os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")):
+            guesses.append(os.path.join(base, "Git", "cmd", "git.exe"))
+        for g in guesses:
+            if os.path.isfile(g):
+                return g
+    return None
+
+
+GIT = find_git()
+
+
 def git(*args, env=None, check=True):
-    r = subprocess.run(["git", "-C", ROOT] + list(args), capture_output=True, text=True, env=env)
+    r = subprocess.run([GIT, "-C", ROOT] + list(args), capture_output=True, text=True, env=env)
     if check and r.returncode != 0:
         raise RuntimeError("git %s: %s" % (" ".join(args), (r.stderr or r.stdout).strip()))
     return r.stdout.strip()
@@ -375,7 +400,7 @@ def publish(stamp, stamp_dir, push):
     except Exception as e:
         return "not pushed: not a git checkout (%s)" % e
     parent = None
-    if subprocess.run(["git", "-C", ROOT, "fetch", "-q", "origin", RESULTS_BRANCH], capture_output=True).returncode == 0:
+    if subprocess.run([GIT, "-C", ROOT, "fetch", "-q", "origin", RESULTS_BRANCH], capture_output=True).returncode == 0:
         parent = git("rev-parse", "FETCH_HEAD")
     os.makedirs(WORK, exist_ok=True)
     index = os.path.join(WORK, "morning.index")
@@ -391,7 +416,7 @@ def publish(stamp, stamp_dir, push):
         git("read-tree", "--empty", env=env)
     rel = os.path.relpath(stamp_dir, RESULTS).replace(os.sep, "/")
     git_dir = git("rev-parse", "--absolute-git-dir")
-    r = subprocess.run(["git", "--git-dir", git_dir, "--work-tree", ".", "add", "-f", "--", rel], cwd=RESULTS,
+    r = subprocess.run([GIT, "--git-dir", git_dir, "--work-tree", ".", "add", "-f", "--", rel], cwd=RESULTS,
                        capture_output=True, text=True, env=env)
     if r.returncode != 0:
         return "not pushed: git add: %s" % r.stderr.strip()
@@ -400,7 +425,7 @@ def publish(stamp, stamp_dir, push):
     args = ["commit-tree", tree, "-m", msg] + (["-p", parent] if parent else [])
     commit = git(*args, env=env)
     os.remove(index)
-    r = subprocess.run(["git", "-C", ROOT, "push", "-q", "origin", "%s:refs/heads/%s" % (commit, RESULTS_BRANCH)],
+    r = subprocess.run([GIT, "-C", ROOT, "push", "-q", "origin", "%s:refs/heads/%s" % (commit, RESULTS_BRANCH)],
                        capture_output=True, text=True)
     if r.returncode != 0:
         return "push failed: %s" % (r.stderr or r.stdout).strip()
@@ -417,8 +442,13 @@ def main():
     ap.add_argument("--no-push", action="store_true", help="don't push the results")
     args = ap.parse_args()
 
+    if GIT is None:
+        log("git not found (not on PATH, and no GitHub Desktop or Git for Windows copy): no pull, and the results are "
+            "only zipped")
+        args.no_pull = True
+        args.no_push = True
     if not args.no_pull:
-        r = subprocess.run(["git", "-C", ROOT, "pull", "-q", "--ff-only"], capture_output=True, text=True)
+        r = subprocess.run([GIT, "-C", ROOT, "pull", "-q", "--ff-only"], capture_output=True, text=True)
         log("git pull: %s" % ("up to date" if r.returncode == 0 else "skipped (%s)" % r.stderr.strip()[:200]))
         if r.returncode == 0 and not args.patches:
             # (this script may have changed with the pull: run the new one)
