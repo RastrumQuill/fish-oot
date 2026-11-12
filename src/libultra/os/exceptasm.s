@@ -282,6 +282,9 @@ counter:
     lw      t2, THREAD_PC(k0)
     la      t3, gFishmodCounterPc
     sw      t2, (t3)
+    lw      t2, THREAD_RA+4(k0) /* (the low word: the registers are saved 64-bit) */
+    la      t3, gFishmodCounterRa
+    sw      t2, (t3)
 #endif
     /* Post counter message */
     li      a0, MESG(OS_EVENT_COUNTER)

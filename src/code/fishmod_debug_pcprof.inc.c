@@ -530,7 +530,15 @@ static void PcProf_FrameEnd(void) {
  */
 static void PcProf_Hook(OSTimer* timer) {
     if (timer == &sPcTimer) {
-        n64prof_sample(gFishmodCounterPc);
+        extern u32 gFishmodCounterRa;
+        u32 pc = gFishmodCounterPc;
+
+        // a sample in __osRestoreInt (a leaf: mtc0, jr ra) is the time its caller spent with interrupts off (the timer's
+        // interrupt waited for it): counted at the call site instead (its return address), so it shows who
+        if ((pc - (u32)__osRestoreInt) < 0x20) {
+            pc = gFishmodCounterRa - 8; // (the jal)
+        }
+        n64prof_sample(pc);
         timer->interval = n64prof_next_interval();
     }
 }

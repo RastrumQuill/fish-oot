@@ -13,6 +13,7 @@ void (*gFishmodTimerHook)(OSTimer* timer);
 // the PC the last counter interrupt came in at (exceptasm.s): the timers themselves run later, in the VI manager's
 // thread, so its own saved PC would always be in osRecvMesg
 u32 gFishmodCounterPc;
+u32 gFishmodCounterRa; // (and its return address: exceptasm.s)
 #endif
 
 void __osTimerServicesInit(void) {
