@@ -59,7 +59,8 @@ def records(folder):
         words = 56 if (version & 0xFF) >= 2 else WORDS  # (version 2: F3DEX3's counters in 52-55; bits 8-15: which set)
         for i in range(count):
             rec = struct.unpack_from(f">{words}I", d, 16 + 4 * words * i)
-            out.append(rec if words == 56 else rec + (0, 0, 0, 0))
+            # (word 56: which set of F3DEX3's counters, 0 default, 1-3 its profiling builds A-C; -1 none)
+            out.append((rec if words == 56 else rec + (0, 0, 0, 0)) + ((version >> 8) & 0xFF if words == 56 else -1,))
     out.sort(key=lambda r: r[0])
     return out
 
@@ -123,6 +124,35 @@ def main():
     print("\nCostliest actor kinds in slow frames (ms per slow frame, where among a frame's top four):")
     for aid, us in cost.most_common(12):
         print(f"  {actors.get(aid, hex(aid)):24s} {us / max(len(slow), 1) / 1000:.2f}")
+    # F3DEX3's own counters (frame log version 2): which set, decoded, slow and full-speed frames
+    sets = {r[56] for r in recs if len(r) > 56 and r[56] >= 0}
+    if sets:
+        rcp = 62.5  # (its cycle counts are RCP cycles: 62.5 a microsecond)
+        decode = {
+            0: [("vertices", lambda r: r[52] >> 16), ("tris in", lambda r: r[53] >> 14),
+                ("tris drawn", lambda r: r[52] & 0xFFFF), ("rects", lambda r: r[53] & 0x3FFF),
+                ("RSP stalled on a full RDP FIFO, us", lambda r: r[54] / rcp)],
+            1: [("vertex work, us", lambda r: r[52] / rcp), ("triangle work, us", lambda r: r[55] / rcp),
+                ("RSP stalled on a full RDP FIFO, us", lambda r: r[54] / rcp),
+                ("display list commands", lambda r: r[53] & 0xFFFF), ("commands fetched", lambda r: r[53] >> 16)],
+            2: [("vertices", lambda r: r[52] >> 16), ("lit vertices", lambda r: r[52] & 0xFFFF),
+                ("tris culled by the occlusion plane", lambda r: r[53] >> 14), ("tris clipped", lambda r: r[53] & 0x3FFF),
+                ("overlay loads", lambda r: r[54] >> 14), ("lighting overlay loads", lambda r: r[54] & 0x3FFF),
+                ("clipping overlay loads", lambda r: r[55] >> 14), ("misc overlay loads", lambda r: r[55] & 0x3FFF)],
+            3: [("F3DEX3 running, us", lambda r: r[52] / rcp),
+                ("RDP doing work when sampled, %", lambda r: 100.0 * (r[53] >> 16) / max(r[53] & 0xFFFF, 1)),
+                ("small RDP commands", lambda r: r[54] >> 14), ("matrix loads", lambda r: r[54] & 0x3FFF),
+                ("RSP stalled on DMAs, us", lambda r: r[55] / rcp)],
+        }
+        names = {0: "default", 1: "profiling A", 2: "profiling B", 3: "profiling C"}
+        for st in sorted(sets):
+            rs_slow = [r for r in slow if r[56] == st]
+            rs_fast = [r for r in fast if r[56] == st]
+            print(f"\nF3DEX3's counters ({names.get(st, st)} set), a frame: slow frames, full-speed frames")
+            for name, f in decode.get(st, []):
+                a = sum(f(r) for r in rs_slow) / max(len(rs_slow), 1)
+                b = sum(f(r) for r in rs_fast) / max(len(rs_fast), 1)
+                print(f"  {name:40s} {a:10.1f} {b:10.1f}")
     # what limits each slow frame: the CPU (update + draw) or the RDP
     lim = collections.Counter()
     for r in slow:
