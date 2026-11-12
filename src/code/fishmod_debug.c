@@ -633,6 +633,33 @@ static char sDebugLines[FISHMOD_DEBUG_LINES][FISHMOD_DEBUG_LINE_LEN];
 
 s32 gFishmodNoPropCol;
 
+
+/*
+ * The heaps' use over a run, for gdb at its end (x/9wx &gFishmodMem): the system heap's lowest free bytes, lowest
+ * largest free block, highest bytes allocated; the same three for the play state's Zelda arena; the system heap's
+ * size, the Zelda arena's (free + allocated), and the play frames sampled.
+ */
+u32 gFishmodMem[9] = { 0xFFFFFFFF, 0xFFFFFFFF, 0, 0xFFFFFFFF, 0xFFFFFFFF, 0, 0, 0, 0 };
+extern u32 gSystemHeapSize;
+void SystemArena_GetSizes(u32* outMaxFree, u32* outFree, u32* outAlloc);
+void ZeldaArena_GetSizes(u32* outMaxFree, u32* outFree, u32* outAlloc);
+
+static void Fishmod_MemSample(void) {
+    u32 maxFree, free, alloc;
+
+    SystemArena_GetSizes(&maxFree, &free, &alloc);
+    gFishmodMem[0] = MIN(gFishmodMem[0], free);
+    gFishmodMem[1] = MIN(gFishmodMem[1], maxFree);
+    gFishmodMem[2] = MAX(gFishmodMem[2], alloc);
+    ZeldaArena_GetSizes(&maxFree, &free, &alloc);
+    gFishmodMem[3] = MIN(gFishmodMem[3], free);
+    gFishmodMem[4] = MIN(gFishmodMem[4], maxFree);
+    gFishmodMem[5] = MAX(gFishmodMem[5], alloc);
+    gFishmodMem[6] = gSystemHeapSize;
+    gFishmodMem[7] = free + alloc;
+    gFishmodMem[8]++;
+}
+
 void Fishmod_DebugBoot(void) {
     sScript.startPos = sScriptStartPos;
     sScript.startYaw = sScriptStartYaw;
@@ -886,6 +913,7 @@ static void Fishmod_DebugTiming(void) {
 #ifdef FISHMOD_BENCH_AREA
     AreaBench_Sample();
 #endif
+    Fishmod_MemSample();
 #ifdef FISHMOD_PCPROF
     PcProf_FrameEnd(); // (before the frame's sections are cleared)
 #endif

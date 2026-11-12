@@ -1347,7 +1347,10 @@ void* AudioLoad_AsyncLoadInner(s32 tableType, s32 id, s32 nChunks, s32 retData, 
 /**
  * original name: Nas_BgDmaFrameWork
  */
+void Fishmod_SampleStoreStep(void);
+
 void AudioLoad_ProcessLoads(s32 resetStatus) {
+    Fishmod_SampleStoreStep();
     AudioLoad_ProcessSlowLoads(resetStatus);
     AudioLoad_ProcessSamplePreloads(resetStatus);
     AudioLoad_ProcessAsyncLoads(resetStatus);
@@ -1988,6 +1991,8 @@ void AudioLoad_AsyncDmaUnkMedium(UNUSED u32 devAddr, UNUSED void* ramAddr, UNUSE
  * @param fontData ram address of raw soundfont binary loaded into cache
  * @param sampleBankReloc information on the sampleBank containing raw audio samples
  */
+void Fishmod_SampleStoreUse(Sample* sample, s32 queue);
+
 void AudioLoad_RelocateSample(TunedSample* tunedSample, SoundFontData* fontData, SampleBankRelocInfo* sampleBankReloc) {
     Sample* sample;
     void* reloc;
@@ -2029,6 +2034,7 @@ void AudioLoad_RelocateSample(TunedSample* tunedSample, SoundFontData* fontData,
             }
 
             sample->isRelocated = true;
+            Fishmod_SampleStoreUse(sample, false); // (kept in RAM already? then played from there from the start)
 
             if (sample->unk_bit26 && (sample->medium != MEDIUM_RAM)) {
                 gAudioCtx.usedSamples[gAudioCtx.numUsedSamples++] = sample;
@@ -2508,4 +2514,146 @@ void AudioLoad_ProcessScriptLoads(void) {
  */
 void AudioLoad_InitScriptLoads(void) {
     osCreateMesgQueue(&sScriptLoadQueue, sScriptLoadMsgBuf, ARRAY_COUNT(sScriptLoadMsgBuf));
+}
+
+/*
+ * fish-oot: the sample store. With the Expansion Pak there's RAM no one else uses (the 870 KB between the two frame
+ * buffers: code/sys_cfb.c), and the game streams every instrument and sound effect from the cart as it plays: a piece
+ * of each sounding note's sample a buffer, found or fetched in the sample DMA buffers (AudioLoad_DmaSampleData). Here,
+ * each sample the game plays from the cart is copied into the store in the background (a DMA of at most
+ * SAMPLE_STORE_CHUNK bytes in flight, one started an audio update), and once it's all there the note plays it from
+ * RAM, as the game does with the samples it preloads: no more lookups, fetches or countdowns for it. The bytes are
+ * the cart's own (each copy keeps its 16-byte alignment and the cart's bytes around it), so the sound is the same:
+ * the audio check compares every sample. When the store is full, the rest stream as before. Copies stay for the
+ * session (the store outlives audio resets): a sample's next soundfont load finds it there (AudioLoad_RelocateSample).
+ */
+extern u32 gFishmodSampleStoreStart;
+extern u32 gFishmodSampleStoreEnd;
+
+#define SAMPLE_STORE_SLOTS 1024 // (a power of two)
+#define SAMPLE_STORE_QUEUE 128  // (a power of two)
+#define SAMPLE_STORE_CHUNK 0x2000
+#define SAMPLE_STORE_PAD 0x20 // cart bytes kept after each sample (the decoder reads a little past the end)
+
+typedef struct SampleStoreSlot {
+    u32 rom;  // the sample's cart address (0: a free slot)
+    u32 romStart, romEnd; // what's copied: from the 16-byte line it starts in, to SAMPLE_STORE_PAD past its end
+    u8* ram;  // where romStart goes
+    u32 done; // bytes copied so far
+    u8 state; // SAMPLE_STORE_*
+} SampleStoreSlot;
+
+#define SAMPLE_STORE_QUEUED 1
+#define SAMPLE_STORE_READY 2
+#define SAMPLE_STORE_NO_ROOM 3
+
+static SampleStoreSlot sSampleStore[SAMPLE_STORE_SLOTS];
+static u16 sSampleStoreQueue[SAMPLE_STORE_QUEUE];
+static u32 sSampleStoreHead, sSampleStoreTail;
+static u8* sSampleStoreNext;
+static OSIoMesg sSampleStoreIoMesg;
+static OSMesgQueue sSampleStoreDmaQueue;
+static OSMesg sSampleStoreDmaMsg;
+static s32 sSampleStoreInFlight; // bytes of the DMA in flight (0: none)
+static s32 sSampleStoreInit;
+
+static SampleStoreSlot* Fishmod_SampleStoreFind(u32 rom, s32 add) {
+    u32 h = ((rom >> 4) * 2654435761u) >> 22;
+    s32 n;
+
+    for (n = 0; n < SAMPLE_STORE_SLOTS; n++, h = (h + 1) & (SAMPLE_STORE_SLOTS - 1)) {
+        SampleStoreSlot* slot = &sSampleStore[h];
+
+        if (slot->rom == rom) {
+            return slot;
+        }
+        if (slot->rom == 0) {
+            if (!add) {
+                return NULL;
+            }
+            slot->rom = rom;
+            return slot;
+        }
+    }
+    return NULL;
+}
+
+/**
+ * A note is about to play `sample` from the cart (queue: true), or a soundfont was just loaded with it (false): if its
+ * copy is in the store, it plays from there now on; if not, it's queued to be copied (when queue is set).
+ */
+void Fishmod_SampleStoreUse(Sample* sample, s32 queue) {
+    SampleStoreSlot* slot;
+
+    if ((gFishmodSampleStoreStart == 0) || (sample->medium != MEDIUM_CART) || (sample->size == 0)) {
+        return;
+    }
+    if (!sSampleStoreInit) {
+        sSampleStoreInit = true;
+        sSampleStoreNext = (u8*)gFishmodSampleStoreStart;
+        osCreateMesgQueue(&sSampleStoreDmaQueue, &sSampleStoreDmaMsg, 1);
+    }
+    slot = Fishmod_SampleStoreFind((u32)sample->sampleAddr, queue);
+    if (slot == NULL) {
+        return;
+    }
+    if (slot->state == SAMPLE_STORE_READY) {
+        sample->sampleAddr = slot->ram + (slot->rom - slot->romStart);
+        sample->medium = MEDIUM_RAM;
+        return;
+    }
+    if ((slot->state == 0) && queue) {
+        u32 romStart = slot->rom & ~0xF;
+        u32 romEnd = ALIGN16(slot->rom + sample->size) + SAMPLE_STORE_PAD;
+
+        if (sSampleStoreTail - sSampleStoreHead >= SAMPLE_STORE_QUEUE) {
+            return; // (asked again next time it plays)
+        }
+        if ((u32)sSampleStoreNext + (romEnd - romStart) > gFishmodSampleStoreEnd) {
+            slot->state = SAMPLE_STORE_NO_ROOM; // (streamed as before)
+            return;
+        }
+        slot->romStart = romStart;
+        slot->romEnd = romEnd;
+        slot->ram = sSampleStoreNext;
+        slot->done = 0;
+        sSampleStoreNext += romEnd - romStart;
+        slot->state = SAMPLE_STORE_QUEUED;
+        sSampleStoreQueue[sSampleStoreTail++ & (SAMPLE_STORE_QUEUE - 1)] = slot - sSampleStore;
+    }
+}
+
+/** Once an audio update: the DMA in flight finished? Then the next piece of the queue's first sample. */
+void Fishmod_SampleStoreStep(void) {
+    SampleStoreSlot* slot;
+    u32 size;
+
+    if (!sSampleStoreInit) {
+        return;
+    }
+    if (sSampleStoreInFlight != 0) {
+        if (osRecvMesg(&sSampleStoreDmaQueue, NULL, OS_MESG_NOBLOCK) == -1) {
+            return;
+        }
+        slot = &sSampleStore[sSampleStoreQueue[sSampleStoreHead & (SAMPLE_STORE_QUEUE - 1)]];
+        slot->done += sSampleStoreInFlight;
+        sSampleStoreInFlight = 0;
+        if (slot->romStart + slot->done >= slot->romEnd) {
+            slot->state = SAMPLE_STORE_READY; // (its notes switch over as they next play it)
+            sSampleStoreHead++;
+        }
+    }
+    if (sSampleStoreHead == sSampleStoreTail) {
+        return;
+    }
+    slot = &sSampleStore[sSampleStoreQueue[sSampleStoreHead & (SAMPLE_STORE_QUEUE - 1)]];
+    size = slot->romEnd - (slot->romStart + slot->done);
+    if (size > SAMPLE_STORE_CHUNK) {
+        size = SAMPLE_STORE_CHUNK;
+    }
+    Audio_InvalDCache(slot->ram + slot->done, size);
+    if (AudioLoad_Dma(&sSampleStoreIoMesg, OS_MESG_PRI_NORMAL, OS_READ, slot->romStart + slot->done,
+                      slot->ram + slot->done, size, &sSampleStoreDmaQueue, MEDIUM_CART, "SampleStore") == 0) {
+        sSampleStoreInFlight = size;
+    }
 }

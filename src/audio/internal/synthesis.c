@@ -68,6 +68,37 @@ u8 sNumSamplesPerWavePeriod[] = {
 /**
  * original name: Nas_CpuFX
  */
+void Fishmod_SampleStoreUse(Sample* sample, s32 queue);
+
+#if FISHMOD_DEBUG
+/*
+ * Streamed samples over a run, for gdb at its end (x/4wx &gFishmodAudStat): sample reads streamed from the cart, the
+ * distinct samples streamed and their bytes (what keeping them in RAM would take), and the table's overflow.
+ */
+u32 gFishmodAudStat[4];
+static u32 sAudStatSeen[2048];
+
+static void Fishmod_AudSampleStat(Sample* sample) {
+    u32 key = (u32)sample->sampleAddr;
+    u32 h = ((key >> 4) * 2654435761u) >> 21;
+    s32 n;
+
+    gFishmodAudStat[0]++;
+    for (n = 0; n < 2048; n++, h = (h + 1) & 2047) {
+        if (sAudStatSeen[h] == key) {
+            return;
+        }
+        if (sAudStatSeen[h] == 0) {
+            sAudStatSeen[h] = key;
+            gFishmodAudStat[1]++;
+            gFishmodAudStat[2] += sample->size;
+            return;
+        }
+    }
+    gFishmodAudStat[3]++;
+}
+#endif
+
 void AudioSynth_InitNextRingBuf(s32 chunkLen, s32 updateIndex, s32 reverbIndex) {
     ReverbRingBufferItem* bufItem;
     STACK_PADS(s32, 3);
@@ -906,6 +937,9 @@ Acmd* AudioSynth_ProcessNote(s32 noteIndex, NoteSampleState* sampleState, NoteSy
         synthState->samplePosInt += numSamplesToLoad;
     } else {
         sample = sampleState->tunedSample->sample;
+        if (sample->medium == MEDIUM_CART) {
+            Fishmod_SampleStoreUse(sample, true); // (fish-oot: kept in RAM once copied: audio/internal/load.c)
+        }
         loopInfo = sample->loop;
         loopEndPos = loopInfo->header.end;
         sampleAddr = (u32)sample->sampleAddr;
@@ -1033,6 +1067,9 @@ Acmd* AudioSynth_ProcessNote(s32 noteIndex, NoteSampleState* sampleState, NoteSy
                     } else if (sample->medium == MEDIUM_UNK) {
                         return cmd;
                     } else {
+#if FISHMOD_DEBUG
+                        Fishmod_AudSampleStat(sample);
+#endif
                         sampleData = AudioLoad_DmaSampleData(sampleDataStart + sampleDataOffset + sampleAddr,
                                                              ALIGN16((nFramesToDecode * frameSize) + SAMPLES_PER_FRAME),
                                                              flags, &synthState->sampleDmaIndex, sample->medium);

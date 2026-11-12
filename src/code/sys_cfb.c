@@ -13,6 +13,9 @@
 uintptr_t sSysCfbFbPtr[2];
 uintptr_t sSysCfbEnd;
 
+u32 gFishmodSampleStoreStart; // fish-oot: RAM no one else uses, for the audio driver's sample store (0: none)
+u32 gFishmodSampleStoreEnd;
+
 void SysCfb_Init(s32 n64dd) {
     u32 screenSize;
     UNUSED_NDEBUG uintptr_t tmpFbEnd;
@@ -61,6 +64,9 @@ void SysCfb_Init(s32 n64dd) {
         // ends at the lower frame buffer, gives up the 870 KB between them.
         sSysCfbFbPtr[0] = 0x80700000 - (screenSize * 2);
         sSysCfbFbPtr[1] = 0x80800000 - (screenSize * 2);
+        // the space between them goes to the audio driver: copies of the samples being played (audio/internal/load.c)
+        gFishmodSampleStoreStart = 0x80700000;
+        gFishmodSampleStoreEnd = sSysCfbFbPtr[1];
     }
 #endif
     PRINTF(T("フレームバッファのアドレスは %08x と %08x です\n", "Frame buffer addresses are %08x and %08x\n"),
