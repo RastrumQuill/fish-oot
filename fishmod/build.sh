@@ -32,7 +32,8 @@
 #                  extracted assets (after --texpack's, if both); outputs get a -colpack suffix
 #   --pgo          (implies --clang) clang optimises with the console's sample profile, PGO_PROFILE (default
 #                  n64prof/profiles/oot-console2.prof; see its README); outputs get a -clang-pgo suffix
-# Uses `flips` on PATH (or FLIPS=/path/to/flips) for the release patch if there is one, else fishmod/tools/bps.py.
+# The release patch: fishmod/tools/bps.py (Flips' format; any BPS patcher applies it), or FLIPS=/path/to/flips. Flips'
+# own patches of these ROMs came out several times larger (30 MB against 4.7 MB: it misses the moved files).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -42,7 +43,7 @@ VERSION=ntsc-1.2
 REGION=US
 BASEROM_DIR="baseroms/$VERSION"
 OUT_DIR="fishmod/out"
-FLIPS="${FLIPS:-flips}"
+FLIPS="${FLIPS:-fishmod/tools/bps.py}"
 
 DEBUG=0
 CLANG=0
