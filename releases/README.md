@@ -10,7 +10,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 
 | Patch | What it is | Notes |
 |---|---|---|
-| `fish-oot-qol6-testmode.bps`, `fish-oot-qol6-hw-testmode.bps` | The newest test build to play: equipment on a button swaps at any time, and pressing what's worn puts the default back | [notes](notes-qol6.md) |
+| `fish-oot-qol7-testmode.bps`, `fish-oot-qol7-hw-testmode.bps` | The newest test build to play: the fish's new behaviour (schools, days, scent, learned baits) | [notes](notes-qol7.md) |
 | `fish-oot-frames9.bps` | The bench route with the first fish AI work (cheaper far schools, no repeated shore raycasts) | [notes](notes-frames9.md) |
 | `fish-oot-frames8b.bps` | The bench route, the baseline for frames9 | [notes](notes-frames8b.md) |
 
