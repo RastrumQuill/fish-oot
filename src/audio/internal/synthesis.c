@@ -1340,6 +1340,27 @@ Acmd* AudioSynth_FinalResample(Acmd* cmd, NoteSynthesisState* synthState, s32 si
 /**
  * original name: Nas_Synth_Envelope
  */
+
+/*
+ * fish-oot: n / d for the envelope's ramps, by multiplying by M = floor((2^32 - 1) / d) + 1 and keeping the high
+ * word: floor(|n| * M / 2^32) = floor(|n| / d) whenever |n| * d < 2^32 (here |n| < 2^17, d < 2^12), rounded toward
+ * zero as C's division is. Checked against the division for every d from 2 to 4095 and |n| up to 131070.
+ */
+static u32 sRampDivisor;
+static u32 sRampMagic;
+
+static inline s32 AudioSynth_RampDiv(s32 n, s32 d) {
+    u32 a;
+    u32 q;
+
+    if (sRampMagic == 0) {
+        return n / d;
+    }
+    a = (n < 0) ? -(u32)n : (u32)n;
+    q = (u32)(((u64)a * sRampMagic) >> 32);
+    return (n < 0) ? -(s32)q : (s32)q;
+}
+
 Acmd* AudioSynth_ProcessEnvelope(Acmd* cmd, NoteSampleState* sampleState, NoteSynthesisState* synthState, s32 aiBufLen,
                                  u16 dmemSrc, s32 haasEffectDelaySide, UNUSED s32 flags) {
     u32 dmemDests;
@@ -1363,13 +1384,19 @@ Acmd* AudioSynth_ProcessEnvelope(Acmd* cmd, NoteSampleState* sampleState, NoteSy
     targetVolRight = sampleState->targetVolRight;
     targetVolRight <<= 4;
 
+    // fish-oot: the three ramps' divisions (about 37 cycles each) as multiplies by the divisor's reciprocal, the same
+    // quotients (AudioSynth_RampDiv)
+    if ((u32)(aiBufLen >> 3) != sRampDivisor) {
+        sRampDivisor = aiBufLen >> 3;
+        sRampMagic = (sRampDivisor >= 2) ? (0xFFFFFFFFu / sRampDivisor + 1) : 0;
+    }
     if (targetVolLeft != curVolLeft) {
-        rampLeft = (targetVolLeft - curVolLeft) / (aiBufLen >> 3);
+        rampLeft = AudioSynth_RampDiv(targetVolLeft - curVolLeft, aiBufLen >> 3);
     } else {
         rampLeft = 0;
     }
     if (targetVolRight != curVolRight) {
-        rampRight = (targetVolRight - curVolRight) / (aiBufLen >> 3);
+        rampRight = AudioSynth_RampDiv(targetVolRight - curVolRight, aiBufLen >> 3);
     } else {
         rampRight = 0;
     }
@@ -1378,7 +1405,7 @@ Acmd* AudioSynth_ProcessEnvelope(Acmd* cmd, NoteSampleState* sampleState, NoteSy
     phi_t1 = sourceReverbVol & 0x7F;
 
     if (sourceReverbVol != reverbVol) {
-        rampReverb = (((reverbVol & 0x7F) - phi_t1) << 9) / (aiBufLen >> 3);
+        rampReverb = AudioSynth_RampDiv(((reverbVol & 0x7F) - phi_t1) << 9, aiBufLen >> 3);
         synthState->reverbVol = reverbVol;
     } else {
         rampReverb = 0;
