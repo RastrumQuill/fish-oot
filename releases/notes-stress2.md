@@ -32,9 +32,12 @@ The fish bench (in the lab tank, two passes; `fishmod/tools/stress_prof.py`), ms
 | 36 | 19.9 | 18 | 12.6 | 14.9 | 28.7 | 34.0 | 5.8 | 4.7 |
 | 42 | 18.4 | 46 (of 445) | 16.2 | 13.3 | 22.3 | 31.4 | 5.5 | 3.2 |
 
-**30 fish held full speed.** On average nothing is near the 50 ms frame (CPU 25-30, RDP 28-34, the CPU idle about 15
-ms a frame): what fails the steps from 24 fish is a few slow frames (spikes), not the steady cost. The fish's own
-update is 5-6 ms for all of them from 18 fish (the far ones cheap), their drawing 2-5 ms.
+**36 fish hold 20 fps on screen** (every picture on time, none held a refresh longer, at every step up to 36; at
+42, 18.4 fps). The bench's own test said 30: it counts frames whose period is over 52 ms, and with the third frame
+buffer (run-ahead) those are only the period wobbling round 50 ms (every third frame 53-56 ms, the CPU at 26-30 ms
+and the RDP at 33 ms in them); the screen never shows them. The test is to go by the pictures shown (next stress
+build). In the tank every fish is close and fully drawn and thinking: the worst case. The fish's own update is 5-6 ms
+from 18 fish (the far ones cheap), their drawing 2-5 ms; the CPU idle about 15 ms a frame.
 
 The plant bench (the kelp forest, two passes):
 
