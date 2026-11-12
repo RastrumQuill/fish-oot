@@ -364,6 +364,7 @@ typedef struct ScatterSet {
     Mtx* mtxp[PROP_BUDGET]; // each drawn prop's matrix: one of mtx, or its own kept one (sPropMtx)
     u16 prop[PROP_BUDGET]; // in drawing order: nearest band first, kind by kind within a band
     u8 tier[PROP_BUDGET];  // ScatterTier, as its matrix was made
+    u8 hidden[PROP_BUDGET]; // wholly beyond the screen's edges: in the set (as the cone chose it), not drawn
     s32 count;
     s16 cards[BEDCARD_SET_MAX]; // the bed cards drawn in place of their chunks' card-drawn plants
     s32 cardCount;
@@ -1230,7 +1231,9 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     static f32 sChunkDistSq[ARRAY_COUNT(sVisible)]; // their centres' distance from the eye, squared
     static u16 sCand[VISIBLE_MAX];                  // props in view (kind by kind)
     static u8 sCandBand[VISIBLE_MAX];               // and their distance bands
+    static u8 sCandHidden[VISIBLE_MAX];             // and whether they're beyond the screen's edges
     static u16 sOrdered[VISIBLE_MAX];               // nearest band first, kind by kind within a band
+    static u8 sOrderedHidden[VISIBLE_MAX];
     static u16 sKindStart[ARRAY_COUNT(sVisible)][FISHMOD_PROP_KIND_MAX + 1]; // each kind's first prop in the chunk
     Vec3f eye = *eyeP;
     s32 bandStart[BANDS + 1];
@@ -1447,6 +1450,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 f32 dz = prop->z - eye.z;
                 f32 dSq = SQ(dx) + SQ(dz);
                 f32 front;
+                s32 hidden;
 
                 if (dSq > maxSq) {
                     continue;
@@ -1471,19 +1475,20 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                         continue;
                     }
                     // wholly beyond the screen's left or right, top or bottom edge (the sphere's distance outside the
-                    // edge's plane: (|x| - tan * z) / sec > room)
+                    // edge's plane: (|x| - tan * z) / sec > room): kept in the set, so everything that reads it (the
+                    // budget, the bubbles' plants, the random numbers they draw) is as it was, but not drawn
+                    hidden = false;
                     if (useEdges && (dSq > SQ(room * 2.0f))) {
                         f32 z = front - room;
                         f32 x = dx * rightX + dy * rightY + dz * rightZ;
                         f32 y = dx * upX + dy * upY + dz * upZ;
 
-                        if ((fabsf(x) > (tanH * z + room * secH)) || (fabsf(y) > (tanV * z + room * secV))) {
-                            continue;
-                        }
+                        hidden = (fabsf(x) > (tanH * z + room * secH)) || (fabsf(y) > (tanV * z + room * secV));
                     }
                 }
                 if (candCount < VISIBLE_MAX) {
                     sCandBand[candCount] = CLAMP_MAX((s32)(sqrtf(dSq) * (1.0f / BAND_WIDTH)), BANDS - 1);
+                    sCandHidden[candCount] = hidden;
                     sCand[candCount++] = i;
                 }
             }
@@ -1499,6 +1504,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         bandStart[band + 1] += bandStart[band];
     }
     for (n = 0; n < candCount; n++) {
+        sOrderedHidden[bandStart[sCandBand[n]]] = sCandHidden[n];
         sOrdered[bandStart[sCandBand[n]]++] = sCand[n];
     }
     // into the other set, as far as the budget (and the room for material changes) goes
@@ -1546,7 +1552,10 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             gFishmodLodTest.drawn[k]++;
         }
 #endif
-        {
+        set->hidden[set->count] = sOrderedHidden[n];
+        if (sOrderedHidden[n]) {
+            set->mtxp[set->count] = NULL; // (not drawn: no matrix)
+        } else {
             s16 yaw = (tier == TIER_IMP) ? sBillboardYaw : (s16)(prop->yaw << 8);
 
             if (sKinds[k].faceCam && (tier != TIER_IMP)) {
@@ -1802,6 +1811,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         f32 dSq;
         s32 tier;
         s32 key;
+
+        if (set->hidden[n]) {
+            continue; // (beyond the screen's edges)
+        }
 
         if (n == cacheUntil) {
             Scatter_KeepAt(&sKeep[sFrame], cacheValid, cacheOpa0, opa, cacheXlu0, xlu, &keepNow, lastOpa, lastXlu,
