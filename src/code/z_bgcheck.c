@@ -66,12 +66,18 @@ static u32 DynaPoly_ActorBit(Actor* actor) {
 
 static Vec3s* sStaticVtxS;
 static Vec3f* sStaticVtxF;
-// fishmod: each scene poly's box on the ground (z and x), for the floor check's early out (BgCheck_Allocate)
+// fishmod: each scene poly's box on the ground (z and x), for the floor check's early out (BgCheck_Allocate), and what
+// the floor search's first tests read (the flags that exclude it, whether it faces down, its lowest vertex), all in one
+// 16-byte record: one cache line for a poly passed over, where the poly, its three vertices and the box were up to five.
+// The box and height are the vertices' own 16-bit values (compared as floats, as before: the same comparisons).
 typedef struct {
-    f32 minZ;
-    f32 maxZ;
-    f32 minX;
-    f32 maxX;
+    s16 minZ;
+    s16 maxZ;
+    s16 minX;
+    s16 maxX;
+    s16 minY;   // the lowest of its vertices' y
+    u16 flags;  // flags_vIA's exclusion bits (0xE000), and bit 0: its normal's y is below 0
+    s32 pad;
 } StaticPolyBox;
 static StaticPolyBox* sStaticPolyBox;
 
@@ -727,16 +733,30 @@ f32 BgCheck_RaycastDownStaticList(CollisionContext* colCtx, u16 xpFlags, SSList*
     while (true) {
         polyId = curNode->polyId;
 
-        if (COLPOLY_VTX_CHECK_FLAGS_ANY(colCtx->colHeader->polyList[polyId].flags_vIA, xpFlags) ||
+        if (sStaticPolyBox != NULL) {
+            // fishmod: the first tests from the poly's record (one cache line): the same flags, the same facing, and
+            // the point below its lowest vertex exactly when it's below all three
+            StaticPolyBox* box = &sStaticPolyBox[polyId];
+
+            if (COLPOLY_VTX_CHECK_FLAGS_ANY(box->flags, xpFlags) ||
+                ((groundChk & BGCHECK_GROUND_CHECK_ON) && (box->flags & 1))) {
+                if (curNode->next == SS_NULL) {
+                    break;
+                }
+                curNode = &colCtx->polyNodes.tbl[curNode->next];
+                continue;
+            }
+            if (pos->y < box->minY) {
+                break;
+            }
+        } else if (COLPOLY_VTX_CHECK_FLAGS_ANY(colCtx->colHeader->polyList[polyId].flags_vIA, xpFlags) ||
             ((groundChk & BGCHECK_GROUND_CHECK_ON) && colCtx->colHeader->polyList[polyId].normal.y < 0)) {
             if (curNode->next == SS_NULL) {
                 break;
             }
             curNode = &colCtx->polyNodes.tbl[curNode->next];
             continue;
-        }
-
-        if (pos->y < colCtx->colHeader->vtxList[COLPOLY_VTX_INDEX(colCtx->colHeader->polyList[polyId].flags_vIA)].y &&
+        } else if (pos->y < colCtx->colHeader->vtxList[COLPOLY_VTX_INDEX(colCtx->colHeader->polyList[polyId].flags_vIA)].y &&
             pos->y < colCtx->colHeader->vtxList[COLPOLY_VTX_INDEX(colCtx->colHeader->polyList[polyId].flags_vIB)].y &&
             pos->y < colCtx->colHeader->vtxList[colCtx->colHeader->polyList[polyId].vIC].y) {
             break;
@@ -1825,9 +1845,10 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
         }
     }
     // fishmod: each poly's box on the ground (the floor check's early out)
-    sStaticPolyBox =
-        GAME_STATE_ALLOC(&play->state, colHeader->numPolygons * sizeof(StaticPolyBox), "../z_bgcheck.c", __LINE__);
+    sStaticPolyBox = GAME_STATE_ALLOC(&play->state, colHeader->numPolygons * sizeof(StaticPolyBox) + 15,
+                                      "../z_bgcheck.c", __LINE__);
     if (sStaticPolyBox != NULL) {
+        sStaticPolyBox = (StaticPolyBox*)ALIGN16((uintptr_t)sStaticPolyBox); // (a record a cache line)
         s32 i;
 
         for (i = 0; i < colHeader->numPolygons; i++) {
@@ -1840,6 +1861,9 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
             sStaticPolyBox[i].maxZ = MAX(MAX(va->z, vb->z), vc->z);
             sStaticPolyBox[i].minX = MIN(MIN(va->x, vb->x), vc->x);
             sStaticPolyBox[i].maxX = MAX(MAX(va->x, vb->x), vc->x);
+            sStaticPolyBox[i].minY = MIN(MIN(va->y, vb->y), vc->y);
+            sStaticPolyBox[i].flags = (poly->flags_vIA & 0xE000) | ((poly->normal.y < 0) ? 1 : 0);
+            sStaticPolyBox[i].pad = 0;
         }
     }
     customNodeListMax = -1;
