@@ -104,6 +104,21 @@ def main():
     secs = sum(r[2] for r in recs) / 1e6
     print(f"# Frame log: {len(recs)} frames ({secs / 3600:.2f} h, {len(recs) / secs:.1f} fps), "
           f"{len(slow)} over 52 ms ({100 * len(slow) / len(recs):.0f}%); {gaps} gaps in the frame count\n")
+    # what reached the screen first (run-ahead's third frame buffer hides a frame period's wobble round 50 ms: a frame
+    # over 52 ms is often no hitch at all): the frames after which a picture stayed 4 refreshes or more
+    shown = [r for r in recs if len(r) > 58 and (r[57] >> 16)]
+    if shown:
+        hitch = [r for r in shown if (r[57] & 0xFFFF) >= 4]
+        kinds = collections.Counter()
+        for r in hitch:
+            cpu_over = (r[3] + r[4]) > 50000
+            rdp_over = r[7] > 50000
+            kinds["both over 50 ms" if cpu_over and rdp_over else "CPU alone over 50 ms" if cpu_over
+                  else "RDP alone over 50 ms" if rdp_over else "neither over 50 ms"] += 1
+        print(f"**On screen: {len(hitch)} of {len(shown)} frames ({100 * len(hitch) / len(shown):.0f}%) left a picture "
+              f"up 4 refreshes or more (a visible hitch).** In them: "
+              + ", ".join(f"{k} {100 * v / max(len(hitch), 1):.0f}%" for k, v in kinds.most_common()) + "\n")
+        print("(The 'slow frames' below are by frame period, over 52 ms: with run-ahead, not all of them are hitches.)\n")
 
     def mean(rs, i):
         return sum(r[i] for r in rs) / max(len(rs), 1) / 1000.0
