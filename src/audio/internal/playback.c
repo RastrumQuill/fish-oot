@@ -844,6 +844,7 @@ void Audio_NoteInitForLayer(Note* note, SequenceLayer* layer) {
     note->playbackState.parentLayer = layer;
     playbackState->priority = layer->channel->notePriority;
     layer->notePropertiesNeedInit = true;
+    layer->channel->fishmodLayerInit = true;
     layer->bit3 = true;
     layer->note = note;
     layer->channel->noteUnused = note;

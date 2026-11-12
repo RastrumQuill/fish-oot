@@ -653,6 +653,7 @@ void AudioSeq_SeqLayerProcessScriptStep1(SequenceLayer* layer) {
         layer->portamento.mode = PORTAMENTO_MODE_OFF;
     }
     layer->notePropertiesNeedInit = true;
+    layer->channel->fishmodLayerInit = true;
 }
 
 /**

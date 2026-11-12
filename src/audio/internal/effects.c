@@ -28,6 +28,14 @@ void Audio_SequenceChannelProcessSound(SequenceChannel* channel, s32 recalculate
         channel->changes.s.freqScale = true;
     }
 
+    // fish-oot: nothing changed and no layer waiting for its first note properties: the loop below would change
+    // nothing, so its four layers (a cache line each) aren't read. fishmodLayerInit is set wherever a layer's
+    // notePropertiesNeedInit is, and cleared only after a pass that leaves none of them set.
+    if ((channel->changes.asByte == 0) && !recalculateVolume && !channel->fishmodLayerInit) {
+        return;
+    }
+    channel->fishmodLayerInit = false;
+
     for (i = 0; i < 4; i++) {
         SequenceLayer* layer = channel->layers[i];
 
@@ -48,6 +56,9 @@ void Audio_SequenceChannelProcessSound(SequenceChannel* channel, s32 recalculate
                     layer->notePan = (channel->pan + layer->pan * (0x80 - channel->panChannelWeight)) >> 7;
                 }
             }
+        }
+        if ((layer != NULL) && layer->notePropertiesNeedInit) {
+            channel->fishmodLayerInit = true; // (still waiting: enabled, or a note, next time)
         }
     }
     channel->changes.asByte = 0;

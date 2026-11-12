@@ -488,6 +488,7 @@ typedef struct SequenceChannel {
     /* 0xC4 */ s8 seqScriptIO[8]; // bridge between .seq script and audio lib, "io ports"
     /* 0xCC */ s16* filter;
     /* 0xD0 */ Stereo stereo;
+    /* 0xD1 */ u8 fishmodLayerInit; // fish-oot: a layer may have notePropertiesNeedInit set (audio/internal/effects.c)
 } SequenceChannel; // size = 0xD4
 
 // Might also be known as a Track, according to sm64 debug strings (?).
