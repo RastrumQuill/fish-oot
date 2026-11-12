@@ -1,5 +1,7 @@
 # frames7: the morning runner's first build, audio layout, the sample store
 
+**`fish-oot-frames7-noclaim.bps`**: the same build without the command-list cache claiming (the last row of the table), to measure it on the console: the morning queue alternates the two.
+
 **`fish-oot-frames7.bps`** (`fishmod/build.sh --script pcprof_frames --hw --colpack --gcc-all`): frames6 plus the
 changes below. It runs the same route and sends the same USB frame log and profile. It also works with
 `fishmod\pc\morning.bat` (see `fishmod/pc/MORNING.md`).
@@ -15,6 +17,8 @@ changes below. It runs the same route and sends the same USB frame log and profi
 | Audio: the sample store. The 870 KB between the frame buffers (unused since frames6) keeps a copy of each sample played from the cart, loaded in the background, then played from RAM | audio check: every sample alike (7,593 buffers). ares bench: cart sample reads 1,812,521 -> 1,476; 61 samples, 632 KB of the store; frame 52.0 -> 50.6 ms, slow frames 28% -> 13% |
 | Audio: the command list's cache lines claimed before they're written (the CPU's Create Dirty Exclusive), so a new line of commands isn't first read from memory | audio check: every sample alike (8,253 buffers). The console profile put these misses at about 1.5% of the CPU |
 
+| Audio: a channel with nothing changed and no layer waiting for its first note skips its four layers (a per-channel bit, set wherever a layer starts waiting) | audio check: every sample alike. The console's hottest line in the channel update, 0.65% of the CPU |
+| Audio: the envelope ramps' divisions (three a note an update, about 37 cycles each) as multiplies by the reciprocal, the same quotients | checked against the division for every possible input; audio check: every sample alike (8,253 buffers) |
 ## Memory over the bench route (ares, the lowest free at any frame)
 
 | heap | size | most used | least free |
