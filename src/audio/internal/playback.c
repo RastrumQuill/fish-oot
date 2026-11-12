@@ -27,6 +27,12 @@ void Audio_InitSampleState(Note* note, NoteSampleState* sampleState, NoteSampleS
     stereoData = attrs->stereo.s;
 
     sampleState->bitField0 = note->sampleState.bitField0;
+    {
+        // fish-oot: the enabled bit's mirror (synthesis.c, gFishmodSampleEnabled)
+        extern u8 gFishmodSampleEnabled[];
+
+        gFishmodSampleEnabled[sampleState - gAudioCtx.sampleStates] = sampleState->bitField0.enabled;
+    }
     sampleState->bitField1 = note->sampleState.bitField1;
     sampleState->waveSampleAddr = note->sampleState.waveSampleAddr;
     sampleState->harmonicIndexCurAndPrev = note->sampleState.harmonicIndexCurAndPrev;

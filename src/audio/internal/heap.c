@@ -7,6 +7,7 @@
 #include "ultra64.h"
 #include "versions.h"
 #include "audio.h"
+#define FISHMOD_SAMPLE_ENABLED_MAX 1024
 
 void AudioHeap_InitSampleCaches(u32 persistentSampleCacheSize, u32 temporarySampleCacheSize);
 SampleCacheEntry* AudioHeap_AllocTemporarySampleCacheEntry(u32 size);
@@ -1061,6 +1062,12 @@ void AudioHeap_Init(void) {
     gAudioCtx.sampleStates =
         AudioHeap_AllocZeroed(&gAudioCtx.miscPool, gAudioCtx.audioBufferParameters.ticksPerUpdate * gAudioCtx.numNotes *
                                                        sizeof(NoteSampleState));
+    {
+        // fish-oot: the per-update states' enabled bits mirrored (synthesis.c, gFishmodSampleEnabled): zero, as they are
+        extern u8 gFishmodSampleEnabled[];
+
+        bzero(gFishmodSampleEnabled, FISHMOD_SAMPLE_ENABLED_MAX);
+    }
     // Initialize audio binary interface command list buffers
     for (i = 0; i != 2; i++) {
         gAudioCtx.abiCmdBufs[i] =

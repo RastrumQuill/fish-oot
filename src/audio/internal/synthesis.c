@@ -139,6 +139,15 @@ void AudioSynth_InitNextRingBuf(s32 chunkLen, s32 updateIndex, s32 reverbIndex) 
     }
 }
 
+/*
+ * fish-oot: each per-update note state's enabled bit (gAudioCtx.sampleStates[i].bitField0.enabled) mirrored in one
+ * byte, so the mixer's pass over every note (AudioSynth_DoOneAudioUpdate) reads a few cache lines instead of one per
+ * note. Written wherever that bit is: the copy in Audio_InitSampleState, the two clears here, and zeroed with the
+ * states (heap.c).
+ */
+#define FISHMOD_SAMPLE_ENABLED_MAX 1024
+u8 gFishmodSampleEnabled[FISHMOD_SAMPLE_ENABLED_MAX];
+
 /**
  * original name: __Nas_PushDrvReg
  */
@@ -156,6 +165,7 @@ void func_800DB03C(s32 updateIndex) {
             sampleState->bitField0.needsInit = false;
         } else {
             sampleState2->bitField0.enabled = false;
+            gFishmodSampleEnabled[baseIndex + i] = false;
         }
         sampleState->harmonicIndexCurAndPrev = 0;
     }
@@ -224,6 +234,7 @@ void func_800DB2C0(s32 updateIndex, s32 noteIndex) {
         sampleState = &gAudioCtx.sampleStates[(gAudioCtx.numNotes * i) + noteIndex];
         if (!sampleState->bitField0.needsInit) {
             sampleState->bitField0.enabled = false;
+            gFishmodSampleEnabled[(gAudioCtx.numNotes * i) + noteIndex] = false;
         } else {
             break;
         }
@@ -663,9 +674,24 @@ Acmd* AudioSynth_DoOneAudioUpdate(s16* aiBuf, s32 aiBufLen, Acmd* cmd, s32 updat
 
     t = gAudioCtx.numNotes * updateIndex;
     count = 0;
+#if FISHMOD_DEBUG
+    {
+        // the check (not in the benches, timed as shipped): the mirror matches every enabled bit
+        extern s32 gFishmodTimingAsShipped;
+        extern u32 gFishmodAudioDmaMismatches;
+
+        if (!gFishmodTimingAsShipped) {
+            for (i = 0; i < gAudioCtx.numNotes; i++) {
+                if (gFishmodSampleEnabled[t + i] != gAudioCtx.sampleStates[t + i].bitField0.enabled) {
+                    gFishmodAudioDmaMismatches++;
+                }
+            }
+        }
+    }
+#endif
     if (gAudioCtx.numSynthesisReverbs == 0) {
         for (i = 0; i < gAudioCtx.numNotes; i++) {
-            if (gAudioCtx.sampleStates[t + i].bitField0.enabled) {
+            if (gFishmodSampleEnabled[t + i]) { // (fish-oot: the mirror of sampleStates[t + i].bitField0.enabled)
                 noteIndices[count++] = i;
             }
         }
@@ -673,7 +699,7 @@ Acmd* AudioSynth_DoOneAudioUpdate(s16* aiBuf, s32 aiBufLen, Acmd* cmd, s32 updat
         for (reverbIndex = 0; reverbIndex < gAudioCtx.numSynthesisReverbs; reverbIndex++) {
             for (i = 0; i < gAudioCtx.numNotes; i++) {
                 sampleState = &gAudioCtx.sampleStates[t + i];
-                if (sampleState->bitField0.enabled && sampleState->bitField1.reverbIndex == reverbIndex) {
+                if (gFishmodSampleEnabled[t + i] && sampleState->bitField1.reverbIndex == reverbIndex) {
                     noteIndices[count++] = i;
                 }
             }
@@ -681,7 +707,8 @@ Acmd* AudioSynth_DoOneAudioUpdate(s16* aiBuf, s32 aiBufLen, Acmd* cmd, s32 updat
 
         for (i = 0; i < gAudioCtx.numNotes; i++) {
             sampleState = &gAudioCtx.sampleStates[t + i];
-            if (sampleState->bitField0.enabled && sampleState->bitField1.reverbIndex >= gAudioCtx.numSynthesisReverbs) {
+            if (gFishmodSampleEnabled[t + i] &&
+                sampleState->bitField1.reverbIndex >= gAudioCtx.numSynthesisReverbs) {
                 noteIndices[count++] = i;
             }
         }
