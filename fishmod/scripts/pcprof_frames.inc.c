@@ -7,6 +7,7 @@
 // Build: fishmod/build.sh --script pcprof_frames --hw   (the game as shipped: GCC, IDO for audio and libultra)
 #define FISHMOD_PCPROF 1
 #define FISHMOD_FRAMELOG 1
+#define FISHMOD_PCPROF_CALIB 1 // (the calibration loops once at the start: fishmod/tools/inst_profile.py)
 #ifndef FISHMOD_FRAME_TAGS
 #define FISHMOD_PCPROF_NORING 1
 #endif

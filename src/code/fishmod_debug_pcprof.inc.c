@@ -661,6 +661,89 @@ static void PcProf_Ranges(void) {
 }
 
 /** Once a play frame: start the sampler, keep the overlay ranges current, save every 30 seconds. */
+#ifdef FISHMOD_PCPROF_CALIB
+/*
+ * Calibration (FISHMOD_PCPROF_CALIB): five loops with a known answer, run once with the sampler going, so the console
+ * shows how each kind of waiting lands in the profile (fishmod/tools/inst_profile.py --func PcCalib_...): about a
+ * third of a second each, timed by the count register.
+ *   PcCalib_Alu        adds in a loop that fits the instruction cache: no waiting (the baseline mix)
+ *   PcCalib_LoadHit    loads from 1 KB, always in the data cache
+ *   PcCalib_LoadMiss   loads every 32 bytes over 3 MB of RDRAM: every one a data-cache miss
+ *   PcCalib_FetchMiss  32 KB of straight-line code, twice the instruction cache: every line fetched from RDRAM
+ *   PcCalib_Div        float divisions back to back (29 cycles each)
+ */
+#define CALIB_COUNTS (46875000 / 3) // a third of a second at the count register's rate
+#define NO_INLINE __attribute__((noinline))
+static volatile u32 sCalibSink;
+static u32 sCalibHot[256];
+
+static NO_INLINE void PcCalib_Alu(void) {
+    u32 start = osGetCount();
+
+    while ((osGetCount() - start) < CALIB_COUNTS) {
+        __asm__ volatile(".set noreorder\n.rept 256\naddiu $t0, $t0, 1\n.endr\n.set reorder" ::: "t0");
+    }
+}
+
+static NO_INLINE void PcCalib_LoadHit(void) {
+    u32 start = osGetCount();
+    volatile u32* p = sCalibHot;
+    u32 sum = 0;
+    s32 i;
+
+    while ((osGetCount() - start) < CALIB_COUNTS) {
+        for (i = 0; i < 256; i++) {
+            sum += p[i];
+        }
+    }
+    sCalibSink = sum;
+}
+
+static NO_INLINE void PcCalib_LoadMiss(void) {
+    u32 start = osGetCount();
+    volatile u32* p = (volatile u32*)0x80000400; // (the game's own code and data, only read: 3 MB, 375 times the cache)
+    u32 sum = 0;
+    s32 i;
+
+    while ((osGetCount() - start) < CALIB_COUNTS) {
+        for (i = 0; i < (3 << 20) / 4; i += 8) {
+            sum += p[i];
+        }
+    }
+    sCalibSink = sum;
+}
+
+static NO_INLINE void PcCalib_FetchMiss(void) {
+    u32 start = osGetCount();
+
+    while ((osGetCount() - start) < CALIB_COUNTS) {
+        __asm__ volatile(".set noreorder\n.rept 8192\naddiu $t0, $t0, 1\n.endr\n.set reorder" ::: "t0");
+    }
+}
+
+static NO_INLINE void PcCalib_Div(void) {
+    u32 start = osGetCount();
+    volatile f32 x = 1.0f;
+    f32 y = 1.0001f;
+    f32 v = x;
+
+    // (in assembly: -ffast-math would turn a division by the same number into a multiply)
+    while ((osGetCount() - start) < CALIB_COUNTS) {
+        __asm__ volatile(".rept 64\ndiv.s %0, %0, %1\n.endr" : "+f"(v) : "f"(y));
+    }
+    x = v;
+}
+
+static void PcProf_Calibrate(void) {
+    PcCalib_Alu();
+    PcCalib_LoadHit();
+    PcCalib_LoadMiss();
+    PcCalib_FetchMiss();
+    PcCalib_Div();
+    Sc64_UsbText("FISHMOD-CALIB done\n");
+}
+#endif
+
 static void PcProf_Update(void) {
     static OSTime sLastSave;
     OSTime now = osGetTime();
@@ -724,6 +807,17 @@ static void PcProf_Update(void) {
         sLastSave = now;
         return;
     }
+#ifdef FISHMOD_PCPROF_CALIB
+    {
+        // once, early (before the route counts anything): the calibration loops, the sampler running
+        static s32 sCalibrated;
+
+        if (!sCalibrated && (sPlayFrames >= 20)) {
+            sCalibrated = true;
+            PcProf_Calibrate();
+        }
+    }
+#endif
     // (every 8 frames: every frame cost 0.8% in pcprof1; an overlay loaded since is unmapped for a few frames)
     if ((sPlayFrames & 7) == 0) {
         PcProf_Ranges();
