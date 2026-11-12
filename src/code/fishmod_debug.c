@@ -779,6 +779,8 @@ OSTime gFishmodCpuTime[FISHMOD_CPU_MAX];
 OSTime gFishmodSect[FISHMOD_SECT_MAX];
 u32 gFishmodActorCycles[FISHMOD_ACTOR_IDS];
 u8 gFishmodActorCount[FISHMOD_ACTOR_IDS];
+u64 gFishmodBgCycles[FISHMOD_ACTOR_IDS];
+u32 gFishmodBgCalls[FISHMOD_ACTOR_IDS];
 u32 gFishmodCatCycles[FISHMOD_ACTOR_CATS];
 #ifndef FISHMOD_HWBENCH
 static u32 sLastCpu[FISHMOD_CPU_MAX];

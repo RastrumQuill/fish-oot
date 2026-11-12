@@ -467,7 +467,9 @@ typedef enum FishmodSect {
 #define FISHMOD_ACTOR_CATS 12
 extern OSTime gFishmodSect[FISHMOD_SECT_MAX];
 extern u32 gFishmodActorCycles[FISHMOD_ACTOR_IDS]; // each actor kind's updates this frame (CPU count cycles)
-extern u8 gFishmodActorCount[FISHMOD_ACTOR_IDS];   // and how many of it updated
+extern u8 gFishmodActorCount[FISHMOD_ACTOR_IDS];
+extern u64 gFishmodBgCycles[FISHMOD_ACTOR_IDS]; // each actor kind's Actor_UpdateBgCheckInfo, the whole run (cycles)
+extern u32 gFishmodBgCalls[FISHMOD_ACTOR_IDS];   // and how many of it updated
 extern u32 gFishmodCatCycles[FISHMOD_ACTOR_CATS];
 #define FISHMOD_SECT(slot, stmt)                          \
     {                                                     \

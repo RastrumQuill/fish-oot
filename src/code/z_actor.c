@@ -1435,8 +1435,28 @@ s32 func_8002E2AC(PlayState* play, Actor* actor, Vec3f* pos, s32 arg3) {
     return true;
 }
 
+#if FISHMOD_DEBUG
+static void Actor_UpdateBgCheckInfoImpl(PlayState* play, Actor* actor, f32 wallCheckHeight, f32 wallCheckRadius,
+                                        f32 ceilingCheckHeight, s32 flags);
+
+// fish-oot (debug builds): each actor kind's collision checks timed, for the bench's end-of-run report
 void Actor_UpdateBgCheckInfo(PlayState* play, Actor* actor, f32 wallCheckHeight, f32 wallCheckRadius,
                              f32 ceilingCheckHeight, s32 flags) {
+    OSTime start = FISHMOD_CLOCK();
+
+    Actor_UpdateBgCheckInfoImpl(play, actor, wallCheckHeight, wallCheckRadius, ceilingCheckHeight, flags);
+    if ((u32)actor->id < FISHMOD_ACTOR_IDS) {
+        gFishmodBgCycles[actor->id] += FISHMOD_SINCE(start);
+        gFishmodBgCalls[actor->id]++;
+    }
+}
+
+static void Actor_UpdateBgCheckInfoImpl(PlayState* play, Actor* actor, f32 wallCheckHeight, f32 wallCheckRadius,
+                                        f32 ceilingCheckHeight, s32 flags) {
+#else
+void Actor_UpdateBgCheckInfo(PlayState* play, Actor* actor, f32 wallCheckHeight, f32 wallCheckRadius,
+                             f32 ceilingCheckHeight, s32 flags) {
+#endif
     f32 sp74;
     s32 floorBgId;
     Vec3f sp64;

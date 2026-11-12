@@ -402,6 +402,7 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     ROD->biting = false;
     ROD->tension = 35.0f;
     ROD->overTimer = ROD->slackTimer = 0;
+    ROD->hookedBait = ROD->bait;
     ROD->bait = FISHMOD_BAIT_NONE; // the fish took it
     EnFishmod_FishHook(fish);
     // its thrashing scares the fish round about
@@ -419,6 +420,7 @@ static void Rod_LoseFish(PlayState* play, Player* player, const char* why) {
     Rod_StopFightMusic();
     if (fish != NULL) {
         EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
+        EnFishmod_LearnBait(fish, ROD->hookedBait); // it got away with that one in its mouth
     }
     ROD->fish = NULL;
     ROD->state = ROD_STATE_FLOAT;
@@ -674,6 +676,7 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
         if (--ROD->biteTimer <= 0) {
             if (ROD->fish != NULL) {
                 EnFishmod_FishSetState(ROD->fish, FISH_STATE_FLEE);
+                EnFishmod_LearnBait(ROD->fish, ROD->bait); // it got the bait free (or felt the hook come late)
             }
             ROD->fish = NULL;
             ROD->biting = false;

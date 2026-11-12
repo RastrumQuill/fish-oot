@@ -39,6 +39,7 @@ typedef enum FishRigModel {
 typedef struct FishmodMood {
     u8 hunger;
     u8 fear;
+    u16 shy; // baits it has learned to leave alone (a bit each, FishmodBait): one it got away with, or broke off on
 } FishmodMood;
 
 // A fish's own looks table (EnFishmod_LookTable): part colours, then each texture role's render tile. The same
@@ -149,6 +150,7 @@ typedef struct EnFishmod {
                                                    // or is on its own
     /* 0x40E */ u8 look;                           // its own looks: EnFishmod_LookTable (saved with it in a bottle)
     /* 0x410 */ f32 swimGain;                      // the tail beat's size on top of swimMag (small fish's bursts)
+    u32 scentFrame;                                // the frame it last smelled bait in the water (EnFishmod_SmellBait)
 } EnFishmod;
 
 /* Rod controller (fishmod_rod.c) */
@@ -207,6 +209,7 @@ typedef struct FishmodRod {
     /* 0x110 */ f32 baitDepth;      // how far under the water the bait hangs (set each cast: see Rod_UpdateSink)
     /* 0x114 */ u8 sinking;         // the bait is still sinking after the cast
     /* 0x115 */ u8 reelLock;        // the A press that stopped the sink: no reeling until A is let go
+    /* 0x116 */ u8 hookedBait;      // the bait the hooked fish took (it learns it if it breaks off)
 } FishmodRod;
 
 // The bait's height under the bobber
@@ -248,6 +251,8 @@ void EnFishmod_WaterGridAcquire(struct PlayState* play);
 void EnFishmod_WaterGridRelease(struct PlayState* play);
 void EnFishmod_WaterGridDestroy(struct PlayState* play);
 void EnFishmod_WaterNewFrame(void);
+void EnFishmod_HearLink(EnFishmod* this, struct PlayState* play, Vec3f* linkPos, f32 speed);
+void EnFishmod_LearnBait(EnFishmod* this, s32 bait);
 s32 EnFishmod_WaterFloor(struct PlayState* play, f32 x, f32 z, f32* surface, f32* floor, s32 conservative);
 s32 EnFishmod_OpenWaterDir(struct PlayState* play, f32 x, f32 z, s16* yaw);
 s32 EnFishmod_WaterCell(struct PlayState* play, f32 x, f32 z);

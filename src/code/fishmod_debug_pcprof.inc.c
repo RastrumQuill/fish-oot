@@ -438,6 +438,58 @@ static s32 sFlReady = -1; // the packet waiting to be sent, or -1
 static u32 sFlLost;       // records dropped (both packets full: the USB fell behind)
 #endif
 
+#ifdef FISHMOD_FRAMELOG
+// each actor kind over the whole run: its updates (CPU count cycles) and how many of it updated, frames added up
+static u64 sActTotal[FISHMOD_ACTOR_IDS];
+static u32 sActInst[FISHMOD_ACTOR_IDS];
+
+/**
+ * The run's actor report, at its end (before FISHMOD-DONE): the kinds whose collision checks (Actor_UpdateBgCheckInfo)
+ * and whose updates cost the most, with how many calls and instances. Text lines in the debug log:
+ *   FISHMOD-BGCHECK id calls us        FISHMOD-ACTOR id instance-frames us
+ */
+static void PcProf_ActorReport(void) {
+    static u8 sTaken[FISHMOD_ACTOR_IDS];
+    char line[96];
+    s32 n;
+    s32 i;
+
+    bzero(sTaken, sizeof(sTaken));
+    for (n = 0; n < 12; n++) {
+        s32 best = -1;
+
+        for (i = 0; i < FISHMOD_ACTOR_IDS; i++) {
+            if (!sTaken[i] && (gFishmodBgCycles[i] != 0) && ((best < 0) || (gFishmodBgCycles[i] > gFishmodBgCycles[best]))) {
+                best = i;
+            }
+        }
+        if (best < 0) {
+            break;
+        }
+        sTaken[best] = true;
+        sprintf(line, "FISHMOD-BGCHECK %d %u %u\n", best, gFishmodBgCalls[best],
+                (u32)OS_CYCLES_TO_USEC(gFishmodBgCycles[best]));
+        Sc64_UsbText(line);
+    }
+    bzero(sTaken, sizeof(sTaken));
+    for (n = 0; n < 16; n++) {
+        s32 best = -1;
+
+        for (i = 0; i < FISHMOD_ACTOR_IDS; i++) {
+            if (!sTaken[i] && (sActTotal[i] != 0) && ((best < 0) || (sActTotal[i] > sActTotal[best]))) {
+                best = i;
+            }
+        }
+        if (best < 0) {
+            break;
+        }
+        sTaken[best] = true;
+        sprintf(line, "FISHMOD-ACTOR %d %u %u\n", best, sActInst[best], (u32)OS_CYCLES_TO_USEC(sActTotal[best]));
+        Sc64_UsbText(line);
+    }
+}
+#endif
+
 /** The frame just ended: its samples tagged, and its record logged (USB only). */
 static void PcProf_FrameEnd(void) {
 #ifdef FISHMOD_FRAMELOG
@@ -450,6 +502,12 @@ static void PcProf_FrameEnd(void) {
 
     if (!sPcUsb || (sFl[0] == NULL)) {
         return;
+    }
+    for (i = 0; i < FISHMOD_ACTOR_IDS; i++) {
+        if (gFishmodActorCount[i] != 0) {
+            sActTotal[i] += gFishmodActorCycles[i];
+            sActInst[i] += gFishmodActorCount[i];
+        }
     }
     n64prof_frame_end((period > FRAMELOG_SLOW_US) ? 1 : 2);
     pk = sFl[sFlCur];
@@ -712,6 +770,9 @@ static void PcProf_Update(void) {
                 Fishmod_DebugPrintf(5, "pcprof usb: DONE, %u packets: stop sc64deployer", sPcPackets);
                 if (!sDoneSaid && !Sc64_UsbBusy()) { // (for fishmod/tools/morning: the run is over)
                     sDoneSaid = true;
+#ifdef FISHMOD_FRAMELOG
+                    PcProf_ActorReport();
+#endif
                     Sc64_UsbText("FISHMOD-DONE\n");
                 }
                 return;
