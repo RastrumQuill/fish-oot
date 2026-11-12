@@ -357,6 +357,7 @@ typedef struct ScatterFrame {
 #define BEDCARD_SET_MAX 64 // bed cards drawn in a frame at most
 typedef struct ScatterSet {
     Mtx mtx[PROP_BUDGET];
+    Mtx* mtxp[PROP_BUDGET]; // each drawn prop's matrix: one of mtx, or its own kept one (sPropMtx)
     u16 prop[PROP_BUDGET]; // in drawing order: nearest band first, kind by kind within a band
     u8 tier[PROP_BUDGET];  // ScatterTier, as its matrix was made
     s32 count;
@@ -405,6 +406,8 @@ typedef struct ScatterKeep {
     s32 edgeNear;
 } ScatterKeep;
 static ScatterKeep sKeep[2]; // a frame buffer's each
+static Mtx* sPropMtx;     // each prop's own matrix, kept once made ([sScatter->count]), or NULL: no room
+static u8* sPropMtxMade;  // [sScatter->count]
 static s32 sSwayInit[2];     // a frame buffer's sway matrices have their fixed entries
 static u32 sSetGen; // a new set every Scatter_Build
 
@@ -442,6 +445,23 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sDryMade = false;
     sBedShadedRoom = NULL;
     Scatter_AllocBuffers();
+    if (osMemSize >= 0x800000) {
+        // (the Expansion Pak: room for every prop's matrix; without it, or if it doesn't fit, made in each set)
+        sPropMtx = ZeldaArena_Malloc(sScatter->count * sizeof(Mtx));
+        sPropMtxMade = ZeldaArena_Malloc(sScatter->count);
+        if ((sPropMtx == NULL) || (sPropMtxMade == NULL)) {
+            if (sPropMtx != NULL) {
+                ZeldaArena_Free(sPropMtx);
+            }
+            if (sPropMtxMade != NULL) {
+                ZeldaArena_Free(sPropMtxMade);
+            }
+            sPropMtx = NULL;
+            sPropMtxMade = NULL;
+        } else {
+            bzero(sPropMtxMade, sScatter->count);
+        }
+    }
     BedCard_Load(play);
 #if FISHMOD_DEBUG
     {
@@ -647,6 +667,14 @@ void EnFishmod_ScatterUnload(void) {
         sChunkDry = NULL;
     }
     Scatter_FreeBuffers();
+    if (sPropMtx != NULL) {
+        ZeldaArena_Free(sPropMtx);
+        sPropMtx = NULL;
+    }
+    if (sPropMtxMade != NULL) {
+        ZeldaArena_Free(sPropMtxMade);
+        sPropMtxMade = NULL;
+    }
 }
 
 /** One s15.16 entry of a fixed-point Mtx (row r, column c). */
@@ -677,8 +705,22 @@ static void Scatter_RockStretch(FishmodProp* prop, f32* out) {
     out[2] = 0.75f + ((h >> 16) & 0xFF) * (0.6f / 255.0f);
 }
 
+/*
+ * fishmod: with the Expansion Pak's room, each prop's matrix kept once made, for the props whose matrix depends on the
+ * prop alone (all but the cards that turn toward the camera and the far single cards): a new set then points at it
+ * instead of making it again. The same matrix, made by the same code (Scatter_MatrixInto), once per scene.
+ */
+
+static void Scatter_MatrixInto(Mtx* mtx, FishmodProp* prop, s32 flatScale, s16 yaw);
+
 static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale, s16 yaw) {
     Mtx* mtx = &sBufs->set[sSet].mtx[sMtxUsed++];
+
+    Scatter_MatrixInto(mtx, prop, flatScale, yaw);
+    return mtx;
+}
+
+static void Scatter_MatrixInto(Mtx* mtx, FishmodProp* prop, s32 flatScale, s16 yaw) {
     f32 s = prop->scale * (65536.0f / 64.0f);
     s32 c = (s32)(Math_CosS(yaw) * s);
     s32 sn = (s32)(Math_SinS(yaw) * s);
@@ -730,7 +772,7 @@ static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale, s16 yaw) {
         mtx->fracPart[3][1] = 0;
         mtx->fracPart[3][2] = 0;
         mtx->fracPart[3][3] = 0;
-        return mtx;
+        return;
     }
 
     // rows are the images of the x, y and z axes; the last row is the position
@@ -754,7 +796,7 @@ static Mtx* Scatter_Matrix(FishmodProp* prop, s32 flatScale, s16 yaw) {
     mtx->fracPart[3][1] = 0;
     mtx->fracPart[3][2] = 0;
     mtx->fracPart[3][3] = 0;
-    return mtx;
+    return;
 }
 
 /**
@@ -1417,7 +1459,36 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                     yaw = own + (delta + 0x2000);
                 }
             }
-            Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD, yaw);
+            if ((sPropMtx != NULL) && (tier != TIER_IMP) && !sKinds[k].faceCam) {
+                // (its own matrix, made once: it depends on the prop alone)
+                s32 id = sOrdered[n];
+
+                if (!sPropMtxMade[id]) {
+                    Scatter_MatrixInto(&sPropMtx[id], prop, k == FISHMOD_PROP_LILY_PAD, yaw);
+                    sPropMtxMade[id] = true;
+                }
+                set->mtxp[set->count] = &sPropMtx[id];
+#ifdef SCATTER_VERIFY
+                {
+                    // the check: made again and compared with the kept one
+                    Mtx check;
+
+                    Scatter_MatrixInto(&check, prop, k == FISHMOD_PROP_LILY_PAD, yaw);
+                    gFishmodScatterCacheUsed++;
+                    s32 w;
+
+                    for (w = 0; w < (s32)(sizeof(Mtx) / sizeof(u32)); w++) {
+                        if (((u32*)&check)[w] != ((u32*)&sPropMtx[id])[w]) {
+                            gFishmodScatterCacheMismatch++;
+                            gFishmodScatterCacheDiff[0] = 5;
+                            break;
+                        }
+                    }
+                }
+#endif
+            } else {
+                set->mtxp[set->count] = Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD, yaw);
+            }
         }
         set->tier[set->count] = tier;
         set->prop[set->count++] = sOrdered[n];
@@ -1684,7 +1755,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 opa = Scatter_PropColor(opa, tier, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
             }
         }
-        gSPMatrix((*disp)++, &set->mtx[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPMatrix((*disp)++, set->mtxp[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         if (info->sway != 0) {
             // neighbours share a phase: a wave through the bed
             s32 ph = ((prop->x + prop->z) >> 7) & (SWAY_PHASES - 1);
