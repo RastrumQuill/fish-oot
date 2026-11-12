@@ -53,6 +53,16 @@ void SysCfb_Init(s32 n64dd) {
            sSysCfbEnd);
     sSysCfbFbPtr[0] = sSysCfbEnd - (screenSize * 4);
     sSysCfbFbPtr[1] = sSysCfbEnd - (screenSize * 2);
+#if !DEBUG_FEATURES
+    if (sSysCfbEnd == 0x80800000) {
+        // fishmod: with the Expansion Pak, the two frame buffers in different 1 MB banks of RDRAM (the tops of the last
+        // two), so the RDP drawing one and the video interface reading out the other don't keep closing each other's
+        // open rows in the same bank. (The Z buffer is in the base RAM, another bank again.) The system heap, which
+        // ends at the lower frame buffer, gives up the 870 KB between them.
+        sSysCfbFbPtr[0] = 0x80700000 - (screenSize * 2);
+        sSysCfbFbPtr[1] = 0x80800000 - (screenSize * 2);
+    }
+#endif
     PRINTF(T("フレームバッファのアドレスは %08x と %08x です\n", "Frame buffer addresses are %08x and %08x\n"),
            sSysCfbFbPtr[0], sSysCfbFbPtr[1]);
 }

@@ -163,11 +163,13 @@ static s32 Sc64_UsbSend(void* buf, u32 len) {
  *   12, 13 the fish's update and draw, us     14 the props' drawing, us; 15 props drawn
  *   16-35 Play_Update's sections (FishmodSect), us    36-47 the actor categories' updates, us
  *   48-51 the four costliest actor kinds this frame: id << 20 | us
+ *   52-55 (version 2) F3DEX3's counters for the frame's graphics task (sched.c): vertices << 16 | tris drawn;
+ *   tris in << 14 | rectangles; cycles stalled on a full RDP FIFO; 0
  * 39 records a packet ('FFRM', version, count, the first record's frame). The profile's samples are tagged by their
  * frame as they're counted: 1 for a frame over 52 ms, 2 otherwise (n64prof_frame_end; n64prof.py --frames).
  */
 #ifdef FISHMOD_FRAMELOG
-#define FRAMELOG_WORDS 52
+#define FRAMELOG_WORDS 56
 #define FRAMELOG_PER_PACKET ((SC64_BUFFER_SIZE - 16) / (FRAMELOG_WORDS * 4))
 #define PCPROF_RING 1024 // samples a frame can hold (about 290 ms at 3,500 a second)
 #define FRAMELOG_SLOW_US 52000
@@ -215,7 +217,11 @@ static void PcProf_FrameEnd(void) {
     }
     if (pk->count == 0) {
         pk->magic = 0x4646524D; // 'FFRM'
-        pk->version = 1;
+#ifdef F3DEX3_PROF
+        pk->version = 2 | (F3DEX3_PROF << 8); // (56 words a record: 52-55 F3DEX3's counters; which set: 1-3 A-C)
+#else
+        pk->version = 2; // (56 words a record: 52-55 F3DEX3's counters, the default set)
+#endif
         pk->first = sPlayFrames;
     }
     r = pk->rec[pk->count++];
@@ -242,6 +248,14 @@ static void PcProf_FrameEnd(void) {
     r[13] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_D_ENGINE]);
     r[14] = (u32)OS_CYCLES_TO_USEC(gFishmodLastProf[FISHMOD_PROF_D_SCATTER]);
     r[15] = gFishmodScatterDrawn;
+    {
+        extern u32 gFishmodRspCounters[4];
+
+        r[52] = gFishmodRspCounters[0];
+        r[53] = gFishmodRspCounters[1];
+        r[54] = gFishmodRspCounters[2];
+        r[55] = gFishmodRspCounters[3];
+    }
     for (i = 0; i < FISHMOD_SECT_MAX; i++) {
         r[16 + i] = (u32)OS_CYCLES_TO_USEC(gFishmodSect[i]);
     }

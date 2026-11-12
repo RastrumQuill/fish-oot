@@ -56,8 +56,10 @@ def records(folder):
         if d[:4] != b"FFRM":
             continue
         _, version, count, _ = struct.unpack(">4I", d[:16])
+        words = 56 if (version & 0xFF) >= 2 else WORDS  # (version 2: F3DEX3's counters in 52-55; bits 8-15: which set)
         for i in range(count):
-            out.append(struct.unpack_from(f">{WORDS}I", d, 16 + 4 * WORDS * i))
+            rec = struct.unpack_from(f">{words}I", d, 16 + 4 * words * i)
+            out.append(rec if words == 56 else rec + (0, 0, 0, 0))
     out.sort(key=lambda r: r[0])
     return out
 

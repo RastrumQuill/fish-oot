@@ -49,6 +49,7 @@
 #include "printf.h"
 #include "regs.h"
 #include "sched.h"
+#include "buffers.h"
 #include "speed_meter.h"
 #include "translation.h"
 #include "versions.h"
@@ -396,6 +397,21 @@ u32 Sched_TaskComplete(Scheduler* sc, OSScTask* task) {
     // the RSP will typically finish before the RDP, as the RSP can halt while the RDP is still
     // working through the command buffer.
     if (!(task->state & (OS_SC_DP | OS_SC_SP))) {
+#if FISHMOD_DEBUG && ENABLE_F3DEX3
+        if (task->list.t.type == M_GFXTASK) {
+            // fishmod: F3DEX3's own counters for the frame, from the end of its yield buffer (its docs, Counters.md):
+            // vertices, triangles in and drawn, rectangles, and the cycles it stalled on a full RDP FIFO
+            extern u32 gFishmodRspCounters[4];
+            u32* footer = (u32*)((u8*)gGfxSPTaskYieldBuffer + OS_YIELD_DATA_SIZE - 0x18);
+
+            osInvalDCache(footer, 0x10);
+            gFishmodRspCounters[0] = footer[0]; // vertexCount << 16 | rdpOutTriCount
+            gFishmodRspCounters[1] = footer[1]; // rspInTriCount << 14 | rectCount
+            gFishmodRspCounters[2] = footer[2]; // stallRDPFifoFullCycles (RCP cycles, 62.5 MHz)
+            gFishmodRspCounters[3] = footer[3];
+            osInvalDCache(footer, 0x10);
+        }
+#endif
         // Send a message to the notify queue if there is one
         if (task->msgQueue != NULL) {
             osSendMesg(task->msgQueue, task->msg, OS_MESG_BLOCK);
@@ -451,6 +467,13 @@ void Sched_RunTask(Scheduler* sc, OSScTask* spTask, OSScTask* dpTask) {
         }
 
         // Run RSP
+#ifdef F3DEX3_PROF
+        if ((spTask->list.t.type == M_GFXTASK) && !(spTask->list.t.flags & OS_TASK_YIELDED)) {
+            // fishmod: F3DEX3's profiling builds time themselves with the RDP's clock counter: cleared (all four) as
+            // the graphics task starts, as their docs ask (not when it resumes after the audio task took the RSP)
+            IO_WRITE(DPC_STATUS_REG, DPC_CLR_CLOCK_CTR | DPC_CLR_CMD_CTR | DPC_CLR_PIPE_CTR | DPC_CLR_TMEM_CTR);
+        }
+#endif
         osSpTaskStartGo(&spTask->list);
 
         SCHED_DEBUG_PRINTF(

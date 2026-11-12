@@ -153,7 +153,7 @@ if [ "$COLPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$CP_OUT")
 fi
-MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -207,7 +207,7 @@ elif [ "$CLANG" = 1 ]; then
     echo "error: --clang goes with the GCC build (not --ido)" >&2
     exit 1
 fi
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} ${TEXPACK_ARGS[@]+"${TEXPACK_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC FISHMOD_TESTMODE=$TESTMODE \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} ${TEXPACK_ARGS[@]+"${TEXPACK_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC F3DEX3_PROF=${F3DEX3_PROF:-} FISHMOD_TESTMODE=$TESTMODE \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -219,6 +219,9 @@ if [ "$F3DEX3" = 1 ]; then
 fi
 if [ "$TESTMODE" = 1 ]; then
     SUFFIX="$SUFFIX-test"
+fi
+if [ -n "${F3DEX3_PROF:-}" ]; then
+    SUFFIX="$SUFFIX-prof$F3DEX3_PROF"
 fi
 SUFFIX="$SUFFIX$PROFILE_SUFFIX"
 if [ -z "$GCC" ]; then

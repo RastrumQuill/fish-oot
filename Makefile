@@ -222,6 +222,16 @@ ifeq ($(F3DEX3),1)
   CPP_DEFINES += -DENABLE_F3DEX3=1
   # the variant with the occlusion plane (the build profile's f3dex3_occlusion)
   F3DEX3_OCC ?= 0
+  # fish-oot: F3DEX3_PROF=A, B or C: one of F3DEX3's profiling builds (its counters in the frame log; with the occlusion
+  # plane, as the hw profile's BrW)
+  F3DEX3_PROF ?=
+  ifeq ($(F3DEX3_PROF),A)
+    CPP_DEFINES += -DF3DEX3_PROF=1
+  else ifeq ($(F3DEX3_PROF),B)
+    CPP_DEFINES += -DF3DEX3_PROF=2
+  else ifeq ($(F3DEX3_PROF),C)
+    CPP_DEFINES += -DF3DEX3_PROF=3
+  endif
   ifeq ($(F3DEX3_OCC),1)
     CPP_DEFINES += -DF3DEX3_OCCLUSION=1
   endif
@@ -887,7 +897,7 @@ $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: MIPS_VERSION := -mips3
 $(BUILD_DIR)/src/code/fishmod%.o $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/%.o: CC_CHECK := gcc -nostdinc -fno-builtin \
   -fsyntax-only -funsigned-char -std=gnu90 -D_LANGUAGE_C $(CPP_DEFINES) $(MIPS_BUILTIN_DEFS) $(GBI_DEFINES) $(INC) -m32 \
   -Werror=implicit-function-declaration
-$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations
+$(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations $(GCC_EXTRA_OPT)
 # debug builds carry line tables, for the PC-sampling profile (n64prof) to map samples to source lines. Not quite
 # free: in the overlays (-mno-explicit-relocs) the assembler can't fill some branch delay slots across the line
 # markers, so a few functions grow; a profile must be read with the ELF of the build it was taken from
@@ -911,7 +921,7 @@ $(SEGMENTS_DIR)/ovl_En_Fishmod.reloc.o: POSTPROCESS_OBJ := $(PYTHON) tools/reloc
 endif
 # fish-oot: GCC_AUDIO=1, GCC_LIBULTRA=1: the audio driver, and libultra's C (os, io, gu), on GCC too (IDO otherwise), so the
 # whole game's C is GCC's. No -ffast-math here: audio's floats stay as IDO computes them (the audlog script checks)
-GCC_PLAIN_OPT = -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno
+GCC_PLAIN_OPT = -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
 # (recursive, so each file's own defines, MML_VERSION and the like, still reach it)
 GCC_PLAIN_CFLAGS = $(CPP_DEFINES) -DCOMPILER_GCC $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 \
   -mabi=32 -mno-abicalls -mdivide-breaks -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
@@ -1183,7 +1193,10 @@ $(EXTRACTED_DIR)/incbin/F3DEX3_%_Text: fishmod/f3dex3/F3DEX3_%.code.bps $(EXTRAC
 $(EXTRACTED_DIR)/incbin/F3DEX3_%_Data: fishmod/f3dex3/F3DEX3_%.data.bps $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoData
 	$(FLIPS) --apply $< $(EXTRACTED_DIR)/incbin/gspF3DZEX2_NoN_fifoData $@
 $(BUILD_DIR)/data/gspF3DEX3.fifo.o: $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_NOC_Data \
-  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_Data
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_Data \
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PA_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PA_Data \
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PB_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PB_Data \
+  $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PC_Text $(EXTRACTED_DIR)/incbin/F3DEX3_BrW_PC_Data
 
 $(BUILD_DIR)/src/makerom/ipl3.o: $(EXTRACTED_DIR)/incbin/ipl3
 	$(OBJCOPY) -I binary -O $(LD_OFORMAT) --rename-section .data=.text $< $@

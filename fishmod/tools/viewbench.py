@@ -16,6 +16,9 @@ VARIANTS = ["as shipped", "no fish", "no props", "no bed cards", "no water surfa
 PARTS = [("fish", 1), ("props", 2), ("bed cards (cost of drawing their clumps plant by plant)", 3),
          ("water surface", 4), ("sky", 5), ("fish and props", 6)]
 METRICS = [("frame", 2), ("CPU update", 3), ("CPU draw", 4), ("RSP", 5), ("RDP", 7)]
+# F3DEX3's counters (frame log version 2, words 52-55; the default set): counts, exact in an emulator too
+COUNTS = [("vertices", lambda r: r[52] >> 16), ("tris in", lambda r: r[53] >> 14), ("tris drawn", lambda r: r[52] & 0xFFFF),
+          ("FIFO stall us", lambda r: r[54] / 62.5)]
 
 
 def main():
@@ -48,6 +51,21 @@ def main():
             d = [mean(cells[(s, 0)], i) - mean(cells[(s, v)], i) for s in stop_ids if cells[(s, v)] and cells[(s, 0)]]
             row.append(f"{sum(d) / len(d):+.1f}" if d else "")
         p(f"| {name} | " + " | ".join(row) + " |")
+    if any(r[52] for r in recs):
+        p("\n## What each part draws (F3DEX3's counters, the stops' average a frame)\n")
+        p("| part | " + " | ".join(n for n, _ in COUNTS) + " |")
+        p("|---|" + "---|" * len(COUNTS))
+
+        def cmean(rs, f):
+            return sum(f(r) for r in rs) / len(rs) if rs else float("nan")
+        p("| everything, as shipped | " + " | ".join(
+            f"{sum(cmean(cells[(s, 0)], f) for s in stop_ids) / len(stop_ids):.0f}" for _, f in COUNTS) + " |")
+        for name, v in PARTS:
+            row = []
+            for _, f in COUNTS:
+                d = [cmean(cells[(s, 0)], f) - cmean(cells[(s, v)], f) for s in stop_ids if cells[(s, v)] and cells[(s, 0)]]
+                row.append(f"{sum(d) / len(d):+.0f}" if d else "")
+            p(f"| {name} | " + " | ".join(row) + " |")
     for m, i in [("RSP", 5), ("RDP", 7), ("CPU draw", 4), ("CPU update", 3), ("frame", 2)]:
         p(f"\n## {m}, stop by stop (ms): as shipped, then what each part costs\n")
         p("| stop | as shipped | " + " | ".join(n.split(" (")[0] for n, _ in PARTS) + " |")
