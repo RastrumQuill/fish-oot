@@ -86,10 +86,18 @@ def find_git():
 
 
 GIT = find_git()
+# git never waits for a login it can't show (a pull or push run here, outside GitHub Desktop, may have none): it fails
+# and the runner carries on
+os.environ["GIT_TERMINAL_PROMPT"] = "0"
+os.environ["GCM_INTERACTIVE"] = "never"
+os.environ["GIT_ASKPASS"] = ""
+os.environ["SSH_ASKPASS"] = ""
+GIT_TIMEOUT = 120
 
 
 def git(*args, env=None, check=True):
-    r = subprocess.run([GIT, "-C", ROOT] + list(args), capture_output=True, text=True, env=env)
+    r = subprocess.run([GIT, "-C", ROOT] + list(args), capture_output=True, text=True, env=env, timeout=GIT_TIMEOUT,
+                       stdin=subprocess.DEVNULL)
     if check and r.returncode != 0:
         raise RuntimeError("git %s: %s" % (" ".join(args), (r.stderr or r.stdout).strip()))
     return r.stdout.strip()
@@ -400,7 +408,12 @@ def publish(stamp, stamp_dir, push):
     except Exception as e:
         return "not pushed: not a git checkout (%s)" % e
     parent = None
-    if subprocess.run([GIT, "-C", ROOT, "fetch", "-q", "origin", RESULTS_BRANCH], capture_output=True).returncode == 0:
+    try:
+        fetched = subprocess.run([GIT, "-C", ROOT, "fetch", "-q", "origin", RESULTS_BRANCH], capture_output=True,
+                                 timeout=GIT_TIMEOUT, stdin=subprocess.DEVNULL).returncode == 0
+    except subprocess.TimeoutExpired:
+        return "not pushed: git fetch timed out (no GitHub login outside GitHub Desktop?)"
+    if fetched:
         parent = git("rev-parse", "FETCH_HEAD")
     os.makedirs(WORK, exist_ok=True)
     index = os.path.join(WORK, "morning.index")
@@ -425,8 +438,11 @@ def publish(stamp, stamp_dir, push):
     args = ["commit-tree", tree, "-m", msg] + (["-p", parent] if parent else [])
     commit = git(*args, env=env)
     os.remove(index)
-    r = subprocess.run([GIT, "-C", ROOT, "push", "-q", "origin", "%s:refs/heads/%s" % (commit, RESULTS_BRANCH)],
-                       capture_output=True, text=True)
+    try:
+        r = subprocess.run([GIT, "-C", ROOT, "push", "-q", "origin", "%s:refs/heads/%s" % (commit, RESULTS_BRANCH)],
+                           capture_output=True, text=True, timeout=GIT_TIMEOUT, stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        return "not pushed: git push timed out (no GitHub login outside GitHub Desktop?)"
     if r.returncode != 0:
         return "push failed: %s" % (r.stderr or r.stdout).strip()
     return "pushed to %s (%s)" % (RESULTS_BRANCH, commit[:10])
@@ -448,7 +464,12 @@ def main():
         args.no_pull = True
         args.no_push = True
     if not args.no_pull:
-        r = subprocess.run([GIT, "-C", ROOT, "pull", "-q", "--ff-only"], capture_output=True, text=True)
+        log("git pull...")
+        try:
+            r = subprocess.run([GIT, "-C", ROOT, "pull", "-q", "--ff-only"], capture_output=True, text=True,
+                               timeout=GIT_TIMEOUT, stdin=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired:
+            r = subprocess.CompletedProcess([], 1, "", "timed out (no GitHub login outside GitHub Desktop?)")
         log("git pull: %s" % ("up to date" if r.returncode == 0 else "skipped (%s)" % r.stderr.strip()[:200]))
         if r.returncode == 0 and not args.patches:
             # (this script may have changed with the pull: run the new one)
