@@ -299,6 +299,15 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
             open(os.path.join(folder, "framelog.txt"), "w", encoding="utf-8").write(r.stdout + r.stderr)
         except Exception as e:
             open(os.path.join(folder, "framelog.txt"), "w", encoding="utf-8").write("framelog.py failed: %s\n" % e)
+        # the RDP calibration bench's table, when it's that run (its tests describe themselves in the debug log)
+        try:
+            if "RDPTEST" in open(os.path.join(folder, "debug.log"), encoding="utf-8", errors="replace").read():
+                rb = os.path.join(ROOT, "fishmod", "tools", "rdpbench.py")
+                r = subprocess.run([sys.executable, rb, folder, "--csv", os.path.join(folder, "rdpbench.csv")],
+                                   capture_output=True, text=True, timeout=600, errors="replace")
+                open(os.path.join(folder, "rdpbench.txt"), "w", encoding="utf-8").write(r.stdout + r.stderr)
+        except Exception as e:
+            open(os.path.join(folder, "rdpbench.txt"), "w", encoding="utf-8").write("rdpbench.py failed: %s\n" % e)
         with zipfile.ZipFile(os.path.join(folder, "packets.zip"), "w", zipfile.ZIP_DEFLATED) as z:
             for f in files:
                 z.write(f, os.path.basename(f))
