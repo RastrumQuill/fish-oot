@@ -53,6 +53,17 @@ static u8 sPolyCheckStamp;
 // the slots that only act on used ones stop there (the same slots visited; there are 50, a scene uses a few)
 static s32 sDynaHighWater;
 
+// fishmod: which actors may hold a moving-platform slot, as bits of a hash of their address (DynaPoly_ActorBit): set
+// when an actor takes a slot, made again from the slots in use once a frame (DynaPoly_UpdateContext). A clear bit means
+// the actor holds none, so DynaPoly_UnsetAllInteractFlags has nothing to look for; a set bit, look as before.
+static u32 sDynaActorBits[2];
+
+static u32 DynaPoly_ActorBit(Actor* actor) {
+    u32 a = (u32)actor;
+
+    return ((a >> 4) ^ (a >> 10)) & 63;
+}
+
 static Vec3s* sStaticVtxS;
 static Vec3f* sStaticVtxF;
 // fishmod: each scene poly's box on the ground (z and x), for the floor check's early out (BgCheck_Allocate)
@@ -3302,6 +3313,7 @@ s32 DynaPoly_SetBgActor(UNUSED PlayState* play, DynaCollisionContext* dyna, Acto
 
     BgActor_SetActor(&dyna->bgActors[bgId], actor, colHeader);
     dyna->bitFlag |= DYNAPOLY_INVALIDATE_LOOKUP;
+    sDynaActorBits[DynaPoly_ActorBit(actor) >> 5] |= 1u << (DynaPoly_ActorBit(actor) & 31);
 
     dyna->bgActorFlags[bgId] &= ~BGACTOR_1;
     PRINTF_COLOR_GREEN();
@@ -3593,6 +3605,13 @@ void DynaPoly_UnsetAllInteractFlags(PlayState* play, DynaCollisionContext* dyna,
     DynaPolyActor* dynaActor;
     s32 i;
 
+    {
+        u32 bit = DynaPoly_ActorBit(actor);
+
+        if (!(sDynaActorBits[bit >> 5] & (1u << (bit & 31)))) {
+            return; // (it holds no slot)
+        }
+    }
     for (i = 0; i < sDynaHighWater; i++) {
         if (dyna->bgActorFlags[i] & BGACTOR_IN_USE) {
             dynaActor = DynaPoly_GetActor(&play->colCtx, i);
@@ -3654,6 +3673,15 @@ void DynaPoly_UpdateContext(PlayState* play, DynaCollisionContext* dyna) {
         }
     }
     dyna->bitFlag &= ~DYNAPOLY_INVALIDATE_LOOKUP;
+    // (the slot holders' bits made again: the slots in use now)
+    sDynaActorBits[0] = sDynaActorBits[1] = 0;
+    for (i = 0; i < sDynaHighWater; i++) {
+        if ((dyna->bgActorFlags[i] & BGACTOR_IN_USE) && (dyna->bgActors[i].actor != NULL)) {
+            u32 bit = DynaPoly_ActorBit(dyna->bgActors[i].actor);
+
+            sDynaActorBits[bit >> 5] |= 1u << (bit & 31);
+        }
+    }
 }
 
 /**
