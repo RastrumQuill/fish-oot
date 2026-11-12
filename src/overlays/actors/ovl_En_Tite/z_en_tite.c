@@ -922,7 +922,10 @@ void EnTite_Update(Actor* thisx, PlayState* play) {
     // fish-oot: an idle tektite far from Link (it only reacts within 300 units) and settled on the ground or the water
     // runs its logic and collision one frame in four, each tektite on its own frame; in between only its animation
     // and idle timer go on. Its hurtbox and push collision are still set every frame (below), so hits are as before.
-    if ((this->actionFunc == EnTite_Idle) && (thisx->xzDistToPlayer > 1000.0f) &&
+    // (and from 400 units while it's off screen: also beyond its 300)
+    if ((this->actionFunc == EnTite_Idle) &&
+        ((thisx->xzDistToPlayer > 1000.0f) ||
+         ((thisx->xzDistToPlayer > 400.0f) && !(thisx->flags & ACTOR_FLAG_INSIDE_CULLING_VOLUME))) &&
         (thisx->colChkInfo.damageReaction == 0) && !(this->collider.base.acFlags & AC_HIT) &&
         (thisx->bgCheckFlags & (BGCHECKFLAG_GROUND | BGCHECKFLAG_WATER)) && (thisx->velocity.y == 0.0f) &&
         (((play->gameplayFrames + ((s32)thisx->home.pos.x ^ (s32)thisx->home.pos.z)) & 3) != 0)) {

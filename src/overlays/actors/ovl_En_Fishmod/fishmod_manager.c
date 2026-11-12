@@ -325,7 +325,8 @@ static void Roster_Place(FishmodRosterFish* rec, Vec3f* out) {
 /**
  * An unspawned fish carries on with its day: from where it was (where Link last saw it, or where it was going) on
  * toward its place, at a cruising pace. So it appears where it got to, not back at home; and one chased off and left
- * is still on its way when he comes back. If the straight line has it over a bank, it's at its place already.
+ * is still on its way when he comes back. Only arithmetic: the water is looked at once, when it's about to appear
+ * (Roster_SpawnSpot; looking every pass cost raycasts along the shores).
  */
 static void Roster_Travel(PlayState* play, FishmodRosterFish* rec) {
     Vec3f place;
@@ -334,8 +335,6 @@ static void Roster_Travel(PlayState* play, FishmodRosterFish* rec) {
     f32 dz;
     f32 dist;
     f32 step = (sRosterClock - rec->posFrame) * ROSTER_TRAVEL;
-    f32 surface;
-    f32 floor;
 
     rec->posFrame = sRosterClock;
     Roster_Place(rec, &place);
@@ -355,7 +354,17 @@ static void Roster_Travel(PlayState* play, FishmodRosterFish* rec) {
     rec->pos.x += (s16)(dx * step / dist);
     rec->pos.y += (s16)(dy * step / dist);
     rec->pos.z += (s16)(dz * step / dist);
+}
+
+/** Where an unspawned fish appears: where it got to, if that's water deep enough; else at its place. */
+static void Roster_SpawnSpot(PlayState* play, FishmodRosterFish* rec) {
+    f32 surface;
+    f32 floor;
+
     if (!EnFishmod_WaterFloor(play, rec->pos.x, rec->pos.z, &surface, &floor, true) || (surface - floor < 20.0f)) {
+        Vec3f place;
+
+        Roster_Place(rec, &place);
         rec->pos.x = place.x;
         rec->pos.y = place.y;
         rec->pos.z = place.z;
@@ -627,7 +636,10 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
         }
         if ((rec->fish == NULL) && (dist < ROSTER_WAKE_DIST) && (spawns-- > 0)) {
             // the record's index rides in the spawn roll (the params only have room for 31)
-            Actor* fish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, rec->pos.x, rec->pos.y, rec->pos.z,
+            Actor* fish;
+
+            Roster_SpawnSpot(play, rec);
+            fish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, rec->pos.x, rec->pos.y, rec->pos.z,
                                       0, rec->yaw, i + 1, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, rec->species));
 
             if (fish != NULL) {

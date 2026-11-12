@@ -64,6 +64,10 @@ static struct {
 static s32 sStressStep;
 static s32 sStressFrame;
 static s32 sStressFailed; // steps under full speed in this pass
+// the step's sums before this pass's frames of it (so this pass's own are the difference)
+static u32 sPassPeriod;
+static u32 sPassFrames;
+static u32 sPassSlow;
 
 s32 gFishmodStress = (FISHMOD_STRESS == 3) ? 1 : FISHMOD_STRESS; // (both: the fish first)
 s32 gFishmodStressCount = 0; // (none until Link has settled on the bottom)
@@ -82,6 +86,7 @@ static void Stress_NextBench(PlayState* play) {
     sStressStep = 0;
     sStressFrame = 0;
     sStressFailed = 0;
+    sPassPeriod = sPassFrames = sPassSlow = 0; // (the fish bench's left over: the plants' first step read wrong)
     sStressWait = 80;
     gFishmodStress = 2;
     gFishmodStressCount = 0;
@@ -146,10 +151,6 @@ static void Stress_Update(PlayState* play) {
     }
     if (sStressFrame >= STRESS_SETTLE + STRESS_MEASURE) {
         // this pass's own frames of the step: was it at full speed?
-        static u32 sPassPeriod;
-        static u32 sPassFrames;
-        static u32 sPassSlow;
-
         sPassPeriod = st->period - sPassPeriod;
         sPassFrames = st->frames - sPassFrames;
         sPassSlow = st->slow - sPassSlow;

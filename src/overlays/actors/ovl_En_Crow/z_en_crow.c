@@ -462,8 +462,19 @@ void EnCrow_Update(Actor* thisx, PlayState* play) {
             height = 0.0f;
             Actor_MoveXZGravity(&this->actor);
         }
-        Actor_UpdateBgCheckInfo(play, &this->actor, 12.0f * scale, 25.0f * scale, 50.0f * scale,
-                                UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_2);
+        // fish-oot: a Guay circling idle, high over the ground and away from walls and from Link (it only dives
+        // within 300 units), checks its collision one frame in four (each on its own frame): about 0.7 ms a check
+        // over Lake Hylia, and its flight only turns from walls and keeps above the water. Close to anything, diving
+        // or hit: every frame, as before.
+        if ((this->actionFunc == EnCrow_FlyIdle) && (this->actor.colChkInfo.health != 0) &&
+            !(this->actor.bgCheckFlags & (BGCHECKFLAG_GROUND | BGCHECKFLAG_WALL | BGCHECKFLAG_CEILING)) &&
+            (this->actor.world.pos.y - this->actor.floorHeight > 60.0f) && (this->actor.xzDistToPlayer > 300.0f) &&
+            (((play->gameplayFrames + ((u32)this >> 4)) & 3) != 0)) {
+            // (the last check's answers stand)
+        } else {
+            Actor_UpdateBgCheckInfo(play, &this->actor, 12.0f * scale, 25.0f * scale, 50.0f * scale,
+                                    UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_2);
+        }
     } else {
         height = 0.0f;
     }

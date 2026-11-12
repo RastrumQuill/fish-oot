@@ -24,3 +24,15 @@
 Checked in ares: the whole short route to `FISHMOD-DONE`, no crash. What to compare with frames8b on the console: the
 fish update (frame log word 12) on legs 2, 9 and 10, the slow frames on the CPU-bound legs (2, 6, 9), and the actor
 report. The fish behave differently, so the sound log differs from frames8b's wherever the fish make the sounds.
+
+## Results (console, 12 Nov, run 20261112-1127: frames9 twice, frames8b between)
+
+The same frame rate as frames8b (18.2 fps on screen; slow frames 47-49% against 44%). The CPU's update went up 1.6
+ms a frame and its draw down 1.4 ms: no gain overall.
+- The fish moved: the bench runs at dawn, their feeding time, so they're at their feeding places now. Their cost fell
+  on legs 4-6 (leg 5: 5.8 -> 3.9 ms) and rose on legs 7-11 (leg 8: 3.7 -> 6.7 ms).
+- The fish manager cost 0.6 ms more (the travelling fish looked at the water every pass, raycasts along the shores):
+  fixed in frames10.
+- The actor report, the whole run (ms a frame): Guays' collision 2.1 ms (3.1 of them, 0.69 ms a check), Tektites'
+  1.6 ms (8.9 of them, 0.35 ms a check), Link's 0.84 ms; updates in all: the fish 5.9 ms (58 of them, 0.1 ms each),
+  Tektites 3.1, Guays 2.8, Link 2.5.

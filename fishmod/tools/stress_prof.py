@@ -78,11 +78,20 @@ def chunks(folder):
 
 
 def stress_lines(folder):
+    """The FISHMOD-STRESS lines: in text packets among the binaryouts (ares), or in the debug.log the morning runner
+    keeps beside them (the console: sc64deployer prints text packets instead of saving them)."""
     out = []
-    for f in arrival(folder):
-        t = open(os.path.join(folder, f), "rb").read().decode("utf-8", "replace")
+    paths = [os.path.join(folder, f) for f in arrival(folder)]
+    for d in (folder, os.path.dirname(os.path.abspath(folder))):
+        paths += [os.path.join(d, f) for f in sorted(os.listdir(d)) if f.endswith(".log")]
+    seen = set()
+    for p in paths:
+        t = open(p, "rb").read().decode("utf-8", "replace")
         for m in re.finditer(r"FISHMOD-STRESS (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+)", t):
-            out.append(tuple(int(m.group(k)) for k in range(1, 8)))
+            line = tuple(int(m.group(k)) for k in range(1, 8))
+            if line not in seen:
+                seen.add(line)
+                out.append(line)
     return out
 
 

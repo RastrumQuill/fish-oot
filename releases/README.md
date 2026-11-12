@@ -12,8 +12,9 @@ results are in [history/](history/), and its patch is in the repository's histor
 |---|---|---|
 | `fish-oot-qol7-testmode.bps`, `fish-oot-qol7-hw-testmode.bps` | The newest test build to play: the fish's new behaviour (schools, days, scent, learned baits) | [notes](notes-qol7.md) |
 | `fish-oot-stress2.bps` | The fish and plant stress benches on the current code, with the profile (how many fish and plants hold 20 fps, and what costs the most at each step) | [notes](notes-stress2.md) |
+| `fish-oot-frames10.bps` | The bench route: Guays and Tektites check collision less while idle and far, the fish manager's travel without raycasts | [notes](notes-frames10.md) |
 | `fish-oot-frames9.bps` | The bench route with the first fish AI work (cheaper far schools, no repeated shore raycasts) | [notes](notes-frames9.md) |
-| `fish-oot-frames8b.bps` | The bench route, the baseline for frames9 | [notes](notes-frames8b.md) |
+| `fish-oot-frames8b.bps` | The bench route, the baseline before the fish AI work | [notes](notes-frames8b.md) |
 
 The bench patches are run by `fishmod\pc\morning.bat` (see `fishmod/pc/MORNING.md`).
 
