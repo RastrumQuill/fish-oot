@@ -11,6 +11,7 @@
 #define FISHMOD_FISH_COUNT 10       // fish per fishing scene
 #define FISHMOD_ROSTER_MAX 600      // the most a scene's roster can hold
 #define FISHMOD_NO_ROSTER 0xFFFF
+#define FISHMOD_FOLLOW_FAR_DIST 300.0f // further from attention: school members just keep their places (EnFishmod_FollowFar)
 #define FISHMOD_LOD_DIST 750.0f     // farther from the camera than this: the flat far shape (textured)
 #define FISHMOD_CULL_DIST 1300.0f   // and past this not drawn at all
 #define FISHMOD_SMALL_RIG_LENGTH 9.0f // fish shorter than this (inches) always use the reduced rig

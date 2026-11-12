@@ -1143,6 +1143,85 @@ static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
 #define EnFishmod_CheckSpook EnFishmod_CheckSpookImpl
 #endif
 
+/** Where a school member keeps its place: behind and to one side of its leader. Returns the school's spacing. */
+static f32 EnFishmod_SchoolSlot(EnFishmod* this, EnFishmod* lead, Vec3f* slot) {
+    s32 k = this->rosterIndex - this->leaderIndex; // 1, 2, ... down the school
+    f32 unit = lead->halfLength * 1.3f + 3.0f;
+    f32 side = ((k & 1) ? 1.0f : -1.0f) * unit * (0.7f + 0.25f * (k % 3));
+    f32 back = unit * (0.4f + 0.55f * ((k + 1) / 2));
+    f32 fx = Math_SinS(lead->actor.shape.rot.y);
+    f32 fz = Math_CosS(lead->actor.shape.rot.y);
+
+    slot->x = lead->actor.world.pos.x - fx * back + fz * side;
+    slot->z = lead->actor.world.pos.z - fz * back - fx * side;
+    slot->y = lead->actor.world.pos.y + ((k * 5) % 7 - 3) * 1.2f;
+    return unit;
+}
+
+/**
+ * A school member far from attention (past the full rig's distance from the camera and the bobber): it eases into
+ * its place in the school without steering or looking at the water itself (the leader did that for the school: its
+ * water is borrowed). Far away a follower's own steering only showed as a fish a little out of place; this costs a
+ * small part of it. False (the full AI) when it's on its own, the leader isn't cruising, or it has fallen well
+ * behind (it may have a bank to get round).
+ */
+static s32 EnFishmod_FollowFar(EnFishmod* this, PlayState* play) {
+    EnFishmod* lead;
+    Vec3f slot;
+    f32 unit;
+    f32 dx;
+    f32 dy;
+    f32 dz;
+    f32 distSq;
+    f32 step;
+
+    if (this->leaderIndex == FISHMOD_NO_ROSTER) {
+        return false;
+    }
+    lead = EnFishmod_RosterFish(this->leaderIndex);
+    if ((lead == NULL) || (lead == this) || (lead->fishState != FISH_STATE_WANDER) || (this->escapeTimer > 0)) {
+        return false;
+    }
+    unit = EnFishmod_SchoolSlot(this, lead, &slot);
+    dx = slot.x - this->actor.world.pos.x;
+    dy = slot.y - this->actor.world.pos.y;
+    dz = slot.z - this->actor.world.pos.z;
+    distSq = SQ(dx) + SQ(dz);
+    if (distSq > SQ(unit * 4.0f)) {
+        return false;
+    }
+    // the leader's pace, more while out of place (as up close), straight at the slot
+    step = lead->speed + 1.5f;
+    if (distSq > SQ(step)) {
+        f32 scale = step / sqrtf(distSq);
+
+        dx *= scale;
+        dz *= scale;
+    }
+    this->actor.world.pos.x += dx;
+    this->actor.world.pos.z += dz;
+    this->actor.world.pos.y += CLAMP(dy * 0.2f, -1.0f, 1.0f);
+    this->speed = lead->speed;
+    Math_SmoothStepToS(&this->actor.shape.rot.y, lead->actor.shape.rot.y, 6, 0x400, 0x20);
+    Math_SmoothStepToS(&this->actor.shape.rot.x, lead->actor.shape.rot.x, 6, 0x200, 0x20);
+    this->waterY = lead->waterY;
+    this->floorY = lead->floorY;
+    this->waterCell = -2; // (its own water looked up again when it steers for itself)
+    this->actor.world.pos.y = EnFishmod_ClampY(this, this->actor.world.pos.y);
+    this->swimPhaseStep = lead->swimPhaseStep;
+    this->swimMag = lead->swimMag;
+    this->restTimer = 0;
+    this->target = this->actor.world.pos;
+    this->stateTimer = 1;
+    this->stuckTimer = 0;
+    this->stuckPos = this->actor.world.pos;
+    if (this->cooldown > 0) {
+        this->cooldown--;
+    }
+    this->blocked = false;
+    return true;
+}
+
 /**
  * A school member keeping its place: behind and to one side of its leader (sides alternating, further back the
  * further down the school), resting when the leader rests and bolting when it bolts. Costs a steer toward the slot
@@ -1152,12 +1231,7 @@ static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
 static s32 EnFishmod_SchoolFollow(EnFishmod* this, PlayState* play) {
     EnFishmod* lead;
     Vec3f slot;
-    s32 k;
     f32 unit;
-    f32 side;
-    f32 back;
-    f32 fx;
-    f32 fz;
     f32 gap;
 
     if (this->leaderIndex == FISHMOD_NO_ROSTER) {
@@ -1177,15 +1251,7 @@ static s32 EnFishmod_SchoolFollow(EnFishmod* this, PlayState* play) {
     if (lead->fishState != FISH_STATE_WANDER) {
         return false;
     }
-    k = this->rosterIndex - this->leaderIndex; // 1, 2, ... down the school
-    unit = lead->halfLength * 1.3f + 3.0f;
-    side = ((k & 1) ? 1.0f : -1.0f) * unit * (0.7f + 0.25f * (k % 3));
-    back = unit * (0.4f + 0.55f * ((k + 1) / 2));
-    fx = Math_SinS(lead->actor.shape.rot.y);
-    fz = Math_CosS(lead->actor.shape.rot.y);
-    slot.x = lead->actor.world.pos.x - fx * back + fz * side;
-    slot.z = lead->actor.world.pos.z - fz * back - fx * side;
-    slot.y = lead->actor.world.pos.y + ((k * 5) % 7 - 3) * 1.2f;
+    unit = EnFishmod_SchoolSlot(this, lead, &slot);
     gap = Math_Vec3f_DistXYZ(&this->actor.world.pos, &slot);
     // keep up: the leader's pace, more while it's out of place
     EnFishmod_SwimToward(this, play, &slot, lead->speed + CLAMP(gap * 0.05f, 0.0f, 1.5f), 0x500);
@@ -2106,6 +2172,12 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         this->thinkMask = (attnDist > 1200.0f) ? 7 : (attnDist > 800.0f) ? 3 : (attnDist > 500.0f) ? 1 : 0;
     } else {
         this->thinkMask = 0;
+    }
+    // a school member away from attention: into its place behind the leader, nothing more
+    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON && (attnDist > FISHMOD_FOLLOW_FAR_DIST) &&
+        EnFishmod_FollowFar(this, play)) {
+        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_UpdateSwim(this));
+        return;
     }
     // away from attention, a wandering fish thinks every other frame and glides on in between
     if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !FISHMOD_PHOTO_ON &&
