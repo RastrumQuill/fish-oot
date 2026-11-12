@@ -25,6 +25,11 @@ xdpyinfo >/dev/null 2>&1 || { echo "no X display in DISPLAY ($DISPLAY): start Xv
 PORT=$((9123 + ${ARES_SLOT:-0}))
 CONF=$(mktemp --suffix=.bml)
 sed "s/^\(\s*Port:\s*\)9123/\1$PORT/" "$HERE/ares_debug.bml" > "$CONF"
+# ARES_FAST=1: no video or audio output (as fishmod/tools/ares_run.sh): about twice as fast, the same emulation
+if [ "${ARES_FAST:-0}" = 1 ]; then
+    sed -i -e '/^Video$/,/^[A-Z]/ s/^  Driver: .*/  Driver: None/' -e '/^Audio$/,/^[A-Z]/ s/^  Driver: .*/  Driver: None/' \
+        -e '/^Audio$/,/^[A-Z]/ s/^  Blocking: .*/  Blocking: false/' "$CONF"
+fi
 timeout $((SECS + 60)) "$ARES" --settings-file "$CONF" --system "Nintendo 64" --no-file-prompt "$ROM" \
     >/dev/null 2>&1 &
 APID=$!

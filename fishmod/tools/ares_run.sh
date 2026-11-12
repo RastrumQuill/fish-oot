@@ -16,6 +16,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PORT=$((9123 + SLOT))
 CONF=$(mktemp --suffix=.bml)
 sed "s/^\(\s*Port:\s*\)9123/\1$PORT/" "$HERE/ares_debug.bml" > "$CONF"
+# ARES_FAST=1: no video or audio output (the emulation unchanged: the RDP still draws into RDRAM): about twice as fast
+if [ "${ARES_FAST:-0}" = 1 ]; then
+    sed -i -e '/^Video$/,/^[A-Z]/ s/^  Driver: .*/  Driver: None/' -e '/^Audio$/,/^[A-Z]/ s/^  Driver: .*/  Driver: None/' \
+        -e '/^Audio$/,/^[A-Z]/ s/^  Blocking: .*/  Blocking: false/' "$CONF"
+fi
 xdpyinfo >/dev/null 2>&1 || { (Xvfb "${DISPLAY:-:190}" -screen 0 1024x768x24 >/dev/null 2>&1 &); sleep 2; }
 if [ -n "$USB" ]; then mkdir -p "$USB"; fi
 ARES_SC64_DIR=$USB timeout $((SECS + 120)) "$ARES" --settings-file "$CONF" --system "Nintendo 64" --no-file-prompt "$ROM" \
