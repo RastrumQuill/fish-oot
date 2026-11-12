@@ -158,9 +158,9 @@ def main():
             continue
         what = BENCHES[bench]
         print(f"## The {what} bench\n")
-        print(f"| {what} | frames | fps | over 52 ms | CPU update | CPU draw | RSP | RDP | fish update | fish draw | "
+        print(f"| {what} | frames | fps | on screen | late pictures | over 52 ms | CPU update | CPU draw | RSP | RDP | fish update | fish draw | "
               f"props draw | limited by | costliest functions (ms a frame) |")
-        print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+        print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
         best = None
         for k in keys:
             rs = steps[k]
@@ -168,7 +168,16 @@ def main():
             slow = sum(1 for r in rs if r[2] > 52000)
             cpu = mean(rs, 3) + mean(rs, 4)
             rdp = mean(rs, 7)
-            full = (period * 1000 <= FULL_SPEED_US) and (slow * 20 <= len(rs))
+            # what reached the screen (words 56-57: pictures and the longest held, refreshes): with run-ahead's third
+            # frame buffer, a frame period over 52 ms is often only wobble the screen never shows
+            pictures = sum(r[56] >> 16 for r in rs)
+            refreshes = sum(r[57] for r in rs)
+            late = sum(1 for r in rs if (r[56] & 0xFFFF) >= 4)
+            screen = 60.0 * pictures / refreshes if refreshes else 0.0
+            if pictures:
+                full = (screen >= 19.7) and (late * 20 <= pictures)
+            else:
+                full = (period * 1000 <= FULL_SPEED_US) and (slow * 20 <= len(rs))
             if full:
                 best = counts.get(k, best)
             top = ""
@@ -177,14 +186,15 @@ def main():
                 ms_per_sample = period / (total / len(rs)) if total else 0  # (the step's own frame time per sample)
                 top = ", ".join(f"{n} {c * ms_per_sample / len(rs):.1f}" for n, c in funcs.most_common(args.top))
             row = {"bench": what, "count": counts.get(k, k[1]), "frames": len(rs), "fps": 1000 / period,
+                   "screenFps": screen, "late": late,
                    "slow": slow, "cpuUpdate": mean(rs, 3), "cpuDraw": mean(rs, 4), "rsp": mean(rs, 5), "rdp": rdp,
                    "fishUpdate": mean(rs, 12), "fishDraw": mean(rs, 13), "propsDraw": mean(rs, 14),
                    "limit": "CPU" if cpu >= rdp else "RDP", "top": top}
             rows.append(row)
-            print(f"| {row['count']} | {len(rs)} | {row['fps']:.1f} | {slow} | {row['cpuUpdate']:.1f} | "
+            print(f"| {row['count']} | {len(rs)} | {row['fps']:.1f} | {screen:.1f} | {late} | {slow} | {row['cpuUpdate']:.1f} | "
                   f"{row['cpuDraw']:.1f} | {row['rsp']:.1f} | {rdp:.1f} | {row['fishUpdate']:.1f} | "
                   f"{row['fishDraw']:.1f} | {row['propsDraw']:.1f} | {row['limit']} | {top} |")
-        print(f"\nThe most {what} at full speed (20 fps, at most 1 frame in 20 over 52 ms): {best}\n")
+        print(f"\nThe most {what} at full speed (on screen: 19.7 fps or more, at most 1 picture in 20 late): {best}\n")
     if args.csv:
         import csv
 

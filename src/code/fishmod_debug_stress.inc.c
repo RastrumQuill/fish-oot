@@ -68,6 +68,10 @@ static s32 sStressFailed; // steps under full speed in this pass
 static u32 sPassPeriod;
 static u32 sPassFrames;
 static u32 sPassSlow;
+// the screen's running totals (sched.c) when this step's measuring began: what reached the screen decides a step
+// (run-ahead's third frame buffer hides a frame period's wobble round 50 ms; the screen shows only real hitches)
+static u32 sShownAt[3];
+extern u32 gFishmodShown[6];
 
 s32 gFishmodStress = (FISHMOD_STRESS == 3) ? 1 : FISHMOD_STRESS; // (both: the fish first)
 s32 gFishmodStressCount = 0; // (none until Link has settled on the bottom)
@@ -87,6 +91,7 @@ static void Stress_NextBench(PlayState* play) {
     sStressFrame = 0;
     sStressFailed = 0;
     sPassPeriod = sPassFrames = sPassSlow = 0; // (the fish bench's left over: the plants' first step read wrong)
+    sStressTag = 0; // (the warp and the plants' first frames aren't the fish's last step)
     sStressWait = 80;
     gFishmodStress = 2;
     gFishmodStressCount = 0;
@@ -131,6 +136,11 @@ static void Stress_Update(PlayState* play) {
     st = &sStress.step[sStressStep];
     st->count = gFishmodStressCount;
     sStressFrame++;
+    if (sStressFrame == STRESS_SETTLE + 1) {
+        sShownAt[0] = gFishmodShown[3];
+        sShownAt[1] = gFishmodShown[4];
+        sShownAt[2] = gFishmodShown[5];
+    }
     sStressTag = ((u32)gFishmodStress << 24) | ((u32)(sStressStep & 0xFF) << 16) | ((u32)(sStress.passes & 0xFF) << 8) |
                  ((sStressFrame > STRESS_SETTLE) ? 1 : 0);
     if (sStressFrame > STRESS_SETTLE) {
@@ -165,11 +175,25 @@ static void Stress_Update(PlayState* play) {
             Sc64_UsbText(line);
         }
 #endif
-        // full speed: the mean frame within 20 fps, and no more than 1 frame in 20 slow (the mean alone hides a
-        // stutter: slow frames and quick ones after them)
-        if ((sPassFrames == 0) || (sPassPeriod / sPassFrames > STRESS_FULL_SPEED_US) ||
-            (sPassSlow * 20 > sPassFrames)) {
-            sStressFailed++;
+        {
+            // full speed, by what reached the screen: the pictures came at 20 fps (3 refreshes each, at most 3.05 on
+            // average: 19.7 fps) and no more than 1 in 20 stayed 4 refreshes or more (a visible hitch)
+            u32 pictures = gFishmodShown[3] - sShownAt[0];
+            u32 late = gFishmodShown[4] - sShownAt[1];
+            u32 refreshes = gFishmodShown[5] - sShownAt[2];
+
+            if ((pictures == 0) || (refreshes * 100 > pictures * 305) || (late * 20 > pictures)) {
+                sStressFailed++;
+            }
+#ifdef FISHMOD_PCPROF
+            {
+                char line[96];
+
+                sprintf(line, "FISHMOD-STRESS-SCREEN %d %d %d %u %u %u %u\n", gFishmodStress, sStress.passes,
+                        sStressStep, gFishmodStressCount, pictures, late, refreshes);
+                Sc64_UsbText(line);
+            }
+#endif
         }
         sStressFrame = 0;
         sStressStep++;

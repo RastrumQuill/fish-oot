@@ -571,7 +571,7 @@ static void PcProf_FrameEnd(void) {
     {
         // the pictures the scheduler put on screen since the last record (sched.c): r[56] = how many << 16 | the most
         // refreshes one stayed; r[57] = refreshes in all (3 a picture at 20 fps; a hitch holds one for 4 or more)
-        extern u32 gFishmodShown[3];
+        extern u32 gFishmodShown[6];
         u32 prevInt = __osDisableInt();
 
         r[56] = (gFishmodShown[0] << 16) | (gFishmodShown[1] & 0xFFFF);

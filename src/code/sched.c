@@ -571,7 +571,7 @@ void Sched_HandleRetrace(Scheduler* sc) {
         {
             // fish-oot: a new picture on screen: how many refreshes the last one stayed (3 at 20 fps; more, a visible
             // hitch), for the frame log (fishmod_debug_pcprof.inc.c): pictures shown, the longest held, refreshes in all
-            extern u32 gFishmodShown[3];
+            extern u32 gFishmodShown[6];
             static u32 sLastShownRetrace;
             u32 held = sc->retraceCount - sLastShownRetrace;
 
@@ -581,6 +581,10 @@ void Sched_HandleRetrace(Scheduler* sc) {
                 gFishmodShown[1] = held;
             }
             gFishmodShown[2] += held;
+            // (and running totals nothing resets, for the stress bench: pictures, late ones, refreshes)
+            gFishmodShown[3]++;
+            gFishmodShown[4] += (held >= 4);
+            gFishmodShown[5] += held;
         }
 #endif
         // Advance buffers

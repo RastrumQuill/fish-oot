@@ -4,3 +4,5 @@
 releases/fish-oot-frames10.bps 12 frames10-a
 releases/fish-oot-frames9.bps 12 frames9
 releases/fish-oot-frames10.bps 12 frames10-b
+# the stress benches judged by the screen (to find the real fish limit; about 15-25 minutes; it ends itself)
+releases/fish-oot-stress3.bps 45 stress3

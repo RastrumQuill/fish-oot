@@ -791,7 +791,8 @@ s32 gFishmodScatterDrawn;                  // props drawn in the last frame
 u32 gFishmodScatterCacheUsed;     // frames the prop commands were copied from the last (or checked: SCATTER_VERIFY)
 u32 gFishmodScatterCacheMismatch; // SCATTER_VERIFY: frames the copy differed from the commands made afresh
 u32 gFishmodRspCounters[4]; // sched.c: F3DEX3's counters for the last graphics task
-u32 gFishmodShown[3]; // sched.c: pictures put on screen, the most refreshes one stayed, refreshes in all
+u32 gFishmodShown[6]; // sched.c: pictures put on screen, the most refreshes one stayed, refreshes in all (since the
+                      // frame log's last record); then the same as running totals: pictures, late ones (held 4+), refreshes
 u32 gFishmodRspCountersSet; // sched.c: which set they are (F3DEX3_ALL: 0 plain, 1-3 profiling A-C)
 u32* gFishmodGfxLog; // graph.c: each frame's graphics hashes, nine words (the collog script's builds)
 u32 gFishmodGfxLogCount;
