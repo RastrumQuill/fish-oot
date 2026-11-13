@@ -886,6 +886,11 @@ static void Scatter_ShadeBed(PlayState* play) {
     }
     osWritebackDCache(room, last);
     sBedShadedRoom = room;
+    {
+        extern s32 gFishmodRelitDirty;
+
+        gFishmodRelitDirty = true; // (the mesh pack's CPU lighting reads these normals: light the bed again)
+    }
 }
 
 /** The scene's water levels in one number: it changes when any water box rises or falls (a lake refilling). */

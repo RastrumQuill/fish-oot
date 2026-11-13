@@ -94,10 +94,16 @@ def name_of(item):
 VTX_REF = re.compile(r"&?\s*(\w+)\s*(?:\[\s*(\d+)\s*\])?")
 
 
+ORIGIN = {}  # a vertex (its fields) -> the first room vertex it was read from ("array[index]"): its copies' source
+
+
 def load_vtx(dirpath, arr):
-    """the array's vertices as their argument strings"""
+    """the array's vertices as their argument strings (each remembered as the copies' source, ORIGIN)"""
     f = os.path.join(dirpath, arr + ".inc.c")
-    return [tuple(a.strip() for a in m.split(",")) for m in re.findall(r"VTX\(([^)]*)\)", open(f).read())]
+    vs = [tuple(a.strip() for a in m.split(",")) for m in re.findall(r"VTX\(([^)]*)\)", open(f).read())]
+    for i, v in enumerate(vs):
+        ORIGIN.setdefault(v, "%s[%d]" % (arr, i))
+    return vs
 
 
 def state_key(c):
@@ -387,7 +393,16 @@ def main():
             # the table the CPU lights from: its count, then its vertices (fishmod_relight.c finds it by this name)
             defs.append("Vtx %s_relitVtx[] = {\n%s};\n\n" % (room, "".join(
                 "    VTX(%s),\n" % ", ".join(v) for v in table)))
-            defs.append("void* %s_fishmodRelit[2] = { (void*)%d, %s_relitVtx };\n" % (room, len(table), room))
+            # each vertex's source in the room (identical copies share one: the same normal, the same shade): the CPU
+            # reads the normal from there, as the game may have shaded it (fishmod_scatter.c's lake bed shading
+            # shortens the normals of the room's own vertices)
+            missing = [v for v in table if v not in ORIGIN]
+            if missing:
+                sys.exit("meshpack: %d relit vertices with no source in the room" % len(missing))
+            defs.append("Vtx* %s_relitSrc[] = {\n%s};\n\n" % (room, "".join(
+                "    &%s,\n" % ORIGIN[v] for v in table)))
+            defs.append("void* %s_fishmodRelit[3] = { (void*)%d, %s_relitVtx, %s_relitSrc };\n" % (
+                room, len(table), room, room))
         if not defs:
             continue
         rp = os.path.join(d, room + ".c")

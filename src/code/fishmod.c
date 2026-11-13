@@ -1572,7 +1572,9 @@ void Fishmod_ClaimDisplayLists(GraphicsContext* gfxCtx) {
 extern void* spot06_room_0_fishmodRelit[] __attribute__((weak)); // (meshpack builds only: else its address is 0)
 
 static Vtx* sRelitBuf[FISHMOD_RELIT_BUFS];
-static s8* sRelitNormal; // each vertex's normal (as stored: the RSP doesn't make it unit length)
+static const u32* sRelitSrcs; // each vertex's source in the room (its segment address): its normal is read there
+static u8* sRelitRoom;        // (the room's segment, for the sources)
+s32 gFishmodRelitDirty;       // set when a room vertex's normal changes (fishmod_scatter.c's bed shading): light again
 static const Vtx* sRelitSrc;
 static s32 sRelitCount;
 static s32 sRelitFront = -1;
@@ -1600,10 +1602,7 @@ static void Fishmod_RelitFree(void) {
             sRelitBuf[i] = NULL;
         }
     }
-    if (sRelitNormal != NULL) {
-        ZELDA_ARENA_FREE(sRelitNormal, "../fishmod.c", __LINE__);
-        sRelitNormal = NULL;
-    }
+    sRelitSrcs = NULL;
     sRelitSrc = NULL;
     sRelitFront = -1;
     sRelitKeyLen = -1;
@@ -1631,7 +1630,8 @@ static void Fishmod_RelitCompute(Vtx* out, Lights* lights) {
         cb[k] = l->col[2];
     }
     for (i = 0; i < sRelitCount; i++) {
-        const s8* nm = &sRelitNormal[i * 3];
+        // (the normal as the room holds it now: the game may have shortened it to shade the lake bed)
+        const s8* nm = (const s8*)((const Vtx*)(sRelitRoom + (sRelitSrcs[i] & 0xFFFFFF)))->n.n;
         s32 r = ar * (128 * 128), g = ag * (128 * 128), b = ab * (128 * 128); // (the dot's scale: both /128, as F3DEX3)
         Vtx* v = &out[i];
 
@@ -1670,26 +1670,17 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
     count = (s32)table[0];
     src = (const Vtx*)((u8*)play->roomCtx.curRoom.segment + ((u32)table[1] & 0xFFFFFF));
     if (src != sRelitSrc) {
-        // the room (re)loaded: the buffers made from its table, the normals made unit length
+        // the room (re)loaded: the buffers made from its table (positions, texture coordinates, alpha)
         Fishmod_RelitFree();
-        sRelitNormal = ZELDA_ARENA_MALLOC(count * 3, "../fishmod.c", __LINE__);
         for (i = 0; i < FISHMOD_RELIT_BUFS; i++) {
             sRelitBuf[i] = ZELDA_ARENA_MALLOC(count * sizeof(Vtx), "../fishmod.c", __LINE__);
         }
-        if ((sRelitNormal == NULL) || (sRelitBuf[FISHMOD_RELIT_BUFS - 1] == NULL) || (sRelitBuf[0] == NULL) ||
-            (sRelitBuf[1] == NULL)) {
+        if ((sRelitBuf[FISHMOD_RELIT_BUFS - 1] == NULL) || (sRelitBuf[0] == NULL) || (sRelitBuf[1] == NULL)) {
             Fishmod_RelitFree();
             return gfx; // (no memory: the lit pieces would read garbage; the segment is left unset)
         }
-        for (i = 0; i < count; i++) {
-            // the normals as stored (the RSP uses them so: not made unit length, over 128; the lake's are about 120
-            // long, which lights them a little under full)
-            const s8* c = (const s8*)src[i].n.n;
-
-            sRelitNormal[i * 3 + 0] = c[0];
-            sRelitNormal[i * 3 + 1] = c[1];
-            sRelitNormal[i * 3 + 2] = c[2];
-        }
+        sRelitRoom = play->roomCtx.curRoom.segment;
+        sRelitSrcs = (const u32*)((u8*)play->roomCtx.curRoom.segment + ((u32)table[2] & 0xFFFFFF));
         for (i = 0; i < FISHMOD_RELIT_BUFS; i++) {
             bcopy(src, sRelitBuf[i], count * sizeof(Vtx)); // (positions, texture coordinates, alpha)
         }
@@ -1703,7 +1694,8 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
         if (len > (s32)sizeof(sRelitKey)) {
             len = sizeof(sRelitKey);
         }
-        if ((sRelitFront < 0) || (len != sRelitKeyLen) || !Fishmod_RelitSame(sRelitKey, &lights->l.a, 8) ||
+        if ((sRelitFront < 0) || gFishmodRelitDirty || (len != sRelitKeyLen) ||
+            !Fishmod_RelitSame(sRelitKey, &lights->l.a, 8) ||
             ((len > 8) && !Fishmod_RelitSame(sRelitKey + 8, &lights->l.l[0], len - 8))) {
             s32 next = (sRelitFront + 1) % FISHMOD_RELIT_BUFS;
 
@@ -1714,6 +1706,7 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
                 bcopy(&lights->l.l[0], sRelitKey + 8, len - 8);
             }
             sRelitKeyLen = len;
+            gFishmodRelitDirty = false;
         }
     }
     gSPSegment(gfx++, FISHMOD_RELIT_SEG, sRelitBuf[sRelitFront]);
