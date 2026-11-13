@@ -19,8 +19,9 @@ A change passes only if all three agree. Each catches what the one before can't.
    at that moment (combiner, render mode, geometry mode, textures and tiles, texture memory contents, colours,
    lights). Commands that change nothing aren't in the stream, so a cleaned list gives the same stream as the
    original: this is the fish rig's proof (`fishmod/tools/rigcheck.py`) applied to whole actors.
-3. **The picture**. Each pose drawn on a plain backdrop (no sky, water or effects: nothing that animates), from fixed
-   camera angles, captured in ares as the VI outputs it, compared pixel for pixel. Catches anything the models above
+3. **The picture**. Each pose (every frame of every case) drawn on a plain backdrop (no sky, water or effects:
+   nothing that animates) from **every one of a fixed set of camera angles**, captured in ares as the VI outputs it,
+   compared pixel for pixel. Catches anything the models above
    miss (an RSP or RDP behaviour the state model doesn't know).
 
 ## The harness: a test ROM that poses the actor (repeatable)
@@ -62,9 +63,13 @@ game can show sampled at least once:
   masks (child).
 - **Face**: every eye and mouth texture index (the face is texture-swapped).
 - **Lighting**: the case table runs twice, with two fixed light directions (Link is lit: his normals matter).
-- **Angles** (level 3 only): front, back, side, above, from a fixed distance.
+- **Angles** (level 3): every case is drawn and captured from each angle of a fixed set, not one per case: front,
+  back, both sides, above, below, and two three-quarter views, at a fixed distance (8 angles). The ROM steps the
+  camera through the set for each pose before moving to the next pose; the marker carries the case and the angle.
 
-Several thousand cases at one a frame: a few minutes in ares per ROM. Run A (before) and B (after) in parallel.
+Several thousand cases at one a frame for levels 1 and 2 (a few minutes in ares per ROM); level 3 is 8 captures
+per case, so tens of thousands of frames (hours in ares: run overnight, A and B in parallel, on as many ares instances
+as the machine allows, each taking a share of the case table).
 
 ## What exists already and what's to build
 
