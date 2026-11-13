@@ -16,7 +16,9 @@
 // the short bench (the default): one lap, clear dawn, of the legs that stutter (1-11 and 21), about 4 minutes, then
 // FISHMOD-DONE; pcprof_frames_full has the whole route, two laps (clear dawn, rain at midday)
 #define FISHMOD_BENCH_SHORT 1
+#ifndef FISHMOD_BENCH_LAPS
 #define FISHMOD_BENCH_LAPS 1
+#endif
 #else
 #define FISHMOD_BENCH_LAPS 2
 #endif
