@@ -508,11 +508,11 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     }
     sPbCond = sPbOrder[sBench.laps % BENCH_CONDS];
 #ifdef FISHMOD_RSP_AB
-    // (the all-day RSP test, rsp_ab script: the audio's RSP tasks off for every other block of BENCH_CONDS laps, a
-    // whole rotation of times and weather each, so every condition is run both ways; the frame log's RSP audio time
-    // is 0 in the laps without them)
-    R_AUDIOMGR_ACTIVITY_LEVEL = ((sBench.laps / BENCH_CONDS) & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
-                                                                  : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
+    // (the RSP test, rsp_ab script: every lap the same time and weather, the audio's RSP tasks on in the even laps
+    // and off in the odd ones; the frame log's RSP audio time is 0 in the laps without them)
+    sPbCond = 0;
+    R_AUDIOMGR_ACTIVITY_LEVEL = (sBench.laps & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
+                                                  : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
 #endif
     // the lake's enemies still bite, but he never runs out of hearts (the bench must outlast the night)
     gSaveContext.save.info.playerData.health = gSaveContext.save.info.playerData.healthCapacity;
