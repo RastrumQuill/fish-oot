@@ -151,7 +151,8 @@ class FrameAnalyzer:
 
         self.collections = collections
         self.prev = None
-        self.prev_changed = False
+        self.prev2 = None
+        self.diffs2 = collections.deque(maxlen=240)
         self.last_t = None
         self.periods = collections.deque(maxlen=600)  # the card's frame-to-frame times (for the refresh period)
         self.diffs = collections.deque(maxlen=240)  # recent differences (for the noise floor)
@@ -173,7 +174,8 @@ class FrameAnalyzer:
 
     def feed(self, frame, t):
         cv2 = self._cv2()
-        small = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (96, 72), interpolation=cv2.INTER_AREA)
+        # (small and blurred vertically: the half-line jitter of a 240p picture captured as 480i mostly averages out)
+        small = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (96, 36), interpolation=cv2.INTER_AREA)
         small = small.astype(np.int16)
         refreshes = 1
         if self.last_t is not None:
@@ -184,22 +186,29 @@ class FrameAnalyzer:
             refreshes = max(1, round(dt / ref))  # (a frame the card or USB dropped still counts as a refresh)
         self.last_t = t
         if self.prev is None:
-            self.prev = small
+            self.prev = self.prev2 = small
             return
-        d = float(np.mean(np.abs(small - self.prev)))
+        # against the refresh before and the one before that: cheap cards bob a 240p picture (a half-line shift every
+        # other refresh), so a repeated picture differs from the refresh before but matches the one two back
+        d1 = float(np.mean(np.abs(small - self.prev)))
+        d2 = float(np.mean(np.abs(small - self.prev2)))
+        self.prev2 = self.prev
         self.prev = small
-        self.diffs.append(d)
-        # the noise floor: the quietest differences lately (a repeated picture's are just the card's noise)
-        floor = sorted(self.diffs)[len(self.diffs) // 10] if len(self.diffs) >= 20 else 0.0
-        changed = d > max(3 * floor, floor + 0.6)
-        # a change straight after another (one refresh apart) is the same new picture: cheap cards send an in-between
-        # frame, the old and new pictures blended, then the new one (and the game never shows a picture for just one
-        # refresh)
-        new = changed and not self.prev_changed
-        self.prev_changed = changed
+        self.diffs.append(d1)
+        self.diffs2.append(d2)
+        floor1 = sorted(self.diffs)[len(self.diffs) // 10] if len(self.diffs) >= 20 else 0.0
+        floor2 = sorted(self.diffs2)[len(self.diffs2) // 10] if len(self.diffs2) >= 20 else 0.0
+        bob = (len(self.diffs) >= 20) and (np.median(self.diffs) > 2 * max(np.median(self.diffs2), 0.3))
+        if bob:
+            changed = d2 > max(3 * floor2, floor2 + 0.6) and d1 > max(3 * floor2, floor2 + 0.6)
+        else:
+            changed = d1 > max(3 * floor1, floor1 + 0.6)
+        # a new picture: a change no sooner than two refreshes after the last one counted (the game never shows a
+        # picture for just one refresh; a card's blended in-between frame, or the other field of a bobbed picture, is
+        # a second change one refresh after the first)
         with self.lock:
             self.since_new += refreshes
-            if new:
+            if changed and self.since_new >= 2:
                 ms = self.since_new * self.refresh_ms()
                 self.since_new = 0
                 self.total.append(ms)
