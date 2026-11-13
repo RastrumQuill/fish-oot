@@ -966,6 +966,13 @@ void AudioHeap_Init(void) {
 
     // audio buffer parameters
     gAudioCtx.audioBufferParameters.samplingFrequency = spec->samplingFrequency;
+#ifdef FISHMOD_AUDIO_RATE
+    // fish-oot (an RSP test): the sound mixed at a lower rate (e.g. 26800 Hz for 32000): the RSP's mixing work scales
+    // with it; the notes' pitches stay right (resampleRate below)
+    if (gAudioCtx.audioBufferParameters.samplingFrequency > FISHMOD_AUDIO_RATE) {
+        gAudioCtx.audioBufferParameters.samplingFrequency = FISHMOD_AUDIO_RATE;
+    }
+#endif
     gAudioCtx.audioBufferParameters.aiSamplingFrequency =
         osAiSetFrequency(gAudioCtx.audioBufferParameters.samplingFrequency);
     gAudioCtx.audioBufferParameters.samplesPerFrameTarget =
@@ -1096,6 +1103,12 @@ void AudioHeap_Init(void) {
         SynthesisReverb* reverb = &gAudioCtx.synthesisReverbs[i];
 
         reverb->downsampleRate = settings->downsampleRate;
+#ifdef FISHMOD_REVERB_DS2
+        // fish-oot (an RSP test): every reverb at half rate or less (the RSP's reverb work about halved; the echo duller)
+        if (reverb->downsampleRate < 2) {
+            reverb->downsampleRate = 2;
+        }
+#endif
         reverb->windowSize = settings->windowSize * 64;
         reverb->windowSize /= reverb->downsampleRate;
         reverb->decayRatio = settings->decayRatio;
