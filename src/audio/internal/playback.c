@@ -5,6 +5,8 @@
 #include "audio.h"
 #include "stack_pad.h"
 
+static u8 sFishmodHaasUsed = false; // (fish-oot: headset output has set a slot's Haas delays: Audio_InitSampleState)
+
 /**
  * original name: Nas_smzSetParam
  */
@@ -26,6 +28,18 @@ void Audio_InitSampleState(Note* note, NoteSampleState* sampleState, NoteSampleS
     reverbVol = attrs->reverbVol;
     stereoData = attrs->stereo.s;
 
+    // fish-oot: this update's slot is written whole below, and was last touched a frame ago (out of the data cache by
+    // now): its two 16-byte lines claimed with the cache's Create Dirty Exclusive instead of read from RDRAM first, the
+    // wait of two misses a playing note an update (the store after each was the costliest instruction here). Every
+    // byte is then written before any is read: the pad here; the Haas delays, which only headset output sets and every
+    // other branch leaves as they were (zero: the slots start zeroed), as zero until headset output is first used
+    // (then the slots are read and written as they always were).
+    if (!sFishmodHaasUsed && (((u32)sampleState & 0xF) == 0)) {
+        __asm__ volatile("cache 0x0D, 0(%0)\n\tcache 0x0D, 16(%0)" : : "r"(sampleState) : "memory");
+        sampleState->haasEffectLeftDelaySize = 0;
+        sampleState->haasEffectRightDelaySize = 0;
+        __builtin_memset(sampleState->pad_18, 0, sizeof(sampleState->pad_18));
+    }
     sampleState->bitField0 = note->sampleState.bitField0;
     {
         // fish-oot: the enabled bit's mirror (synthesis.c, gFishmodSampleEnabled)
@@ -46,6 +60,7 @@ void Audio_InitSampleState(Note* note, NoteSampleState* sampleState, NoteSampleS
     sampleState->bitField0.stereoHeadsetEffects = stereoData.stereoHeadsetEffects;
     sampleState->bitField0.usesHeadsetPanEffects = stereoData.usesHeadsetPanEffects;
     if (stereoHeadsetEffects && (gAudioCtx.soundOutputMode == SOUND_OUTPUT_HEADSET)) {
+        sFishmodHaasUsed = true;
         halfPanIndex = pan >> 1;
         if (halfPanIndex > 0x3F) {
             halfPanIndex = 0x3F;
