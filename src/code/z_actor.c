@@ -313,6 +313,8 @@ static AttentionColor sAttentionColors[ACTORCAT_MAX + 1] = {
     { { 255, 255, 0, 255 }, { 200, 155, 0, 0 } },     // ACTORCAT_BOSS
     { { 0, 255, 0, 255 }, { 0, 255, 0, 0 } },         // ACTORCAT_DOOR
     { { 0, 255, 0, 255 }, { 0, 255, 0, 0 } },         // ACTORCAT_CHEST
+    { { 150, 150, 255, 255 }, { 150, 150, 255, 0 } }, // ACTORCAT_FISH (fish-oot: as the NPCs they were)
+    { { 0, 255, 0, 255 }, { 0, 255, 0, 0 } },         // ACTORCAT_FISHMGR (fish-oot: as MISC)
     { { 0, 255, 0, 255 }, { 0, 255, 0, 0 } },         // unused extra entry
 };
 
@@ -2476,6 +2478,10 @@ u32 sCategoryFreezeMasks[ACTORCAT_MAX] = {
     0,
     // ACTORCAT_CHEST
     PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_28,
+    // ACTORCAT_FISH (fish-oot: as the NPCs they were)
+    PLAYER_STATE1_DEAD,
+    // ACTORCAT_FISHMGR (fish-oot: as MISC, where it was)
+    PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_28 | PLAYER_STATE1_29,
 };
 
 void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
@@ -2618,7 +2624,10 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                                 gFishmodActorCount[actor->id]++;
                             }
                         }
-                        gFishmodCatCycles[i] += cycles;
+                        // (the frame log's twelve: the fish counted as the NPCs and their manager as MISC, as before)
+                        gFishmodCatCycles[(i == ACTORCAT_FISH)      ? ACTORCAT_NPC
+                                          : (i == ACTORCAT_FISHMGR) ? ACTORCAT_MISC
+                                                                    : i] += cycles;
                     }
 #else
                     actor->update(actor, play);

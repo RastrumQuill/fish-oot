@@ -498,6 +498,10 @@ void EnFishmod_Init(Actor* thisx, PlayState* play) {
         }
         thisx->objectSlot = slot;
         Actor_SetObjectDependency(play, thisx); // segment 6 is object_fish from here on (Init runs with the profile's)
+        if (this->type == FISHMOD_TYPE_FISH) {
+            // (frames12: a list of their own, which the Z-target search doesn't walk: see ACTORCAT_FISH)
+            Actor_ChangeCategory(play, &play->actorCtx, thisx, ACTORCAT_FISH);
+        }
     }
 
     if (this->type == FISHMOD_TYPE_MANAGER) {

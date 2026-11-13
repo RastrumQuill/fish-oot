@@ -137,7 +137,7 @@ static void Fishmod_PlayLog(PlayState* play) {
         m.flags = under | (rod << 1) | (((player->stateFlags1 & PLAYER_STATE1_27) != 0) << 2) |
                   ((gFishmodRodInfo.tension > 0.0f) << 3);
         m.fish = 0;
-        for (actor = play->actorCtx.actorLists[ACTORCAT_NPC].head; actor != NULL; actor = actor->next) {
+        for (actor = play->actorCtx.actorLists[ACTORCAT_FISH].head; actor != NULL; actor = actor->next) {
             m.fish += (actor->id == ACTOR_EN_FISHMOD);
         }
         m.actors = MIN(play->actorCtx.total, 255);

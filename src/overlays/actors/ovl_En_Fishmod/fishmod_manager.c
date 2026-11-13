@@ -716,7 +716,7 @@ void EnFishmod_ManagerInit(EnFishmod* this, PlayState* play) {
     this->actor.room = -1;
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     // after the fish in the actor lists, so their culling is already worked out when the manager draws them
-    Actor_ChangeCategory(play, &play->actorCtx, &this->actor, ACTORCAT_MISC);
+    Actor_ChangeCategory(play, &play->actorCtx, &this->actor, ACTORCAT_FISHMGR);
     EnFishmod_WaterGridAcquire(play);
     EnFishmod_ScatterLoad(play);
     Manager_BuildRoster(play);
@@ -840,7 +840,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
 #endif
 
     // which fish, and how
-    for (actor = play->actorCtx.actorLists[ACTORCAT_NPC].head; actor != NULL; actor = actor->next) {
+    for (actor = play->actorCtx.actorLists[ACTORCAT_FISH].head; actor != NULL; actor = actor->next) {
         EnFishmod* fish = (EnFishmod*)actor;
         f32 dist;
         s32 close;

@@ -32,7 +32,12 @@ typedef enum ActorCategory {
     /* 0x09 */ ACTORCAT_BOSS,
     /* 0x0A */ ACTORCAT_DOOR,
     /* 0x0B */ ACTORCAT_CHEST,
-    /* 0x0C */ ACTORCAT_MAX
+    // fish-oot (frames12): the mod's fish, and then their manager (which draws them, after their culling is worked
+    // out), each in a list of its own: the Z-target search (sAttentionCategorySearchOrder) walks neither, and it
+    // read every fish's flags every frame to skip them (as NPCs)
+    /* 0x0C */ ACTORCAT_FISH,
+    /* 0x0D */ ACTORCAT_FISHMGR,
+    /* 0x0E */ ACTORCAT_MAX
 } ActorCategory;
 
 typedef void (*ActorFunc)(struct Actor*, struct PlayState*);
