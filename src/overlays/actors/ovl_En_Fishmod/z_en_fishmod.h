@@ -81,14 +81,34 @@ typedef void (*EnFishmodActionFunc)(struct EnFishmod*, struct PlayState*);
 
 typedef struct EnFishmod {
     /* 0x000 */ Actor actor;
+    // fish-oot (frames12): the fields the fish's code waits on most (the console profile's stalled loads), together
+    // right after the actor instead of across the struct: 3-4 cache lines where they were a dozen. Offsets in the
+    // comments are as before the move.
+    /* 0x351 */ u8 type;
+    /* 0x378 */ u8 fishState;   // FishmodFishState
+    /* 0x400 */ u8 rigReady;                       // the manager can draw it
+    /* 0x401 */ u8 drawnFull;                      // frames the full model was drawn lately (the swim wave runs while > 0)
+    /* 0x3CD */ u8 blocked;                        // the last SwimToward hit the shore (debug display)
+    /* 0x40E */ u8 look;                           // its own looks: EnFishmod_LookTable (saved with it in a bottle)
+    /* 0x352 */ s16 timer;
+    /* 0x37A */ s16 stateTimer;
+    /* 0x37C */ s16 cooldown;   // frames before it will look at the bobber again
+    /* 0x3F4 */ s16 restTimer;                     // wandering: frames left resting in place before moving on
+    /* 0x3D6 */ s16 escapeTimer;                   // frames left heading for `escape` to get unstuck
+    /* 0x3D4 */ s16 stuckTimer;                    // frames since the last stuck check
+    /* 0x260 */ const FishmodSpecies* species;
+    /* 0x398 */ f32 speed;
+    /* 0x3B4 */ f32 halfLength; // body size in world units, for keeping it inside the water
+    /* 0x3B8 */ f32 halfHeight;
+    /* 0x3A4 */ f32 waterY;     // water surface above it
+    /* 0x3A8 */ f32 floorY;     // floor below it
+    /* 0x268 */ f32 swimPhase;
+    /* 0x26C */ f32 swimPhaseStep;
     /* 0x14C */ SkelAnime skelAnime;
     /* 0x190 */ Vec3s jointTable[EN_FISHMOD_MAX_LIMBS + 1];
     /* 0x1F6 */ Vec3s morphTable[EN_FISHMOD_MAX_LIMBS + 1];
     /* 0x25C */ EnFishmodActionFunc actionFunc;
-    /* 0x260 */ const FishmodSpecies* species;
     /* 0x264 */ f32 lengthInches;
-    /* 0x268 */ f32 swimPhase;
-    /* 0x26C */ f32 swimPhaseStep;
     /* 0x270 */ f32 swimMag;     // tail beat amplitude (binary angle units)
     /* 0x274 */ s16 bodyYaw[4];  // per-segment yaw for the swim wave
     /* 0x27C */ s16 finYaw;      // pectoral fin flutter
@@ -96,44 +116,30 @@ typedef struct EnFishmod {
     /* 0x280 */ u8 limbParent[EN_FISHMOD_MAX_LIMBS]; // 0xFF for the root
     /* 0x290 */ Vec3f limbScale[EN_FISHMOD_MAX_LIMBS];
     /* 0x350 */ u8 limbCount;
-    /* 0x351 */ u8 type;
-    /* 0x352 */ s16 timer;
     /* 0x354 */ Vec3f headPos; // world position of the head, for whiskers and the hook
     /* 0x360 */ Vec3f boundsMin; // world bounds of the limb origins, from the last draw
     /* 0x36C */ Vec3f boundsMax;
     // fish AI
-    /* 0x378 */ u8 fishState;   // FishmodFishState
     /* 0x379 */ u8 nibblesLeft;
-    /* 0x37A */ s16 stateTimer;
-    /* 0x37C */ s16 cooldown;   // frames before it will look at the bobber again
     /* 0x37E */ s16 runYaw;     // direction it runs when hooked
     /* 0x380 */ Vec3f target;
     /* 0x38C */ Vec3f vel;
-    /* 0x398 */ f32 speed;
     /* 0x39C */ f32 stamina;    // fight stamina, counts down while it pulls
     /* 0x3A0 */ f32 staminaMax;
-    /* 0x3A4 */ f32 waterY;     // water surface above it
-    /* 0x3A8 */ f32 floorY;     // floor below it
     /* 0x3AC */ f32 interest;   // builds while it watches the bobber
     /* 0x3B0 */ s16 runTimer;
     /* 0x3B2 */ u8 jumping;
     /* 0x3B3 */ u8 beached;     // reeled up onto the bank: it counts as landed
-    /* 0x3B4 */ f32 halfLength; // body size in world units, for keeping it inside the water
-    /* 0x3B8 */ f32 halfHeight;
     /* 0x3BC */ u8 limbMode[EN_FISHMOD_MAX_LIMBS]; // EnFishmodLimbMode: the cheapest way to apply the part scales
     /* 0x3CC */ u8 lastTintPart;                   // during a draw: the part whose tint is currently set
-    /* 0x3CD */ u8 blocked;                        // the last SwimToward hit the shore (debug display)
     /* 0x3CE */ s16 detourYaw;                     // heading around a bank that was in the way
     /* 0x3D0 */ s16 detourTimer;                   // frames left to follow detourYaw
     /* 0x3D2 */ u8 runKind;                        // EnFishmodRunKind of the current or last run when hooked
     /* 0x3D3 */ u8 stuckLevel;                     // how many checks in a row found it not moving
-    /* 0x3D4 */ s16 stuckTimer;                    // frames since the last stuck check
-    /* 0x3D6 */ s16 escapeTimer;                   // frames left heading for `escape` to get unstuck
     /* 0x3D8 */ Vec3f stuckPos;                    // where it was at the last stuck check
     /* 0x3E4 */ Vec3f escape;                      // open water to head for when stuck
     /* 0x3F0 */ s16 lastYaw;                       // heading last frame, for bending the body into turns
     /* 0x3F2 */ s16 turnBend;                      // how hard the body is bent into the current turn
-    /* 0x3F4 */ s16 restTimer;                     // wandering: frames left resting in place before moving on
     /* 0x3F6 */ s8 startle;                        // frames left of a startled flick (sign: which way)
     /* 0x3F7 */ u8 fleeFromLink;                   // the current flee is away from Link (runYaw already set)
     /* 0x3F8 */ u8 thinkMask;                      // the AI runs on frames where (timer & thinkMask) == 0
@@ -141,14 +147,11 @@ typedef struct EnFishmod {
     /* 0x3FA */ u16 rosterIndex;                   // its record in the scene's roster, FISHMOD_NO_ROSTER if none
     /* 0x3FC */ s16 lastThink;                     // timer value when it last ran its AI
     /* 0x3FE */ s16 startleBend;                   // the C-bend of a startle (sign: which way), 0 otherwise
-    /* 0x400 */ u8 rigReady;                       // the manager can draw it
-    /* 0x401 */ u8 drawnFull;                      // frames the full model was drawn lately (the swim wave runs while > 0)
     /* 0x404 */ s32 waterCell;                     // the water grid cell waterY/floorY are for
     /* 0x408 */ u8 biteStruck;                     // the strike reached the bait (after the wind-up)
     /* 0x409 */ FishmodMood mood;                  // hunger and fear (kept in its roster record while away)
     /* 0x40C */ u16 leaderIndex;                   // roster record of its school's leader, FISHMOD_NO_ROSTER if it leads
                                                    // or is on its own
-    /* 0x40E */ u8 look;                           // its own looks: EnFishmod_LookTable (saved with it in a bottle)
     /* 0x410 */ f32 swimGain;                      // the tail beat's size on top of swimMag (small fish's bursts)
     u32 scentFrame;                                // the frame it last smelled bait in the water (EnFishmod_SmellBait)
 } EnFishmod;

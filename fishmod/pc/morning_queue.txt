@@ -9,6 +9,8 @@ releases/fish-oot-frames11b-noaffine.bps 12 noaffine
 releases/fish-oot-frames11b-oldfish.bps 12 oldfish
 releases/fish-oot-frames10.bps 12 frames10
 releases/fish-oot-frames11b.bps 12 frames11b-b
-# frames12 (less waiting on memory), twice
+# frames12 (less waiting on memory), and with the audio every two refreshes; each twice
 releases/fish-oot-frames12.bps 12 frames12-a
+releases/fish-oot-frames12-audio2.bps 12 frames12-audio2-a
 releases/fish-oot-frames12.bps 12 frames12-b
+releases/fish-oot-frames12-audio2.bps 12 frames12-audio2-b

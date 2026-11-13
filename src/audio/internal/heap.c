@@ -1005,7 +1005,14 @@ void AudioHeap_Init(void) {
     gAudioCtx.unk_2870 /= gAudioCtx.audioBufferParameters.aiSamplingFrequency;
     gAudioCtx.unk_2870 /= gAudioCtx.maxTempo;
 
+#ifdef FISHMOD_AUDIO_EVERY2
+    // fish-oot (frames12-audio2): the driver's own two-refresh mode for every spec (unused in vanilla, but the frame
+    // size, AI buffer limits, ticks a update, sample DMAs and reverbs all scale with it here): half the audio thread's
+    // wake-ups and RSP tasks, the same ticks; the sound up to a refresh (about 17 ms) later
+    gAudioCtx.audioBufferParameters.specUnk4 = 2;
+#else
     gAudioCtx.audioBufferParameters.specUnk4 = spec->unk_04;
+#endif
     gAudioCtx.audioBufferParameters.samplesPerFrameTarget *= gAudioCtx.audioBufferParameters.specUnk4;
     gAudioCtx.audioBufferParameters.maxAiBufferLength *= gAudioCtx.audioBufferParameters.specUnk4;
     gAudioCtx.audioBufferParameters.minAiBufferLength *= gAudioCtx.audioBufferParameters.specUnk4;

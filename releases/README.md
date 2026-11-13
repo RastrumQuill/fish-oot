@@ -12,7 +12,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 |---|---|---|
 | `fish-oot-qol7-testmode.bps`, `fish-oot-qol7-hw-testmode.bps` | The newest test build to play: the fish's new behaviour (schools, days, scent, learned baits) | [notes](notes-qol7.md) |
 | `fish-oot-stress3.bps` | The fish and plant stress benches judged by the screen (how many really hold 20 fps), on frames10's code | [notes](notes-stress3.md) |
-| `fish-oot-frames12.bps` | The bench route with less waiting on memory (actor lists, collision lists, audio channels, the fish manager) | [notes](notes-frames12.md) |
+| `fish-oot-frames12.bps`, `fish-oot-frames12-audio2.bps` | The bench route with less waiting on memory (actor lists and categories, collision lists, audio channels, the fish's fields, the fish manager); -audio2 with the audio every two refreshes | [notes](notes-frames12.md) |
 | `fish-oot-frames11b.bps` and `-oldsky`, `-noclaim`, `-nowall`, `-noaffine`, `-oldfish` | frames11 bisected: each leaves one change out, to find what made the CPU slower | [notes](notes-frames11b.md) |
 | `fish-oot-frames10.bps` | The bench route: Guays and Tektites check collision less while idle and far, the fish manager's travel without raycasts | [notes](notes-frames10.md) |
 

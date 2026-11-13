@@ -20,7 +20,20 @@ worst with their source lines.
 - **The bench**: the heaps' use sampled every 32nd frame (a walk of every block, every frame: it inflated the CPU
   times of every bench so far a little).
 
-Not yet: the props' and the fish's own data (spread thin over many fields: for the layout tool, which learns which
-fields are read together from recorded accesses), and the actor framework's Z-target search over the fish.
+- **The fish and their manager in actor lists of their own** (ACTORCAT_FISH, ACTORCAT_FISHMGR, after the others):
+  the Z-target search no longer walks the fish (it read every fish's flags each frame to skip them). The manager still
+  updates and draws after the fish; the fish now update after the other actors rather than among the NPCs (a change
+  in order, not in what they do).
+- **The fish's hot fields together**: the 20 fields the fish code waits on most (state, timers, flags, species,
+  speed, sizes, water heights, swim phase) moved right after the actor, 3-4 cache lines where they were a dozen.
+- **The props**: looked at and left as they are: 12-byte records already in chunk-and-kind order, the distance test
+  reading only what it needs; their remaining waits are the records streaming in, which only drawing fewer props
+  shrinks.
+
+**`fish-oot-frames12-audio2.bps`**: the same, with the audio driver's own two-refresh mode (`-DFISHMOD_AUDIO_EVERY2`:
+the spec's `unk_04` forced to 2; unused in vanilla, but the frame size, AI buffer limits, ticks per update, sample
+DMAs and reverbs all scale with it in the driver). Half the audio thread's wake-ups and RSP tasks, the same ticks; the
+sound up to a refresh (about 17 ms) later. Not bit-exact by design (game sounds start on the next audio frame): listen
+for anything off. Three refreshes doesn't fit the AI buffers (1,600 samples against 1,408).
 
 Compare with frames11b (the bisection, same queue): the CPU's update and draw, and `inst_profile.py --stalls` on both.
