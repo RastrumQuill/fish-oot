@@ -82,6 +82,7 @@ static u8 Fishmod_SwordBItem(void) {
 
 FishmodPhoto gFishmodPhoto;
 FishmodStudio gFishmodStudio;
+FishmodAnimCheck gFishmodAnimCheck;
 FishmodRodInfo gFishmodRodInfo;
 
 const FishmodSceneSpawns* Fishmod_GetSceneSpawns(s16 sceneId) {

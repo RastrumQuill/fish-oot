@@ -12130,6 +12130,12 @@ void Player_Update(Actor* thisx, PlayState* play) {
     STACK_PAD(s32);
     Input input;
 
+#if FISHMOD_DEBUG
+    if (FISHMOD_ANIMCHECK_ON && Fishmod_AnimCheckPlayerUpdate(this, play)) {
+        return; // the animation check holds Link still and poses him itself (fishmod_debug.c)
+    }
+#endif
+
 #if DEBUG_FEATURES
     if (!Player_UpdateNoclip(this, play)) {
         goto skip_update;

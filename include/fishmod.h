@@ -204,6 +204,28 @@ extern FishmodStudio gFishmodStudio;
 #define FISHMOD_STUDIO_ON 0
 #endif
 
+// The animation check (debug, fishmod/scripts/animcheck.inc.c; fishmod/docs/anim-verify.md): Link held still and posed
+// by the harness, one case a frame, his drawing walked and hashed (fishmod_debug_animcheck.inc.c). Used with
+// gFishmodPhoto.active (only Link is drawn).
+typedef struct FishmodAnimCheck {
+    /* 0x00 */ u8 active;
+    /* 0x04 */ void* opaStart; // (Gfx*) where Link's commands start in this frame's lists
+    /* 0x08 */ void* xluStart;
+} FishmodAnimCheck;
+
+extern FishmodAnimCheck gFishmodAnimCheck;
+
+#if FISHMOD_DEBUG
+#define FISHMOD_ANIMCHECK_ON (gFishmodAnimCheck.active)
+#else
+#define FISHMOD_ANIMCHECK_ON 0
+#endif
+struct Player;
+struct Actor;
+s32 Fishmod_AnimCheckPlayerUpdate(struct Player* player, struct PlayState* play);
+void Fishmod_AnimCheckDrawBegin(struct PlayState* play);
+void Fishmod_AnimCheckDrawEnd(struct PlayState* play, struct Actor* actor);
+
 // Rod status published every frame by the fishing controller (for the debug auto-angler and the HUD)
 typedef struct FishmodRodInfo {
     /* 0x00 */ u8 state;  // FishmodRodState

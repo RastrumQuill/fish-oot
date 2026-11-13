@@ -228,6 +228,18 @@ static FishmodScript sScript = {
 
 #include "fishmod_debug_studio.inc.c" // the animation studio (FISHMOD_ANIM_STUDIO)
 
+// The animation check's hooks (fishmod/docs/anim-verify.md): the harness itself is being written; until then Link is
+// never held (gFishmodAnimCheck.active is only set by the animcheck script)
+s32 Fishmod_AnimCheckPlayerUpdate(Player* player, PlayState* play) {
+    return false;
+}
+
+void Fishmod_AnimCheckDrawBegin(PlayState* play) {
+}
+
+void Fishmod_AnimCheckDrawEnd(PlayState* play, Actor* actor) {
+}
+
 Vec3f gFishmodDebugFocus;
 FishmodLodTest gFishmodLodTest;
 #ifdef FISHMOD_VIEW_SCHOOL

@@ -3081,7 +3081,8 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
             if (!DEBUG_FEATURES || (HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(71) == 0)) {
                 if ((actor->init == NULL) && (actor->draw != NULL) &&
                     (actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) &&
-                    (!FISHMOD_PHOTO_ON || (actor->id == ACTOR_EN_FISHMOD))) {
+                    (!FISHMOD_PHOTO_ON || (actor->id == ACTOR_EN_FISHMOD) ||
+                     (FISHMOD_ANIMCHECK_ON && (actor->id == ACTOR_PLAYER)))) {
                     if ((actor->flags & ACTOR_FLAG_REACT_TO_LENS) &&
                         ((play->roomCtx.curRoom.lensMode == LENS_MODE_SHOW_ACTORS) || play->actorCtx.lensActive ||
                          (actor->room != play->roomCtx.curRoom.num))) {
@@ -3095,6 +3096,14 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
 #if FISHMOD_DEBUG
                             if (actor->id == ACTOR_EN_FISHMOD) {
                                 FISHMOD_PROF(FISHMOD_PROF_D_ENGINE, Actor_Draw(play, actor));
+                            } else
+#endif
+#if FISHMOD_DEBUG
+                            if (FISHMOD_ANIMCHECK_ON && (actor->id == ACTOR_PLAYER)) {
+                                // the animation check: Link's commands walked and hashed (fishmod_debug.c)
+                                Fishmod_AnimCheckDrawBegin(play);
+                                Actor_Draw(play, actor);
+                                Fishmod_AnimCheckDrawEnd(play, actor);
                             } else
 #endif
                             {
