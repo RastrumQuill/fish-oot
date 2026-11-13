@@ -41,6 +41,11 @@ not started; **on hold** = waiting on a decision.
 
 ## Places to measure, by the engine system they load
 
+Order (13 Nov): the animation harness first, then the spots bench. The spots bench runs first on a **control**: a build
+as close to the original ROM as can be (the game's own code and assets, only the frame log and the spots script
+added: none of fish-oot's changes), to have the original game's numbers at each place; then every engine change is
+validated against that control, once Lake Hylia is done.
+
 Not a whole-game profile: a "spots" bench (one ROM, one power cycle) that warps to each place, walks a short fixed
 path for ~30 seconds and tags the frame log and profile by place, to see which engine system costs most where, and
 then whether an engine-wide improvement (a faster particle system, actor update, skeleton draw...) makes each run
