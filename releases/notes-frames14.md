@@ -1,5 +1,24 @@
 # frames14
 
+**frames14c and frames13r (13 November, evening).** Why frames14b had more hitches than frames13 (29.9% against
+23.1%), found in the frame log's RDP counters and in ares:
+
+- **Texture loading, every leg: +0.45 ms a frame** (the RDP's TMEM-busy counter, 3.1 to 3.56 ms). The terrain cut
+  into areas replayed, before each area's triangles, every state command of the piece before them, every texture
+  load included: 48 loads where the piece had 13. frames14c cuts by texture instead: the piece's own list loads each
+  texture once, as the original, and calls each area's triangles under it (each area still culled on its own by its
+  box). Back to 13 loads and 16 pipe syncs; ares: the same frame costs what frames13's does (1.86 ms of loads and
+  syncs by the console's calibration, against frames14b's 2.41); the tour's 22 stops the same picture as without the
+  mesh pack (mean shift -0.04 of a step).
+- **Legs 3 and 4: +3 to +5 ms of RDP drawing, but another scene.** The bench seeded the game's random numbers once;
+  how many a frame draws depends on timing, so a build that runs at another speed shifts every number after it. A
+  Tektite then hops elsewhere and meets Link elsewhere: in frames14 it came up to the camera (big triangles to fill)
+  and Link's path changed. ares: the same ROM run twice already differed by frame 100. The bench now reseeds the
+  numbers every frame from the frame's number: two runs of one ROM keep Link in the same place through leg 3 and
+  draw the same picture but for a few ripples. frames13's earlier runs can't be compared with the new ones: frames13r
+  is frames13's drawing (no mesh pack, no rig cleanup) on the new bench, as the control.
+
+
 **Rebuilt 13 November (frames14b, the same name):** the first frames14 run lit the terrain on the CPU every frame
 (6.6 ms of CPU draw, 44% hitches against frames13-sound's 23%): its "did the lights change" check compared the
 lights' padding, which isn't cleared each frame. Now only the bytes that light a vertex are compared, a small change

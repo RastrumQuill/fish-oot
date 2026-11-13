@@ -1,3 +1,5 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# One run: frames14b (frames14 with the CPU lighting computed only when the lights change), about 4 minutes.
-releases/fish-oot-frames14.bps 12 frames14b
+# Two runs, about 4 minutes each, on the bench with the game's random numbers reseeded every frame (the same scene in
+# every build): frames13r (the control: frames13's drawing) then frames14c (the lake terrain cut by texture, the rig cleaned).
+releases/fish-oot-frames13r.bps 12 frames13r
+releases/fish-oot-frames14c.bps 12 frames14c
