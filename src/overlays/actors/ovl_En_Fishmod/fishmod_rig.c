@@ -598,6 +598,26 @@ static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
                 // other bone once with all its runs (A B A B was four matrix loads, now two). Every vertex still
                 // goes to its own slot under its own bone's matrix: the same vertices, the same picture.
                 bzero(done, sizeof(done));
+#ifdef FISHMOD_OLD_RIGLOADS // (console bisection: the runs in their order, a matrix at every bone change)
+                for (a = 0; a < load->n;) {
+                    s32 bone = base->vtxBone[load->dst + a];
+                    s32 b = a + 1;
+
+                    while ((b < load->n) && (base->vtxBone[load->dst + b] == bone)) {
+                        b++;
+                    }
+                    if (bone != curBone) {
+                        gSPMatrix(out++, SEGMENT_ADDR(RIG_SEG_MTX, bone * sizeof(Mtx)),
+                                  G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+                        curBone = bone;
+                    }
+                    gSPVertex(out++, SEGMENT_ADDR(RIG_SEG_VTX, (load->dst + a) * sizeof(Vtx)), b - a, v0 + a);
+                    a = b;
+                }
+                if (true) {
+                    continue;
+                }
+#endif
                 while (true) {
                     s32 bone = -1;
 

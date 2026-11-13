@@ -12,7 +12,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 |---|---|---|
 | `fish-oot-qol7-testmode.bps`, `fish-oot-qol7-hw-testmode.bps` | The newest test build to play: the fish's new behaviour (schools, days, scent, learned baits) | [notes](notes-qol7.md) |
 | `fish-oot-stress3.bps` | The fish and plant stress benches judged by the screen (how many really hold 20 fps), on frames10's code | [notes](notes-stress3.md) |
-| `fish-oot-frames11.bps`, `fish-oot-frames11-norun.bps` | The bench route: sky and clears, collision and matrices, the fish's list and edges, press-to-picture latency; with and without run-ahead | [notes](notes-frames11.md) |
+| `fish-oot-frames11b.bps` and `-oldsky`, `-noclaim`, `-nowall`, `-noaffine`, `-oldfish` | frames11 bisected: each leaves one change out, to find what made the CPU slower | [notes](notes-frames11b.md) |
 | `fish-oot-frames10.bps` | The bench route: Guays and Tektites check collision less while idle and far, the fish manager's travel without raycasts | [notes](notes-frames10.md) |
 
 The bench patches are run by `fishmod\pc\morning.bat` (see `fishmod/pc/MORNING.md`).

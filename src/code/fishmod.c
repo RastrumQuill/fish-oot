@@ -1545,6 +1545,10 @@ static void Fishmod_ClaimArena(TwoHeadGfxArena* arena, u32* claimed) {
 void Fishmod_ClaimDisplayLists(GraphicsContext* gfxCtx) {
     static u32 sClaimed[3];
 
+#ifdef FISHMOD_NO_DLCLAIM // (console bisection: frames11's display-list claims left out)
+    return;
+#endif
+
     Fishmod_ClaimArena(&gfxCtx->polyOpa, &sClaimed[0]);
     Fishmod_ClaimArena(&gfxCtx->polyXlu, &sClaimed[1]);
     Fishmod_ClaimArena(&gfxCtx->overlay, &sClaimed[2]);

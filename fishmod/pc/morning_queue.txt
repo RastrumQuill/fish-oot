@@ -1,8 +1,11 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# The short bench (one lap, clear dawn, legs 1-11 and 21, about 4 minutes; it ends itself).
-# frames11 with and without run-ahead, against frames10.
-releases/fish-oot-frames11.bps 12 frames11-a
-releases/fish-oot-frames11-norun.bps 12 frames11-norun-a
+# The short bench (one lap, clear dawn, legs 1-11 and 21, about 4 minutes; it ends itself, then halts).
+# frames11b: frames11 bisected (each leaves one change out), against frames11b whole and frames10.
+releases/fish-oot-frames11b.bps 12 frames11b-a
+releases/fish-oot-frames11b-oldsky.bps 12 oldsky
+releases/fish-oot-frames11b-noclaim.bps 12 noclaim
+releases/fish-oot-frames11b-nowall.bps 12 nowall
+releases/fish-oot-frames11b-noaffine.bps 12 noaffine
+releases/fish-oot-frames11b-oldfish.bps 12 oldfish
 releases/fish-oot-frames10.bps 12 frames10
-releases/fish-oot-frames11.bps 12 frames11-b
-releases/fish-oot-frames11-norun.bps 12 frames11-norun-b
+releases/fish-oot-frames11b.bps 12 frames11b-b

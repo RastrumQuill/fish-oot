@@ -874,7 +874,21 @@ static void PcProf_Update(void) {
         if (sPcStopped) {
             user[3] = 1;
             if (sPcSending == NULL) {
+                static s32 sSinceDone;
+
                 Fishmod_DebugPrintf(5, "pcprof usb: DONE, %u packets: stop sc64deployer", sPcPackets);
+                if (sDoneSaid && (++sSinceDone >= 20) && !Sc64_UsbBusy()) {
+                    // A second after DONE the game stops itself for good, interrupts off, touching nothing: the
+                    // morning runner uploads the next ROM into the cart while this one is still on, and a game still
+                    // running reads the new ROM's bytes as its own (the frozen last frame of 12 Nov's runs). Now the
+                    // picture stops here on purpose; switch the console off when the runner says.
+                    Sc64_UsbText("FISHMOD-HALTED (the run is over: the picture stays until the console is switched off)\n");
+                    for (sSinceDone = 0; (sSinceDone < 100000) && Sc64_UsbBusy(); sSinceDone++) {
+                    }
+                    __osDisableInt();
+                    while (true) {
+                    }
+                }
                 if (!sDoneSaid && !Sc64_UsbBusy()) { // (for fishmod/tools/morning: the run is over)
                     sDoneSaid = true;
 #ifdef FISHMOD_FRAMELOG

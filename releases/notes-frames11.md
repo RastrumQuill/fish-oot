@@ -45,3 +45,21 @@ Both on frames10 (see [its notes](notes-frames10.md)) plus:
 **Not in it: the batched audio (S7).** The game's sound effects would start up to two refreshes later (not provable
 with the audio check), and the audio frames would have to triple in length (the audio heap's output, reverb and DMA
 buffers resized): too much risk to ride in this build. It comes as its own build after this one.
+
+## Results (console, 12 Nov, run 20261112-1748: frames11 and -norun twice each, frames10 between)
+
+| | on screen | hitches | RDP (slow frames) | CPU update | CPU draw | press to picture |
+|---|---|---|---|---|---|---|
+| frames10 | 18.40 fps | 26% | 48.8 ms | 23.8 | 23.7 | (not measured) |
+| frames11 (x2) | 18.21-18.29 | 30-31% | 46.4 | 25.6 | 26.7 | 121 ms mean, 140 ms 90% |
+| frames11-norun (x2) | 18.30-18.38 | 28-29% | 46.1 | 26.0 | 26.5 | 120 ms mean, 132 ms 90% |
+
+- The graphics items took about 2.4 ms off the RDP in the slow frames (estimated 3-5).
+- The CPU got 4-5 ms slower: nearly every actor's update 5-15% slower at the same counts (the actor report), Link's
+  collision 15% slower despite the wall bound. Something global (code layout in the instruction cache, or memory
+  traffic): frames11b bisects it.
+- Run-ahead buys nothing now: no picture ever waited behind another (0%), the latency is the same (121 against 120 ms),
+  and the hitches no fewer.
+- The runs froze in their last seconds: not the game's fault. The runner uploads the next ROM into the cart while the
+  finished game still runs, and the game reads the new ROM's bytes as its own (the last run of a queue never froze:
+  nothing after it). From frames11b on, the game halts itself a second after DONE.

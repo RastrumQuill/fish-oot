@@ -1187,6 +1187,11 @@ void Play_DrawOverlayElements(PlayState* this) {
 }
 
 // fish-oot: the frame's buffer clears (z_rcp.c's Gfx_SetupFrame)
+#ifdef FISHMOD_OLD_SKY
+#define FISHMOD_OLD_SKY_ON 1
+#else
+#define FISHMOD_OLD_SKY_ON 0
+#endif
 extern Gfx* gFishmodColorFill;
 extern s32 gFishmodZClearByRsp;
 extern u8* gFishmodZClear;
@@ -1235,7 +1240,9 @@ void Play_Draw(PlayState* this) {
 
     gFishmodColorFill = NULL;
 #if ENABLE_F3DEX3
+#ifndef FISHMOD_OLD_SKY // (console bisection: frames11's sky and clears left out)
     gFishmodZClearByRsp = !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY_Z); // (the Z clear by the RSP, after the sky)
+#endif
 #endif
     if (FISHMOD_NO_SKY()) {
         Gfx_SetupFrame(gfxCtx, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2]);
@@ -1351,7 +1358,7 @@ void Play_Draw(PlayState* this) {
                     // fish-oot: at Lake Hylia the sky and the scene cover the whole screen, and the sky's render mode
                     // reads nothing back: the colour clear under it changes nothing (and costs the RDP 0.9 ms)
                     if ((this->sceneId == SCENE_LAKE_HYLIA) && (gFishmodColorFill != NULL) &&
-                        !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY_FILL)) {
+                        !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY_FILL) && !FISHMOD_OLD_SKY_ON) {
                         Gfx noop = gsDPNoOp();
 
                         *gFishmodColorFill = noop;

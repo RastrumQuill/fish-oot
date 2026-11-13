@@ -92,7 +92,11 @@ void Skybox_Draw(SkyboxContext* skyboxCtx, GraphicsContext* gfxCtx, s16 skyboxId
                 }
             }
         }
-    } else if ((blend == 0) && (gFishmodSkyOneTex != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY_1CYC)) {
+    } else if ((blend == 0) && (gFishmodSkyOneTex != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_OLDSKY_1CYC)
+#ifdef FISHMOD_OLD_SKY
+               && false
+#endif
+    ) {
         // fish-oot: not blending two skies: 1-cycle, one texture (the same picture: see gFishmodSkyOneTex)
         gDPPipeSync(POLY_OPA_DISP++);
         gDPSetCycleType(POLY_OPA_DISP++, G_CYC_1CYCLE);
