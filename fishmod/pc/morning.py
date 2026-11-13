@@ -316,7 +316,8 @@ def verify_upload(deployer, rom_path, log_path):
 
 # --- one run ---
 
-def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
+def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first, power=None):
+    """power: something with cycle() (lab.py's smart plug): the console switched off and on by it instead of by hand."""
     folder = os.path.join(stamp_dir, "%02d-%s" % (n, label))
     os.makedirs(folder, exist_ok=True)
     info = {"run": n, "label": label, "patch": os.path.relpath(patch, ROOT) if patch.startswith(ROOT) else patch,
@@ -369,7 +370,11 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
     dbg = Debug(deployer, folder, spool)
     try:
         wait = START_SECONDS
-        if not SOFT_REBOOT:
+        if not SOFT_REBOOT and power is not None:
+            log("  the plug: the console off and on")
+            power.cycle()
+            info["power_cycled"] = True
+        elif not SOFT_REBOOT:
             # (the console restarted by hand, from off: the software reboot left it unsteady, 12 Nov 2026)
             beep()
             log("  >>> Switch the console OFF, then ON, to start the new ROM <<<")

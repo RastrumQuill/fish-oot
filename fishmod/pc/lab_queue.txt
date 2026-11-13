@@ -1,0 +1,2 @@
+# The lab's queue (fishmod/pc/lab.py, read from the lab branch): ID PATCH [MINUTES] [LABEL] a line.
+# Each ID is run once; lines stay as a record (a new run needs a new ID). Only .bps patches under releases/.

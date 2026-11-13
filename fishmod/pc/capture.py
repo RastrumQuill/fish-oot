@@ -27,7 +27,9 @@ shows the picture).
 The frame analyzer: the card sends every refresh; a refresh whose picture differs from the one before (beyond the
 card's own noise, which it learns) is a new picture from the game. The time between two new pictures is counted in
 refreshes (the card's timestamps wobble with USB; the refresh count doesn't), times the refresh period it measures.
-A still scene (a menu, a pause) reads as a slow frame: it can't tell a picture that didn't change from a repeat.
+A still scene (a menu, a pause) reads as a slow frame: it can't tell a picture that didn't change from a repeat. A
+change on the refresh straight after another counts as the same picture (cheap cards send a blend of the old and new
+pictures between them).
 
 Low delay: the video is read on its own thread, keeping only the newest picture (older ones are dropped, never
 queued); the window draws whatever is newest. The sound goes from the capture card's input to the speakers in small
@@ -149,6 +151,7 @@ class FrameAnalyzer:
 
         self.collections = collections
         self.prev = None
+        self.prev_changed = False
         self.last_t = None
         self.periods = collections.deque(maxlen=600)  # the card's frame-to-frame times (for the refresh period)
         self.diffs = collections.deque(maxlen=240)  # recent differences (for the noise floor)
@@ -188,7 +191,12 @@ class FrameAnalyzer:
         self.diffs.append(d)
         # the noise floor: the quietest differences lately (a repeated picture's are just the card's noise)
         floor = sorted(self.diffs)[len(self.diffs) // 10] if len(self.diffs) >= 20 else 0.0
-        new = d > max(3 * floor, floor + 0.6)
+        changed = d > max(3 * floor, floor + 0.6)
+        # a change straight after another (one refresh apart) is the same new picture: cheap cards send an in-between
+        # frame, the old and new pictures blended, then the new one (and the game never shows a picture for just one
+        # refresh)
+        new = changed and not self.prev_changed
+        self.prev_changed = changed
         with self.lock:
             self.since_new += refreshes
             if new:
