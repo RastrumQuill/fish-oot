@@ -189,6 +189,18 @@ typedef struct Actor {
     /* 0x002 */ u8 category; // Actor category. Refer to the corresponding enum for values
     /* 0x003 */ s8 room; // Room number the actor is in. -1 denotes that the actor won't despawn on a room change
     /* 0x004 */ u32 flags; // Flags used for various purposes
+    // fish-oot (frames12): the list links and the routines moved up from 0x120-0x137 to here, so every walk over the
+    // actor lists (update, draw, attention: three a frame) finds id, flags, the next actor and the routines in the
+    // first two 16-byte cache lines instead of three apart (they were half of those loops' waiting on memory). The
+    // offsets in the comments below are as before the move (everything from home on is 24 bytes later).
+#ifndef FISHMOD_OLD_ACTOR_LAYOUT // (the check that it changes nothing: the collision logs with and without)
+    /* 0x008 */ struct Actor* prev; // Previous actor of this category
+    /* 0x00C */ struct Actor* next; // Next actor of this category
+    /* 0x010 */ ActorFunc init; // Initialization Routine. Called by `Actor_Init` or `Actor_UpdateAll`
+    /* 0x014 */ ActorFunc destroy; // Destruction Routine. Called by `Actor_Destroy`
+    /* 0x018 */ ActorFunc update; // Update Routine. Called by `Actor_UpdateAll`
+    /* 0x01C */ ActorFunc draw; // Draw Routine. Called by `Actor_Draw`
+#endif
     /* 0x008 */ PosRot home; // Initial position/rotation when spawned. Can be used for other purposes
     /* 0x01C */ s16 params; // Configurable variable set by the actor's spawn data; original name: "args_data"
     /* 0x01E */ s8 objectSlot; // Object slot (in ObjectContext) corresponding to the actor's object; original name: "bank"
@@ -233,12 +245,14 @@ typedef struct Actor {
     /* 0x117 */ u8 naviEnemyId; // Sets what 0600 dialog to display when talking to navi. Default 0xFF
     /* 0x118 */ struct Actor* parent; // Usage is actor specific. Set if actor is spawned via `Actor_SpawnAsChild`
     /* 0x11C */ struct Actor* child; // Usage is actor specific. Set if actor is spawned via `Actor_SpawnAsChild`
+#ifdef FISHMOD_OLD_ACTOR_LAYOUT
     /* 0x120 */ struct Actor* prev; // Previous actor of this category
     /* 0x124 */ struct Actor* next; // Next actor of this category
     /* 0x128 */ ActorFunc init; // Initialization Routine. Called by `Actor_Init` or `Actor_UpdateAll`
     /* 0x12C */ ActorFunc destroy; // Destruction Routine. Called by `Actor_Destroy`
     /* 0x130 */ ActorFunc update; // Update Routine. Called by `Actor_UpdateAll`
     /* 0x134 */ ActorFunc draw; // Draw Routine. Called by `Actor_Draw`
+#endif
     /* 0x138 */ struct ActorOverlay* overlayEntry; // Pointer to the overlay table entry for this actor
 #if DEBUG_FEATURES
     /* 0x13C */ char dbgPad[0x10];

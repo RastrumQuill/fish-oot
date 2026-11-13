@@ -262,6 +262,29 @@ s32 AudioSeq_HandleScriptFlowControl(SequencePlayer* seqPlayer, SeqScriptState* 
 }
 
 /**
+ * fish-oot (frames12): a channel switched on or off, mirrored in its player's fishmodChannelsOn, so the player's update
+ * (effects.c) visits its enabled channels without reading the other ones' structs (a cache miss each: up to 16 a
+ * player an update). Every write of a channel's enabled goes with one of these.
+ */
+static void AudioSeq_FishmodChannelOn(SequenceChannel* channel, s32 on) {
+    SequencePlayer* seqPlayer = channel->seqPlayer;
+    s32 i;
+
+    if ((channel == &gAudioCtx.sequenceChannelNone) || (seqPlayer == NULL)) {
+        return;
+    }
+    for (i = 0; i < SEQ_NUM_CHANNELS; i++) {
+        if (seqPlayer->channels[i] == channel) {
+            if (on) {
+                seqPlayer->fishmodChannelsOn |= (1 << i);
+            } else {
+                seqPlayer->fishmodChannelsOn &= ~(1 << i);
+            }
+        }
+    }
+}
+
+/**
  * original name: Nas_InitSubTrack
  */
 void AudioSeq_InitSequenceChannel(SequenceChannel* channel) {
@@ -272,6 +295,7 @@ void AudioSeq_InitSequenceChannel(SequenceChannel* channel) {
     }
 
     channel->enabled = false;
+    AudioSeq_FishmodChannelOn(channel, false);
     channel->finished = false;
     channel->stopScript = false;
     channel->muted = false;
@@ -315,7 +339,7 @@ void AudioSeq_InitSequenceChannel(SequenceChannel* channel) {
         channel->seqScriptIO[i] = SEQ_IO_VAL_NONE;
     }
 
-    channel->unused = false;
+    channel->fishmodLayerInit = false;
     Audio_InitNoteLists(&channel->notePool);
 }
 
@@ -409,6 +433,7 @@ void AudioSeq_SequenceChannelDisable(SequenceChannel* channel) {
 
     Audio_NotePoolClear(&channel->notePool);
     channel->enabled = false;
+    AudioSeq_FishmodChannelOn(channel, false);
     channel->finished = true;
 }
 
@@ -453,6 +478,7 @@ void AudioSeq_SequenceChannelEnable(SequencePlayer* seqPlayer, u8 channelIndex, 
     s32 i;
 
     channel->enabled = true;
+    seqPlayer->fishmodChannelsOn |= (1 << channelIndex); // (fish-oot: see AudioSeq_FishmodChannelOn)
     channel->finished = false;
     channel->scriptState.depth = 0;
     channel->scriptState.pc = script;
@@ -2216,6 +2242,7 @@ void AudioSeq_InitSequencePlayerChannels(s32 playerIdx) {
     s32 i;
     s32 j;
 
+    seqPlayer->fishmodChannelsOn = 0; // (fish-oot: none yet)
     for (i = 0; i < SEQ_NUM_CHANNELS; i++) {
         seqPlayer->channels[i] = AudioHeap_AllocZeroed(&gAudioCtx.miscPool, sizeof(SequenceChannel));
         if (seqPlayer->channels[i] == NULL) {
@@ -2224,6 +2251,7 @@ void AudioSeq_InitSequencePlayerChannels(s32 playerIdx) {
             channel = seqPlayer->channels[i];
             channel->seqPlayer = seqPlayer;
             channel->enabled = false;
+            seqPlayer->fishmodChannelsOn &= ~(1 << i);
             for (j = 0; j < ARRAY_COUNT(channel->layers); j++) {
                 channel->layers[j] = NULL;
             }

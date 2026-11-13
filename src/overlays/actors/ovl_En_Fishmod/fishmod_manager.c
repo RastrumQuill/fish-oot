@@ -163,6 +163,8 @@ static u32 Roster_Seed(PlayState* play, s32 slot) {
 }
 
 static void Manager_PlanDays(PlayState* play, FishmodRng* rng);
+static void Manager_FindSchools(void);
+static s32 sSchoolCount;
 
 static void Manager_BuildRoster(PlayState* play) {
     FishmodRng rng;
@@ -175,6 +177,7 @@ static void Manager_BuildRoster(PlayState* play) {
     s32 n;
 
     sRosterCount = 0;
+    sSchoolCount = 0; // (none until this roster's are found: a scene without fish keeps none)
     if ((spawns == NULL) || (numBoxes == 0) || FISHMOD_PHOTO_ON) {
         return;
     }
@@ -293,6 +296,7 @@ static void Manager_BuildRoster(PlayState* play) {
         }
     }
     Manager_PlanDays(play, &rng);
+    Manager_FindSchools();
     gFishmodRngNow = &gFishmodRng;
 }
 
@@ -378,18 +382,46 @@ static void Roster_SpawnSpot(PlayState* play, FishmodRosterFish* rec) {
  * rest). A fish that's off at the bobber, hooked or caught isn't with its school; the next one leads the rest, and
  * it rejoins when it's free again. So a school is never caught whole: only the fish that took the bait.
  */
-static void Manager_UpdateSchools(void) {
+#define SCHOOLS_MAX 128
+static u16 sSchoolFirst[SCHOOLS_MAX]; // each school's records: sSchoolFirst[n] up to sSchoolEnd[n] (made with the roster)
+static u16 sSchoolEnd[SCHOOLS_MAX];
+
+/** The schools' record ranges, once the roster is made (a school's records are together, its first one leading). */
+static void Manager_FindSchools(void) {
     s32 i = 0;
 
+    sSchoolCount = 0;
     while (i < sRosterCount) {
         s32 end = i + 1;
-        s32 lead = -1;
-        s32 k;
 
         while ((end < sRosterCount) && (sRoster[end].leader == i)) {
             end++;
         }
-        if (end - i > 1) {
+        if ((end - i > 1) && (sSchoolCount < SCHOOLS_MAX)) {
+            sSchoolFirst[sSchoolCount] = i;
+            sSchoolEnd[sSchoolCount] = end;
+            sSchoolCount++;
+        }
+        i = end;
+    }
+}
+
+static void Manager_UpdateSchools(void) {
+    s32 n;
+
+    // (frames12: from the schools' ranges, not a walk of the whole roster every frame (300 records, the data cache's
+    // size and more: the manager's update was 70% waiting on memory), and every 4th frame: a school's lead changes
+    // hands a few frames later at most)
+    if ((sRosterClock & 3) != 0) {
+        return;
+    }
+    for (n = 0; n < sSchoolCount; n++) {
+        s32 i = sSchoolFirst[n];
+        s32 end = sSchoolEnd[n];
+        s32 lead = -1;
+        s32 k;
+
+        {
             for (k = i; k < end; k++) {
                 EnFishmod* fish = sRoster[k].fish;
 
@@ -405,7 +437,6 @@ static void Manager_UpdateSchools(void) {
                 }
             }
         }
-        i = end;
     }
 }
 
@@ -698,6 +729,7 @@ void EnFishmod_ManagerDestroy(EnFishmod* this, PlayState* play) {
         sRoster[i].fish = NULL;
     }
     sRosterCount = 0;
+    sSchoolCount = 0;
     EnFishmod_RigFreeAll();
     EnFishmod_ScatterUnload();
     EnFishmod_WaterGridRelease(play);

@@ -926,7 +926,15 @@ static void Fishmod_DebugTiming(void) {
 #ifdef FISHMOD_BENCH_AREA
     AreaBench_Sample();
 #endif
-    Fishmod_MemSample();
+    {
+        // (every 32nd frame: each walks both heaps' blocks, a chain of cache misses, and it's only the run's lowest
+        // free memory for gdb; every frame it inflated the benches' CPU times)
+        static u32 sMemFrame;
+
+        if ((sMemFrame++ & 31) == 0) {
+            Fishmod_MemSample();
+        }
+    }
 #ifdef FISHMOD_PCPROF
     PcProf_FrameEnd(); // (before the frame's sections are cleared)
 #endif

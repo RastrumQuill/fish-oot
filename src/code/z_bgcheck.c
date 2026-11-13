@@ -1,6 +1,7 @@
 #include "fishmod.h"
 #include "fishmod_tri.h"
 #include "ultra64/libc.h"
+#include "libc64/malloc.h"
 #include "libu64/debug.h"
 #include "array_count.h"
 #include "attributes.h"
@@ -1899,6 +1900,62 @@ typedef struct BgCheckSceneSubdivisionEntry {
 /**
  * Allocate CollisionContext
  */
+/**
+ * fishmod (frames12): the static lookup's lists made contiguous. Each cell's floor, wall and ceiling lists are linked
+ * lists of nodes, allocated as the polys were inserted into every cell in turn, so walking one cell's list jumped
+ * across the node table: about a cache miss a node, before the poly's own record (the floor search was 58% waiting on
+ * memory). Here every list's nodes are copied, in their order, into consecutive slots, the links renumbered: the same
+ * lists in the same order (the same answers: fishmod/tools/collog.sh, FISHMOD_NO_COMPACT_LISTS), four nodes a cache
+ * line. Done once, as the scene's collision is set up; a temporary copy of the table from the system heap (skipped,
+ * as before, if there's no room).
+ */
+static void BgCheck_CompactStaticLists(CollisionContext* colCtx) {
+    SSNodeList* nodes = &colCtx->polyNodes;
+    s32 count = nodes->count;
+    s32 cells = colCtx->subdivAmount.x * colCtx->subdivAmount.y * colCtx->subdivAmount.z;
+    SSNode* old;
+    s32 out = 0;
+    s32 c;
+
+    if (count <= 0) {
+        return;
+    }
+    old = SYSTEM_ARENA_MALLOC(count * sizeof(SSNode), "../z_bgcheck.c", __LINE__);
+    if (old == NULL) {
+        return;
+    }
+    bcopy(nodes->tbl, old, count * sizeof(SSNode));
+    for (c = 0; c < cells; c++) {
+        StaticLookup* lookup = &colCtx->lookupTbl[c];
+        SSList* lists[3];
+        s32 l;
+
+        lists[0] = &lookup->floor;
+        lists[1] = &lookup->wall;
+        lists[2] = &lookup->ceiling;
+        for (l = 0; l < 3; l++) {
+            u16 at = lists[l]->head;
+            s32 prevOut = -1;
+
+            if (at == SS_NULL) {
+                continue;
+            }
+            lists[l]->head = out;
+            while (at != SS_NULL) {
+                nodes->tbl[out].polyId = old[at].polyId;
+                nodes->tbl[out].next = SS_NULL;
+                if (prevOut >= 0) {
+                    nodes->tbl[prevOut].next = out;
+                }
+                prevOut = out;
+                out++;
+                at = old[at].next;
+            }
+        }
+    }
+    SYSTEM_ARENA_FREE(old, "../z_bgcheck.c", __LINE__);
+}
+
 void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader* colHeader) {
     static BgCheckSceneSubdivisionEntry sceneSubdivisionList[] = {
         { SCENE_SHADOW_TEMPLE, { 23, 7, 14 }, -1 },
@@ -2052,6 +2109,9 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
     SSNodeList_Alloc(play, &colCtx->polyNodes, tblMax, colCtx->colHeader->numPolygons);
 
     lookupTblMemSize = BgCheck_InitializeStaticLookup(colCtx, play, colCtx->lookupTbl);
+#ifndef FISHMOD_NO_COMPACT_LISTS
+    BgCheck_CompactStaticLists(colCtx);
+#endif
 #if FISHMOD_DEBUG
     Fishmod_DebugColNodes(play->sceneId, colCtx->polyNodes.count, colCtx->polyNodes.max);
 #endif

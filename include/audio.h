@@ -364,7 +364,8 @@ typedef struct SequencePlayer {
     /* 0x09C */ NotePool notePool;
     /* 0x0DC */ s32 skipTicks;
     /* 0x0E0 */ u32 scriptCounter;
-    /* 0x0E4 */ char unk_E4[0x74]; // unused struct members for sequence/sound font dma management, according to sm64 decomp
+    /* 0x0E4 */ u16 fishmodChannelsOn; // fish-oot: bit i: channels[i]->enabled (seqplayer.c keeps it; effects.c reads it)
+    /* 0x0E6 */ char unk_E6[0x72]; // unused struct members for sequence/sound font dma management, according to sm64 decomp
     /* 0x158 */ s8 seqScriptIO[8];
 } SequencePlayer; // size = 0x160
 
@@ -432,7 +433,7 @@ typedef struct SequenceChannel {
     /* 0x00 */ u8 hasInstrument : 1;
     /* 0x00 */ u8 stereoHeadsetEffects : 1;
     /* 0x00 */ u8 largeNotes : 1; // notes specify duration and velocity
-    /* 0x00 */ u8 unused : 1;
+    /* 0x00 */ u8 fishmodLayerInit : 1; // fish-oot: a layer may have notePropertiesNeedInit set (effects.c); here, in the first byte with enabled and next to changes, so the check of a channel with nothing to do reads one cache line (it was at 0xD1)
     union {
         struct {
             /* 0x01 */ u8 freqScale : 1;
@@ -488,7 +489,7 @@ typedef struct SequenceChannel {
     /* 0xC4 */ s8 seqScriptIO[8]; // bridge between .seq script and audio lib, "io ports"
     /* 0xCC */ s16* filter;
     /* 0xD0 */ Stereo stereo;
-    /* 0xD1 */ u8 fishmodLayerInit; // fish-oot: a layer may have notePropertiesNeedInit set (audio/internal/effects.c)
+    /* 0xD1 */ u8 fishmodPadD1; // (fish-oot: was fishmodLayerInit, moved to the first byte)
 } SequenceChannel; // size = 0xD4
 
 // Might also be known as a Track, according to sm64 debug strings (?).

@@ -22,19 +22,24 @@ void Audio_SequenceChannelProcessSound(SequenceChannel* channel, s32 recalculate
         channel->pan = channel->newPan * channel->panChannelWeight;
     }
 
-    chanFreqScale = channel->freqScale;
     if (applyBend) {
-        chanFreqScale *= channel->seqPlayer->bend;
         channel->changes.s.freqScale = true;
     }
 
     // fish-oot: nothing changed and no layer waiting for its first note properties: the loop below would change
     // nothing, so its four layers (a cache line each) aren't read. fishmodLayerInit is set wherever a layer's
-    // notePropertiesNeedInit is, and cleared only after a pass that leaves none of them set.
+    // notePropertiesNeedInit is, and cleared only after a pass that leaves none of them set. (frames12: the check
+    // first, before the channel's frequency is read: with fishmodLayerInit now in the first byte, a channel with
+    // nothing to do reads one cache line; the same values either way.)
     if ((channel->changes.asByte == 0) && !recalculateVolume && !channel->fishmodLayerInit) {
         return;
     }
     channel->fishmodLayerInit = false;
+
+    chanFreqScale = channel->freqScale;
+    if (applyBend) {
+        chanFreqScale *= channel->seqPlayer->bend;
+    }
 
     for (i = 0; i < 4; i++) {
         SequenceLayer* layer = channel->layers[i];
@@ -93,7 +98,8 @@ void Audio_SequencePlayerProcessSound(SequencePlayer* seqPlayer) {
     }
 
     for (i = 0; i < 16; i++) {
-        if (seqPlayer->channels[i]->enabled == 1) {
+        // (fish-oot: the enabled ones from the player's mask, the others' structs not read: seqplayer.c keeps it)
+        if (seqPlayer->fishmodChannelsOn & (1 << i)) {
             Audio_SequenceChannelProcessSound(seqPlayer->channels[i], seqPlayer->recalculateVolume,
                                               seqPlayer->applyBend);
         }
