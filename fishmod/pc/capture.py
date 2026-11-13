@@ -14,11 +14,20 @@ Keys (in the window):
   F or F11      full screen on and off
   M             sound off and on
   L             the frame rate and delay shown in the corner
+  G             the frame analyzer in the corner: the game's own frame rate (new pictures a second), its jitter and
+                1% lows, over the last 10 seconds and since it was last reset
+  R             reset the frame analyzer's totals (on quit they're printed, and saved to fishmod/pc/captures/)
   Q or Esc      quit
 Anywhere (even with another window in front): Ctrl+Alt+S, a screenshot to the clipboard.
 
 For another program (only from this PC): http://127.0.0.1:8765/frame.jpg (the newest picture), /frame.png,
-/audio.wav?s=5 (the last 5 seconds of sound, up to 10), and / (a page that shows the picture).
+/audio.wav?s=5 (the last 5 seconds of sound, up to 10), /stats.json (the frame analyzer's numbers), and / (a page that
+shows the picture).
+
+The frame analyzer: the card sends every refresh; a refresh whose picture differs from the one before (beyond the
+card's own noise, which it learns) is a new picture from the game. The time between two new pictures is counted in
+refreshes (the card's timestamps wobble with USB; the refresh count doesn't), times the refresh period it measures.
+A still scene (a menu, a pause) reads as a slow frame: it can't tell a picture that didn't change from a repeat.
 
 Low delay: the video is read on its own thread, keeping only the newest picture (older ones are dropped, never
 queued); the window draws whatever is newest. The sound goes from the capture card's input to the speakers in small
@@ -85,6 +94,7 @@ class Video:
         self.cap.set(cv2.CAP_PROP_FPS, fps)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # (where the driver honours it: no queue of old frames)
         self.latest = None
+        self.analyzer = FrameAnalyzer()
         self.stamp = 0.0
         self.count = 0
         self.lock = threading.Lock()
@@ -98,10 +108,15 @@ class Video:
             if not ok:
                 time.sleep(0.005)
                 continue
+            t = time.perf_counter()
             with self.lock:
                 self.latest = frame
-                self.stamp = time.perf_counter()
+                self.stamp = t
                 self.count += 1
+            try:
+                self.analyzer.feed(frame, t)
+            except Exception:  # (never let the analyzer stop the picture)
+                pass
 
     def frame(self):
         with self.lock:
@@ -118,6 +133,113 @@ class Video:
         self.running = False
         self.thread.join(timeout=1)
         self.cap.release()
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Frame analyzer
+
+
+class FrameAnalyzer:
+    """The game's frame rate from the picture: which refreshes bring a new picture, and the time between them."""
+
+    WINDOW_S = 10.0
+
+    def __init__(self):
+        import collections
+
+        self.collections = collections
+        self.prev = None
+        self.last_t = None
+        self.periods = collections.deque(maxlen=600)  # the card's frame-to-frame times (for the refresh period)
+        self.diffs = collections.deque(maxlen=240)  # recent differences (for the noise floor)
+        self.recent = collections.deque()  # (time, frame time in ms) over the last WINDOW_S
+        self.lock = threading.Lock()
+        self.reset()
+
+    def reset(self):
+        with self.lock:
+            self.total = []  # every frame time (ms) since the reset
+            self.since_new = 0  # refreshes since the last new picture
+            self.started = time.perf_counter()
+
+    def refresh_ms(self):
+        if len(self.periods) < 30:
+            return 1000 / 60.0
+        p = sorted(self.periods)
+        return 1000 * p[len(p) // 2]
+
+    def feed(self, frame, t):
+        cv2 = self._cv2()
+        small = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (96, 72), interpolation=cv2.INTER_AREA)
+        small = small.astype(np.int16)
+        refreshes = 1
+        if self.last_t is not None:
+            dt = t - self.last_t
+            ref = self.refresh_ms() / 1000
+            if 0.5 * ref < dt < 1.5 * ref:
+                self.periods.append(dt)
+            refreshes = max(1, round(dt / ref))  # (a frame the card or USB dropped still counts as a refresh)
+        self.last_t = t
+        if self.prev is None:
+            self.prev = small
+            return
+        d = float(np.mean(np.abs(small - self.prev)))
+        self.prev = small
+        self.diffs.append(d)
+        # the noise floor: the quietest differences lately (a repeated picture's are just the card's noise)
+        floor = sorted(self.diffs)[len(self.diffs) // 10] if len(self.diffs) >= 20 else 0.0
+        new = d > max(3 * floor, floor + 0.6)
+        with self.lock:
+            self.since_new += refreshes
+            if new:
+                ms = self.since_new * self.refresh_ms()
+                self.since_new = 0
+                self.total.append(ms)
+                self.recent.append((t, ms))
+            while self.recent and self.recent[0][0] < t - self.WINDOW_S:
+                self.recent.popleft()
+
+    _cv = None
+
+    @classmethod
+    def _cv2(cls):
+        if cls._cv is None:
+            import cv2
+
+            cls._cv = cv2
+        return cls._cv
+
+    @staticmethod
+    def summary(times, refresh_ms):
+        """Average fps, jitter (the frame times' standard deviation, ms), 1% low fps (the slowest 1% of frames' average
+        time, as fps), the slowest frame (ms) and the pictures held 4 refreshes or more (a visible hitch at 20 fps)."""
+        if len(times) < 2:
+            return None
+        a = np.array(times[1:])  # (the first is from before the count began)
+        worst = np.sort(a)[::-1][:max(1, len(a) // 100)]
+        return {"frames": int(len(a)), "fps": float(1000 * len(a) / a.sum()), "jitter_ms": float(a.std()),
+                "low1_fps": float(1000 / worst.mean()), "worst_ms": float(a.max()),
+                "held4": int(np.sum(a >= 3.5 * refresh_ms)), "refresh_ms": float(refresh_ms)}
+
+    def stats(self):
+        with self.lock:
+            recent = [ms for _, ms in self.recent]
+            total = list(self.total)
+        r = self.refresh_ms()
+        return {"last_10s": self.summary(recent, r), "since_reset": self.summary(total, r),
+                "seconds": time.perf_counter() - self.started}
+
+    @staticmethod
+    def line(s, label):
+        if s is None:
+            return f"{label}: (waiting for pictures)"
+        return (f"{label}: {s['fps']:.1f} fps, jitter {s['jitter_ms']:.1f} ms, 1% low {s['low1_fps']:.1f} fps, "
+                f"worst {s['worst_ms']:.0f} ms, held 4+ {s['held4']}/{s['frames']}")
+
+    def report(self):
+        s = self.stats()
+        return "\n".join([self.line(s["last_10s"], "last 10 s"),
+                          self.line(s["since_reset"], f"since reset ({s['seconds']:.0f} s)")])
 
 
 def list_video():
@@ -354,6 +476,8 @@ def serve(port, video, audio):
             elif url.path in ("/frame.jpg", "/frame.png") and frame is not None:
                 fmt = "JPEG" if url.path.endswith("jpg") else "PNG"
                 self.reply(encode(frame, fmt), "image/jpeg" if fmt == "JPEG" else "image/png")
+            elif url.path == "/stats.json":
+                self.reply(json.dumps(video.analyzer.stats()).encode(), "application/json")
             elif url.path == "/audio.wav" and audio is not None:
                 secs = float(parse_qs(url.query).get("s", ["5"])[0])
                 self.reply(audio.wav_bytes(secs), "audio/wav")
@@ -455,6 +579,7 @@ def main():
     cv2.resizeWindow(WINDOW, 960, 720)
     fullscreen = False
     overlay = False
+    analyzer = False
     shown = 0
     last_count = 0
     t_rate = time.perf_counter()
@@ -470,7 +595,7 @@ def main():
         while True:
             frame, stamp = video.frame()
             if frame is not None:
-                if overlay or (time.perf_counter() < message_until):
+                if overlay or analyzer or (time.perf_counter() < message_until):
                     frame = frame.copy()
                     y = 24
                     if overlay:
@@ -483,6 +608,11 @@ def main():
                         cv2.putText(frame, f"in {fps_in:.0f} fps, shown {fps_out:.0f} fps, frame age {age:.0f} ms{snd}",
                                     (8, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
                         y += 22
+                    if analyzer:
+                        for text in video.analyzer.report().split("\n"):
+                            cv2.putText(frame, text, (8, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1,
+                                        cv2.LINE_AA)
+                            y += 22
                     if time.perf_counter() < message_until:
                         cv2.putText(frame, message, (8, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1,
                                     cv2.LINE_AA)
@@ -526,7 +656,24 @@ def main():
                 message, message_until = ("sound off" if audio.muted else "sound on"), now + 1.0
             elif ch == "l":
                 overlay = not overlay
+            elif ch == "g":
+                analyzer = not analyzer
+            elif ch == "r":
+                video.analyzer.reset()
+                message, message_until = "frame analyzer reset", now + 1.0
     finally:
+        # the frame analyzer's totals: printed and saved beside the screenshots
+        try:
+            report = video.analyzer.report()
+            print(report)
+            os.makedirs(SHOTS, exist_ok=True)
+            path = os.path.join(SHOTS, time.strftime("frames-%Y%m%d-%H%M%S"))
+            with open(path + ".txt", "w") as f:
+                f.write(report + "\n")
+            with open(path + ".csv", "w") as f:
+                f.write("frame_ms\n" + "".join(f"{ms:.2f}\n" for ms in video.analyzer.total))
+        except Exception as e:
+            print(f"frame analyzer totals not saved: {e}")
         cv2.destroyAllWindows()
         video.close()
         if audio is not None:
