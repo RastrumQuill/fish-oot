@@ -46,12 +46,16 @@ def disassemble(elf):
         sys.exit("no MIPS objdump (mips-linux-gnu-objdump or llvm-objdump)")
     out = subprocess.run([exe, "-d", "--no-show-raw-insn", elf], capture_output=True, text=True).stdout
     insns = {}
-    pat = re.compile(r"^\s*([0-9a-f]{8}):\s+([a-z0-9.]+)")
+    pat = re.compile(r"^\s*([0-9a-f]{8}):\s+([a-z0-9.]+)\s*(.*)$")
     for line in out.splitlines():
         m = pat.match(line)
         if m:
             insns[int(m.group(1), 16)] = m.group(2)
+            TEXT[int(m.group(1), 16)] = (m.group(2) + " " + m.group(3)).strip()
     return insns
+
+
+TEXT = {}  # address -> the instruction with its operands (disassemble)
 
 
 def category(insns, pc):
@@ -84,6 +88,9 @@ def main():
     ap.add_argument("--elf", required=True)
     ap.add_argument("--top", type=int, default=20)
     ap.add_argument("--func", help="one function's instructions, hottest first")
+    ap.add_argument("--stalls", type=int, metavar="N",
+                    help="the N loads with the most time stalled after them (a data-cache miss: the console's "
+                         "calibration puts its wait on the next instruction), each with its source line")
     args = ap.parse_args()
     for f in os.listdir(args.folder):
         if f == "packets.zip" or (f.startswith("packets-") and f.endswith(".zip")):
@@ -125,6 +132,26 @@ def main():
         print(f"| {cat} | {100 * overall[cat] / max(known, 1):.1f}% |")
     print(f"\nOn the first instruction of a 32-byte cache line: "
           f"{100 * sum(line_start.values()) / max(known, 1):.1f}% (12.5% if fetching cost nothing)\n")
+
+    if args.stalls:
+        # the time a load's next instruction holds beyond the load's own (a hit gives them about the same)
+        rows = []
+        for pc, c in pcs.items():
+            if insns.get(pc - 4) in LOADS:
+                excess = c - pcs.get(pc - 4, 0)
+                if excess > 0:
+                    rows.append((excess, pc - 4))
+        rows.sort(reverse=True)
+        stalled = sum(e for e, _ in rows)
+        print(f"## Stalled loads: {100 * stalled / max(known, 1):.1f}% of the time in all\n")
+        print("| share | function | load | source |")
+        print("|---|---|---|---|")
+        for e, pc in rows[:args.stalls]:
+            fr = frames.get(pc + 4) or frames.get(pc)
+            name = fr[-1]["FunctionName"] if fr else "?"
+            src = f"{os.path.basename(fr[0]['FileName'])}:{fr[0]['Line']}" if fr else "?"
+            print(f"| {100 * e / max(known, 1):.2f}% | {name} | `{TEXT.get(pc, '?')}` | {src} |")
+        return
 
     if args.func:
         print(f"## {args.func}, hottest instructions\n")
