@@ -53,7 +53,13 @@ typedef void (*AudioCustomUpdateFunction)(void);
 // Both left and right channels
 #define DMEM_2CH_SIZE (2 * DMEM_1CH_SIZE)
 
+#ifdef FISHMOD_AUDIO_EVERY2
+// fish-oot: the two-refresh mode's updates are twice as long (up to 1,056 stereo samples): buffers of 704 overflowed
+// into the audio heap behind them, and the sound was silence
+#define AIBUF_LEN (2 * 88 * SAMPLES_PER_FRAME) // number of samples
+#else
 #define AIBUF_LEN (88 * SAMPLES_PER_FRAME) // number of samples
+#endif
 #define AIBUF_SIZE (AIBUF_LEN * SAMPLE_SIZE) // number of bytes
 
 // Filter sizes
