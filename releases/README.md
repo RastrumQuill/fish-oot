@@ -14,7 +14,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-stress3.bps` | The fish and plant stress benches judged by the screen (how many really hold 20 fps), on frames10's code | [notes](notes-stress3.md) |
 | `fish-oot-frames12.bps` | The bench route with less waiting on memory (actor lists and categories, collision lists, audio channels, the fish's fields, the fish manager) | [notes](notes-frames12.md) |
 | `fish-oot-rsp-ab.bps` | The all-day RSP test: frames13's bench lap after lap, the audio's RSP work off for every other 8 laps | (rsp_ab script) |
-| `fish-oot-frames13.bps`, `fish-oot-frames13-audio2.bps` | frames12 without the wall clearance bound (frames11's CPU slowdown, found by the bisection), and two audio memory changes | [notes](notes-frames13.md) |
+| `fish-oot-frames13.bps`, `-reverb2`, `-27k` (`-audio2`: broken, not run) | frames12 without the wall clearance bound (frames11's CPU slowdown, found by the bisection), and two audio memory changes; -reverb2: every reverb at half rate or less; -27k: the sound mixed at 26.8 kHz (both change the sound: RSP tests) | [notes](notes-frames13.md) |
 
 The bench patches are run by `fishmod\pc\morning.bat` (see `fishmod/pc/MORNING.md`).
 

@@ -28,3 +28,11 @@ First run (silent, 12 November `20261112-2106`): visible hitches 10% (frames12 1
 Compare with frames12 (12 November, `20261112-2034/01-frames12`): the CPU's update and draw, the visible hitches.
 
 **frames13-audio2:** the same with the audio driver mixing every two refreshes (FISHMOD_AUDIO_EVERY2): half the RSP audio tasks. Not bit-exact (the timing of the sound changes). Compare its RSP audio time and hitches with frames13-sound.
+
+**RSP tests (13 November), each built clean and checked in ares (boots, draws, the sound not silent):**
+- `fish-oot-frames13-reverb2.bps`: every reverb at half its rate or less (FISHMOD_REVERB_DS2). The two reverbs the
+  lake runs process every note, every update (ares: 10-20 notes playing, all of them sending to a reverb; none silent).
+- `fish-oot-frames13-27k.bps`: the sound mixed at 26.8 kHz instead of 32 kHz (FISHMOD_AUDIO_RATE=26800).
+- `fish-oot-frames13-audio2.bps`: broken. With its buffers sized for two refreshes (they overflowed before: silence)
+  its audio thread runs about eleven times a refresh and starves the game: no picture. Not to be run.
+ares' RSP audio times swing too much (8.6-14.7 ms a frame within one run) to tell these apart: the console decides.
