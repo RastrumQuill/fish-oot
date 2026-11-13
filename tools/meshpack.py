@@ -366,8 +366,9 @@ def main():
         text = open(rp).read()
         os.remove(rp)
         # the declarations after the includes (the pieces' lists use the areas' names), the definitions at the end
-        last_inc = max(m.end() for m in re.finditer(r"^#include [^\n]*\n", text, re.M))
-        text = text[:last_inc] + "\n// fish-oot: tools/meshpack.py's areas\n" + "".join(externs) + text[last_inc:]
+        # (the data files are included inside each array's definition: the declarations go before the first one)
+        first_def = re.search(r"^[A-Za-z_][\w ]*\*?\s+\w+\[\w*\]\s*=", text, re.M).start()
+        text = text[:first_def] + "// fish-oot: tools/meshpack.py's areas\n" + "".join(externs) + "\n" + text[first_def:]
         text += "\n// fish-oot: tools/meshpack.py's areas\n" + "".join(defs)
         open(rp, "w").write(text)
 
