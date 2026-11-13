@@ -1,6 +1,9 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
 # The RSP test: 4 laps on one power-on (about 16 minutes), clear dawn each, the audio's RSP work on, off, on, off.
 releases/fish-oot-rsp-ab.bps 25 rsp-ab
-# then (a power cycle each, when it beeps): the reverb at half rate, the sound at 26.8 kHz
+# then (a power cycle each, when it beeps): F3DEX3's profiling counters (where the RSP's graphics time goes: memory
+# waits, a full RDP buffer, or work)
+releases/fish-oot-frames13-prof.bps 12 frames13-prof
+# the reverb at half rate, the sound at 26.8 kHz
 releases/fish-oot-frames13-reverb2.bps 12 frames13-reverb2
 releases/fish-oot-frames13-27k.bps 12 frames13-27k
