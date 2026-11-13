@@ -51,3 +51,6 @@ fishmod/docs/lake-hylia-zones-draft.png
 fishmod/pc/sc64deployer_path.txt
 fishmod/pc/work/
 fishmod/pc/lab.json
+
+# crash dumps (a debugger on the build machine)
+core
