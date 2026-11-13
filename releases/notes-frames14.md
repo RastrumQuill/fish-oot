@@ -1,5 +1,12 @@
 # frames14
 
+**Rebuilt 13 November (frames14b, the same name):** the first frames14 run lit the terrain on the CPU every frame
+(6.6 ms of CPU draw, 44% hitches against frames13-sound's 23%): its "did the lights change" check compared the
+lights' padding, which isn't cleared each frame. Now only the bytes that light a vertex are compared, a small change
+waits half a second (the sun moves 0.3 degrees a second: a day is 20 minutes), a jump is lit at once. ares: lit 2
+times in 414 pictures. The first run's other numbers: 11% fewer vertices and 13% fewer triangles sent to the RSP
+(4,477 to 3,985; 2,561 to 2,232), but no less RSP time (it waits on a full RDP buffer much of the time).
+
 frames13 (with sound) plus three changes for the RSP, each checked before it went in:
 
 - **The fish rig's lists without the commands that do nothing** (state set to the value it has, pipe syncs with
