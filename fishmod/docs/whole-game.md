@@ -49,6 +49,9 @@ not started; **on hold** = waiting on a decision.
 
 ## Skeletons, textures and models (every object, NPC, enemy and Link)
 
+Every skeleton change is proven with the animation harness first (`fishmod/docs/anim-verify.md`): the pose, the draw
+stream and the picture, every frame of every animation, before and after. Link first.
+
 | What | Status | Notes |
 |---|---|---|
 | Limb display lists cleaned at build time: state set to what it already is, pipe syncs with nothing drawn, repeated texture loads (exact) | to do | as the fish rig's (19-27% fewer commands there); proven per list by the rigcheck method; the extracted object lists are known by name, so a build pass can rewrite them safely (unlike patching them in RAM) |
