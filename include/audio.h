@@ -462,34 +462,37 @@ typedef struct SequenceChannel {
     /* 0x23 */ u8 velocityRandomVariance;
     /* 0x24 */ u8 gateTimeRandomVariance;
     /* 0x25 */ u8 combFilterSize;
-    /* 0x26 */ u16 vibratoRateStart;
-    /* 0x28 */ u16 vibratoDepthStart;
-    /* 0x2A */ u16 vibratoRateTarget;
-    /* 0x2C */ u16 vibratoDepthTarget;
-    /* 0x2E */ u16 vibratoRateChangeDelay;
-    /* 0x30 */ u16 vibratoDepthChangeDelay;
-    /* 0x32 */ u16 vibratoDelay;
-    /* 0x34 */ u16 combFilterGain;
-    /* 0x36 */ u16 unk_22;
-    /* 0x38 */ s16 instOrWave; // either 0 (none), instrument index + 1, or
+    // fish-oot: what Audio_ProcessNotes reads of a playing note's channel every tick (with targetReverbVol and
+    // bookOffset above) in this line, next to gain and combFilterSize: 3 lines a note, were 6 (combFilterGain at 0x34,
+    // filter at 0xCC, stereo at 0xD0; the vibrato settings, read when a note starts, moved after them)
+    /* 0x26 */ u16 combFilterGain;
+    /* 0x28 */ s16* filter;
+    /* 0x2C */ Stereo stereo;
+    /* 0x2D */ u8 fishmodPad2D;
+    /* 0x2E */ u16 vibratoRateStart;
+    /* 0x30 */ u16 vibratoDepthStart;
+    /* 0x32 */ u16 vibratoRateTarget;
+    /* 0x34 */ u16 vibratoDepthTarget;
+    /* 0x36 */ u16 vibratoRateChangeDelay;
+    /* 0x38 */ u16 vibratoDepthChangeDelay;
+    /* 0x3A */ u16 vibratoDelay;
+    /* 0x3C */ u16 unk_22;
+    /* 0x3E */ s16 instOrWave; // either 0 (none), instrument index + 1, or
                              // 0x80..0x83 for sawtooth/triangle/sine/square waves.
-    /* 0x3A */ s16 transposition;
-    /* 0x3C */ f32 volumeScale;
-    /* 0x40 */ f32 volume;
-    /* 0x44 */ s32 pan;
-    /* 0x48 */ f32 appliedVolume;
-    /* 0x4C */ f32 freqScale;
-    /* 0x50 */ u8 (*dynTable)[][2];
-    /* 0x54 */ struct Note* noteUnused;
-    /* 0x58 */ struct SequenceLayer* layerUnused;
-    /* 0x5C */ Instrument* instrument;
-    /* 0x60 */ SeqScriptState scriptState;
-    /* 0x7C */ AdsrSettings adsr;
-    /* 0x84 */ NotePool notePool;
-    /* 0xC4 */ s8 seqScriptIO[8]; // bridge between .seq script and audio lib, "io ports"
-    /* 0xCC */ s16* filter;
-    /* 0xD0 */ Stereo stereo;
-    /* 0xD1 */ u8 fishmodPadD1; // (fish-oot: was fishmodLayerInit, moved to the first byte)
+    /* 0x40 */ s16 transposition;
+    /* 0x44 */ f32 volumeScale;
+    /* 0x48 */ f32 volume;
+    /* 0x4C */ s32 pan;
+    /* 0x50 */ f32 appliedVolume;
+    /* 0x54 */ f32 freqScale;
+    /* 0x58 */ u8 (*dynTable)[][2];
+    /* 0x5C */ struct Note* noteUnused;
+    /* 0x60 */ struct SequenceLayer* layerUnused;
+    /* 0x64 */ Instrument* instrument;
+    /* 0x68 */ SeqScriptState scriptState;
+    /* 0x84 */ AdsrSettings adsr;
+    /* 0x8C */ NotePool notePool;
+    /* 0xCC */ s8 seqScriptIO[8]; // bridge between .seq script and audio lib, "io ports"
 } SequenceChannel; // size = 0xD4
 
 // Might also be known as a Track, according to sm64 debug strings (?).
@@ -513,23 +516,26 @@ typedef struct SequenceLayer {
     /* 0x0A */ s16 gateDelay;
     /* 0x0C */ s16 delay2;
     /* 0x0E */ u16 portamentoTime;
-    /* 0x10 */ s16 transposition; // #semitones added to play commands
+    // fish-oot: what Audio_ProcessNotes and the channel's sound update read of a playing layer every tick (its note,
+    // channel and the note's frequency and velocity) in its second line, with its flags, pan and delays in the first:
+    // 2 lines, were 4 (note at 0x2C, noteVelocity and noteFreqScale at 0x40, channel at 0x50)
+    /* 0x10 */ struct Note* note;
+    /* 0x14 */ SequenceChannel* channel;
+    /* 0x18 */ f32 noteFreqScale;
+    /* 0x1C */ f32 noteVelocity;
+    /* 0x20 */ f32 freqScale;
+    /* 0x24 */ f32 velocitySquare2;
+    /* 0x28 */ s16 transposition; // #semitones added to play commands
                                   // (seq instruction encoding only allows referring to the limited range
                                   // 0..0x3F; this makes 0x40..0x7F accessible as well)
-    /* 0x12 */ s16 shortNoteDefaultDelay;
-    /* 0x14 */ s16 lastDelay;
-    /* 0x18 */ AdsrSettings adsr;
-    /* 0x20 */ Portamento portamento;
-    /* 0x2C */ struct Note* note;
-    /* 0x30 */ f32 freqScale;
-    /* 0x34 */ f32 bend;
-    /* 0x38 */ f32 velocitySquare2;
-    /* 0x3C */ f32 velocitySquare; // not sure which one of those corresponds to the sm64 original
-    /* 0x40 */ f32 noteVelocity;
-    /* 0x44 */ f32 noteFreqScale;
-    /* 0x48 */ Instrument* instrument;
-    /* 0x4C */ TunedSample* tunedSample;
-    /* 0x50 */ SequenceChannel* channel;
+    /* 0x2A */ s16 shortNoteDefaultDelay;
+    /* 0x2C */ s16 lastDelay;
+    /* 0x30 */ AdsrSettings adsr;
+    /* 0x38 */ Portamento portamento;
+    /* 0x44 */ f32 bend;
+    /* 0x48 */ f32 velocitySquare; // not sure which one of those corresponds to the sm64 original
+    /* 0x4C */ Instrument* instrument;
+    /* 0x50 */ TunedSample* tunedSample;
     /* 0x54 */ SeqScriptState scriptState;
     /* 0x70 */ AudioListItem listItem;
 } SequenceLayer; // size = 0x80
