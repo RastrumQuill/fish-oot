@@ -100,6 +100,20 @@ def load_vtx(dirpath, arr):
     return [tuple(a.strip() for a in m.split(",")) for m in re.findall(r"VTX\(([^)]*)\)", open(f).read())]
 
 
+def state_key(c):
+    """what a state command sets, for the entry check (None: not state, as a pipe sync)"""
+    n = name_of(c)
+    if n in ("gsDPPipeSync", "gsDPLoadSync", "gsDPTileSync"):
+        return None
+    if n in ("gsSPSetGeometryMode", "gsSPClearGeometryMode"):
+        return "geometry"
+    if n in ("gsDPLoadMultiBlock", "gsDPLoadMultiBlock_4b", "gsDPSetTile", "gsDPSetTileSize"):
+        return (n, args_of(c)[1] if len(args_of(c)) > 1 else "")  # (by its texture memory address or tile)
+    if n == "gsSPDisplayList":
+        return (n, args_of(c)[0])
+    return n
+
+
 def cut(dirpath, dl):
     """the piece's list cut into areas: (area lists, new vertex arrays, the piece's new list) or (None, reason)"""
     text = open(os.path.join(dirpath, dl + ".inc.c")).read()
@@ -146,6 +160,15 @@ def cut(dirpath, dl):
             return None, "a command not known here: %s" % n
     if not tris:
         return None, "no triangles"
+    # every kind of state the list changes must be set before its first triangle: then an area replaying the list's
+    # state up to its own triangles sets every one of them to what the original had there, whatever an area before it
+    # left (one changed only later could still hold a later value when an earlier triangle is drawn)
+    first = tris[0][0]
+    early = {state_key(c) for c in stream[:first]}
+    for c in stream[first:]:
+        k = state_key(c)
+        if k is not None and k not in early:
+            return None, "state first set after a triangle (%s)" % name_of(c)
     # the original's bounding box load and cull come first in its stream (state only around them): the cull itself is
     # dropped here, the box vertices aren't in `stream` (vertex loads aren't state)
     cells = collections.defaultdict(list)
@@ -219,9 +242,12 @@ def cut(dirpath, dl):
         flush()
         out.append("gsSPEndDisplayList()")
         area_dls.append((name, out))
+        last_emitted = emitted
         area_vtx.append((vname, vtx))
     # the piece's own list: the areas in turn (state set inside each area)
-    new_dl = ["gsSPDisplayList(%s)" % n for n, _ in area_dls] + ["gsSPEndDisplayList()"]
+    # ... then the rest of the list's state commands, so the piece hands the state on as the original did (the
+    # next piece drawn may inherit some, as the lake's do the environment colour)
+    new_dl = ["gsSPDisplayList(%s)" % n for n, _ in area_dls] + list(stream[last_emitted:]) + ["gsSPEndDisplayList()"]
     # check: every triangle once, same vertices, after the same state commands in order
     got = collections.Counter()
     for (name, out), (vname, vtx) in zip(area_dls, area_vtx):
