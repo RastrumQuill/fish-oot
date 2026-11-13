@@ -1,0 +1,13 @@
+[
+ {
+  "run": 1,
+  "label": "rsp-ab",
+  "patch": "releases\\fish-oot-rsp-ab.bps",
+  "minutes_max": 540.0,
+  "status": "failed",
+  "started": "2026-11-12 22:07:00",
+  "patch_sha1": "d025b83d1f888fe18c0efbea1feed9a8bf4d2ea1",
+  "upload_check": "ok",
+  "error": "the new ROM never said FISHMOD-START"
+ }
+]

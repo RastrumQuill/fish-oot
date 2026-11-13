@@ -1,0 +1,11 @@
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe upload C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\morning.z64
+Uploading ROM [morning.z64]... done
+Save type set to [None]
+Boot mode set to [Bootloader -> ROM]
+
+(exit 0)
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe dump 0 0x2000000 C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\readback.bin
+Dumping from [0x00000000] length [0x2000000] to [readback.bin]... done
+
+(exit 0)
+read back: the same, all 33554432 bytes
