@@ -1,0 +1,16 @@
+[
+ {
+  "run": 1,
+  "label": "frames14",
+  "patch": "releases\\fish-oot-frames14.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-13 12:04:50",
+  "patch_sha1": "7763f49ac7c5d781875fc986857e93a3724ee326",
+  "upload_check": "ok",
+  "packets": 401,
+  "bytes": 3039424,
+  "packs": 1,
+  "seconds": 235
+ }
+]
