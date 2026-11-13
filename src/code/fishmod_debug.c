@@ -1038,6 +1038,16 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #ifdef FISHMOD_SCRIPT
     StateHash_Update(play);
 #endif
+#if defined(FISHMOD_SCRIPT) && !defined(FISHMOD_NO_RESEED)
+    // The game's random numbers seeded again every frame from the frame's number (scripted runs, after Link is
+    // placed): how many a frame draws depends on timing (an actor whose object loads a frame sooner or later draws its
+    // numbers at another point), so without this one build's speed shifts every number after it, and the scene with
+    // it (a Tektite meeting Link elsewhere: frames14's legs 3 and 4 drew another scene than frames13's). Each frame now
+    // starts from the same numbers whatever happened before.
+    if (sScriptActive) {
+        Rand_Seed(0x46495348 ^ ((u32)sPlayFrames * 0x9E3779B1));
+    }
+#endif
 #if defined(F3DEX3_ALL) && defined(FISHMOD_BENCH_PLAY)
     {
         // all four of F3DEX3's builds in one run: each leg drawn by the set (leg + lap) mod 4, so over four laps every
