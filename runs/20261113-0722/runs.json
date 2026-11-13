@@ -1,0 +1,72 @@
+[
+ {
+  "run": 1,
+  "label": "rsp-ab",
+  "patch": "releases\\fish-oot-rsp-ab.bps",
+  "minutes_max": 25.0,
+  "status": "done",
+  "started": "2026-11-13 07:22:39",
+  "patch_sha1": "7dd1359d199e27bd5c002de8ca8a65e80a990e0b",
+  "upload_check": "ok",
+  "packets": 1548,
+  "bytes": 11753208,
+  "packs": 1,
+  "seconds": 815
+ },
+ {
+  "run": 2,
+  "label": "frames13-prof",
+  "patch": "releases\\fish-oot-frames13-prof.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-13 07:36:23",
+  "patch_sha1": "f0dcf63577c4d455358cadc83eab09d3ec3292ee",
+  "upload_check": "ok",
+  "packets": 396,
+  "bytes": 3009048,
+  "packs": 1,
+  "seconds": 227
+ },
+ {
+  "run": 3,
+  "label": "frames13-audio2",
+  "patch": "releases\\fish-oot-frames13-audio2.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-13 07:40:12",
+  "patch_sha1": "4a5d792508da02d6804fa8aba998b71255f4c73e",
+  "upload_check": "ok",
+  "packets": 391,
+  "bytes": 2968088,
+  "packs": 1,
+  "seconds": 228
+ },
+ {
+  "run": 4,
+  "label": "frames13-reverb2",
+  "patch": "releases\\fish-oot-frames13-reverb2.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-13 07:44:02",
+  "patch_sha1": "750514789ff1d2cc4dded8b2399c416a6f75e734",
+  "upload_check": "ok",
+  "packets": 397,
+  "bytes": 3019112,
+  "packs": 1,
+  "seconds": 234
+ },
+ {
+  "run": 5,
+  "label": "frames13-27k",
+  "patch": "releases\\fish-oot-frames13-27k.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-13 07:48:42",
+  "patch_sha1": "b1fbf878b50b1316fbe1dd72144eac5b06183bf5",
+  "upload_check": "ok",
+  "packets": 392,
+  "bytes": 2976768,
+  "packs": 1,
+  "seconds": 229
+ }
+]

@@ -1,0 +1,114 @@
+(the bench's counted frames only: --all-frames for every frame)
+(left out: 229 frames that sent a USB packet, the profiler's own cost: --keep-sends to keep them)
+# Frame log: 2651 frames (0.04 h, 18.1 fps), 1226 over 52 ms (46%); 199 gaps in the frame count
+
+**On screen: 758 of 2284 frames (33%) left a picture up 4 refreshes or more (a visible hitch).** In the frames that made them late: RDP alone over 50 ms 41%, both over 50 ms 39%, CPU alone over 50 ms 13%, neither over 50 ms 8%
+
+(The 'slow frames' below are by frame period, over 52 ms: with run-ahead, not all of them are hitches.)
+
+**Press to picture** (the controller read to the refresh the picture went up at; the TV's own delay not included): mean 123 ms, 90% under 149 ms, the most 165 ms; 0% of the pictures went up with another finished frame waiting behind them
+
+| ms per frame | slow frames | full-speed frames | difference |
+|---|---|---|---|
+| frame period | 61.24 | 49.87 | +11.37 |
+| CPU update | 22.92 | 22.16 | +0.75 |
+| CPU draw | 26.07 | 22.83 | +3.24 |
+| RSP graphics | 27.66 | 22.03 | +5.63 |
+| RSP audio | 12.87 | 9.64 | +3.23 |
+| RDP | 49.35 | 42.13 | +7.22 |
+| fish update | 5.52 | 4.22 | +1.30 |
+| fish draw | 10.19 | 7.67 | +2.52 |
+| props draw | 6.22 | 5.44 | +0.77 |
+|   update: fm_play | 0.06 | 0.05 | +0.02 |
+|   update: fm_debug | 1.18 | 1.01 | +0.17 |
+|   update: col_at | 0.15 | 0.14 | +0.01 |
+|   update: col_oc | 0.68 | 0.66 | +0.02 |
+|   update: actors | 15.77 | 15.42 | +0.34 |
+|   update: dynapoly | 0.21 | 0.23 | -0.02 |
+|   update: effects | 1.06 | 0.83 | +0.23 |
+|   update: interface | 0.21 | 0.19 | +0.03 |
+|   update: camera | 3.13 | 3.19 | -0.06 |
+|   update: env | 0.24 | 0.29 | -0.05 |
+|   actors: bg | 0.21 | 0.22 | -0.00 |
+|   actors: player | 2.08 | 2.48 | -0.40 |
+|   actors: npc | 5.08 | 4.10 | +0.98 |
+|   actors: enemy | 3.34 | 3.74 | -0.39 |
+|   actors: prop | 0.31 | 0.37 | -0.07 |
+|   actors: itemaction | 0.54 | 0.54 | +0.00 |
+|   actors: misc | 0.92 | 0.65 | +0.28 |
+
+RDP in slow frames: command buffer busy 77%, pipeline 81%, TMEM 5%
+
+RDP in full-speed frames: command buffer busy 82%, pipeline 84%, TMEM 8%
+
+Costliest actor kinds in slow frames (ms per slow frame, where among a frame's top four):
+  En_Fishmod               5.67
+  En_Tite                  2.47
+  Player                   2.07
+  En_Crow                  0.72
+  En_Elf                   0.35
+  En_Sw                    0.08
+  En_River_Sound           0.04
+  En_Kanban                0.02
+  Obj_Mure2                0.02
+  En_Weather_Tag           0.01
+  En_Kakasi2               0.01
+  En_A_Obj                 0.01
+
+F3DEX3's counters (default set), a frame: slow frames, full-speed frames
+  vertices                                     4961.3     3830.8
+  tris in                                      2830.6     2206.2
+  tris drawn                                   1284.3      913.9
+  rects                                          79.9       79.9
+  RSP stalled on a full RDP FIFO, us           9849.9     7605.9
+
+F3DEX3's counters (profiling A set), a frame: slow frames, full-speed frames
+  vertex work, us                              5482.0     3792.5
+  triangle work, us                            5151.8     4187.8
+  RSP stalled on a full RDP FIFO, us           9321.1     7177.8
+  display list commands                       11428.7     7725.4
+  commands fetched                            29244.6    17951.6
+
+F3DEX3's counters (profiling B set), a frame: slow frames, full-speed frames
+  vertices                                     4403.2     3825.9
+  lit vertices                                 3940.2     3391.3
+  tris culled by the occlusion plane              0.0        0.0
+  tris clipped                                   44.6       30.6
+  overlay loads                                  25.2       23.9
+  lighting overlay loads                         10.1        9.9
+  clipping overlay loads                          8.1        8.0
+  misc overlay loads                              0.0        0.0
+
+F3DEX3's counters (profiling C set), a frame: slow frames, full-speed frames
+  F3DEX3 running, us                          27829.7    24010.4
+  RDP doing work when sampled, %                 34.1       33.1
+  small RDP commands                           5439.0     4816.6
+  matrix loads                                  406.4      367.6
+  RSP stalled on DMAs, us                      2913.8     2672.1
+
+Slow frames by the longer of CPU (update + draw) and RDP: RDP 53%, CPU 47%
+
+| lap | conditions | leg | frames | fps | over 52 ms |
+|---|---|---|---|---|---|
+| 1 | clear dawn | 1 | 219 | 16.2 | 75% |
+| 1 | clear dawn | 2 | 212 | 17.7 | 54% |
+| 1 | clear dawn | 3 | 223 | 17.1 | 57% |
+| 1 | clear dawn | 4 | 226 | 15.9 | 91% |
+| 1 | clear dawn | 5 | 212 | 16.2 | 92% |
+| 1 | clear dawn | 6 | 220 | 18.3 | 55% |
+| 1 | clear dawn | 7 | 223 | 19.9 | 11% |
+| 1 | clear dawn | 8 | 215 | 19.7 | 23% |
+| 1 | clear dawn | 9 | 216 | 18.3 | 69% |
+| 1 | clear dawn | 10 | 231 | 19.8 | 16% |
+| 1 | clear dawn | 11 | 231 | 20.0 | 8% |
+| 1 | clear dawn | 21 | 223 | 20.0 | 10% |
+
+## The screen's pacing (how long each picture stayed)
+
+2661 pictures over 8811 refreshes: 18.12 fps on screen
+| longest a picture stayed in the record | records | share |
+|---|---|---|
+| 3 refreshes (on time) | 1627 | 66.4% |
+| 4 refreshes (a hitch) | 820 | 33.5% |
+| 5 refreshes (a hitch) | 3 | 0.1% |
+Hitches in a row: 1: 108, 2: 21, 3: 6, 4: 3, 6+: 15

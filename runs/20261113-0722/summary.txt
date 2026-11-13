@@ -1,0 +1,7 @@
+Morning runs 20261113-0722
+
+ 1. rsp-ab                       done       1548 packets   11.8 MB   815 s  
+ 2. frames13-prof                done        396 packets    3.0 MB   227 s  
+ 3. frames13-audio2              done        391 packets    3.0 MB   228 s  
+ 4. frames13-reverb2             done        397 packets    3.0 MB   234 s  
+ 5. frames13-27k                 done        392 packets    3.0 MB   229 s  
