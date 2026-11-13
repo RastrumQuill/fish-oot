@@ -409,8 +409,6 @@ def one_run(n, patch, minutes, label, rom, deployer, stamp_dir, first):
         if dbg.done.is_set():
             time.sleep(3)  # (the last packets)
             info["status"] = "done"
-            # (builds from frames11b on stop their own picture a second after DONE, on purpose: see notes-frames11b)
-            log("  done (the game freezes its picture now, on purpose)")
             info.pop("error", None)
         else:
             log("  " + info["error"])
