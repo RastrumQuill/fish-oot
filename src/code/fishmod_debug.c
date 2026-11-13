@@ -1511,6 +1511,8 @@ static void Watchdog_Start(void) {
  * this a crash on the hardware is just a frozen picture.
  */
 struct Actor* gFishmodDrawingActor;
+u32 gFishmodRigCheck[16 * 4]; // fishmod_rig.c: (raw start, raw end, cleaned start, cleaned end) per rig list built
+u32 gFishmodRigCheckCount;    // (in code, not the overlay: the checker finds them by the ELF's addresses)
 s32 gFishmodBenchDone = false;
 #ifdef FISHMOD_AUDLOG
 s32 gFishmodAudioLockstep = true; // the audio check: from boot (audio_thread_manager.c)

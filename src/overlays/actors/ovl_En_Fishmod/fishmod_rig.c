@@ -22,6 +22,7 @@
  */
 
 #include "z_en_fishmod.h"
+#include "attributes.h"
 #include "assets/objects/object_fish/object_fish.h"
 #include "assets/objects/gameplay_keep/gameplay_keep_0x18610.h"
 #include "assets/objects/gameplay_keep/gFishInWaterAnim.h"
@@ -433,6 +434,145 @@ static f32 Rig_BoneStart(FishRigBase* base, s32 b) {
     return RIG_PIVOT + (1.0f - RIG_PIVOT) * (b - 1) / base->bodyBones;
 }
 
+
+/*
+ * (frames14) The rig's list without the commands that do nothing. It is every limb's own list copied one after
+ * another, and each limb's list sets up the RDP from scratch: the same combiner, render mode, texture and tile again
+ * (and its pipe sync), and the same texture loaded again when the limbs share it. Here, in order, a command is left
+ * out when, at that point of the list, it:
+ * - sets RDP state (or the RSP's texture or geometry setting) to the value it already has since it was last set in
+ *   this list (the state on entry is unknown: the first setting of each is always kept);
+ * - is a pipe sync with nothing drawn since the last pipe sync kept (nothing in the pipeline to wait for);
+ * - is a texture load identical to the last load (the same image, tile and command), with no other load between
+ *   (texture memory holds the same bytes already).
+ * Every triangle is drawn with the same RDP state and texture memory as before: the same picture
+ * (fishmod/tools/dlstat.py --compare checks the lists command by command). A call to the tints table changes only the
+ * primitive colour; any other call or command not known here forgets everything.
+ */
+static Gfx* Rig_Peephole(Gfx* start, Gfx* end) {
+    enum { K_COMBINE, K_PRIM, K_ENV, K_FOG, K_BLEND, K_FILL, K_PRIMDEPTH, K_SCISSOR, K_TEXTURE, K_TIMG, K_GEOM,
+           K_TILE0, K_TILESIZE0 = K_TILE0 + 8, K_OML = K_TILESIZE0 + 8, K_OMH = K_OML + 32, K_COUNT = K_OMH + 32 };
+    u32 val[K_COUNT][2];
+    u8 known[K_COUNT];
+    u32 lastLoad[6]; // the image's two words, the load tile's descriptor (its two words) and the load's two words
+    s32 loadKnown = false;
+    s32 drawnSinceSync = true;
+    Gfx* in;
+    Gfx* out = start;
+
+    bzero(known, sizeof(known));
+    for (in = start; in < end; in++) {
+        u32 w0 = in->words.w0;
+        u32 w1 = in->words.w1;
+        u8 op = w0 >> 24;
+        s32 key = -1;
+
+        switch (op) {
+            case G_SETCOMBINE: key = K_COMBINE; break;
+            case G_SETPRIMCOLOR: key = K_PRIM; break;
+            case G_SETENVCOLOR: key = K_ENV; break;
+            case G_SETFOGCOLOR: key = K_FOG; break;
+            case G_SETBLENDCOLOR: key = K_BLEND; break;
+            case G_SETFILLCOLOR: key = K_FILL; break;
+            case G_SETPRIMDEPTH: key = K_PRIMDEPTH; break;
+            case G_SETSCISSOR: key = K_SCISSOR; break;
+            case G_TEXTURE: key = K_TEXTURE; break;
+            case G_SETTIMG: key = K_TIMG; break;
+            case G_GEOMETRYMODE: key = K_GEOM; break; // ((mode & a) | b twice is once)
+            case G_SETTILE: key = K_TILE0 + ((w1 >> 24) & 7); break;
+            case G_SETTILESIZE: key = K_TILESIZE0 + ((w1 >> 24) & 7); break;
+            case G_SETOTHERMODE_L: key = K_OML + ((w0 >> 8) & 0x1F); break; // (keyed by its shift: one per field)
+            case G_SETOTHERMODE_H: key = K_OMH + ((w0 >> 8) & 0x1F); break;
+            default: break;
+        }
+        if (key >= 0) {
+            // (othermode: the same field only if the same length too)
+            if (known[key] && (val[key][0] == (w0 & 0x00FFFFFF)) && (val[key][1] == w1)) {
+                continue;
+            }
+            if ((op == G_SETOTHERMODE_L) || (op == G_SETOTHERMODE_H)) {
+                // the bits it sets (F3DEX2's encoding: 32 - shift - length, length - 1): any other setting of the same
+                // word that overlaps them is forgotten
+                s32 base = (op == G_SETOTHERMODE_L) ? K_OML : K_OMH;
+                s32 len = (w0 & 0xFF) + 1;
+                s32 lo = 32 - ((w0 >> 8) & 0xFF) - len;
+                s32 j;
+
+                for (j = 0; j < 32; j++) {
+                    if ((base + j != key) && known[base + j]) {
+                        s32 len2 = (val[base + j][0] & 0xFF) + 1;
+                        s32 lo2 = 32 - ((val[base + j][0] >> 8) & 0xFF) - len2;
+
+                        if ((lo < lo2 + len2) && (lo2 < lo + len)) {
+                            known[base + j] = false;
+                        }
+                    }
+                }
+            }
+            known[key] = true;
+            val[key][0] = w0 & 0x00FFFFFF;
+            val[key][1] = w1;
+            *out++ = *in;
+            continue;
+        }
+        switch (op) {
+            case G_RDPPIPESYNC:
+                if (!drawnSinceSync) {
+                    continue;
+                }
+                drawnSinceSync = false;
+                break;
+            case G_LOADBLOCK:
+            case G_LOADTILE:
+            case G_LOADTLUT: {
+                s32 tile = K_TILE0 + ((w1 >> 24) & 7); // (the descriptor it loads through: where in texture memory)
+
+                if (loadKnown && known[K_TIMG] && known[tile] && (lastLoad[0] == val[K_TIMG][0]) &&
+                    (lastLoad[1] == val[K_TIMG][1]) && (lastLoad[2] == val[tile][0]) && (lastLoad[3] == val[tile][1]) &&
+                    (lastLoad[4] == w0) && (lastLoad[5] == w1)) {
+                    continue;
+                }
+                // (a load through an image or descriptor not known here can't be matched: kept, not remembered)
+                loadKnown = known[K_TIMG] && known[tile];
+                lastLoad[0] = val[K_TIMG][0];
+                lastLoad[1] = val[K_TIMG][1];
+                lastLoad[2] = val[tile][0];
+                lastLoad[3] = val[tile][1];
+                lastLoad[4] = w0;
+                lastLoad[5] = w1;
+                break;
+            }
+            case G_TRI1:
+            case G_TRI2:
+            case G_QUAD:
+            case G_TEXRECT:
+            case G_TEXRECTFLIP:
+            case G_FILLRECT:
+                drawnSinceSync = true;
+                break;
+            case G_VTX:
+            case G_MTX:
+            case G_RDPLOADSYNC:
+            case G_RDPTILESYNC:
+            case G_NOOP:
+                break;
+            case G_DL:
+                if ((w1 >> 24) == RIG_SEG_TINT) {
+                    known[K_PRIM] = false; // (a tint: a primitive colour, then back)
+                    break;
+                }
+                FALLTHROUGH;
+            default:
+                bzero(known, sizeof(known));
+                loadKnown = false;
+                drawnSinceSync = true;
+                break;
+        }
+        *out++ = *in;
+    }
+    return out;
+}
+
 static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
     FishRigBase* base = &sRigBases[model][variant];
     FlexSkeletonHeader* skel = SEGMENTED_TO_VIRTUAL(Rig_Skeleton(model));
@@ -674,6 +814,32 @@ static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
         }
     }
     }
+#ifndef FISHMOD_NO_RIG_PEEPHOLE
+#if FISHMOD_DEBUG
+    {
+        // (debug builds: the list as it was, kept beside it for fishmod/tools/dlstat.py --rigcheck, which walks both
+        // and checks every vertex, matrix and triangle comes with the same state)
+        extern u32 gFishmodRigCheck[];
+        extern u32 gFishmodRigCheckCount;
+        Gfx* raw = ZeldaArena_Malloc((out - base->dl) * sizeof(Gfx));
+
+        if ((raw != NULL) && (gFishmodRigCheckCount < 16)) {
+            u32* r = &gFishmodRigCheck[gFishmodRigCheckCount++ * 4];
+
+            bcopy(base->dl, raw, (out - base->dl) * sizeof(Gfx));
+            r[0] = (u32)raw;
+            r[1] = (u32)(raw + (out - base->dl));
+            r[2] = (u32)base->dl;
+            out = Rig_Peephole(base->dl, out);
+            r[3] = (u32)out;
+        } else {
+            out = Rig_Peephole(base->dl, out);
+        }
+    }
+#else
+    out = Rig_Peephole(base->dl, out);
+#endif
+#endif
     gSPEndDisplayList(out++);
     base->ready = true;
     return true;
