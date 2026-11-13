@@ -1393,6 +1393,7 @@ void Play_Draw(PlayState* this) {
             sp228 = LightContext_NewLights(&this->lightCtx, gfxCtx);
             Lights_BindAll(sp228, this->lightCtx.listHead, NULL);
             Lights_Draw(sp228, gfxCtx);
+            POLY_OPA_DISP = Fishmod_Relight(this, sp228, POLY_OPA_DISP); // (fish-oot: before the rooms are drawn)
         }
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || (R_PLAY_DRAW_ROOM_FLAGS != 0)) {

@@ -94,6 +94,7 @@ def main():
     state = {}  # key -> (value, the list it came from, used since)
     othermode = {0xE2: {}, 0xE3: {}}  # the othermode words by bit range
     vtx = mtx = tris = 0
+    vtx_by_list = collections.Counter()
     drawn_since_sync = True
     idle_syncs = collections.Counter()  # pipe syncs with nothing drawn since the last
     last_load = None  # (the image, the load command) of the last TMEM load
@@ -135,6 +136,7 @@ def main():
                 ram.seg[(offset // 4) & 0xF] = ram.phys(w1) if (w1 >> 24) & 0xF else (w1 & 0x1FFFFFFF)
         if op == 0x01:
             vtx += (w0 >> 12) & 0xFF
+            vtx_by_list[cur_list] += (w0 >> 12) & 0xFF
         elif op == 0xDA:
             mtx += 1
         elif op == 0x05:
@@ -204,6 +206,11 @@ def main():
     print("|---|---|---|---|")
     for p, c in by_list.most_common(args.top):
         print("| %s | %d | %d | %d |" % (sym_of(syms, 0x80000000 | p), c, red_by_list.get(p, 0), dead_by_list.get(p, 0)))
+    print("\n## Vertices loaded, by list\n")
+    print("| list | vertices | commands |")
+    print("|---|---|---|")
+    for p, c in vtx_by_list.most_common(args.top):
+        print("| %s | %d | %d |" % (sym_of(syms, 0x80000000 | p), c, by_list[p]))
     print("\n## Idle pipe syncs and repeated texture loads, by list\n")
     print("| list | idle pipe syncs | repeated loads | commands |")
     print("|---|---|---|---|")

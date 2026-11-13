@@ -30,6 +30,8 @@
 #                  converted copy of the extracted assets (extracted/VERSION-texpack); outputs get a -texpack suffix
 #   --colpack      fewer collision triangles, the same surfaces (tools/colpack.py): the build reads a merged copy of the
 #                  extracted assets (after --texpack's, if both); outputs get a -colpack suffix
+#   --meshpack     the lake's widest mesh pieces cut into areas, each culled by the RSP on its own (tools/meshpack.py):
+#                  the build reads a copy (after the other packs); outputs get a -meshpack suffix
 #   --pgo          (implies --clang) clang optimises with the console's sample profile, PGO_PROFILE (default
 #                  n64prof/profiles/oot-console2.prof; see its README); outputs get a -clang-pgo suffix
 # The release patch: fishmod/tools/bps.py (Flips' format; any BPS patcher applies it), or FLIPS=/path/to/flips. Flips'
@@ -54,6 +56,7 @@ GCC_AUDIO=0
 GCC_LIBULTRA=0
 TEXPACK=0
 COLPACK=0
+MESHPACK=0
 PGO=0
 SCRIPT=""
 F3DEX3=0
@@ -81,6 +84,7 @@ while [ $# -gt 0 ]; do
         --gcc-all) GCC_AUDIO=1; GCC_LIBULTRA=1 ;;
         --texpack) TEXPACK=1 ;;
         --colpack) COLPACK=1 ;;
+        --meshpack) MESHPACK=1 ;;
         --clang-opt) CLANG=1; CLANG_OPT="$2"; shift ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
@@ -154,7 +158,19 @@ if [ "$COLPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$CP_OUT")
 fi
-MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+if [ "$MESHPACK" = 1 ]; then
+    MP_SRC="extracted/$VERSION"
+    [ "$TEXPACK" = 1 ] && MP_SRC="$TP_OUT"
+    [ "$COLPACK" = 1 ] && MP_SRC="$CP_OUT"
+    MP_OUT="$MP_SRC-meshpack"
+    MP_SUM="$({ cat tools/meshpack.py; cat "$MP_SRC/.texpack" "$MP_SRC/.colpack" 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    if [ "$(cat "$MP_OUT/.meshpack" 2>/dev/null)" != "$MP_SUM" ]; then
+        python3 tools/meshpack.py "$MP_SRC" "$MP_OUT" --report
+        echo "$MP_SUM" > "$MP_OUT/.meshpack"
+    fi
+    TEXPACK_ARGS=(EXTRACTED_DIR="$MP_OUT")
+fi
+MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -241,6 +257,9 @@ if [ "$TEXPACK" = 1 ]; then
 fi
 if [ "$COLPACK" = 1 ]; then
     SUFFIX="$SUFFIX-colpack"
+fi
+if [ "$MESHPACK" = 1 ]; then
+    SUFFIX="$SUFFIX-meshpack"
 fi
 if [ "$CLANG_AUDIO" = 1 ]; then
     SUFFIX="$SUFFIX-clangaudio"

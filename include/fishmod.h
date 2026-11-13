@@ -663,4 +663,8 @@ void Fishmod_DebugColNodes(s32 sceneId, s32 used, s32 max);
 void Fishmod_DebugFault(struct OSThread* thread, const char* exp1, const char* exp2);
 #endif
 
+struct Lights;
+// the lake's terrain lit by the CPU (fishmod.c, meshpack builds): sets its vertex segment for this frame
+Gfx* Fishmod_Relight(struct PlayState* play, struct Lights* lights, Gfx* gfx);
+
 #endif
