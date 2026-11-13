@@ -2,4 +2,4 @@
 #include "alignment.h"
 #include "buffers.h"
 
-ALIGNED(16) u8 gAudioHeap[FISHMOD_AUDIO_HEAP_SIZE];
+ALIGNED(16) u8 gAudioHeap[0x38000];

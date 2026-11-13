@@ -1486,6 +1486,16 @@ void AudioLoad_Init(void* heap, u32 heapSize) {
     // Initialize the audio interface buffers
     for (i = 0; i < ARRAY_COUNT(gAudioCtx.aiBuffers); i++) {
         gAudioCtx.aiBuffers[i] = AudioHeap_AllocZeroed(&gAudioCtx.initPool, AIBUF_SIZE);
+#ifdef FISHMOD_AUDIO_EVERY2
+        {
+            // fish-oot: the two-refresh mode's updates are twice as long (up to 1,056 stereo samples, the heap's
+            // buffers 704: they overflowed, and the sound was silence). Buffers of their own, outside the audio heap
+            // (its size is set in an IDO-built file that never sees this switch)
+            static ALIGNED(16) s16 sFishmodAiBuffers[3][2 * AIBUF_LEN];
+
+            gAudioCtx.aiBuffers[i] = sFishmodAiBuffers[i];
+        }
+#endif
     }
 
     // Set audio tables pointers

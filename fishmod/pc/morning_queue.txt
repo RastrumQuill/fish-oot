@@ -4,6 +4,8 @@ releases/fish-oot-rsp-ab.bps 25 rsp-ab
 # then (a power cycle each, when it beeps): F3DEX3's profiling counters (where the RSP's graphics time goes: memory
 # waits, a full RDP buffer, or work)
 releases/fish-oot-frames13-prof.bps 12 frames13-prof
+# the audio mixed every two refreshes (half the RSP audio tasks: the sound up to a refresh later)
+releases/fish-oot-frames13-audio2.bps 12 frames13-audio2
 # the reverb at half rate, the sound at 26.8 kHz
 releases/fish-oot-frames13-reverb2.bps 12 frames13-reverb2
 releases/fish-oot-frames13-27k.bps 12 frames13-27k

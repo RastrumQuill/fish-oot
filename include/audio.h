@@ -53,13 +53,7 @@ typedef void (*AudioCustomUpdateFunction)(void);
 // Both left and right channels
 #define DMEM_2CH_SIZE (2 * DMEM_1CH_SIZE)
 
-#ifdef FISHMOD_AUDIO_EVERY2
-// fish-oot: the two-refresh mode's updates are twice as long (up to 1,056 stereo samples): buffers of 704 overflowed
-// into the audio heap behind them, and the sound was silence
-#define AIBUF_LEN (2 * 88 * SAMPLES_PER_FRAME) // number of samples
-#else
 #define AIBUF_LEN (88 * SAMPLES_PER_FRAME) // number of samples
-#endif
 #define AIBUF_SIZE (AIBUF_LEN * SAMPLE_SIZE) // number of bytes
 
 // Filter sizes
@@ -312,8 +306,15 @@ typedef struct SynthesisReverb {
     /* 0x034 */ void* unk_34;
     /* 0x038 */ void* unk_38;
     /* 0x03C */ void* unk_3C;
+#ifdef FISHMOD_AUDIO_EVERY2
+    // fish-oot: one slot per tick of an update, and the two-refresh mode's updates have 6 ticks: with 5 the sixth
+    // wrote over the next reverb (its ring buffer addresses: the audio task hung the RSP, and the game with it)
+    /* 0x040 */ ReverbRingBufferItem items[2][10];
+    /*       */ ReverbRingBufferItem items2[2][10];
+#else
     /* 0x040 */ ReverbRingBufferItem items[2][5];
     /* 0x158 */ ReverbRingBufferItem items2[2][5];
+#endif
     /* 0x270 */ s16* filterLeft;
     /* 0x274 */ s16* filterRight;
     /* 0x278 */ s16* filterLeftState;

@@ -33,6 +33,9 @@ Compare with frames12 (12 November, `20261112-2034/01-frames12`): the CPU's upda
 - `fish-oot-frames13-reverb2.bps`: every reverb at half its rate or less (FISHMOD_REVERB_DS2). The two reverbs the
   lake runs process every note, every update (ares: 10-20 notes playing, all of them sending to a reverb; none silent).
 - `fish-oot-frames13-27k.bps`: the sound mixed at 26.8 kHz instead of 32 kHz (FISHMOD_AUDIO_RATE=26800).
-- `fish-oot-frames13-audio2.bps`: broken. With its buffers sized for two refreshes (they overflowed before: silence)
-  its audio thread runs about eleven times a refresh and starves the game: no picture. Not to be run.
+- `fish-oot-frames13-audio2.bps`: the audio driver's two-refresh mode, fixed (13 November). It had three faults: its
+  updates (1,056 stereo samples) overflowed the 704-sample output buffers (silence); its reverbs keep a slot per tick
+  in arrays of 5 and its updates have 6 (the sixth wrote over the next reverb); and the first fix, a larger audio heap,
+  was set in a file built by IDO that never sees the switch (the audio code wrote 9 KB past the real heap: the RCP hung,
+  no picture). Now: buffers of its own outside the heap, 10 reverb slots. ares: boots, draws, sound.
 ares' RSP audio times swing too much (8.6-14.7 ms a frame within one run) to tell these apart: the console decides.
