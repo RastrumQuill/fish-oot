@@ -209,7 +209,10 @@ def main():
                     help="no plug: start runs with the software reboot (unreliable on 12 Nov 2026: for testing it)")
     args = ap.parse_args()
 
-    cfg = load_config()
+    if args.soft_reboot and not os.path.isfile(CONFIG):
+        cfg = {"branch": "claude/harkinian-tp-fishing-mod-ehepm9", "poll_minutes": 2}
+    else:
+        cfg = load_config()
     plug = None if args.soft_reboot else Plug(cfg["plug"], cfg["host"])
     if args.test_plug:
         log("the plug: off for %d s, then on" % OFF_SECONDS)
@@ -242,8 +245,9 @@ def main():
             todo = [r for r in read_queue(commit) if r[0] not in done]
             for rid, patch_rel, minutes, label in todo:
                 if not run_one(rid, patch_rel, minutes, label, commit, rom, deployer, plug, not args.no_push):
-                    log("The console needs someone (no plug): stopping")
-                    return
+                    # (no plug: with the software reboot it carries on regardless: a hung game just fails the runs
+                    # after it, which costs nothing while nobody's there)
+                    log("  the console may need someone (no plug): carrying on")
                 commit = fetch(branch) or commit  # (new lines may have come in meanwhile: the next pass picks them up)
         if args.once:
             return
