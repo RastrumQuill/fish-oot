@@ -5,7 +5,7 @@ Two builds of the same code (`fishmod/build.sh --script pcprof_frames --hw --col
 - **`fish-oot-frames11-norun.bps`**: without it (`GCC_EXTRA_OPT=-DFISHMOD_NO_RUNAHEAD`; touch `src/code/sys_cfb.c` before
   and after, or make keeps the other object).
 
-Both on frames10 (see [its notes](notes-frames10.md)) plus:
+Both on frames10 (see [its notes](history/notes-frames10.md)) plus:
 
 **Graphics (the RDP is what limits the route now):**
 - **No colour clear under Lake Hylia's sky.** The sky and the scene cover the screen and the sky's render mode reads

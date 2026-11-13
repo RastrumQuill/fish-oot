@@ -1,7 +1,7 @@
 # stress3: the stress benches judged by the screen, on frames10's code
 
 **`fish-oot-stress3.bps`** (`fishmod/build.sh --script stress_prof --hw --colpack --gcc-all`): stress2 (see
-[its notes](history/notes-stress2.md)) on frames10's code (see [its notes](notes-frames10.md)), with the bench fixed:
+[its notes](history/notes-stress2.md)) on frames10's code (see [its notes](history/notes-frames10.md)), with the bench fixed:
 
 - **A step is judged by what reached the screen:** full speed when the pictures came at 19.7 fps or better and no
   more than 1 in 20 stayed 4 refreshes or longer. stress2 judged by frames whose period was over 52 ms, which run-ahead's
