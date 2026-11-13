@@ -1,0 +1,19 @@
+[
+ {
+  "run": 1,
+  "label": "frames13-sound-r1",
+  "patch": "releases/fish-oot-frames13.bps",
+  "minutes_max": 12.0,
+  "status": "incomplete",
+  "started": "2026-11-12 21:57:40",
+  "patch_sha1": "cafaf18b949fd2acee391d87310f856be2d69dc4",
+  "upload_check": "ok",
+  "error": "no packets for 240 s: the game stopped",
+  "packets": 174,
+  "bytes": 1321064,
+  "packs": 1,
+  "seconds": 346,
+  "id": "f13s-r1",
+  "commit": "fffd2004407e4030f19af3e981143bfeaec01654"
+ }
+]

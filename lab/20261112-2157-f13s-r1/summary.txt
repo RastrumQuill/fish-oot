@@ -1,0 +1,1 @@
+Lab run f13s-r1: frames13-sound-r1 incomplete 174 packets 1.3 MB 346 s no packets for 240 s: the game stopped
