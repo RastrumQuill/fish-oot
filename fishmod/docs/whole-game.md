@@ -39,6 +39,22 @@ not started; **on hold** = waiting on a decision.
   removed in place safely (lists jump into each other): a build pass over the extracted lists, like texpack's, can.
 - **Vertices per triangle**: the lake loads ~1.8 vertices per triangle drawn; the rooms with the worst ratio first.
 
+## Places to measure, by the engine system they load
+
+Not a whole-game profile: a "spots" bench (one ROM, one power cycle) that warps to each place, walks a short fixed
+path for ~30 seconds and tags the frame log and profile by place, to see which engine system costs most where, and
+then whether an engine-wide improvement (a faster particle system, actor update, skeleton draw...) makes each run
+smoother. Documented reports (13 Nov search: scattered, none measured on hardware in these terms) are marked *(rep.)*.
+
+| System | Places |
+|---|---|
+| Particles and effects (EffectSs, Effect) | Death Mountain Crater (fire, smoke, embers); Fire Temple; the rain at Lake Hylia and Kakariko (Song of Storms); Ganon's Tower collapse *(rep.)* (debris, fire); Volvagia; bomb and bombchu explosions in a crowd (Bombchu Bowling); Dodongo's Cavern (fire, bomb flowers) |
+| Many actors (update, draw, collision) | Castle Town market *(rep.)* (people, dogs); Kokiri Forest *(rep.)* (Kokiri, grass, bushes); Kakariko Village (chickens, workers, people); Lon Lon Ranch (horses); Hyrule Field at night (Stalchildren) *(rep.: field)*; Gerudo Fortress (guards); grass fields cut with a spin attack |
+| Skeletons and animation | the market (many animated people); Lon Lon Ranch (horses); the Ganon fight *(rep.)*; Twinrova; Gohma's larvae; Spirit Temple (Iron Knuckles) |
+| Big rooms and geometry | Hyrule Field *(rep.)*; Gerudo Valley; Zora's Domain and Zora's River (waterfalls); Death Mountain Trail; Lake Hylia (ours) |
+| Translucency and fill (RDP) | Zora's Domain waterfall; Jabu-Jabu's Belly (animated walls); the Forest Temple's twisted corridor; Shadow Temple (fog walls); the water at Lake Hylia (ours); Ganon's Castle barrier |
+| Audio | the market (many sound sources); Kakariko (wind, people, music); boss fights |
+
 ## Ideas not started (for all scenes)
 
 - A display-list pass (build time) removing state commands that change nothing and idle pipe syncs from every
