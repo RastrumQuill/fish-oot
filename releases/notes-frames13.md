@@ -26,3 +26,5 @@ First run (silent, 12 November `20261112-2106`): visible hitches 10% (frames12 1
 21.2 ms (21.9); the cache instruction fine on the console.
 
 Compare with frames12 (12 November, `20261112-2034/01-frames12`): the CPU's update and draw, the visible hitches.
+
+**frames13-audio2:** the same with the audio driver mixing every two refreshes (FISHMOD_AUDIO_EVERY2): half the RSP audio tasks. Not bit-exact (the timing of the sound changes). Compare its RSP audio time and hitches with frames13-sound.
