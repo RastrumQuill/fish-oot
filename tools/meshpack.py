@@ -38,6 +38,8 @@ if os.environ.get("MESHPACK_NO_RELIGHT"):  # (a test: the areas without the CPU'
     RELIGHT = set()
 RELIT_SEG = 0x0C
 CELL = 1500        # area size (units, x and z)
+# MESHPACK_BY_AREA: the first cut (each area its own list, replaying the piece's state before its triangles: frames14)
+BY_AREA = bool(os.environ.get("MESHPACK_BY_AREA"))
 MIN_TRIS = 12      # areas with fewer triangles are joined to their nearest neighbour
 VTX_SLOTS = 32     # vertices loaded at a time (the original lists' own limit)
 SAFE_STATE = {"gsDPPipeSync", "gsSPClearGeometryMode", "gsSPSetGeometryMode", "gsDPSetTextureLUT", "gsSPTexture",
@@ -190,6 +192,8 @@ def cut(dirpath, dl):
         tgt = min(others, key=lambda c: (c[0] - k[0]) ** 2 + (c[1] - k[1]) ** 2)
         cells[tgt].extend(cells.pop(k))
     order = sorted(cells)
+    if not BY_AREA:
+        return cut_by_material(dl, stream, tris, cells, order)
     area_dls = []
     area_vtx = []
     for ai, key in enumerate(order):
@@ -283,10 +287,132 @@ def cut(dirpath, dl):
     want = collections.Counter((t[0], t[1]) for t in tris)
     if got != want:
         return None, "check: the triangles differ"
-    return (area_dls, area_vtx, new_dl, len(tris), len(order)), None
+    return (area_dls, area_vtx, new_dl, len(tris), len(order), {}), None
 
 
-def relight(lists, arrays_of):
+def emit_tris(ts, vname, vtx, out):
+    """the triangles' vertex loads (identical vertices in a load loaded once) and triangles, appended to out"""
+    batch = []
+    pending = []
+
+    def flush():
+        if not batch:
+            return
+        start = len(vtx)
+        vtx.extend(batch)
+        out.append("gsSPVertex(&%s[%d], %d, 0)" % (vname, start, len(batch)))
+        k = 0
+        while k < len(pending):
+            if k + 1 < len(pending):
+                out.append("gsSP2Triangles(%d, %d, %d, 0, %d, %d, %d, 0)" % (pending[k] + pending[k + 1]))
+                k += 2
+            else:
+                out.append("gsSP1Triangle(%d, %d, %d, 0)" % pending[k])
+                k += 1
+        batch.clear()
+        pending.clear()
+
+    for t in ts:
+        need = [v for v in dict.fromkeys(t[1]) if v not in batch]
+        if len(batch) + len(need) > VTX_SLOTS:
+            flush()
+        for v in t[1]:
+            if v not in batch:
+                batch.append(v)
+        pending.append(tuple(batch.index(v) for v in t[1]))
+    flush()
+
+
+def cut_by_material(dl, stream, tris, cells, order):
+    """The piece drawn material by material, as the original: its state commands (texture loads among them) run once
+    each, in the piece's own list, in their order; after each run of state, every area with triangles drawn under it
+    is called in turn: a small list of its own (that area's triangles under that state: their box, the cull, their
+    vertices and triangles; no state), so an area out of view costs its box and the textures stay loaded. (The areas
+    first cut replayed the state before each of their triangles, every texture load before them included: more
+    loads for the RDP than the piece had.)"""
+    area_of = {}
+    for ai, key in enumerate(order):
+        for t in cells[key]:
+            area_of[id(t)] = ai
+    by_state = collections.OrderedDict()
+    for t in tris:  # (the original order: the state points ascending)
+        by_state.setdefault(t[0], collections.defaultdict(list))[area_of[id(t)]].append(t)
+    sub_dls, sub_vtx, new_dl = [], [], []
+    emitted = 0
+    for mi, (k, areas) in enumerate(by_state.items()):
+        new_dl.extend(stream[emitted:k])
+        emitted = k
+        for ai in sorted(areas):
+            ts = areas[ai]
+            name = "%s_mp%d_%d" % (dl, ai, mi)
+            vname = name + "_Vtx"
+            vtx = []
+            out = []
+            xs = [int(v[0]) for t in ts for v in t[1]]
+            ys = [int(v[1]) for t in ts for v in t[1]]
+            zs = [int(v[2]) for t in ts for v in t[1]]
+            for x in (min(xs), max(xs)):
+                for y in (min(ys), max(ys)):
+                    for z in (min(zs), max(zs)):
+                        vtx.append(("%d" % x, "%d" % y, "%d" % z, "0", "0", "0", "0", "0", "0"))
+            out.append("gsSPVertex(&%s[0], 8, 0)" % vname)
+            out.append("gsSPCullDisplayList(0, 7)")
+            emit_tris(ts, vname, vtx, out)
+            out.append("gsSPEndDisplayList()")
+            sub_dls.append((name, out))
+            sub_vtx.append((vname, vtx))
+            new_dl.append("gsSPDisplayList(%s)" % name)
+    new_dl.extend(stream[emitted:])
+    new_dl.append("gsSPEndDisplayList()")
+    # check: walking the piece's list, every state command of the original once and in order, and every triangle
+    # once with the same vertices after the same state commands
+    subs = dict(sub_dls)
+    vtxs = dict(sub_vtx)
+    got = collections.Counter()
+    n_state = 0
+    for it in new_dl[:-1]:
+        nm = name_of(it)
+        if nm == "gsSPDisplayList" and args_of(it)[0] in subs:
+            name = args_of(it)[0]
+            sl = [None] * 64
+            for c in subs[name]:
+                cn = name_of(c)
+                if cn == "gsSPVertex":
+                    a = args_of(c)
+                    m = VTX_REF.fullmatch(a[0])
+                    base, cnt = int(m.group(2)), int(a[1])
+                    for j in range(cnt):
+                        sl[j] = vtxs[name + "_Vtx"][base + j]
+                elif cn in ("gsSP1Triangle", "gsSP2Triangles"):
+                    a = [int(x, 0) for x in args_of(c)]
+                    for g in ([a[0:3]] if cn == "gsSP1Triangle" else [a[0:3], a[4:7]]):
+                        got[(n_state, tuple(sl[i] for i in g))] += 1
+                elif cn not in ("gsSPCullDisplayList", "gsSPEndDisplayList"):
+                    return None, "check: state in an area's list (%s)" % c
+        elif n_state < len(stream) and it == stream[n_state]:
+            n_state += 1
+        else:
+            return None, "check: state out of order (%s)" % it
+    if n_state != len(stream):
+        return None, "check: %d of %d state commands" % (n_state, len(stream))
+    want = collections.Counter((t[0], t[1]) for t in tris)
+    if got != want:
+        return None, "check: the triangles differ"
+    # each area list's lighting where it's called (G_LIGHTING as the piece's state has it there)
+    lit_at, lit = {}, None
+    for j, c in enumerate(stream + [None]):
+        lit_at[j] = lit
+        if c is not None and name_of(c) in ("gsSPSetGeometryMode", "gsSPClearGeometryMode") and \
+                "G_LIGHTING" in [x.strip() for x in args_of(c)[0].split("|")]:
+            lit = name_of(c) == "gsSPSetGeometryMode"
+    entry_lit = {}
+    for mi, (k, areas) in enumerate(by_state.items()):
+        for ai in areas:
+            entry_lit["%s_mp%d_%d" % (dl, ai, mi)] = lit_at[k]
+    return (sub_dls, sub_vtx, new_dl, len(tris), len(order), entry_lit), None
+
+
+def relight(lists, arrays_of, entry_lit=None):
     """The lit pieces' vertex loads moved to segment RELIT_SEG, lighting off: lists is {name: [commands]} (each list
     changed in place); arrays_of(name) gives an array's vertices. Returns the vertices in the table's order (the CPU
     lights them, code/fishmod_relight.c) or None and why. A load is lit when G_LIGHTING is on where it is (the lists
@@ -294,9 +420,9 @@ def relight(lists, arrays_of):
     colour the RSP would have computed from their normals is the CPU's now."""
     table = []
     for name, cmds in lists.items():
-        lit = None  # unknown at the start
+        lit = (entry_lit or {}).get(name)  # (an area's list called with the piece's state: known; else unknown)
         out = []
-        for c in cmds:
+        for i, c in enumerate(cmds):
             n = name_of(c)
             if n in ("gsSPSetGeometryMode", "gsSPClearGeometryMode"):
                 terms = [t.strip() for t in args_of(c)[0].split("|")]
@@ -305,6 +431,8 @@ def relight(lists, arrays_of):
                     if n == "gsSPSetGeometryMode":
                         terms = [t for t in terms if t != "G_LIGHTING"]
                         c = "%s(%s)" % (n, " | ".join(terms)) if terms else "gsSPNoOp()"
+            elif n == "gsSPVertex" and (i + 1 < len(cmds)) and name_of(cmds[i + 1]) == "gsSPCullDisplayList":
+                pass  # (a bounding box: positions only, for the cull)
             elif n == "gsSPVertex" and lit:
                 a = args_of(c)
                 m = VTX_REF.fullmatch(a[0].strip())
@@ -338,24 +466,27 @@ def main():
         areas = {}      # area list name -> commands
         area_arrays = {}  # area vertex array name -> vertices
         pieces = {}     # piece list name -> commands (as the build will have them)
+        entry_lit = {}  # area list name -> the lighting where it's called (the material cut's lists set no state)
         for dl in dls:
             res, why = cut(d, dl)
             if res is None:
                 print("meshpack: %s left as it is (%s)" % (dl, why))
                 continue
-            area_dls, area_vtx, new_dl, ntri, nareas = res
+            area_dls, area_vtx, new_dl, ntri, nareas, lits = res
+            entry_lit.update(lits)
             pieces[dl] = new_dl
             for (name, cmds), (vname, vtx) in zip(area_dls, area_vtx):
                 areas[name] = cmds
                 area_arrays[vname] = vtx
             if report:
-                print("meshpack: %s: %d triangles in %d areas" % (dl, ntri, nareas))
+                print("meshpack: %s: %d triangles in %d areas, %d area lists" % (dl, ntri, nareas, len(area_dls)))
         table = None
         if room in RELIGHT:
             # every piece of the room (cut or not) relit
             ent = [f for f in os.listdir(d) if f.startswith(room) and f.endswith("_CullableEntries.inc.c")]
             names = re.findall(r"(\w+), // opa", open(os.path.join(d, ent[0])).read()) if ent else []
             lists = dict(areas)
+            lists.update(pieces)  # (the cut pieces' own lists: the material cut's hold the piece's state)
             for n in names:
                 if n != "NULL" and n not in pieces:
                     p = os.path.join(d, n + ".inc.c")
@@ -369,7 +500,7 @@ def main():
                 if a not in room_arrays:
                     room_arrays[a] = load_vtx(d, a)
                 return room_arrays[a]
-            table, why = relight(lists, arrays_of)
+            table, why = relight(lists, arrays_of, entry_lit)
             if table is None:
                 sys.exit("meshpack: relighting %s failed: %s" % (room, why))
             for n in lists:
