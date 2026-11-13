@@ -47,6 +47,18 @@ not started; **on hold** = waiting on a decision.
 - Identical-vertex merging inside each vertex load, for every scene list (exact).
 - Room-level culling finer than the game's own for the big outdoor rooms (as the lake's areas).
 
+## Skeletons, textures and models (every object, NPC, enemy and Link)
+
+| What | Status | Notes |
+|---|---|---|
+| Limb display lists cleaned at build time: state set to what it already is, pipe syncs with nothing drawn, repeated texture loads (exact) | to do | as the fish rig's (19-27% fewer commands there); proven per list by the rigcheck method; the extracted object lists are known by name, so a build pass can rewrite them safely (unlike patching them in RAM) |
+| Identical vertices merged inside each vertex load of every model (exact) | to do | fewer vertices transformed and lit by the RSP |
+| Skeleton matrices: limbs that never move relative to their parent drawn under the parent's matrix | to do | fewer matrix loads and multiplies (CPU and RSP); exact when the limb's own transform is the identity in every animation it plays |
+| Skeleton animation on the CPU: frame data decoded once per frame per skeleton, the matrix stack work trimmed | to do | measure first: the profile's costliest skeleton functions |
+| Textures: CI8 for 16-bit textures of 256 colours or fewer | all assets (texpack) | in builds with `--texpack`; to put in the bench builds and test on the console |
+| Textures: CI4 for those of 16 colours or fewer, I4/IA8 for grey ones | to do | half again the bytes loaded, the same texels |
+| Models: lower-detail versions for distance (Link and the common NPCs/enemies) | to do | changes the picture far away: tested by eye |
+
 ## On hold
 
 - Other scenes' optimizations: on hold for now (13 Nov), the list kept here meanwhile.
