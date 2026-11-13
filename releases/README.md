@@ -13,6 +13,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-qol7-testmode.bps`, `fish-oot-qol7-hw-testmode.bps` | The newest test build to play: the fish's new behaviour (schools, days, scent, learned baits) | [notes](notes-qol7.md) |
 | `fish-oot-stress3.bps` | The fish and plant stress benches judged by the screen (how many really hold 20 fps), on frames10's code | [notes](notes-stress3.md) |
 | `fish-oot-frames12.bps` | The bench route with less waiting on memory (actor lists and categories, collision lists, audio channels, the fish's fields, the fish manager) | [notes](notes-frames12.md) |
+| `fish-oot-frames14.bps` | frames13 with the fish rig's lists cleaned, the lake terrain cut into areas the RSP culls and lit by the CPU | [notes](notes-frames14.md) |
 | `fish-oot-rsp-ab.bps` | The RSP test: frames13's bench for 4 laps (about 16 minutes), the audio's RSP work on, off, on, off | (rsp_ab script) |
 | `fish-oot-frames13.bps`, `-prof`, `-audio2`, `-reverb2`, `-27k` | frames12 without the wall clearance bound (frames11's CPU slowdown, found by the bisection), and two audio memory changes; -prof: F3DEX3's profiling counters (where the RSP's time goes); -audio2: the audio mixed every two refreshes (half the RSP audio tasks); -reverb2: every reverb at half rate or less; -27k: the sound mixed at 26.8 kHz (both change the sound: RSP tests) | [notes](notes-frames13.md) |
 
