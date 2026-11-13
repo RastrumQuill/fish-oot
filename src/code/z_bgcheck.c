@@ -1117,7 +1117,11 @@ static WallCacheEntry sWallCache[WALL_CACHE_SIZE];
  * untouched, false, without walking the list. Every wall in the cell counts, whatever its height or flags (more than
  * the test looks at: the bound only gets smaller). Emptied with the floor cache (a new generation). The exact answers:
  * fishmod/tools/collog.sh compares the collision logs with FISHMOD_NO_WALLCLEAR.
+ * (Off since frames13, only built with FISHMOD_WALLCLEAR: on the console it cost more than it saved. With it alone
+ * left out of frames11, the CPU's update was 1.3 ms less and the visible hitches 19% instead of 28-31%: its
+ * measurement of every wall in a cell, and the misses of the table, outweighed the walks it skipped.)
  */
+#ifdef FISHMOD_WALLCLEAR
 #define WALL_CLEAR_SIZE 64
 typedef struct {
     StaticLookup* lookup;
@@ -1165,10 +1169,11 @@ static f32 WallClear_Measure(StaticLookup* lookup, CollisionContext* colCtx, Vec
     }
     return clear;
 }
+#endif
 
 s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 xpFlags, f32* outX, f32* outZ,
                             Vec3f* pos, f32 radius, CollisionPoly** outPoly) {
-#ifndef FISHMOD_NO_WALLCLEAR
+#ifdef FISHMOD_WALLCLEAR
     WallClear* c = &sWallClear[((u32)lookup >> 2) & (WALL_CLEAR_SIZE - 1)];
 
     if ((sStaticPolyBox != NULL) && (lookup->wall.head != SS_NULL) && (c->gen == sFloorCacheGen) &&
@@ -1224,7 +1229,7 @@ s32 BgCheck_SphVsStaticWall(StaticLookup* lookup, CollisionContext* colCtx, u16 
     e->outX = FloorCache_Bits(*outX);
     e->outZ = FloorCache_Bits(*outZ);
     e->outPoly = *outPoly;
-#ifndef FISHMOD_NO_WALLCLEAR
+#ifdef FISHMOD_WALLCLEAR
     // nothing found: how far from here nothing can be (at most every 4th time for a cell that keeps missing)
     if (!result && (sStaticPolyBox != NULL) && (lookup->wall.head != SS_NULL) &&
         ((c->gen != sFloorCacheGen) || (c->lookup != lookup) || ((++c->misses & 3) == 0))) {
