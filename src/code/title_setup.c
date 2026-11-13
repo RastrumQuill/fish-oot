@@ -6,6 +6,7 @@
 #include "save.h"
 #include "fishmod.h"
 #include "play_state.h"
+#include "cic6105.h"
 
 void Setup_InitImpl(SetupState* this) {
     PRINTF(T("ゼルダ共通データ初期化\n", "Zelda common data initialization\n"));
@@ -14,6 +15,9 @@ void Setup_InitImpl(SetupState* this) {
 #if FISHMOD_DEBUG
     if (!Fishmod_DebugNormalBoot()) {
         Fishmod_DebugBoot();
+        // the title screen, skipped here, is what turns on the audio's RSP tasks: without this every script ran with
+        // the sound mixed on the CPU but never on the RSP (silent, and the RSP's audio time missing from the benches)
+        CIC6105_EnableAudio();
         SET_NEXT_GAMESTATE(&this->state, Play_Init, PlayState);
         return;
     }
