@@ -34,6 +34,8 @@ TARGETS = [
       "gSpot06DL_00A400_03004AF0_DL"]),
 ]
 RELIGHT = {"spot06_room_0"}  # rooms whose lit pieces read their vertices lit by the CPU (segment RELIT_SEG)
+if os.environ.get("MESHPACK_NO_RELIGHT"):  # (a test: the areas without the CPU's lighting)
+    RELIGHT = set()
 RELIT_SEG = 0x0C
 CELL = 1500        # area size (units, x and z)
 MIN_TRIS = 12      # areas with fewer triangles are joined to their nearest neighbour
