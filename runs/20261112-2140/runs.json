@@ -1,0 +1,16 @@
+[
+ {
+  "run": 1,
+  "label": "frames13-sound",
+  "patch": "releases\\fish-oot-frames13.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-12 21:40:37",
+  "patch_sha1": "cafaf18b949fd2acee391d87310f856be2d69dc4",
+  "upload_check": "ok",
+  "packets": 394,
+  "bytes": 2993736,
+  "packs": 1,
+  "seconds": 225
+ }
+]
