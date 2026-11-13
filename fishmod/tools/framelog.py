@@ -99,7 +99,9 @@ def main():
         n = len(recs)
         recs = [r for r in recs if r[16 + sects.index("fm_debug")] <= 5000]
         print(f"(left out: {n - len(recs)} frames that sent a USB packet, the profiler's own cost: --keep-sends to keep them)")
-    cats = enum_names("include/actor_profile.h", "ActorCategory", "ACTORCAT_")
+    # (the record has 12 category words: the fish's and their manager's own categories are counted with the NPCs and
+    # misc, as before they had their own: z_actor.c)
+    cats = enum_names("include/actor_profile.h", "ActorCategory", "ACTORCAT_")[:12]
     actors = actor_names()
     gaps = sum(1 for a, b in zip(recs, recs[1:]) if b[0] != a[0] + 1)
     slow = [r for r in recs if r[2] > SLOW_US]
