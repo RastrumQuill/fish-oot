@@ -1568,12 +1568,17 @@ void Fishmod_ClaimDisplayLists(GraphicsContext* gfxCtx) {
 
 #define FISHMOD_RELIT_SEG 0x0C
 #define FISHMOD_RELIT_BUFS 3
+#define FISHMOD_RELIT_MIN_FRAMES 10 // a small change in the lights waits this long (half a second at 20 fps)
+#define FISHMOD_RELIT_JUMP 4        // a change bigger than this in any byte is lit at once
+static s32 sRelitAge;               // frames since the terrain was last lit
 
 extern void* spot06_room_0_fishmodRelit[] __attribute__((weak)); // (meshpack builds only: else its address is 0)
 
 static Vtx* sRelitBuf[FISHMOD_RELIT_BUFS];
 static const u32* sRelitSrcs; // each vertex's source in the room (its segment address): its normal is read there
+static s8* sRelitNormal;      // the sources' normals gathered in one array (on load, and when they change)
 static u8* sRelitRoom;        // (the room's segment, for the sources)
+u32 gFishmodRelitCount;       // (the times the terrain was lit again: a check that it isn't every frame)
 s32 gFishmodRelitDirty;       // set when a room vertex's normal changes (fishmod_scatter.c's bed shading): light again
 static const Vtx* sRelitSrc;
 static s32 sRelitCount;
@@ -1601,6 +1606,10 @@ static void Fishmod_RelitFree(void) {
             ZELDA_ARENA_FREE(sRelitBuf[i], "../fishmod.c", __LINE__);
             sRelitBuf[i] = NULL;
         }
+    }
+    if (sRelitNormal != NULL) {
+        ZELDA_ARENA_FREE(sRelitNormal, "../fishmod.c", __LINE__);
+        sRelitNormal = NULL;
     }
     sRelitSrcs = NULL;
     sRelitSrc = NULL;
@@ -1630,8 +1639,7 @@ static void Fishmod_RelitCompute(Vtx* out, Lights* lights) {
         cb[k] = l->col[2];
     }
     for (i = 0; i < sRelitCount; i++) {
-        // (the normal as the room holds it now: the game may have shortened it to shade the lake bed)
-        const s8* nm = (const s8*)((const Vtx*)(sRelitRoom + (sRelitSrcs[i] & 0xFFFFFF)))->n.n;
+        const s8* nm = &sRelitNormal[i * 3];
         s32 r = ar * (128 * 128), g = ag * (128 * 128), b = ab * (128 * 128); // (the dot's scale: both /128, as F3DEX3)
         Vtx* v = &out[i];
 
@@ -1675,7 +1683,9 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
         for (i = 0; i < FISHMOD_RELIT_BUFS; i++) {
             sRelitBuf[i] = ZELDA_ARENA_MALLOC(count * sizeof(Vtx), "../fishmod.c", __LINE__);
         }
-        if ((sRelitBuf[FISHMOD_RELIT_BUFS - 1] == NULL) || (sRelitBuf[0] == NULL) || (sRelitBuf[1] == NULL)) {
+        sRelitNormal = ZELDA_ARENA_MALLOC(count * 3, "../fishmod.c", __LINE__);
+        if ((sRelitBuf[FISHMOD_RELIT_BUFS - 1] == NULL) || (sRelitBuf[0] == NULL) || (sRelitBuf[1] == NULL) ||
+            (sRelitNormal == NULL)) {
             Fishmod_RelitFree();
             return gfx; // (no memory: the lit pieces would read garbage; the segment is left unset)
         }
@@ -1686,27 +1696,67 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
         }
         sRelitSrc = src;
         sRelitCount = count;
+        gFishmodRelitDirty = true; // (the normals gathered below)
     }
     {
-        // the lights this frame, as bytes: when they're what the newest buffer was lit with, it stays
-        s32 len = 8 + lights->numLights * 16;
+        // the lights this frame (their count, the ambient colour, each light's colour and direction: the bytes that
+        // light a vertex; the structure's padding isn't cleared each frame, so it isn't compared): when they're what
+        // the newest buffer was lit with, it stays
+        u8 key[sizeof(sRelitKey)];
+        s32 len = 0;
+        s32 k;
 
-        if (len > (s32)sizeof(sRelitKey)) {
-            len = sizeof(sRelitKey);
+        key[len++] = lights->numLights;
+        key[len++] = lights->l.a.l.col[0];
+        key[len++] = lights->l.a.l.col[1];
+        key[len++] = lights->l.a.l.col[2];
+        for (k = 0; (k < lights->numLights) && (len + 6 <= (s32)sizeof(key)); k++) {
+            Light_t* l = &lights->l.l[k].l;
+
+            key[len++] = l->col[0];
+            key[len++] = l->col[1];
+            key[len++] = l->col[2];
+            key[len++] = l->dir[0];
+            key[len++] = l->dir[1];
+            key[len++] = l->dir[2];
         }
-        if ((sRelitFront < 0) || gFishmodRelitDirty || (len != sRelitKeyLen) ||
-            !Fishmod_RelitSame(sRelitKey, &lights->l.a, 8) ||
-            ((len > 8) && !Fishmod_RelitSame(sRelitKey + 8, &lights->l.l[0], len - 8))) {
+        if (gFishmodRelitDirty) {
+            // the normals as the room holds them now (the game may have shortened some to shade the lake bed)
+            for (i = 0; i < sRelitCount; i++) {
+                const s8* n = (const s8*)((const Vtx*)(sRelitRoom + (sRelitSrcs[i] & 0xFFFFFF)))->n.n;
+
+                sRelitNormal[i * 3 + 0] = n[0];
+                sRelitNormal[i * 3 + 1] = n[1];
+                sRelitNormal[i * 3 + 2] = n[2];
+            }
+        }
+        s32 big = (sRelitFront < 0) || gFishmodRelitDirty || (len != sRelitKeyLen);
+        s32 changed = big || !Fishmod_RelitSame(sRelitKey, key, len);
+
+        // (a small change waits until half a second has passed since the last: the sun moves a fraction of a degree
+        // a second, a day being 20 minutes; a jump of more than a few steps, a lightning flash or the lights of a
+        // new scene, is lit at once)
+        sRelitAge++;
+        if (changed && !big) {
+            for (k = 0; k < len; k++) {
+                s32 d = key[(k)] - sRelitKey[k];
+
+                if ((d > FISHMOD_RELIT_JUMP) || (d < -FISHMOD_RELIT_JUMP)) {
+                    big = true;
+                    break;
+                }
+            }
+        }
+        if (changed && (big || (sRelitAge >= FISHMOD_RELIT_MIN_FRAMES))) {
             s32 next = (sRelitFront + 1) % FISHMOD_RELIT_BUFS;
 
             Fishmod_RelitCompute(sRelitBuf[next], lights);
             sRelitFront = next;
-            bcopy(&lights->l.a, sRelitKey, 8);
-            if (len > 8) {
-                bcopy(&lights->l.l[0], sRelitKey + 8, len - 8);
-            }
+            bcopy(key, sRelitKey, len);
             sRelitKeyLen = len;
             gFishmodRelitDirty = false;
+            gFishmodRelitCount++;
+            sRelitAge = 0;
         }
     }
     gSPSegment(gfx++, FISHMOD_RELIT_SEG, sRelitBuf[sRelitFront]);
