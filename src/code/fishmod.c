@@ -1572,7 +1572,7 @@ void Fishmod_ClaimDisplayLists(GraphicsContext* gfxCtx) {
 extern void* spot06_room_0_fishmodRelit[] __attribute__((weak)); // (meshpack builds only: else its address is 0)
 
 static Vtx* sRelitBuf[FISHMOD_RELIT_BUFS];
-static s8* sRelitNormal; // each vertex's normal, made unit length (x127) once
+static s8* sRelitNormal; // each vertex's normal (as stored: the RSP doesn't make it unit length)
 static const Vtx* sRelitSrc;
 static s32 sRelitCount;
 static s32 sRelitFront = -1;
@@ -1621,7 +1621,7 @@ static void Fishmod_RelitCompute(Vtx* out, Lights* lights) {
     for (k = 0; k < n; k++) {
         Light_t* l = &lights->l.l[k].l;
         f32 len = sqrtf(SQ((f32)l->dir[0]) + SQ((f32)l->dir[1]) + SQ((f32)l->dir[2]));
-        f32 s = (len > 0.0f) ? (256.0f / len) : 0.0f; // (the direction made unit length, x256)
+        f32 s = (len > 0.0f) ? (127.0f / len) : 0.0f; // (made unit length as the RSP stores it: in a byte, x127)
 
         dx[k] = (s32)(l->dir[0] * s);
         dy[k] = (s32)(l->dir[1] * s);
@@ -1632,7 +1632,7 @@ static void Fishmod_RelitCompute(Vtx* out, Lights* lights) {
     }
     for (i = 0; i < sRelitCount; i++) {
         const s8* nm = &sRelitNormal[i * 3];
-        s32 r = ar * (127 * 256), g = ag * (127 * 256), b = ab * (127 * 256); // (the dot's scale)
+        s32 r = ar * (128 * 128), g = ag * (128 * 128), b = ab * (128 * 128); // (the dot's scale: both /128, as F3DEX3)
         Vtx* v = &out[i];
 
         for (k = 0; k < n; k++) {
@@ -1644,9 +1644,9 @@ static void Fishmod_RelitCompute(Vtx* out, Lights* lights) {
                 b += cb[k] * d;
             }
         }
-        r = (r + (127 * 128)) / (127 * 256);
-        g = (g + (127 * 128)) / (127 * 256);
-        b = (b + (127 * 128)) / (127 * 256);
+        r = r / (128 * 128);
+        g = g / (128 * 128);
+        b = b / (128 * 128);
         v->v.cn[0] = (r > 255) ? 255 : r;
         v->v.cn[1] = (g > 255) ? 255 : g;
         v->v.cn[2] = (b > 255) ? 255 : b;
@@ -1682,13 +1682,13 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
             return gfx; // (no memory: the lit pieces would read garbage; the segment is left unset)
         }
         for (i = 0; i < count; i++) {
+            // the normals as stored (the RSP uses them so: not made unit length, over 128; the lake's are about 120
+            // long, which lights them a little under full)
             const s8* c = (const s8*)src[i].n.n;
-            f32 len = sqrtf(SQ((f32)c[0]) + SQ((f32)c[1]) + SQ((f32)c[2]));
-            f32 s = (len > 0.0f) ? (127.0f / len) : 0.0f;
 
-            sRelitNormal[i * 3 + 0] = (s8)(c[0] * s);
-            sRelitNormal[i * 3 + 1] = (s8)(c[1] * s);
-            sRelitNormal[i * 3 + 2] = (s8)(c[2] * s);
+            sRelitNormal[i * 3 + 0] = c[0];
+            sRelitNormal[i * 3 + 1] = c[1];
+            sRelitNormal[i * 3 + 2] = c[2];
         }
         for (i = 0; i < FISHMOD_RELIT_BUFS; i++) {
             bcopy(src, sRelitBuf[i], count * sizeof(Vtx)); // (positions, texture coordinates, alpha)
