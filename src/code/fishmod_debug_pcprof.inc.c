@@ -925,7 +925,11 @@ static void PcProf_Update(void) {
 #endif
         // one packet a frame, when the last one has gone (never waits: with no PC listening the counts wait, and
         // the table counting drops samples once full)
+#ifdef FISHMOD_NO_PROFILE_SEND // (long runs: the frame log only, the profile's samples not sent)
+        if (0) {
+#else
         if ((sPcSending != NULL) && !Sc64_UsbBusy()) {
+#endif
             u32 bytes = n64prof_pack(sPcSending, &sPcSendPos, sPcOut, SC64_BUFFER_SIZE, user);
 
             if (Sc64_UsbSend(sPcOut, bytes) == 0) {

@@ -284,6 +284,23 @@ static void Bench_SetMode(s32 mode) {
     mode = 0; // the profile wants the game as shipped on every pass
 #endif
     gFishmodBench = sFlags[mode];
+#ifdef FISHMOD_RDP_SWEEP
+    {
+        // (the RDP sweep, rdp_sweep script: one thing left out a lap, every other lap the game as shipped; the frame
+        // log's lap number says which: lap % 12)
+        static const s32 sSweep[12] = {
+            0, FISHMOD_BENCH_NOPROPS,
+            0, FISHMOD_BENCH_NOFISH,
+            0, FISHMOD_BENCH_NOROOMXLU,
+            0, FISHMOD_BENCH_NOSKY,
+            0, FISHMOD_BENCH_NOHUD,
+            0, FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOROOMXLU | FISHMOD_BENCH_NOSKY |
+                   FISHMOD_BENCH_NOHUD,
+        };
+
+        gFishmodBench = sSweep[sBench.laps % 12];
+    }
+#endif
 }
 
 static void Bench_Save(void) {
@@ -513,6 +530,18 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     sPbCond = 0;
     R_AUDIOMGR_ACTIVITY_LEVEL = (sBench.laps & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
                                                   : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
+#endif
+#ifdef FISHMOD_RDP_SWEEP
+    sPbCond = 0; // (every lap clear dawn)
+    {
+        static s32 sHudOff = -1;
+        s32 off = (gFishmodBench & FISHMOD_BENCH_NOHUD) != 0;
+
+        if (off != sHudOff) {
+            Interface_ChangeHudVisibilityMode(off ? HUD_VISIBILITY_NOTHING : HUD_VISIBILITY_ALL);
+            sHudOff = off;
+        }
+    }
 #endif
     // the lake's enemies still bite, but he never runs out of hearts (the bench must outlast the night)
     gSaveContext.save.info.playerData.health = gSaveContext.save.info.playerData.healthCapacity;

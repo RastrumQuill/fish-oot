@@ -548,6 +548,7 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_OLDSKY (FISHMOD_BENCH_OLDSKY_FILL | FISHMOD_BENCH_OLDSKY_Z | FISHMOD_BENCH_OLDSKY_1CYC)
 #define FISHMOD_BENCH_NOSKY (1 << 7)      // no skybox
 #define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
+#define FISHMOD_BENCH_NOHUD (1 << 25)     // no HUD or minimap (the RDP sweep: fishmod/scripts/rdp_sweep.inc.c)
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;
 extern struct Actor* gFishmodDrawingActor; // debug builds: the actor Actor_Draw is drawing (the crash record says which)
