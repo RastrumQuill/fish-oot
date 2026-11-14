@@ -1,4 +1,4 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# One run, about 4 minutes, on the reseeded bench: frames16 (frames15 with the fish update's code compact: the
-# instruction-cache regression since frames14c fixed). Compare with frames14c and frames15.
-releases/fish-oot-frames16.bps 12 frames16
+# One run, about 4 minutes, on the reseeded bench: frames17 (frames16 with the north-beach dock rebuilt). Compare
+# with frames16 (run 20261114-0923).
+releases/fish-oot-frames17.bps 12 frames17

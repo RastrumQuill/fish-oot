@@ -1,6 +1,7 @@
 // The north-beach dock from five cameras (a tour that moves on by itself: frames to capture at each stop), for its
 // design (fishmod/tools/gen_habitat.py, mesh_dock_*; fishmod/docs/dock-designs.png): from the beach, side on from the
-// water, under the water, from across the lake, close on a post. Clear midday.
+// water, under the water, from across the lake, close on a post; and the garden by the scarecrow
+// beside it (its grass and flowers: the scene's own actors). Clear midday.
 #define FISHMOD_SCRIPT_ENTRANCE ENTR_LAKE_HYLIA_0
 #define FISHMOD_SCRIPT_DAY 1
 #define FISHMOD_SCRIPT_TIME 0x8000
@@ -19,4 +20,5 @@ static FishmodTourStop sTourStops[] = {
     { { -540, -1343, 3200 }, { -400, -1333, 3340 }, "Dock: under the water", "", "", "" },
     { { 100, -1248, 3780 }, { -400, -1298, 3280 }, "Dock: from across the lake", "", "", "" },
     { { -340, -1278, 3250 }, { -369, -1298, 3280 }, "Dock: a post, close", "", "", "" },
+    { { -150, -1225, 3080 }, { -150, -1290, 2900 }, "The garden by the scarecrow", "", "", "" },
 };
