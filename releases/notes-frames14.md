@@ -1,5 +1,10 @@
 # frames14
 
+**Console, 13 November (run 20261113-2139), both on the reseeded bench:** the legs now agree between builds (RDP
+within 0.6 ms on every leg). frames14c against the control frames13r: hitches 25.5% / 26.9%, CPU draw 22.9 / 23.6 ms,
+RDP 44.2 / 44.4 ms, RSP graphics 23.9 / 24.1 ms, TMEM loading 2.86 / 2.87 ms (the reloads gone), triangles sent
+2,354 / 2,504. A small gain and no leg worse; the RDP's drawing (44 ms) is still what makes the frames late.
+
 **frames14c and frames13r (13 November, evening).** Why frames14b had more hitches than frames13 (29.9% against
 23.1%), found in the frame log's RDP counters and in ares:
 
