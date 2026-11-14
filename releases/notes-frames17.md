@@ -1,5 +1,12 @@
 # frames17
 
+**Console, 14 November (run 20261114-1035), against frames16:** hitches 32.7% -> 30.5% of pictures, frame period
+-0.6 ms, RDP -0.3 ms overall. The legs past the dock: leg 3 (north beach) RDP 47.8 -> 43.6 ms, frame 58.2 -> 53.3,
+slow frames 59% -> 39%; leg 4 RDP 52.1 -> 48.8, frame 63.9 -> 57.3, slow frames 95% -> 69%. Elsewhere: CPU update
++0.7 to +2.4 ms on most legs (the enemies' updates among it: leg 7 +1.9), leg 5's RSP +5.3 ms: not the dock. Likely
+the cache-placement effect again (frames16's notes): the fish overlay grew, so every overlay loaded after it lands at
+other addresses; to be pinned down before the next comparison.
+
 **`fish-oot-frames17.bps`** (`fishmod/build.sh --script pcprof_frames --hw --colpack --meshpack --gcc-all`): frames16
 with the north-beach dock rebuilt. The PC profile and frame log as in every bench build. Compare with frames16
 (14 November, run 20261114-0923): the dock legs (6, "Pillar ruins (under) -> Lab shore and dock", and those that pass
