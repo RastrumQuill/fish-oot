@@ -1,0 +1,4 @@
+Morning runs 20261113-2139
+
+ 1. frames13r                    done        395 packets    3.0 MB   223 s  
+ 2. frames14c                    done        394 packets    3.0 MB   224 s  
