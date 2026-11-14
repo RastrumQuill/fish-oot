@@ -1,4 +1,4 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# One run, about 4 minutes, on the reseeded bench: frames18 (frames17 with the code and data pinned in the CPU's
-# caches). Compare with frames17 (run 20261114-1035).
-releases/fish-oot-frames18.bps 12 frames18
+# One run, about 5.5 hours: the prop sweep (fishmod/scripts/prop_sweep.inc.c): 84 laps of clear dawn, every other lap as
+# shipped, between them one plant kind left out, drawn with whole cards, or with its cut split low.
+releases/fish-oot-prop-sweep.bps 400 prop-sweep
