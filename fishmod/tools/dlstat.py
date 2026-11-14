@@ -4,7 +4,7 @@ F3DEX3 walks it (segments resolved, called and branched lists followed), counted
 change nothing (the same value again) or are overwritten before anything is drawn with them; the matrices, vertices
 and triangles; and the lists the commands come from, by symbol where the list is the game's own.
 
-Usage: fishmod/tools/dlstat.py RAM.bin ELF [--start ADDR] [--top N]
+Usage: fishmod/tools/dlstat.py RAM.bin ELF [--start ADDR] [--end ADDR] [--top N]
 RAM.bin: RDRAM from 0x80000000 (gdb: dump binary memory RAM.bin 0x80000000 0x80800000, the game paused). ADDR: the
 list to start from (default: the graphics pool whose list is complete: the one the game isn't building, gGfxPools).
 """
@@ -78,6 +78,7 @@ def main():
     ap.add_argument("elf")
     ap.add_argument("--start", type=lambda s: int(s, 16))
     ap.add_argument("--top", type=int, default=25)
+    ap.add_argument("--end", type=lambda s: int(s, 16), help="stop when the starting list reaches this address")
     args = ap.parse_args()
     ram = Ram(open(args.ram, "rb").read())
     syms = symbols(args.elf)
@@ -104,8 +105,18 @@ def main():
     pc = ram.phys(start)
     cur_list = pc
     steps = 0
+    end = ram.phys(args.end) if args.end else None
+    if args.end:
+        # a walk from the middle of a frame: the segments as the game's own table has them (gSegments)
+        out = subprocess.run(["mips-linux-gnu-nm", args.elf], capture_output=True, text=True).stdout
+        seg_at = [int(l.split()[0], 16) for l in out.splitlines() if l.endswith(" gSegments")]
+        if seg_at:
+            for i in range(16):
+                ram.seg[i] = struct.unpack_from(">I", ram.d, (seg_at[0] & 0x1FFFFFFF) + 4 * i)[0] & 0x1FFFFFFF
     while steps < 2000000:
         steps += 1
+        if end is not None and not stack and pc >= end:
+            break
         w = ram.word2(pc)
         if w is None:
             print("ran off the dump at %08X" % pc)

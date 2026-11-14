@@ -228,17 +228,6 @@ static FishmodScript sScript = {
 
 #include "fishmod_debug_studio.inc.c" // the animation studio (FISHMOD_ANIM_STUDIO)
 
-// The animation check's hooks (fishmod/docs/anim-verify.md): the harness itself is being written; until then Link is
-// never held (gFishmodAnimCheck.active is only set by the animcheck script)
-s32 Fishmod_AnimCheckPlayerUpdate(Player* player, PlayState* play) {
-    return false;
-}
-
-void Fishmod_AnimCheckDrawBegin(PlayState* play) {
-}
-
-void Fishmod_AnimCheckDrawEnd(PlayState* play, Actor* actor) {
-}
 
 Vec3f gFishmodDebugFocus;
 FishmodLodTest gFishmodLodTest;
@@ -1031,6 +1020,8 @@ static void StateHash_Update(PlayState* play) {
 }
 #endif
 
+#include "fishmod_debug_animcheck.inc.c" // the animation check (FISHMOD_ANIMCHECK)
+
 void Fishmod_DebugPlayUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
@@ -1205,6 +1196,16 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #ifdef FISHMOD_ANIM_STUDIO
     if (sPlacedPlayer && (sPlayFrames > 60)) {
         Fishmod_StudioUpdate(play);
+    }
+#endif
+#ifdef FISHMOD_ANIMCHECK
+    if (sPlacedPlayer && (sPlayFrames > 80)) {
+        // only Link drawn, on a plain backdrop, the clock and the light held
+        gFishmodPhoto.active = true;
+        gFishmodAnimCheck.active = true;
+        play->envCtx.skyboxDisabled = true;
+        play->envCtx.sunMoonDisabled = true;
+        Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_NOTHING);
     }
 #endif
 

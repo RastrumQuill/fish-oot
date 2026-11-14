@@ -30,9 +30,7 @@ def main():
              "#define FISHMOD_ANIMCHECK_LINK_ANIMS %d" % len(names),
              "static LinkAnimationHeader* const sAnimCheckLinkAnims[FISHMOD_ANIMCHECK_LINK_ANIMS] = {"]
     lines += ["    &%s," % n for n in names]
-    lines += ["};", "static const char* const sAnimCheckLinkAnimNames[FISHMOD_ANIMCHECK_LINK_ANIMS] = {"]
-    lines += ['    "%s",' % n for n in names]
-    lines += ["};", ""]
+    lines += ["};", ""]  # (the names: animcheck_compare.py reads this file's list, in the same order)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     open(OUT, "w").write("\n".join(lines))
     print("wrote %s: %d animations" % (os.path.relpath(OUT, ROOT), len(names)))

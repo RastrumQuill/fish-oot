@@ -211,6 +211,8 @@ typedef struct FishmodAnimCheck {
     /* 0x00 */ u8 active;
     /* 0x04 */ void* opaStart; // (Gfx*) where Link's commands start in this frame's lists
     /* 0x08 */ void* xluStart;
+    /* 0x0C */ void* opaEnd; // (and where they end: for fishmod/tools/dlstat.py --start/--end on a RAM dump)
+    /* 0x10 */ void* xluEnd;
 } FishmodAnimCheck;
 
 extern FishmodAnimCheck gFishmodAnimCheck;

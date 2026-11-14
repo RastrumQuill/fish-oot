@@ -213,6 +213,8 @@ python3 fishmod/tools/gen_occluders.py > /dev/null
 python3 fishmod/tools/gen_item_page.py
 # the water floor maps, baked from the extracted scenes and the props' collision (generated, not committed)
 python3 fishmod/tools/gen_watermap.py
+# the animation check's case table: every one of Link's animations (generated, not committed)
+python3 fishmod/tools/gen_animcheck_cases.py > /dev/null
 
 GCC_ARGS=()
 if [ -n "$GCC" ]; then

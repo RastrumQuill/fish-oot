@@ -5,6 +5,7 @@
 #
 # Usage: fishmod/tools/collog.sh [--audio] ROM ELF SECONDS OUT.bin [GFX_OUT.bin]
 #   --audio: the audio check's log instead (fishmod/scripts/audlog.inc.c; compare with audlog_compare.py)
+#   --anim: the animation check's log (fishmod/scripts/animcheck.inc.c; compare with animcheck_compare.py)
 #   GFX_OUT.bin: also the graphics log (graph.c: each frame's display lists and their allocations hashed, one word a
 #   frame): two builds that draw exactly the same give the same file (cmp, or collog_compare.py --gfx)
 # Needs: ares built by fishmod/tools/build_ares.sh (ARES=...), gdb-multiarch, an X display (Xvfb) in DISPLAY.
@@ -13,6 +14,11 @@ set -euo pipefail
 REC=32 PTRSYM=gFishmodColLog CNTSYM=gFishmodColLogFrames
 if [ "${1:-}" = "--audio" ]; then
     REC=16 PTRSYM=gFishmodAudLog CNTSYM=gFishmodAudLogCount
+    shift
+fi
+if [ "${1:-}" = "--anim" ]; then
+    # the animation check's log (fishmod/scripts/animcheck.inc.c; compare with animcheck_compare.py)
+    REC=32 PTRSYM=gFishmodAnimLog CNTSYM=gFishmodAnimLogCount
     shift
 fi
 ROM=$1 ELF=$2 SECS=$3 OUT=$4 GFXOUT=${5:-}
