@@ -301,6 +301,46 @@ static void Bench_SetMode(s32 mode) {
         gFishmodBench = sSweep[sBench.laps % 12];
     }
 #endif
+#ifdef FISHMOD_PROP_SWEEP
+#include "src/fishmod_data/fishmod_props_kinds.h"
+    {
+        // (the props' kinds, numbered as fishmod_scatter.c numbers them)
+        enum {
+#define X(id, name) SWEEP_PROP_##id,
+            FISHMOD_PROP_KINDS(X)
+#undef X
+        };
+        // (the prop sweep, prop_sweep script: every other lap the game as shipped, between them one plant kind drawn
+        // another way: left out, its whole cards near, or its cut split into low triangles. The frame log's lap
+        // number says which: fishmod/tools/prop_sweep_report.py has the same list)
+        static const struct {
+            s16 kind;
+            u8 mode;
+        } sTests[] = {
+            { SWEEP_PROP_BUSH_WEED, FISHMOD_PROPTEST_OFF },    { SWEEP_PROP_BUSH_WEED, FISHMOD_PROPTEST_WHOLE },
+            { SWEEP_PROP_BUSH_WEED, FISHMOD_PROPTEST_LOW },    { SWEEP_PROP_GRASS_TUFT, FISHMOD_PROPTEST_OFF },
+            { SWEEP_PROP_GRASS_TUFT, FISHMOD_PROPTEST_WHOLE }, { SWEEP_PROP_GRASS_TUFT, FISHMOD_PROPTEST_LOW },
+            { SWEEP_PROP_BROADLEAF, FISHMOD_PROPTEST_OFF },    { SWEEP_PROP_BROADLEAF, FISHMOD_PROPTEST_WHOLE },
+            { SWEEP_PROP_BROADLEAF, FISHMOD_PROPTEST_LOW },    { SWEEP_PROP_BIG_PONDWEED, FISHMOD_PROPTEST_OFF },
+            { SWEEP_PROP_BIG_PONDWEED, FISHMOD_PROPTEST_WHOLE }, { SWEEP_PROP_BIG_PONDWEED, FISHMOD_PROPTEST_LOW },
+            { SWEEP_PROP_KELP_FROND, FISHMOD_PROPTEST_OFF },   { SWEEP_PROP_KELP_FROND, FISHMOD_PROPTEST_WHOLE },
+            { SWEEP_PROP_KELP_FROND, FISHMOD_PROPTEST_LOW },   { SWEEP_PROP_RIBBON_WEED, FISHMOD_PROPTEST_OFF },
+            { SWEEP_PROP_RIBBON_WEED, FISHMOD_PROPTEST_WHOLE }, { SWEEP_PROP_TALL_WEED, FISHMOD_PROPTEST_OFF },
+            { SWEEP_PROP_TALL_WEED, FISHMOD_PROPTEST_WHOLE },  { SWEEP_PROP_VINE_CURTAIN, FISHMOD_PROPTEST_OFF },
+            { SWEEP_PROP_ROCK, FISHMOD_PROPTEST_OFF },
+        };
+        s32 t = sBench.laps / 2 % ARRAY_COUNT(sTests);
+        u8 mode = (sBench.laps & 1) ? sTests[t].mode : FISHMOD_PROPTEST_NONE;
+        s16 kind = (sBench.laps & 1) ? sTests[t].kind : 0;
+
+        gFishmodBench = 0;
+        if ((mode != gFishmodPropTest.mode) || (kind != gFishmodPropTest.kind)) {
+            gFishmodPropTest.kind = kind;
+            gFishmodPropTest.mode = mode;
+            gFishmodPropTest.serial++;
+        }
+    }
+#endif
 }
 
 static void Bench_Save(void) {
@@ -531,7 +571,7 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     R_AUDIOMGR_ACTIVITY_LEVEL = (sBench.laps & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
                                                   : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
 #endif
-#ifdef FISHMOD_RDP_SWEEP
+#if defined(FISHMOD_RDP_SWEEP) || defined(FISHMOD_PROP_SWEEP)
     sPbCond = 0; // (every lap clear dawn)
     {
         static s32 sHudOff = -1;

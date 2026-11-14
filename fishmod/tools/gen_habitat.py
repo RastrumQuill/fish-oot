@@ -35,6 +35,8 @@ os.makedirs(MESH, exist_ok=True)
 # the meshes the game uses: the same, with each card cut down to its texture's outline (fishmod/tools/card_outline.py,
 # made from the ROM's textures, so not committed)
 MESH_TRIM = os.path.join(ROOT, "src", "fishmod_data", "habitat_trim")
+# the same cut outlines split into the triangles of least height (low_triangulate), for the props' console comparison
+MESH_LOW = os.path.join(ROOT, "src", "fishmod_data", "habitat_low")
 # small plants whose cards are drawn as one triangle each (round everything that can show): a triangle's setup costs
 # the RDP more than the few pixels a tight outline of several triangles saves on a plant this small
 MESH_TRI = os.path.join(ROOT, "src", "fishmod_data", "habitat_tri")
@@ -395,6 +397,11 @@ class Mesh:
             if tri is not None:
                 self._write(MESH_TRI, *tri[:3])
         trimmed = self.trimmed()
+        low = self.trimmed(split=low_triangulate)
+        if low is not None:
+            self._write(MESH_LOW, *low[:3])
+        elif os.path.exists(os.path.join(MESH_LOW, self.name + ".obj")):
+            os.remove(os.path.join(MESH_LOW, self.name + ".obj"))
         self.trim_stats = None
         if trimmed is not None:
             self._write(MESH_TRIM, *trimmed[:3])
@@ -403,7 +410,7 @@ class Mesh:
             os.remove(os.path.join(MESH_TRIM, self.name + ".obj"))
         return self
 
-    def trimmed(self, triangle=False):
+    def trimmed(self, triangle=False, split=None):
         """The mesh with each card (a quad with the whole texture across it, once or repeated up) cut down to its
         texture's outline. The outline holds every texel that can show, and positions, UVs and colours inside the
         quad are where they were, so the picture is the same. None if nothing here can be cut."""
@@ -462,7 +469,7 @@ class Mesh:
                 for pos, uv in verts:
                     v.append(pos)
                     vt.append(uv)
-                for tri in ear_clip([uv for _, uv in verts]):
+                for tri in (split or ear_clip)([uv for _, uv in verts]):
                     faces.append(tuple(base + 1 + j for j in tri))
                 continue
             if fi - 1 in cut:
@@ -531,6 +538,83 @@ def texture_path(name):
         if os.path.exists(path):
             return path
     return None
+
+
+def low_triangulate(poly, tri_const=0.04):
+    """Triangles (index triples) for a simple polygon of (u, v) points, chosen to make the sum of the triangles'
+    heights in v (plus a constant per triangle: about 2.3 scanlines of a card 60 tall) least: a minimum-weight
+    triangulation, by dynamic programming over the polygon's diagonals (those inside it only). The RDP pays a cost
+    per scanline per triangle, so the triangles a fan stretches across the card's height cost most; these cover the
+    same outline (the same pixels) in fewer scanlines (fishmod/tools/prop_designs.py)."""
+    n = len(poly)
+    if n < 3:
+        return []
+    P = [tuple(map(float, p)) for p in poly]
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    area = sum(P[i][0] * P[(i + 1) % n][1] - P[(i + 1) % n][0] * P[i][1] for i in range(n))
+    sign = 1 if area > 0 else -1
+
+    def seg_cross(p, q, r, s):
+        d1, d2 = cross(p, q, r), cross(p, q, s)
+        d3, d4 = cross(r, s, p), cross(r, s, q)
+        return (d1 * d2 < 0) and (d3 * d4 < 0)
+
+    def inside(x, y):
+        c = False
+        for i in range(n):
+            (x1, y1), (x2, y2) = P[i], P[(i + 1) % n]
+            if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+                c = not c
+        return c
+
+    ok = [[False] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(i + 1, n):
+            if j == i + 1 or (i == 0 and j == n - 1):
+                ok[i][j] = ok[j][i] = True
+                continue
+            if any(seg_cross(P[i], P[j], P[k], P[(k + 1) % n]) for k in range(n)
+                   if len({i, j, k, (k + 1) % n}) == 4):
+                continue
+            mx, my = (P[i][0] + P[j][0]) / 2, (P[i][1] + P[j][1]) / 2
+            if inside(mx, my):
+                ok[i][j] = ok[j][i] = True
+    INF = float("inf")
+    cost = [[0.0] * n for _ in range(n)]
+    pick = [[-1] * n for _ in range(n)]
+    for gap in range(2, n):
+        for i in range(0, n - gap):
+            j = i + gap
+            best, bk = INF, -1
+            if not ok[i][j]:
+                cost[i][j] = INF
+                continue
+            for k in range(i + 1, j):
+                if not (ok[i][k] and ok[k][j]):
+                    continue
+                if cross(P[i], P[k], P[j]) * sign <= 0:
+                    continue  # (a triangle turned the wrong way: outside the polygon)
+                ys = (P[i][1], P[k][1], P[j][1])
+                c = cost[i][k] + cost[k][j] + tri_const + (max(ys) - min(ys))
+                if c < best:
+                    best, bk = c, k
+            cost[i][j], pick[i][j] = best, bk
+    if cost[0][n - 1] == INF:
+        return ear_clip(poly)  # (no valid split found: as before)
+    out = []
+
+    def walk(i, j):
+        if j - i < 2:
+            return
+        k = pick[i][j]
+        out.append((i, k, j))
+        walk(i, k)
+        walk(k, j)
+    walk(0, n - 1)
+    return out
+
 
 
 def ear_clip(poly):
@@ -1185,9 +1269,20 @@ def write_props_manifest():
                                "texture": halfname, "out": out, "separateMaterial": True, "clamp": True})
             models.append({"name": "gFishmodProp_" + kind + "DLAlt", "src": os.path.relpath(mesh, ROOT),
                            "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
+            models.append({"name": "gFishmodProp_" + kind + "DLLow", "src": os.path.relpath(tri, ROOT),
+                           "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
             tri_kinds_built.append(kind)
             continue
         models.append({"name": "gFishmodProp_" + kind + "DL", "src": os.path.relpath(mesh, ROOT),
+                       "texture": texname, "out": out, "separateMaterial": True})
+        # (the console's comparison: the same cut split low; the near model where nothing is cut)
+        low = os.path.join(MESH_LOW, kind + ".obj")
+        if os.path.exists(low) and os.path.exists(os.path.join(MESH_TRIM, kind + ".obj")):
+            if pad is not None:
+                low = remap_obj(low, os.path.join(MESH_PAD, kind + "_low.obj"), pad)
+        else:
+            low = mesh
+        models.append({"name": "gFishmodProp_" + kind + "DLLow", "src": os.path.relpath(low, ROOT),
                        "texture": texname, "out": out, "separateMaterial": True})
         # far away: the whole cards, uncut. The same picture (the cut only drops texels that never show) in a third
         # of the triangles, and far props are few pixels each, so their cost is per triangle (hwbench-2)

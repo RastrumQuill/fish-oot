@@ -63,6 +63,7 @@ typedef struct FishmodPropKindInfo {
     Gfx* model;
     Gfx* modelFar; // past PROP_FAR_DIST: the cards uncut (the same picture in fewer triangles), or the same model
     Gfx* modelAlt; // the one-triangle kinds' cut outline (the bench's comparison), else the model
+    Gfx* modelLow; // the cut split into low triangles (the prop sweep's comparison: gen_habitat.py low_triangulate)
     Gfx* modelHalf;     // far, on the texture at half size (...DLFarH), or NULL
     Gfx* materialHalf;  // its texture
     f32 halfDist;       // from how far (at scale 1) a texel of the full texture is under half a pixel
@@ -224,7 +225,8 @@ static void Scatter_InitKinds(void) {
 #define X(id, name)                                                       \
     sKinds[FISHMOD_PROP_##id].material = gFishmodProp_##name##DLMaterial; \
     sKinds[FISHMOD_PROP_##id].model = gFishmodProp_##name##DL;            \
-    sKinds[FISHMOD_PROP_##id].modelFar = gFishmodProp_##name##DLFar;
+    sKinds[FISHMOD_PROP_##id].modelFar = gFishmodProp_##name##DLFar;     \
+    sKinds[FISHMOD_PROP_##id].modelLow = gFishmodProp_##name##DLLow;
     // the generated kinds (the vanilla ones are set below)
     FISHMOD_PROP_KINDS_GENERATED(X)
 #undef X
@@ -244,6 +246,9 @@ static void Scatter_InitKinds(void) {
 
         for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
             sKinds[i].modelAlt = sKinds[i].model;
+            if (sKinds[i].modelLow == NULL) {
+                sKinds[i].modelLow = sKinds[i].model; // (the vanilla kinds)
+            }
         }
     }
 #define X(id, name) sKinds[FISHMOD_PROP_##id].modelAlt = gFishmodProp_##name##DLAlt;
@@ -380,6 +385,9 @@ static s32 sMtxUsed;
 // the camera the current set was made for
 static Vec3f sSetEye;
 static Vec3f sSetLook;
+#if FISHMOD_DEBUG
+static u32 sSetPropTest; // the prop sweep's test the set was made for
+#endif
 static s32 sSetAge = 1000;
 // Remake the set when the camera has moved this far or turned this much, or after this many frames anyway
 #define REUSE_MOVE 6.0f
@@ -1462,6 +1470,11 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 if (dSq > maxSq) {
                     continue;
                 }
+#if FISHMOD_DEBUG
+                if ((gFishmodPropTest.mode == FISHMOD_PROPTEST_OFF) && (info == &sKinds[gFishmodPropTest.kind])) {
+                    continue; // (the prop sweep: this kind left out)
+                }
+#endif
                 if (info->card) {
                     // the camera inside it or right against it
                     f32 h = info->height * prop->scale * (1.0f / 64.0f);
@@ -1720,6 +1733,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 #if FISHMOD_DEBUG
         gFishmodLodTest.active || // calibrating: what's drawn changes with the test, not the camera
         ((u32)gFishmodBench != sSetBench) || // the bench switched a mode: the tiers are chosen here
+        (gFishmodPropTest.serial != sSetPropTest) || // the prop sweep switched its test
 #endif
         ((SQ(eye.x - sSetEye.x) + SQ(eye.y - sSetEye.y) + SQ(eye.z - sSetEye.z)) > SQ(REUSE_MOVE)) ||
         ((lookX * sSetLook.x + lookY * sSetLook.y + lookZ * sSetLook.z) < REUSE_TURN_COS)) {
@@ -1727,6 +1741,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         sSetGen++;
 #if FISHMOD_DEBUG
         sSetBench = gFishmodBench;
+        sSetPropTest = gFishmodPropTest.serial;
 #endif
         sSetAge = 0;
         sSetEye = eye;
@@ -1904,10 +1919,22 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 
             gSPMatrix((*disp)++, &frame->sway[kind * SWAY_PHASES + ph], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
         }
-        gSPDisplayList((*disp)++, (tier == TIER_IMP)    ? info->modelImp
-                                  : (tier == TIER_HALF) ? info->modelHalf
-                                  : (tier == TIER_FAR)  ? info->modelFar
-                                                        : info->model);
+        {
+            Gfx* near = info->model;
+
+#if FISHMOD_DEBUG
+            // (the prop sweep: this kind's near model whole, or its cut split low)
+            if ((gFishmodPropTest.mode != FISHMOD_PROPTEST_NONE) && (info == &sKinds[gFishmodPropTest.kind])) {
+                near = (gFishmodPropTest.mode == FISHMOD_PROPTEST_WHOLE) ? info->modelFar
+                       : (gFishmodPropTest.mode == FISHMOD_PROPTEST_LOW) ? info->modelLow
+                                                                         : near;
+            }
+#endif
+            gSPDisplayList((*disp)++, (tier == TIER_IMP)    ? info->modelImp
+                                      : (tier == TIER_HALF) ? info->modelHalf
+                                      : (tier == TIER_FAR)  ? info->modelFar
+                                                            : near);
+        }
     }
     if (cacheUntil == set->count) { // (no fading prop: the whole loop is the part kept)
         Scatter_KeepAt(&sKeep[sFrame], cacheValid, cacheOpa0, opa, cacheXlu0, xlu, &keepNow, lastOpa, lastXlu,

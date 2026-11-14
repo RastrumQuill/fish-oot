@@ -543,6 +543,19 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 // audio under the fish's tag)
 extern u32 gFishmodPcTag;
 extern u32 gFishmodScatterDropped[4];
+// The prop sweep (fishmod_debug_bench.inc.c, FISHMOD_PROP_SWEEP): one prop kind drawn another way for a lap
+typedef enum FishmodPropTestMode {
+    FISHMOD_PROPTEST_NONE,
+    FISHMOD_PROPTEST_OFF,   // not drawn at all
+    FISHMOD_PROPTEST_WHOLE, // near, its whole cards (the far model) instead of the cut
+    FISHMOD_PROPTEST_LOW    // near, the same cut split into low triangles
+} FishmodPropTestMode;
+typedef struct FishmodPropTest {
+    s16 kind;
+    u8 mode;
+    u32 serial; // changes with each test (the props' set made again)
+} FishmodPropTest;
+extern FishmodPropTest gFishmodPropTest;
 // The flat fish compared (fishmod_manager.c, LIT_DIST): set by a script (FISHMOD_FLAT_TEST_INIT), else normal
 extern s32 gFishmodFlatTest;
 #define FISHMOD_FLAT_TEST gFishmodFlatTest
