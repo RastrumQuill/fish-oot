@@ -1,0 +1,4 @@
+Morning runs 20261114-0720
+
+ 1. frames15L                    done        434 packets    3.3 MB   229 s  
+ 2. frames15                     done        436 packets    3.3 MB   231 s  
