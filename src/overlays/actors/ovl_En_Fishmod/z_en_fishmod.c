@@ -2241,7 +2241,7 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     f32 attnDist = 0.0f; // (once a frame: it was worked out twice)
 
     if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON) {
-        attnDist = EnFishmod_AttentionDist(this, play);
+        FISHMOD_PROF(FISHMOD_PROF_U_ATTN, attnDist = EnFishmod_AttentionDist(this, play));
         if (attnDist > 1600.0f) {
             return;
         }
@@ -2250,10 +2250,14 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
         this->thinkMask = 0;
     }
     // a school member away from attention: into its place behind the leader, nothing more
-    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON && (attnDist > FISHMOD_FOLLOW_FAR_DIST) &&
-        EnFishmod_FollowFar(this, play)) {
-        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_UpdateSwim(this));
-        return;
+    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON && (attnDist > FISHMOD_FOLLOW_FAR_DIST)) {
+        s32 followed;
+
+        FISHMOD_PROF(FISHMOD_PROF_U_FOLLOW, followed = EnFishmod_FollowFar(this, play));
+        if (followed) {
+            FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_UpdateSwim(this));
+            return;
+        }
     }
     // away from attention, a wandering fish thinks every other frame and glides on in between
     if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !FISHMOD_PHOTO_ON &&

@@ -807,6 +807,7 @@ u32 gFishmodScatterCmdTime[2];    // the prop draw's per-frame commands: time (O
 u32 gFishmodScatterCacheDiff[8];  // SCATTER_VERIFY: the last difference (list, index, fresh w0 w1, copied w0 w1, lengths)
 OSTime gFishmodProf[FISHMOD_PROF_MAX];
 u32 gFishmodProfCount[FISHMOD_PROF_MAX];
+u32 gFishmodPcTag; // the PC profile's tag for its samples now (FISHMOD_PCTAG_*)
 
 /**
  * Averages over 60 frames, in tenths of a millisecond: RSP graphics and RDP time, the CPU time of Play_Update,

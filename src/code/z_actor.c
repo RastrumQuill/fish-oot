@@ -2613,7 +2613,9 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                         u32 cycles;
 
                         if (actor->id == ACTOR_EN_FISHMOD) {
+                            gFishmodPcTag = FISHMOD_PCTAG_FISH_UPDATE;
                             FISHMOD_PROF(FISHMOD_PROF_U_ENGINE, actor->update(actor, play));
+                            gFishmodPcTag = 0;
                         } else if (FISHMOD_ANIMCHECK_ON && (actor == gFishmodAnimCheck.target) &&
                                    (actor->id != ACTOR_PLAYER)) {
                             // (the animation check holds it still: its pose is the harness's)

@@ -44,6 +44,11 @@ void n64prof_init(N64ProfEntry* table, unsigned int tableSize, unsigned int inte
 /* One sample (interrupt context). */
 void n64prof_sample(unsigned int pc);
 
+/* A tag for the samples from now on (0 to the bucket size - 1, kept in the low bits of each bucket's address): what
+   the program was doing, its own say (e.g. 1 while some part of it runs). 0: untagged. Samples counted as they come
+   only: with a frame ring set (below), its own tags take those bits. */
+extern unsigned int n64prof_tag;
+
 /* The count cycles until the next sample: the interval, jittered a quarter either way so that work repeating with
    the frame isn't always hit or always missed. Call it from the interrupt and set the timer to it. */
 unsigned int n64prof_next_interval(void);

@@ -633,6 +633,7 @@ static void PcProf_Hook(OSTimer* timer) {
         if ((pc - (u32)__osRestoreInt) < 0x20) {
             pc = gFishmodCounterRa - 8; // (the jal)
         }
+        n64prof_tag = gFishmodPcTag & ((1u << N64PROF_BUCKET_SHIFT) - 1);
         n64prof_sample(pc);
         timer->interval = n64prof_next_interval();
     }

@@ -533,9 +533,16 @@ typedef enum FishmodProfSlot {
     FISHMOD_PROF_D_RIG_BONES, //   (in pose) the rig's bone frames: the swim wave's angles, the body and fin bones
     FISHMOD_PROF_D_RIG_MTX,   //   (in pose) the bones' matrices converted for the RSP
     FISHMOD_PROF_D_RIG_LOOK,  //   (in pose) the fish's own colours (its tint table)
+    FISHMOD_PROF_U_ATTN,      // (in update) how far it is from attention (the camera, the bobber)
+    FISHMOD_PROF_U_FOLLOW,    // (in update) a far school member taking its place behind its leader
     FISHMOD_PROF_MAX
 } FishmodProfSlot;
 extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
+// The PC profile's samples tagged by what the game was doing when they were taken (fishmod/tools/pc_ram.py --tag):
+// whatever ran then counts, a thread that took over included (the audio thread preempting a fish's update shows as
+// audio under the fish's tag)
+extern u32 gFishmodPcTag;
+#define FISHMOD_PCTAG_FISH_UPDATE 1 // a fish's update (Actor_UpdateAll)
 extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 // the hardware bench (fishmod_debug.c, FISHMOD_HWBENCH) switches these off to time the rest without them
 #define FISHMOD_BENCH_NOPROPS (1 << 0)

@@ -79,6 +79,8 @@ unsigned int n64prof_next_interval(void) {
 
 static void n64prof_count_into(N64ProfEntry* table, unsigned int pc, unsigned int tag);
 
+unsigned int n64prof_tag;
+
 void n64prof_sample(unsigned int pc) {
     const N64ProfRange* r;
     N64ProfEntry* table = sTable;
@@ -113,7 +115,7 @@ void n64prof_sample(unsigned int pc) {
         }
         return;
     }
-    n64prof_count_into(table, pc, 0);
+    n64prof_count_into(table, pc, n64prof_tag);
 }
 
 /* A sample (or a tagged one) into table. */
