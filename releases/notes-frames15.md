@@ -1,5 +1,10 @@
 # frames15
 
+**Console, 14 November (run 20261114-0720), frames15 against the control frames15L (every fish lit):** RDP 44.7 ->
+44.5 ms, RSP graphics 23.7 -> 23.2 ms, hitches 39.4% -> 38.3% of pictures; CPU draw +0.1 ms. Most legs within noise,
+the dock leg (6) 1.3 ms a frame faster. As the RDP sweep says, the fish are 1.3 ms of the RDP in all: flat fish
+can't save much more. The props (8.5 ms) are next.
+
 **`fish-oot-frames15.bps`** and **`fish-oot-frames15L.bps`** (`fishmod/build.sh --script pcprof_frames --hw --colpack
 --meshpack --gcc-all`, and `--script pcprof_frames_flatoff` for 15L): the same code, the reseeded bench of frames14c.
 15L draws every fish lit, as before: the control. 15 draws the fish flat past arm's length.
