@@ -2614,6 +2614,9 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
 
                         if (actor->id == ACTOR_EN_FISHMOD) {
                             FISHMOD_PROF(FISHMOD_PROF_U_ENGINE, actor->update(actor, play));
+                        } else if (FISHMOD_ANIMCHECK_ON && (actor == gFishmodAnimCheck.target) &&
+                                   (actor->id != ACTOR_PLAYER)) {
+                            // (the animation check holds it still: its pose is the harness's)
                         } else {
                             actor->update(actor, play);
                         }
@@ -3082,7 +3085,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
                 if ((actor->init == NULL) && (actor->draw != NULL) &&
                     (actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) &&
                     (!FISHMOD_PHOTO_ON ||
-                     (FISHMOD_ANIMCHECK_ON ? (actor->id == ACTOR_PLAYER) : (actor->id == ACTOR_EN_FISHMOD)))) {
+                     (FISHMOD_ANIMCHECK_ON ? (actor == gFishmodAnimCheck.target) : (actor->id == ACTOR_EN_FISHMOD)))) {
                     if ((actor->flags & ACTOR_FLAG_REACT_TO_LENS) &&
                         ((play->roomCtx.curRoom.lensMode == LENS_MODE_SHOW_ACTORS) || play->actorCtx.lensActive ||
                          (actor->room != play->roomCtx.curRoom.num))) {
@@ -3099,7 +3102,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
                             } else
 #endif
 #if FISHMOD_DEBUG
-                            if (FISHMOD_ANIMCHECK_ON && (actor->id == ACTOR_PLAYER)) {
+                            if (FISHMOD_ANIMCHECK_ON && (actor == gFishmodAnimCheck.target)) {
                                 // the animation check: Link's commands walked and hashed (fishmod_debug.c)
                                 Fishmod_AnimCheckDrawBegin(play);
                                 Actor_Draw(play, actor);

@@ -1200,9 +1200,14 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
 #endif
 #ifdef FISHMOD_ANIMCHECK
     if (sPlacedPlayer && (sPlayFrames > 80)) {
-        // only Link drawn, on a plain backdrop, the clock and the light held
+        // only the actor checked drawn, on a plain backdrop, the clock and the light held
         gFishmodPhoto.active = true;
+#ifdef FISHMOD_ANIMCHECK_ACTOR
+        gTimeSpeed = 0;
+        Ac_ActorDrive(play, player);
+#else
         gFishmodAnimCheck.active = true;
+#endif
         play->envCtx.skyboxDisabled = true;
         play->envCtx.sunMoonDisabled = true;
         Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_NOTHING);

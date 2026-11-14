@@ -565,6 +565,7 @@ static s32 sAcAngle; // (level 3) the camera angle this frame
 static s32 sAcSeq;   // the cases begun so far (for FISHMOD_ANIMCHECK_FROM/TO)
 static s32 sAcRec;   // the record this case's pictures go in
 static s32 sAcMax;   // the records the log holds
+static SkelAnime* sAcSkel; // (another actor) its skeleton's state, found in its instance; NULL: Link's
 
 typedef struct AcPixJob {
     u16* fb;
@@ -656,17 +657,23 @@ static s32 Ac_Next(void) {
     }
 }
 
+static void Ac_CameraAt(PlayState* play, Actor* actor, f32 height, f32 dist, s32 angle);
+
 static void Ac_Camera(PlayState* play, Player* player, f32 dist, s32 angle) {
+    Ac_CameraAt(play, &player->actor, LINK_IS_ADULT ? 40.0f : 25.0f, dist, angle);
+}
+
+static void Ac_CameraAt(PlayState* play, Actor* actor, f32 height, f32 dist, s32 angle) {
     // (the angles: front, back, his left, his right, three-quarter front-left from above, three-quarter back-right
     // from above, from above, from below)
     static const s16 sYaw[8] = { 0, 0x8000, 0x4000, -0x4000, 0x2000, -0x6000, 0, 0x8000 };
     static const f32 sPitch[8] = { 0.15f, 0.15f, 0.15f, 0.15f, 0.5f, 0.5f, 1.45f, -1.2f };
-    Vec3f at = player->actor.world.pos;
+    Vec3f at = actor->world.pos;
     Vec3f eye;
-    s16 yaw = player->actor.shape.rot.y + sYaw[angle];
+    s16 yaw = actor->shape.rot.y + sYaw[angle];
     f32 flat = dist * cosf(sPitch[angle]);
 
-    at.y += LINK_IS_ADULT ? 40.0f : 25.0f;
+    at.y += height;
     eye.x = at.x + Math_SinS(yaw) * flat;
     eye.y = at.y + dist * sinf(sPitch[angle]);
     eye.z = at.z + Math_CosS(yaw) * flat;
@@ -697,11 +704,15 @@ s32 Fishmod_AnimCheckPlayerUpdate(Player* this, PlayState* play) {
     if (!gFishmodAnimCheck.active) {
         return false;
     }
+#ifdef FISHMOD_ANIMCHECK_ACTOR
+    return false; // (another actor is checked: Link plays on, not drawn)
+#endif
     if (sAcCamId == SUB_CAM_ID_DONE) {
         // the first frame held: his own models and equipment as they are now are the default ones
         sAcCamId = Play_CreateSubCamera(play);
         Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STAT_WAIT);
         Play_ChangeCameraStatus(play, sAcCamId, CAM_STAT_ACTIVE);
+        gFishmodAnimCheck.target = &this->actor;
         sAcModelGroup = this->modelGroup;
         sAcTunic = this->currentTunic;
         sAcBoots = this->currentBoots;
@@ -876,13 +887,17 @@ void Fishmod_AnimCheckDrawEnd(PlayState* play, Actor* actor) {
     draws |= w->draws & 0xFFFF;
     cmds += w->cmds;
     flags |= w->flags;
-    // the pose: the joint table (the face's byte with it) and the limb matrices
-    pose = Ac_Bytes(0x811C9DC5, (const u8*)player->skelAnime.jointTable,
-                    (player->skelAnime.limbCount + 1) * sizeof(Vec3s));
-    if ((w->mtxSeg != 0) && (w->mtxSeg + player->skelAnime.dListCount * sizeof(Mtx) < 0x800000)) {
-        pose = Ac_Bytes(pose, (const u8*)(0x80000000 | w->mtxSeg), player->skelAnime.dListCount * sizeof(Mtx));
-    } else {
-        flags |= 2; // (no limb matrices found)
+    // the pose: the joint table (Link's: the face's byte with it) and, for a flexible skeleton, the limb matrices
+    {
+        SkelAnime* sk = (sAcSkel != NULL) ? sAcSkel : &player->skelAnime;
+
+        // (Link's table has the face's byte after its limbCount entries; another skeleton's has limbCount entries)
+        pose = Ac_Bytes(0x811C9DC5, (const u8*)sk->jointTable, (sk->limbCount + ((sAcSkel == NULL) ? 1 : 0)) * sizeof(Vec3s));
+        if ((sAcSkel == NULL) && (w->mtxSeg != 0) && (w->mtxSeg + sk->dListCount * sizeof(Mtx) < 0x800000)) {
+            pose = Ac_Bytes(pose, (const u8*)(0x80000000 | w->mtxSeg), sk->dListCount * sizeof(Mtx));
+        } else if (sAcSkel == NULL) {
+            flags |= 2; // (no limb matrices found)
+        }
     }
     rec = &gFishmodAnimLog[gFishmodAnimLogCount * AC_REC_WORDS];
     rec[0] = sAcCase;
@@ -898,6 +913,109 @@ void Fishmod_AnimCheckDrawEnd(PlayState* play, Actor* actor) {
 #endif
     gFishmodAnimLogCount++;
 }
+
+#ifdef FISHMOD_ANIMCHECK_ACTOR
+/*
+ * Another actor (fishmod/scripts/animcheck_<object>.inc.c): spawned in front of Link, its update skipped (z_actor.c),
+ * its skeleton's state found in its instance (a SkelAnime with the skeleton's limbs and limb count), and posed by the
+ * game's own frame decoding (SkelAnime_GetFrameData) through every frame of every animation of its object made for
+ * its skeleton; its drawing walked and hashed as Link's. Called each frame from Fishmod_DebugPlayUpdate (before the
+ * actors' update and draw).
+ */
+#include FISHMOD_ANIMCHECK_ACTOR_TABLE
+
+void SkelAnime_GetFrameData(AnimationHeader* animation, s32 frame, s32 limbCount, Vec3s* frameTable);
+
+static s32 sAcWarm;
+
+static void Ac_ActorDrive(PlayState* play, Player* player) {
+    Actor* a = gFishmodAnimCheck.target;
+
+    if (a == NULL) {
+        Vec3f p = player->actor.world.pos;
+
+        p.y += 30.0f;
+        a = Actor_Spawn(&play->actorCtx, play, FISHMOD_ANIMCHECK_ACTOR, p.x, p.y, p.z, 0, 0, 0,
+                        FISHMOD_ANIMCHECK_ACTOR_PARAMS);
+        if (a == NULL) {
+            return;
+        }
+        gFishmodAnimCheck.target = a;
+        gFishmodAnimCheck.active = true; // (its update skipped from now: its init still runs)
+        sAcWarm = 10;
+        return;
+    }
+    // (its object behind segment 6, as the game sets it before any of the actor's own code: the animations and the
+    // skeleton are read through it)
+    Actor_SetObjectDependency(play, a);
+    if (sAcWarm > 0) {
+        if (--sAcWarm == 0) {
+            // its skeleton's state: a SkelAnime with this skeleton's limb count and limbs
+            void** limbs = SEGMENTED_TO_VIRTUAL(((SkeletonHeader*)SEGMENTED_TO_VIRTUAL(&FISHMOD_ANIMCHECK_ACTOR_SKEL))->segment);
+            s32 off;
+
+            for (off = sizeof(Actor); off < 0x1000; off += 4) {
+                SkelAnime* sk = (SkelAnime*)((u8*)a + off);
+
+                // (SkelAnime_Init: its limb count is the skeleton's plus one, the root's place)
+                if ((sk->limbCount == FISHMOD_ANIMCHECK_ACTOR_LIMBS + 1) && (sk->skeleton == limbs) &&
+                    (sk->jointTable != NULL)) {
+                    sAcSkel = sk;
+                    break;
+                }
+            }
+            if (sAcSkel == NULL) {
+                sAcWarm = 10; // (not yet: its init may set it up later)
+                return;
+            }
+            sAcCamId = Play_CreateSubCamera(play);
+            Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STAT_WAIT);
+            Play_ChangeCameraStatus(play, sAcCamId, CAM_STAT_ACTIVE);
+            if (gFishmodAnimLog == NULL) {
+                s32 n = AC_MAX_CASES;
+
+                while ((n > 0) && ((gFishmodAnimLog = SYSTEM_ARENA_MALLOC(n * AC_REC_WORDS * sizeof(u32),
+                                                                         "../fishmod_debug.c", __LINE__)) == NULL)) {
+                    n /= 2;
+                }
+                sAcMax = n;
+            }
+            sAcA = sAcF = 0;
+            sAcAngle = 0;
+            sAcSettle = 10;
+        }
+        return;
+    }
+    if (sAcSettle > 0) {
+        sAcSettle--;
+    } else if (sAcAngle + 1 < AC_ANGLES) {
+        sAcAngle++;
+    } else if (sAcA < FISHMOD_ANIMCHECK_ACTOR_ANIMS) {
+        AnimationHeader* h = SEGMENTED_TO_VIRTUAL(sAnimCheckActorAnims[sAcA]);
+
+        sAcAngle = 0;
+        if (++sAcF >= h->common.frameCount) {
+            sAcF = 0;
+            sAcA++;
+        }
+    }
+#ifdef FISHMOD_ANIMCHECK_PIX
+    Ac_PixelJobs();
+#endif
+    Ac_CameraAt(play, a, FISHMOD_ANIMCHECK_CAM_HEIGHT, FISHMOD_ANIMCHECK_CAM_DIST, sAcAngle);
+    sAcCase = -1;
+    if (sAcA >= FISHMOD_ANIMCHECK_ACTOR_ANIMS) {
+        gFishmodAnimDone = (sAcJobCount == 0);
+        return;
+    }
+    if (sAcAngle == 0) {
+        SkelAnime_GetFrameData(sAnimCheckActorAnims[sAcA], sAcF, sAcSkel->limbCount, sAcSkel->jointTable);
+    }
+    if (sAcSettle == 0) {
+        sAcCase = (sAcAngle != 0) ? 0x0FFFFFFF : ((sAcA & 0xFFF) << 16) | (sAcF & 0xFFFF);
+    }
+}
+#endif
 
 #else
 
