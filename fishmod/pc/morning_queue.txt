@@ -1,6 +1,4 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# First two runs, about 4 minutes each, on the reseeded bench: frames15L (the control: every fish lit, as before) then
-# frames15 (the fish flat past 200 units: one cycle, unlit, fogged in the combiner).
-releases/fish-oot-frames15L.bps 12 frames15L
-releases/fish-oot-frames15.bps 12 frames15
-# (the RDP sweep ran on the night of 13 November: releases/notes-rdp-sweep.md)
+# One run, about 4 minutes, on the reseeded bench: frames16 (frames15 with the fish update's code compact: the
+# instruction-cache regression since frames14c fixed). Compare with frames14c and frames15.
+releases/fish-oot-frames16.bps 12 frames16

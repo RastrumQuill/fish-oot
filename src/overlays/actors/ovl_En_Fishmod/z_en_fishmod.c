@@ -1196,7 +1196,7 @@ static void EnFishmod_CheckSpook(EnFishmod* this, PlayState* play) {
 #endif
 
 /** Where a school member keeps its place: behind and to one side of its leader. Returns the school's spacing. */
-static f32 EnFishmod_SchoolSlot(EnFishmod* this, EnFishmod* lead, Vec3f* slot) {
+__attribute__((always_inline)) static inline f32 EnFishmod_SchoolSlot(EnFishmod* this, EnFishmod* lead, Vec3f* slot) {
     s32 k = this->rosterIndex - this->leaderIndex; // 1, 2, ... down the school
     f32 unit = lead->halfLength * 1.3f + 3.0f;
     f32 side = ((k & 1) ? 1.0f : -1.0f) * unit * (0.7f + 0.25f * (k % 3));
@@ -1217,7 +1217,7 @@ static f32 EnFishmod_SchoolSlot(EnFishmod* this, EnFishmod* lead, Vec3f* slot) {
  * small part of it. False (the full AI) when it's on its own, the leader isn't cruising, or it has fallen well
  * behind (it may have a bank to get round).
  */
-static s32 EnFishmod_FollowFar(EnFishmod* this, PlayState* play) {
+__attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlayState* play) {
     EnFishmod* lead;
     Vec3f slot;
     f32 unit;
@@ -2193,88 +2193,13 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
 #define EnFishmod_Draw EnFishmod_DrawImpl
 #endif
 
-/** A frame without the AI: keep going the way it was headed. */
-static void EnFishmod_Glide(EnFishmod* this) {
-    this->actor.world.pos.x += Math_SinS(this->actor.shape.rot.y) * this->speed;
-    this->actor.world.pos.z += Math_CosS(this->actor.shape.rot.y) * this->speed;
-    if (this->stateTimer > 0) {
-        this->stateTimer--;
-    }
-    // its rest runs on whether it thinks this frame or not (else a far fish rests many times as long, and is still
-    // resting, frozen, when the camera comes close)
-    if (this->restTimer > 1) {
-        this->restTimer--;
-    }
-    if (this->cooldown > 0) {
-        this->cooldown--;
-    }
-    EnFishmod_UpdateSwim(this);
-}
-
-void EnFishmod_Update(Actor* thisx, PlayState* play) {
-    EnFishmod* this = (EnFishmod*)thisx;
-
-    this->timer++;
-    if (this->type == FISHMOD_TYPE_MANAGER) {
-        EnFishmod_ManagerUpdate(this, play);
-        return;
-    }
-
 #if FISHMOD_DEBUG
-    if ((gFishmodBench & FISHMOD_BENCH_NOFISHAI) && (this->type == FISHMOD_TYPE_FISH)) {
-        return; // the hardware bench, timing the rest without the fish's thinking and swimming
-    }
-#endif
-    if (this->type == FISHMOD_TYPE_ROD) {
-        EnFishmod_RodUpdate(this, play);
-        gFishmodRodState.splashed = false;
-        return;
-    }
-    if (this->type == FISHMOD_TYPE_COMB) {
-        EnFishmod_CombUpdate(this, play);
-        return;
-    }
-
-    // Away from attention (the camera or the bobber, whichever is nearer) a fish does
-    // less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200 every 8th (gliding on in
-    // between), and past 1600 it goes dormant: it holds still (and is out of drawing range) until attention comes.
-    f32 attnDist = 0.0f; // (once a frame: it was worked out twice)
-
-    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON) {
-        FISHMOD_PROF(FISHMOD_PROF_U_ATTN, attnDist = EnFishmod_AttentionDist(this, play));
-        if (attnDist > 1600.0f) {
-            return;
-        }
-        this->thinkMask = (attnDist > 1200.0f) ? 7 : (attnDist > 800.0f) ? 3 : (attnDist > 500.0f) ? 1 : 0;
-    } else {
-        this->thinkMask = 0;
-    }
-    // a school member away from attention: into its place behind the leader, nothing more
-    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON && (attnDist > FISHMOD_FOLLOW_FAR_DIST)) {
-        s32 followed;
-
-        FISHMOD_PROF(FISHMOD_PROF_U_FOLLOW, followed = EnFishmod_FollowFar(this, play));
-        if (followed) {
-            FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_UpdateSwim(this));
-            return;
-        }
-    }
-    // away from attention, a wandering fish thinks every other frame and glides on in between
-    if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !FISHMOD_PHOTO_ON &&
-        (attnDist > 500.0f)) {
-        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
-        return;
-    }
-    if ((this->type == FISHMOD_TYPE_FISH) && !EnFishmod_ThinkAllowed(this, play)) {
-        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
-        return;
-    }
-    FISHMOD_PROF(FISHMOD_PROF_U_AI, EnFishmod_FishAI(this, play));
-    FISHMOD_PROF(FISHMOD_PROF_U_SWIM, EnFishmod_UpdateSwim(this));
-
-#if FISHMOD_DEBUG
-    // (not in the benches: they time the game as it ships, and this cost 2.4 ms a frame there)
-    if (!gFishmodTimingAsShipped) {
+/**
+ * The debug readouts (the nearest fish's state, how far bodies poke out of the water, the follow camera's fish): out
+ * of the update's line, so the update's own code stays together in the instruction cache (fishmod/docs: the update
+ * slowed by a third when unrelated code moved it onto other cache lines)
+ */
+__attribute__((noinline, cold)) static void EnFishmod_DebugReadout(EnFishmod* this, PlayState* play) {
     OSTime debugStart = FISHMOD_CLOCK();
     {
         // nearest fish to the camera focus, for testing
@@ -2348,6 +2273,102 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     }
     gFishmodProf[FISHMOD_PROF_U_DEBUG] += FISHMOD_SINCE(debugStart);
     gFishmodProfCount[FISHMOD_PROF_U_DEBUG]++;
+}
+#endif
+
+/** A frame without the AI: keep going the way it was headed. */
+static void EnFishmod_Glide(EnFishmod* this) {
+    this->actor.world.pos.x += Math_SinS(this->actor.shape.rot.y) * this->speed;
+    this->actor.world.pos.z += Math_CosS(this->actor.shape.rot.y) * this->speed;
+    if (this->stateTimer > 0) {
+        this->stateTimer--;
+    }
+    // its rest runs on whether it thinks this frame or not (else a far fish rests many times as long, and is still
+    // resting, frozen, when the camera comes close)
+    if (this->restTimer > 1) {
+        this->restTimer--;
+    }
+    if (this->cooldown > 0) {
+        this->cooldown--;
+    }
+    EnFishmod_UpdateSwim(this);
+}
+
+void EnFishmod_Update(Actor* thisx, PlayState* play) {
+    EnFishmod* this = (EnFishmod*)thisx;
+
+    this->timer++;
+    if (this->type == FISHMOD_TYPE_MANAGER) {
+        EnFishmod_ManagerUpdate(this, play);
+        return;
+    }
+
+#if FISHMOD_DEBUG
+    if ((gFishmodBench & FISHMOD_BENCH_NOFISHAI) && (this->type == FISHMOD_TYPE_FISH)) {
+        return; // the hardware bench, timing the rest without the fish's thinking and swimming
+    }
+#endif
+    if (this->type == FISHMOD_TYPE_ROD) {
+        EnFishmod_RodUpdate(this, play);
+        gFishmodRodState.splashed = false;
+        return;
+    }
+    if (this->type == FISHMOD_TYPE_COMB) {
+        EnFishmod_CombUpdate(this, play);
+        return;
+    }
+
+    // Away from attention (the camera or the bobber, whichever is nearer) a fish does
+    // less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200 every 8th (gliding on in
+    // between), and past 1600 it goes dormant: it holds still (and is out of drawing range) until attention comes.
+    f32 attnDist = 0.0f; // (once a frame: it was worked out twice)
+
+    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON) {
+        FISHMOD_PROF(FISHMOD_PROF_U_ATTN, attnDist = EnFishmod_AttentionDist(this, play));
+        if (attnDist > 1600.0f) {
+            return;
+        }
+        this->thinkMask = (attnDist > 1200.0f) ? 7 : (attnDist > 800.0f) ? 3 : (attnDist > 500.0f) ? 1 : 0;
+    } else {
+        this->thinkMask = 0;
+    }
+    // a school member away from attention: into its place behind the leader, nothing more
+    if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON && (attnDist > FISHMOD_FOLLOW_FAR_DIST)) {
+        s32 followed;
+
+        FISHMOD_PROF(FISHMOD_PROF_U_FOLLOW, followed = EnFishmod_FollowFar(this, play));
+        if (followed) {
+            if (this->drawnFull == 0) {
+                // (EnFishmod_UpdateSwim's first case, here: most of these fish aren't drawn in full, and the swim
+                // function's code is a cache line or two more each)
+                this->lastYaw = this->actor.shape.rot.y;
+                if (this->startle != 0) {
+                    this->startle -= (this->startle > 0) ? 1 : -1;
+                }
+                this->startleBend = 0;
+            } else {
+                FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_UpdateSwim(this));
+            }
+            return;
+        }
+    }
+    // away from attention, a wandering fish thinks every other frame and glides on in between
+    if ((this->fishState == FISH_STATE_WANDER) && (this->timer & FISHMOD_THINK_MASK(this)) && !FISHMOD_PHOTO_ON &&
+        (attnDist > 500.0f)) {
+        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
+        return;
+    }
+    if ((this->type == FISHMOD_TYPE_FISH) && !EnFishmod_ThinkAllowed(this, play)) {
+        FISHMOD_PROF(FISHMOD_PROF_U_GLIDE, EnFishmod_Glide(this));
+        return;
+    }
+    FISHMOD_PROF(FISHMOD_PROF_U_AI, EnFishmod_FishAI(this, play));
+    FISHMOD_PROF(FISHMOD_PROF_U_SWIM, EnFishmod_UpdateSwim(this));
+
+#if FISHMOD_DEBUG
+    // (not in the benches: they time the game as it ships, and this cost 2.4 ms a frame there)
+    if (!gFishmodTimingAsShipped) {
+        EnFishmod_DebugReadout(this, play);
     }
 #endif
 }
