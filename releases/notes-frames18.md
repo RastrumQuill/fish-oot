@@ -1,5 +1,9 @@
 # frames18
 
+**Console, 14 November (run 20261114-1127):** hitches 24.5% of pictures, the fewest of any build (frames17 30.5%,
+frames16 32.7%, frames14c 27.9%); frames over 52 ms 38% (frames17 46%); frame period 53.6 ms (frames17 54.4);
+CPU update -0.8 ms and CPU draw -0.7 ms against frames17; RDP 44.0 ms, unchanged: still the limit.
+
 **`fish-oot-frames18.bps`** (`fishmod/build.sh --script pcprof_frames --hw --colpack --meshpack --gcc-all`): frames17
 with the game's code and data pinned in the CPU's caches. The PC profile and frame log as in every bench build.
 Compare with frames17 (run 20261114-1035) and frames16 (20261114-0923).
