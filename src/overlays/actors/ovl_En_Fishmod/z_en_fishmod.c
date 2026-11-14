@@ -2631,6 +2631,71 @@ void EnFishmod_DrawPhotoBackdrop(PlayState* play) {
  * The far shape's material for a species: its side texture (the scale pattern the model tiles along
  * the body) with its palette, coloured by the vertex colours. The manager sets it once per species.
  */
+/**
+ * How fogged a point is (0-255), as the RSP fogs a vertex: from its depth (z / w after the view and projection,
+ * -1 at the near plane, 1 at the far) by the factors Gfx_SetFog gives the scene's fog (Play_SetFog: from fogNear to
+ * the haze's far). For a flat fish (EnFishmod_RigDraw), whose fog is one amount for all of it.
+ */
+/**
+ * The light a flat fish is coloured by (in place of lighting each vertex): the scene's ambient light and a share of its
+ * two directional lights, the average a lit fish's sides catch (fitted on the lit fish: FISHMOD_FLAT_DIR_SHARE). So a
+ * fish that goes flat keeps its brightness, and at night it is as dark as a lit one would be.
+ */
+#define FISHMOD_FLAT_DIR_SHARE 0.22f
+void EnFishmod_FlatLight(PlayState* play, u8* out) {
+    // (once a frame: the same for every fish)
+    static u32 sFrame = 0xFFFFFFFF;
+    static u8 sLight[3];
+
+    if (sFrame != play->gameplayFrames) {
+        s32 c;
+
+        sFrame = play->gameplayFrames;
+        for (c = 0; c < 3; c++) {
+            f32 v = play->lightCtx.ambientColor[c] + FISHMOD_FLAT_DIR_SHARE * (play->envCtx.dirLight1.params.dir.color[c] +
+                                                                           play->envCtx.dirLight2.params.dir.color[c]);
+
+            sLight[c] = (v >= 255.0f) ? 255 : (u8)v;
+        }
+    }
+    out[0] = sLight[0];
+    out[1] = sLight[1];
+    out[2] = sLight[2];
+}
+
+s32 EnFishmod_FogAmount(PlayState* play, Vec3f* pos) {
+    MtxF* m = &play->viewProjectionMtxF;
+    s32 near = play->lightCtx.fogNear;
+    s32 far = 1000 - (s32)((1000 - FISHMOD_HAZE_FOG_FAR) * gFishmodHaze);
+    f32 z = m->zx * pos->x + m->zy * pos->y + m->zz * pos->z + m->zw;
+    f32 w = m->wx * pos->x + m->wy * pos->y + m->wz * pos->z + m->ww;
+    f32 fm;
+    f32 fo;
+    f32 fog;
+
+    if (far == near) {
+        far++;
+    }
+    if (near >= 1000) {
+        return 0;
+    }
+    if (near < 0) {
+        return 255;
+    }
+    if (near > 996) {
+        fm = 0x7FFF;
+        fo = -0x7F00;
+    } else {
+        fm = 128000.0f / (far - near);
+        fo = (500 - near) * 256.0f / (far - near);
+    }
+    if (w < 1.0f) {
+        return 0; // (at or behind the eye: unfogged, as the nearest)
+    }
+    fog = (z / w) * fm + fo;
+    return (fog <= 0.0f) ? 0 : (fog >= 255.0f) ? 255 : (s32)fog;
+}
+
 void EnFishmod_BillboardMaterial(EnFishmod* this, PlayState* play) {
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     s32 speciesIndex = this->species - gFishmodSpecies;
@@ -2639,7 +2704,15 @@ void EnFishmod_BillboardMaterial(EnFishmod* this, PlayState* play) {
     OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
     Gfx_SetupDL_25Opa(gfxCtx);
     gDPPipeSync(POLY_OPA_DISP++);
-    gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH | G_TEXTURE_GEN);
+    if (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT) {
+        gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH | G_TEXTURE_GEN); // (as before: a comparison)
+    } else {
+        // flat, as the rig past its lit distance: one cycle, the fog in the combiner (each shape's own environment
+        // colour and corner colours: EnFishmod_DrawBillboard), not in the blender
+        gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH | G_TEXTURE_GEN | G_FOG);
+        gDPSetCycleType(POLY_OPA_DISP++, G_CYC_1CYCLE);
+        gDPSetRenderMode(POLY_OPA_DISP++, G_RM_RA_ZB_OPA_SURF, G_RM_RA_ZB_OPA_SURF2);
+    }
     if ((tex != NULL) && (sSpeciesPalettes[speciesIndex] != NULL)) {
         s32 big = FISHMOD_BASE_TEX_SIZE(gFishmodSpecies[speciesIndex].base) == 32;
 
@@ -2653,10 +2726,20 @@ void EnFishmod_BillboardMaterial(EnFishmod* this, PlayState* play) {
                                 G_TX_WRAP | G_TX_NOMIRROR, 4, 4, G_TX_NOLOD, G_TX_NOLOD);
         }
         gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
-        gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIDECALA, G_CC_MODULATEIDECALA);
+        if (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT) {
+            gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIDECALA, G_CC_MODULATEIDECALA);
+        } else {
+            gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, SHADE, ENVIRONMENT, 0, 0, 0, 1, TEXEL0, 0, SHADE,
+                              ENVIRONMENT, 0, 0, 0, 1);
+        }
     } else {
         gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-        gDPSetCombineMode(POLY_OPA_DISP++, G_CC_SHADE, G_CC_SHADE);
+        if (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT) {
+            gDPSetCombineMode(POLY_OPA_DISP++, G_CC_SHADE, G_CC_SHADE);
+        } else {
+            gDPSetCombineLERP(POLY_OPA_DISP++, 1, 0, SHADE, ENVIRONMENT, 0, 0, 0, 1, 1, 0, SHADE, ENVIRONMENT, 0, 0, 0,
+                              1);
+        }
     }
     CLOSE_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
 }
@@ -2700,7 +2783,18 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     s32 texSize = FISHMOD_BASE_TEX_SIZE(this->species->base);
     const u8* tint = this->species->tint;
     s32 i;
+    // (all lit, a comparison: the blender fogs it, as before)
+    s32 fog = (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT) ? 0 : EnFishmod_FogAmount(play, &this->actor.world.pos);
+    s32 keep = 255 - fog;
+    u8 light[3] = { 255, 255, 255 }; // (all lit, a comparison: unlit, as before)
+    s32 scale[3];
 
+    if (FISHMOD_FLAT_TEST != FISHMOD_FLAT_TEST_ALL_LIT) {
+        EnFishmod_FlatLight(play, light); // (as the flat rig: the same brightness where one becomes the other)
+    }
+    for (i = 0; i < 3; i++) {
+        scale[i] = light[i] * keep; // (65025ths, taken as 65536ths: a shift, not a division)
+    }
     if (vl < 0.001f) {
         vl = 0.001f;
     }
@@ -2783,13 +2877,15 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
         vtx[i].v.flag = 0;
         vtx[i].v.tc[0] = (s16)((1.0f - sShape[i][0]) * texSize * 32.0f);
         vtx[i].v.tc[1] = (s16)((1.0f - sShape[i][1]) * 0.5f * texSize * 32.0f);
-        vtx[i].v.cn[0] = this->bbColor[i][0];
-        vtx[i].v.cn[1] = this->bbColor[i][1];
-        vtx[i].v.cn[2] = this->bbColor[i][2];
+        vtx[i].v.cn[0] = (this->bbColor[i][0] * scale[0]) >> 16;
+        vtx[i].v.cn[1] = (this->bbColor[i][1] * scale[1]) >> 16;
+        vtx[i].v.cn[2] = (this->bbColor[i][2] * scale[2]) >> 16;
         vtx[i].v.cn[3] = 255;
     }
 
     OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
+    gDPSetEnvColor(POLY_OPA_DISP++, (play->lightCtx.fogColor[0] * fog) >> 8, (play->lightCtx.fogColor[1] * fog) >> 8,
+                   (play->lightCtx.fogColor[2] * fog) >> 8, 255);
     gSPVertex(POLY_OPA_DISP++, vtx, 6, 0);
     gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
     gSP2Triangles(POLY_OPA_DISP++, 0, 3, 4, 0, 0, 4, 5, 0);

@@ -156,6 +156,8 @@ typedef struct EnFishmod {
     u32 scentFrame;                                // the frame it last smelled bait in the water (EnFishmod_SmellBait)
     s32 lookKey;                                   // what lookGfx was made for (species and looks), -1: not made
     Gfx lookGfx[(FISHMOD_PART_MAX + FISHMOD_TEX_ROLE_MAX) * 2]; // its tint table (EnFishmod_LookTable), made once
+    Gfx flatGfx[(FISHMOD_PART_MAX + FISHMOD_TEX_ROLE_MAX) * 2]; // the same for drawing flat: tints by light and fog
+    u32 flatKey; // what flatGfx was made for (its looks, the light, the fog in 64 steps), 0: not made
     s32 bbKey;                                     // what bbColor was made for (as lookKey)
     u8 bbColor[6][3];                              // its far shape's corner colours (EnFishmod_DrawBillboard), made once
 } EnFishmod;
@@ -293,7 +295,12 @@ s32 EnFishmod_RigPrepare(struct EnFishmod* this);
 void EnFishmod_RigFreeAll(void);
 void EnFishmod_RigSetSpecies(struct EnFishmod* this, struct PlayState* play, s32 variant);
 void EnFishmod_RigRestoreSegments(struct PlayState* play);
-void EnFishmod_RigDraw(struct EnFishmod* this, struct PlayState* play, s32 variant, s32 wantBounds);
+// fog: -1 lit (the model's own material), else flat with this much fog (0-255, EnFishmod_FogAmount)
+void EnFishmod_RigDraw(struct EnFishmod* this, struct PlayState* play, s32 variant, s32 wantBounds, s32 fog);
+// How fogged a point is (0-255), as the RSP would fog a vertex there with the scene's fog now (Play_SetFog)
+s32 EnFishmod_FogAmount(struct PlayState* play, Vec3f* pos);
+// The light a flat fish is coloured by (RGB): the scene's ambient and a share of its directional lights
+void EnFishmod_FlatLight(struct PlayState* play, u8* out);
 void EnFishmod_BillboardMaterial(struct EnFishmod* this, struct PlayState* play);
 
 // Fish manager (fishmod_manager.c)

@@ -542,6 +542,9 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 // whatever ran then counts, a thread that took over included (the audio thread preempting a fish's update shows as
 // audio under the fish's tag)
 extern u32 gFishmodPcTag;
+// The flat fish compared (fishmod_manager.c, LIT_DIST): set by a script (FISHMOD_FLAT_TEST_INIT), else normal
+extern s32 gFishmodFlatTest;
+#define FISHMOD_FLAT_TEST gFishmodFlatTest
 #define FISHMOD_PCTAG_FISH_UPDATE 1 // a fish's update (Actor_UpdateAll)
 extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 // the hardware bench (fishmod_debug.c, FISHMOD_HWBENCH) switches these off to time the rest without them
@@ -614,6 +617,7 @@ extern s16 gFishmodDebugFocusYaw;
     {                            \
         stmt;                    \
     }
+#define FISHMOD_FLAT_TEST 0
 #define FISHMOD_SECT(slot, stmt) \
     {                            \
         stmt;                    \
@@ -629,6 +633,9 @@ extern s16 gFishmodDebugFocusYaw;
 
 #define FISHMOD_DEBUG_LINES 12
 #define FISHMOD_DEBUG_LINE_LEN 40
+
+#define FISHMOD_FLAT_TEST_ALL_LIT 1  // every fish lit (the model's own material), as before the flat fish
+#define FISHMOD_FLAT_TEST_ALL_FLAT 2 // every fish flat, even up close
 
 typedef struct FishmodAutoplayStep {
     /* 0x00 */ u16 frames;

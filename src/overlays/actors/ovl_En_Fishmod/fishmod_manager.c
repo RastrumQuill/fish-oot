@@ -37,6 +37,11 @@
 #define HOME_CROWD_MAX 6          // this many other homes already (dense weed drew too many fish to one spot)
 #define THINK_BUDGET 16           // full AI updates per frame for fish cruising far from Link and the bobber
 #define THINK_FAR_DIST 300.0f
+// closer than this: lit, the model's own material; farther, flat (EnFishmod_RigDraw). (Comparisons: every fish lit as
+// before, or every fish flat even up close: FISHMOD_FLAT_TEST)
+#define LIT_DIST ((FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT)    ? 1e9f \
+                  : (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_FLAT) ? 0.0f \
+                                                                      : 200.0f)
 #define LOD_FULL_DIST 300.0f      // closer than this: the full rig (and whiskers); then the reduced rig to the far shape
 #define DRAW_WHISKERS 0           // catfish whiskers are off for now: too thin to see (to be redone)
 
@@ -792,6 +797,7 @@ typedef struct ManagerDrawItem {
     EnFishmod* fish;
     u8 variant;
     u8 whiskers;
+    s16 fog; // -1: lit; else flat, this fogged (EnFishmod_FogAmount)
 } ManagerDrawItem;
 
 void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
@@ -805,6 +811,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
     s32 j;
     s32 lastSpecies = -1;
     s32 lastVariant = -1;
+    s32 lastFlat = -1;
 #if FISHMOD_DEBUG
     OSTime profStart;
 #endif
@@ -874,18 +881,20 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
                     }
                 }
             }
+            item->fog = (close || (dist < LIT_DIST)) ? -1 : EnFishmod_FogAmount(play, &actor->world.pos);
             item->whiskers = DRAW_WHISKERS && (fish->species->lookFlags & FISHMOD_LOOK_WHISKERS) &&
                              (item->variant == FISH_RIG_FULL) && (close || (dist < LOD_FULL_DIST));
         }
     }
 
-    // sorted by species and rig, so each species' textures and vertices are set up once
+    // sorted by species, rig and material, so each species' textures and vertices, and each material, are set up once
+#define DRAW_KEY(item) ((((item).fish->species - gFishmodSpecies) * 2 + (item).variant) * 2 + ((item).fog >= 0))
     for (i = 1; i < fullCount; i++) {
         ManagerDrawItem item = full[i];
-        s32 key = (item.fish->species - gFishmodSpecies) * 2 + item.variant;
+        s32 key = DRAW_KEY(item);
 
         for (j = i - 1; j >= 0; j--) {
-            if ((full[j].fish->species - gFishmodSpecies) * 2 + full[j].variant <= key) {
+            if (DRAW_KEY(full[j]) <= key) {
                 break;
             }
             full[j + 1] = full[j];
@@ -899,11 +908,20 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
 
         Fishmod_ClaimDisplayLists(play->state.gfxCtx); // (the lists' next lines, before this fish is written)
 
-        if (species != lastSpecies) {
+        if ((species != lastSpecies) || ((full[i].fog >= 0) != lastFlat)) {
 #if FISHMOD_DEBUG
             profStart = FISHMOD_CLOCK();
 #endif
             Gfx_SetupDL_25Opa(play->state.gfxCtx);
+            lastFlat = (full[i].fog >= 0);
+            if (lastFlat) {
+                // flat (fishmod_rig.c, Rig_Flatten): one cycle, nothing lit or shaded
+                OPEN_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+                gDPPipeSync(POLY_OPA_DISP++);
+                gDPSetCycleType(POLY_OPA_DISP++, G_CYC_1CYCLE);
+                gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_FOG | G_SHADE);
+                CLOSE_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+            }
             EnFishmod_SetSpeciesTextures(fish, play);
 #if FISHMOD_DEBUG
             gFishmodProf[FISHMOD_PROF_D_SETUP] += FISHMOD_SINCE(profStart);
@@ -917,7 +935,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
             lastVariant = full[i].variant;
         }
         EnFishmod_RigDraw(fish, play, full[i].variant,
-                          full[i].whiskers || FISHMOD_PHOTO_ON || (fish->fishState == FISH_STATE_CAUGHT));
+                          full[i].whiskers || FISHMOD_PHOTO_ON || (fish->fishState == FISH_STATE_CAUGHT), full[i].fog);
     }
     if (fullCount != 0) {
         EnFishmod_RigRestoreSegments(play);

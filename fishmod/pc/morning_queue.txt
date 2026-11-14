@@ -1,4 +1,9 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# One run, about 9 hours: the RDP sweep (fishmod/scripts/rdp_sweep.inc.c): 140 laps of clear dawn, every other lap as
-# shipped, between them the props, fish, water surface, sky, HUD, or all of them left out in turn.
+# First two runs, about 4 minutes each, on the reseeded bench: frames15L (the control: every fish lit, as before) then
+# frames15 (the fish flat past 200 units: one cycle, unlit, fogged in the combiner).
+# Then the RDP sweep, about 9 hours (fishmod/scripts/rdp_sweep.inc.c): 140 laps of clear dawn, every other lap as
+# shipped, between them the props, fish, water surface, sky, HUD, or all of them left out in turn. (If its results
+# from the night of 13 November came through, drop its line.)
+releases/fish-oot-frames15L.bps 12 frames15L
+releases/fish-oot-frames15.bps 12 frames15
 releases/fish-oot-rdp-sweep.bps 600 rdp-sweep

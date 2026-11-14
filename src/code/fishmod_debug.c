@@ -808,6 +808,10 @@ u32 gFishmodScatterCacheDiff[8];  // SCATTER_VERIFY: the last difference (list, 
 OSTime gFishmodProf[FISHMOD_PROF_MAX];
 u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 u32 gFishmodPcTag; // the PC profile's tag for its samples now (FISHMOD_PCTAG_*)
+#ifndef FISHMOD_FLAT_TEST_INIT
+#define FISHMOD_FLAT_TEST_INIT 0
+#endif
+s32 gFishmodFlatTest = FISHMOD_FLAT_TEST_INIT;
 
 /**
  * Averages over 60 frames, in tenths of a millisecond: RSP graphics and RDP time, the CPU time of Play_Update,

@@ -22,6 +22,7 @@
  */
 
 #include "z_en_fishmod.h"
+#include "array_count.h"
 #include "attributes.h"
 #include "assets/objects/object_fish/object_fish.h"
 #include "assets/objects/gameplay_keep/gameplay_keep_0x18610.h"
@@ -86,6 +87,7 @@ typedef struct FishRigBase {
     FishRigVtxLoad loads[RIG_MAX_LOADS];
     u8* vtxBone; // per baked vertex
     Gfx* dl;
+    Gfx* dlFlat; // the same, flat: 1 cycle, unlit, fogged in the combiner (Rig_Flatten)
 } FishRigBase;
 
 /** A species' copy of a model's rig: its baked vertices and tints, and the bones' rest places (shapes differ). */
@@ -606,6 +608,64 @@ static Gfx* Rig_Peephole(Gfx* start, Gfx* end) {
     return out;
 }
 
+/*
+ * The rig's list for a fish past the lit distance (EnFishmod_RigDraw with a fog amount): the same triangles in one
+ * cycle, unlit, the fog in the combiner instead of the blender. The model's material is texture x lighting x tint,
+ * fogged by the blender in a first cycle (two cycles: half the fill rate). Flat, it is texture x tint + fog colour,
+ * the tint scaled by (1 - fog) for the fish as a whole (EnFishmod_FogAmount at its middle: a fish is small next to the
+ * fog's distances) and the fog colour x fog in the environment colour. No lighting and no shade at all: under water,
+ * past arm's length, the lighting showed as little, and a triangle without shade is a shorter RDP command.
+ * - combiner: texture x primitive + environment; alpha the texture's (fins cut out as before) or 1, as the limb's;
+ * - render mode: the limb's own second-cycle mode (anti-aliased, opaque or cut out) in both cycles, the colour buffer
+ *   not read back (as the lit list);
+ * - geometry mode: lighting, fog and shade off wherever a limb would turn them on.
+ */
+static Gfx* Rig_Flatten(Gfx* in, Gfx* end, Gfx* out) {
+    static Gfx sOpaqueCombine[] = { gsDPSetCombineLERP(TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, 0, PRIMITIVE, 0, 0, 0,
+                                                       0, COMBINED) };
+    static Gfx sFlat[] = {
+        gsDPSetCombineLERP(TEXEL0, 0, PRIMITIVE, ENVIRONMENT, 0, 0, 0, TEXEL0, TEXEL0, 0, PRIMITIVE, ENVIRONMENT, 0, 0, 0,
+                           TEXEL0),
+        gsDPSetCombineLERP(TEXEL0, 0, PRIMITIVE, ENVIRONMENT, 0, 0, 0, 1, TEXEL0, 0, PRIMITIVE, ENVIRONMENT, 0, 0, 0, 1),
+    };
+
+    for (; in < end; in++) {
+        u32 w0 = in->words.w0;
+        u32 w1 = in->words.w1;
+
+        switch (w0 >> 24) {
+            case G_SETCOMBINE:
+                *out = sFlat[(w0 == sOpaqueCombine[0].words.w0) && (w1 == sOpaqueCombine[0].words.w1)];
+                break;
+            case G_SETOTHERMODE_L:
+                if ((w0 & 0xFFFF) == (((32 - G_MDSFT_RENDERMODE - 29) << 8) | 28)) {
+                    u32 second = (w1 >> 16) & 0x3333; // (the second cycle's blender inputs)
+
+                    out->words.w0 = w0;
+                    out->words.w1 = ((second | (second << 2)) << 16) | (w1 & 0xFFFF & ~IM_RD);
+                } else {
+                    *out = *in;
+                }
+                break;
+            case G_SETOTHERMODE_H:
+                *out = *in;
+                if ((w0 & 0xFFFF) == (((32 - G_MDSFT_CYCLETYPE - 2) << 8) | 1)) {
+                    out->words.w1 = G_CYC_1CYCLE;
+                }
+                break;
+            case G_GEOMETRYMODE:
+                out->words.w0 = w0 & ~(G_LIGHTING | G_FOG | G_SHADE);
+                out->words.w1 = w1 & ~(G_LIGHTING | G_FOG | G_SHADE);
+                break;
+            default:
+                *out = *in;
+                break;
+        }
+        out++;
+    }
+    return out;
+}
+
 static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
     FishRigBase* base = &sRigBases[model][variant];
     FlexSkeletonHeader* skel = SEGMENTED_TO_VIRTUAL(Rig_Skeleton(model));
@@ -847,6 +907,16 @@ static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
         }
     }
     }
+    // the flat list (before the lit one is tidied in place)
+    base->dlFlat = ZeldaArena_Malloc(((out - base->dl) + 1) * sizeof(Gfx));
+    if (base->dlFlat != NULL) {
+        Gfx* flatEnd = Rig_Flatten(base->dl, out, base->dlFlat);
+
+#ifndef FISHMOD_NO_RIG_PEEPHOLE
+        flatEnd = Rig_Peephole(base->dlFlat, flatEnd);
+#endif
+        gSPEndDisplayList(flatEnd++);
+    }
 #ifndef FISHMOD_NO_RIG_PEEPHOLE
 #if FISHMOD_DEBUG
     {
@@ -1054,6 +1124,9 @@ void EnFishmod_RigFreeAll(void) {
             if (sRigBases[i][v].dl != NULL) {
                 ZeldaArena_Free(sRigBases[i][v].dl);
             }
+            if (sRigBases[i][v].dlFlat != NULL) {
+                ZeldaArena_Free(sRigBases[i][v].dlFlat);
+            }
             if (sRigBases[i][v].vtxBone != NULL) {
                 ZeldaArena_Free(sRigBases[i][v].vtxBone);
             }
@@ -1110,7 +1183,7 @@ static s16 Rig_BodyAngle(FishRigSwim* swim, f32 x, f32 phase, f32 amp, f32 curve
  * Draws a fish with its rig (EnFishmod_RigSetSpecies first). Also updates its head position, and its bounds when
  * something needs them (held up by Link, photos, whiskers).
  */
-void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBounds) {
+void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBounds, s32 fog) {
     s32 model = EnFishmod_RigModel(this->species);
     FishRigBase* base = &sRigBases[model][variant];
     FishRigSpecies* rig = sRigSpecies[this->species - gFishmodSpecies][variant];
@@ -1254,9 +1327,54 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
 #endif
     OPEN_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
     gSPSegment(POLY_OPA_DISP++, RIG_SEG_MTX, mtx);
-    // the bass's display lists don't set culling (EnFishmod_PatchSkeleton): a shut mouth culls back faces, an open
-    // one draws both sides, or you'd see through the mouth and out the fish
-    if ((model == FISH_RIG_BASS) && (this->jawRot > 0)) {
+    if ((fog >= 0) && (base->dlFlat != NULL)) {
+        // flat (Rig_Flatten): its tints by the scene's light and (1 - fog), the fog colour x fog added in the
+        // environment colour. The tints in the fish's own memory, made again only when its looks, the light or its fog
+        // (in 64 steps, 1.6% each) change: once a frame they cost about 40 us a fish (ares)
+        LightContext* lights = &play->lightCtx;
+        u8 light[3];
+        u32 key;
+
+        EnFishmod_FlatLight(play, light);
+        fog &= ~3;
+        key = ((u32)(this->lookKey * 0x9E3779B1) ^ ((u32)light[0] << 16 | (u32)light[1] << 8 | light[2]) ^
+               ((u32)fog << 24)) | 1;
+        if (this->flatKey != key) {
+            s32 keep = 255 - fog;
+            s32 scale[3]; // (the light and (1 - fog) together, in 65025ths taken as 65536ths: shifts, not divisions)
+            s32 i;
+
+            this->flatKey = key;
+            for (i = 0; i < 3; i++) {
+                scale[i] = light[i] * keep;
+            }
+            for (i = 0; i < ARRAY_COUNT(this->lookGfx); i++) {
+                this->flatGfx[i] = this->lookGfx[i];
+            }
+            for (i = 0; i < FISHMOD_PART_MAX; i++) {
+                u32 c = this->flatGfx[i * 2].words.w1;
+
+                this->flatGfx[i * 2].words.w1 = ((((c >> 24) * scale[0]) >> 16) << 24) |
+                                                (((((c >> 16) & 0xFF) * scale[1]) >> 16) << 16) |
+                                                (((((c >> 8) & 0xFF) * scale[2]) >> 16) << 8) | (c & 0xFF);
+            }
+        }
+        gSPSegment(POLY_OPA_DISP++, RIG_SEG_TINT, this->flatGfx);
+        gDPSetEnvColor(POLY_OPA_DISP++, (lights->fogColor[0] * fog) >> 8, (lights->fogColor[1] * fog) >> 8,
+                       (lights->fogColor[2] * fog) >> 8, 255);
+        if ((model == FISH_RIG_BASS) && (this->jawRot > 0)) {
+            gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+            gSPDisplayList(POLY_OPA_DISP++, base->dlFlat);
+            gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+        } else {
+            if (model == FISH_RIG_BASS) {
+                gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+            }
+            gSPDisplayList(POLY_OPA_DISP++, base->dlFlat);
+        }
+    } else if ((model == FISH_RIG_BASS) && (this->jawRot > 0)) {
+        // the bass's display lists don't set culling (EnFishmod_PatchSkeleton): a shut mouth culls back faces, an open
+        // one draws both sides, or you'd see through the mouth and out the fish
         gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
         gSPDisplayList(POLY_OPA_DISP++, base->dl);
         gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
