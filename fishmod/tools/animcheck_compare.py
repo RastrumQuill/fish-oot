@@ -14,7 +14,7 @@ import struct
 import sys
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
-PHASES = ["frames", "blends", "model groups", "faces", "tunics/boots", "far detail"]
+PHASES = ["frames", "blends", "model groups", "faces", "tunics/boots", "far detail", "head and body turns"]
 
 
 def anim_names():
@@ -36,6 +36,8 @@ def load(path):
 def describe(case, names):
     phase, a, f = case >> 28, (case >> 16) & 0xFFF, case & 0xFFFF
     name = PHASES[phase] if phase < len(PHASES) else "phase %d" % phase
+    if phase == 6:
+        return "%s: set %d, %s" % (name, a, names[f] if names and f < len(names) else "#%d" % f)
     if phase == 0 or phase == 5:
         an = names[a if phase == 0 else f] if names else "#%d" % a
         return "%s: %s frame %d" % (name, an, f if phase == 0 else 0)

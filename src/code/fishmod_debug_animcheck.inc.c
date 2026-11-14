@@ -528,6 +528,8 @@ typedef enum AcPhase {
     AC_PHASE_FACES,   // every face on the first 8 animations
     AC_PHASE_TUNICS,  // every tunic and boots on every 64th animation
     AC_PHASE_FAR,     // the far level of detail: every 4th animation's first frame, seen from far off
+    AC_PHASE_LOOK,    // the head and upper body turned by his code (looking at something, aiming): 90 angle sets on
+                      // every 32nd animation's first frame
     AC_PHASE_DONE
 } AcPhase;
 
@@ -590,6 +592,13 @@ static s32 Ac_Next(void) {
         case AC_PHASE_FAR:
             sAcF += 4;
             return sAcF < FISHMOD_ANIMCHECK_LINK_ANIMS;
+        case AC_PHASE_LOOK:
+            sAcF += 32;
+            if (sAcF < FISHMOD_ANIMCHECK_LINK_ANIMS) {
+                return true;
+            }
+            sAcF = 0;
+            return ++sAcA < 90;
         default:
             return false;
     }
@@ -664,6 +673,8 @@ s32 Fishmod_AnimCheckPlayerUpdate(Player* this, PlayState* play) {
             this->currentTunic = sAcTunic;
             this->currentBoots = sAcBoots;
             this->actor.shape.face = sAcFace;
+            this->headLimbRot.x = this->headLimbRot.y = this->headLimbRot.z = 0;
+            this->upperLimbRot.x = this->upperLimbRot.y = this->upperLimbRot.z = 0;
             sAcSettle = 10; // (the camera moves for the far phase)
         }
     }
@@ -699,6 +710,19 @@ s32 Fishmod_AnimCheckPlayerUpdate(Player* this, PlayState* play) {
         case AC_PHASE_FAR:
             AnimTaskQueue_AddLoadPlayerFrame(play, sAnimCheckLinkAnims[sAcF], 0, limbs, sAcJoints);
             break;
+        case AC_PHASE_LOOK: {
+            // (variant a: head yaw 5 steps x head pitch 3 x upper body yaw 3 x upper body pitch 2)
+            static const s16 sHeadYaw[5] = { -0x3000, -0x1500, 0, 0x1500, 0x3000 };
+            static const s16 sPitch[3] = { -0x1000, 0, 0x1000 };
+            static const s16 sUpperYaw[3] = { -0x2000, 0, 0x2000 };
+
+            this->headLimbRot.y = sHeadYaw[sAcA % 5];
+            this->headLimbRot.x = sPitch[(sAcA / 5) % 3];
+            this->upperLimbRot.y = sUpperYaw[(sAcA / 15) % 3];
+            this->upperLimbRot.x = ((sAcA / 45) & 1) ? 0x800 : 0;
+            AnimTaskQueue_AddLoadPlayerFrame(play, sAnimCheckLinkAnims[sAcF], 0, limbs, sAcJoints);
+            break;
+        }
     }
     a = sAcA;
     if (sAcSettle == 0) {
