@@ -131,11 +131,11 @@ def design_now():
     gh.quad_uv(deck, ((hw, -t, L), (-hw, -t, L), (-hw, 0, L), (hw, 0, L)), side, (0, 0.8, 1, 1))
     posts = gh.Mesh("posts", "dock_wood")
     dark, light = gh.hexc("#4a3a28"), gh.hexc("#a08a68")
-    for z in gh.DOCK_PILING_ROWS:
-        for x in (-gh.DOCK_PILING_X, gh.DOCK_PILING_X):
+    for z in (100, 200, 300, 400):  # (the old layout)
+        for x in (-25, 25):
             gh.cylinder(posts, (x, -150, z), (x, -t, z), 5, 5, 6, dark, light, v_repeat=4.0)
         gh.cylinder(posts, (-33, -t - 4, z), (33, -t - 4, z), 4, 4, 4, dark, light, v_repeat=1.5)
-    x, z, h = gh.DOCK_MOORING
+    x, z, h = (-25, 412, 30)
     gh.cylinder(posts, (x, -150, z), (x, h, z), 6, 6, 6, dark, light, v_repeat=5.0)
     return [(deck, "dock_planks", False), (posts, "dock_wood", False)]
 
@@ -199,7 +199,7 @@ def design_pier():
     return [(deck, "lake_planks", True), (stone, "lake_stone", True), (posts, "lake_post", True)]
 
 
-DESIGNS = {"A: now": design_now, "B: now, fixed": design_fixed, "C: Lake Hylia bridge style": design_lake,
+DESIGNS = {"A: now": design_now, "B: as built (twisted pentagon posts)": design_fixed, "C: Lake Hylia bridge style": design_lake,
            "D: stone piers": design_pier}
 
 VIEWS = [

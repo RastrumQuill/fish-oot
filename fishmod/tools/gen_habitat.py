@@ -335,6 +335,8 @@ ROM_TEXTURES = {
     "leaf_litter": (rom_leaf_litter, "ci4"),
     "bark": (rom_bark, "ci4"),
     # the north-beach dock: the Fishing Pond's own weathered planks and plain wood
+    # the north-beach dock: the Fishing Pond's own weathered planks and plain wood (the lake's bridge boards were tried:
+    # too busy at the dock's size, they shimmered)
     "dock_planks": (lambda: rom_colour("scenes/misc/turibori/turibori_scene_0000ACE0_Tex.rgba16.png"), "ci8"),
     "dock_wood": (lambda: rom_colour("scenes/misc/turibori/turibori_scene_000081E0_Tex.rgba16.png"), "ci8"),
     "pebbles": (rom_pebbles, "ci4"),
@@ -773,11 +775,12 @@ DOCK = {"scene": "SCENE_LAKE_HYLIA", "x": -400, "y": -1288, "z": 3080}
 DOCK_LENGTH = 420
 DOCK_WIDTH = 60
 DOCK_THICK = 6
-DOCK_PILING_ROWS = (100, 200, 300, 400)  # pairs of pilings, this far out
-DOCK_PILING_X = 25
-DOCK_PILING_R = 5
-DOCK_PILING_DEPTH = 150                   # down from the deck: well into the bed all along
-DOCK_MOORING = (-25, 412, 30)              # x, z, height above the deck
+DOCK_PILING_ROWS = (60, 200, 340, 412)    # pairs of posts, this far out (the last pair, at the end, to moor to)
+DOCK_PILING_X = 31                         # at the deck's edges, standing above it as the island bridge's do
+DOCK_PILING_R = 5.5
+DOCK_POST_ABOVE = 22                       # how far they stand above the deck
+DOCK_PILING_DEPTH = 150                   # down from the deck at most (each is cut 10 under the bed where it stands)
+DOCK_WATER = -25                           # the water surface, from the deck (the full lake)
 
 
 def quad_uv(m, corners, col, uv):
@@ -788,19 +791,34 @@ def quad_uv(m, corners, col, uv):
 
 
 def mesh_dock_deck():
-    """The deck: weathered planks across it, top, sides, both ends and underside (seen from under the water). A closed
-    box, drawn with its back faces culled."""
+    """The deck: weathered planks across the top and underside, a rim board along each side, both ends closed (a
+    solid, drawn with back faces culled)."""
     m = Mesh("dock_deck", "dock_planks")
     hw, L, t = DOCK_WIDTH / 2, DOCK_LENGTH, DOCK_THICK
-    top, side, under = (235, 230, 220), (170, 165, 155), (110, 110, 105)
+    top, side, under = (230, 225, 210), (175, 165, 150), (95, 100, 90)
     rep = L / 30.0  # one plank-texture tile per 30 units of deck
     quad_uv(m, ((-hw, 0, 0), (hw, 0, 0), (hw, 0, L), (-hw, 0, L)), top, (0, 0, 1, rep))
+    orient_outward(m, (0, -100, L / 2), 0)
+    first = len(m.f)
     quad_uv(m, ((-hw, -t, L), (hw, -t, L), (hw, -t, 0), (-hw, -t, 0)), under, (0, 0, 1, rep))
-    quad_uv(m, ((hw, -t, 0), (hw, -t, L), (hw, 0, L), (hw, 0, 0)), side, (0, 0.8, rep, 1))
-    quad_uv(m, ((-hw, -t, L), (-hw, -t, 0), (-hw, 0, 0), (-hw, 0, L)), side, (0, 0.8, rep, 1))
-    quad_uv(m, ((hw, -t, L), (-hw, -t, L), (-hw, 0, L), (hw, 0, L)), side, (0, 0.8, 1, 1))
-    quad_uv(m, ((-hw, -t, 0), (hw, -t, 0), (hw, 0, 0), (-hw, 0, 0)), side, (0, 0.8, 1, 1))  # (the shore end)
-    return orient_outward(m, (0, -t / 2, L / 2))
+    orient_outward(m, (0, 100, L / 2), first)
+    for x0, x1 in ((hw, hw + 3), (-hw - 3, -hw)):
+        # the rim boards, standing 2 proud of the deck
+        first = len(m.f)
+        for quad, uv in (
+                (((x1, -t - 2, 0), (x1, -t - 2, L), (x1, 2, L), (x1, 2, 0)), (0, 0, L / 32.0, 0.3)),
+                (((x0, -t - 2, L), (x0, -t - 2, 0), (x0, 2, 0), (x0, 2, L)), (0, 0, L / 32.0, 0.3)),
+                (((x0, 2, 0), (x1, 2, 0), (x1, 2, L), (x0, 2, L)), (0, 0, L / 32.0, 0.1)),
+                (((x0, -t - 2, L), (x1, -t - 2, L), (x1, -t - 2, 0), (x0, -t - 2, 0)), (0, 0, L / 32.0, 0.1)),
+                (((x1, -t - 2, L), (x0, -t - 2, L), (x0, 2, L), (x1, 2, L)), (0, 0, 0.1, 0.3)),
+                (((x0, -t - 2, 0), (x1, -t - 2, 0), (x1, 2, 0), (x0, 2, 0)), (0, 0, 0.1, 0.3))):
+            quad_uv(m, quad, side, uv)
+        orient_outward(m, ((x0 + x1) / 2, -t / 2, L / 2), first)
+    for z, c in ((L, L + 100), (0, -100)):
+        first = len(m.f)
+        quad_uv(m, ((-hw, -t, z), (hw, -t, z), (hw, 0, z), (-hw, 0, z)), side, (0, 0, hw / 16.0, 0.2))
+        orient_outward(m, (0, -t / 2, z - (c - z)), first)
+    return m
 
 
 _DOCK_BED = {}
@@ -859,32 +877,75 @@ def tube(m, p0, p1, r, sides, dark, light, v_repeat, caps=(False, False)):
     return orient_outward(m, [(p0[k] + p1[k]) / 2 for k in range(3)], first)
 
 
-def mesh_dock_posts(sides=6, name="dock_posts"):
-    """The pilings (pairs, down to just under the lake bed where each stands: the rest was drawn into the ground for
-    nothing), a cross beam under the deck at each pair, and a mooring post. Each a closed post, drawn with back faces
-    culled. With fewer sides for far away (mesh_dock_posts_far)."""
-    m = Mesh(name, "dock_wood")
-    dark, light = hexc("#4a3a28"), hexc("#a08a68")
-    for z in DOCK_PILING_ROWS:
-        for x in (-DOCK_PILING_X, DOCK_PILING_X):
-            depth = dock_bed_depth(x, z)
-            depth = DOCK_PILING_DEPTH if depth is None else min(DOCK_PILING_DEPTH, depth + 10)
-            # (the texture keeps its scale: the repeat in proportion to the length kept)
-            tube(m, (x, -depth, z), (x, -DOCK_THICK, z), DOCK_PILING_R, sides, dark, light,
-                 4.0 * (depth - DOCK_THICK) / (DOCK_PILING_DEPTH - DOCK_THICK))
-        tube(m, (-DOCK_PILING_X - 8, -DOCK_THICK - 4, z), (DOCK_PILING_X + 8, -DOCK_THICK - 4, z), 4,
-             max(4, sides - 2), dark, light, 1.5, caps=(True, True))
-    x, z, h = DOCK_MOORING
+def dock_post(m, x, z, sides, twist):
+    """One post: from 10 under the bed where it stands up to DOCK_POST_ABOVE over the deck. Its far end turned by
+    `twist` of a side (half: the antiprism's outline, as round as twice the sides: fishmod/docs/low-poly-shapes.md),
+    its shading baked from round normals (smooth whatever the side count), the wood dark and stained below the
+    waterline, a cap on top."""
     depth = dock_bed_depth(x, z)
     depth = DOCK_PILING_DEPTH if depth is None else min(DOCK_PILING_DEPTH, depth + 10)
-    tube(m, (x, -depth, z), (x, h, z), 6, sides, dark, light, 5.0 * (depth + h) / (DOCK_PILING_DEPTH + h),
-         caps=(False, True))
+    y0, y1 = -depth, DOCK_POST_ABOVE
+    wet, dry, top = (100, 96, 70), (165, 140, 105), (190, 165, 125)  # (the old posts' browns; wet: darker, stained)
+    light = (0.55, 0.35, -0.75)
+    span = y1 - y0
+    wl = (DOCK_WATER - y0) / span  # the waterline's share up the post
+    stops = [(0.0, wet), (wl, wet), (min(wl + 0.05, 0.95), dry), (1.0, top)]
+    first = len(m.f)
+    rings = []
+    for t, col in stops:
+        ring = []
+        for k in range(sides + 1):
+            a = 2 * math.pi * (k + 0.5 + twist * t) / sides
+            nx, nz = math.cos(a), math.sin(a)
+            shade = 0.62 + 0.38 * max(0.0, nx * light[0] + nz * light[2] + 0.35)
+            ring.append(m.vert((x + DOCK_PILING_R * nx, y0 + span * t, z + DOCK_PILING_R * nz),
+                               (k / sides, (1 - t) * span / 32.0), tuple(min(255, int(c * shade)) for c in col)))
+        rings.append(ring)
+    for r0, r1 in zip(rings, rings[1:]):
+        for k in range(sides):
+            if twist:
+                # (between turned rings: the triangles that follow the turn)
+                m.tri(r0[k], r0[k + 1], r1[k + 1])
+                m.tri(r0[k], r1[k + 1], r1[k])
+            else:
+                m.quad(r0[k], r0[k + 1], r1[k + 1], r1[k])
+    c = m.vert((x, y1, z), (0.5, 0.5), top)
+    for k in range(sides):
+        m.tri(c, rings[-1][k], rings[-1][k + 1])
+    return orient_outward_axis(m, x, z, first, y1)
+
+
+def orient_outward_axis(m, x, z, first, ytop):
+    """turns the faces from `first` on outward from a post's axis (its top cap: upward)"""
+    for i in range(first, len(m.f)):
+        a, b, c = m.f[i]
+        pa, pb, pc = (m.v[a - 1][:3], m.v[b - 1][:3], m.v[c - 1][:3])
+        e1 = [pb[k] - pa[k] for k in range(3)]
+        e2 = [pc[k] - pa[k] for k in range(3)]
+        n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
+        mid = [(pa[k] + pb[k] + pc[k]) / 3 for k in range(3)]
+        cap = all(abs(p[1] - ytop) < 1e-3 for p in (pa, pb, pc))
+        d = (0, 1, 0) if cap else (mid[0] - x, 0, mid[2] - z)
+        if sum(n[k] * d[k] for k in range(3)) < 0:
+            m.f[i] = (a, c, b)
+    return m
+
+
+def mesh_dock_posts(sides=5, name="dock_posts"):
+    """The dock's posts, in pairs at the deck's edges (DOCK_PILING_ROWS), each a twisted pentagon: rounder than the
+    old six-sided pilings in fewer triangles, cut 10 under the lake bed (the rest was drawn into the ground for
+    nothing), drawn with back faces culled. For far away (mesh_dock_posts_far): twisted triangles."""
+    m = Mesh(name, "dock_wood")
+    for z in DOCK_PILING_ROWS:
+        for x in (-DOCK_PILING_X, DOCK_PILING_X):
+            dock_post(m, x, z, sides, 0.5)
     return m
 
 
 def mesh_dock_posts_far():
-    """The posts for far away (fishmod_scatter.c: past PROP_FAR_DIST from the dock): four sides instead of six"""
-    return mesh_dock_posts(4, "dock_posts_lod")
+    """The posts for far away (fishmod_scatter.c: past PROP_FAR_DIST from the dock): twisted triangles (as round,
+    from there, in 6 triangles a post)"""
+    return mesh_dock_posts(3, "dock_posts_lod")
 
 
 def mesh_spatterdock():

@@ -139,11 +139,9 @@ def dock_tris(scene):
     r = gh.DOCK_PILING_R
     for z in gh.DOCK_PILING_ROWS:
         for x in (-gh.DOCK_PILING_X, gh.DOCK_PILING_X):
-            out += box_tris(ox + x - r, ox + x + r, oy - gh.DOCK_PILING_DEPTH, oy - gh.DOCK_THICK, oz + z - r,
-                            oz + z + r, BRIDGE_SURFACE, top=False)
-    mx, mz, mh = gh.DOCK_MOORING
-    out += box_tris(ox + mx - 6, ox + mx + 6, oy - gh.DOCK_PILING_DEPTH, oy + mh, oz + mz - 6, oz + mz + 6,
-                    BRIDGE_SURFACE)
+            # (each post from well under the bed up to where it stands above the deck, as drawn)
+            out += box_tris(ox + x - r, ox + x + r, oy - gh.DOCK_PILING_DEPTH, oy + gh.DOCK_POST_ABOVE, oz + z - r,
+                            oz + z + r, BRIDGE_SURFACE)
     return out
 
 
