@@ -162,6 +162,11 @@ typedef struct EnFishmod {
     u8 bbColor[6][3];                              // its far shape's corner colours (EnFishmod_DrawBillboard), made once
 } EnFishmod;
 
+// Each fish's memory: a fixed size, whatever EnFishmod's (the dozens of fish sit between the actors' code in the arena:
+// growing the struct would move the code loaded after them to other cache lines). Raise it when the struct outgrows it.
+#define FISHMOD_INSTANCE_SIZE 0x600
+typedef char EnFishmodFitsItsInstance[(sizeof(EnFishmod) <= FISHMOD_INSTANCE_SIZE) ? 1 : -1];
+
 /* Rod controller (fishmod_rod.c) */
 
 typedef enum FishmodRodState {

@@ -3381,7 +3381,11 @@ Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 pos
             } else if (overlayEntry->allocType & ACTOROVL_ALLOC_PERSISTENT) {
                 overlayEntry->loadedRamAddr = ZELDA_ARENA_MALLOC_R(overlaySize, name, 0);
             } else {
-                overlayEntry->loadedRamAddr = ZELDA_ARENA_MALLOC(overlaySize, name, 0);
+                // fish-oot: the mod's own overlay given a whole number of 16 KB (the instruction cache's size):
+                // editing it never moves the code of the actors loaded after it to other cache lines
+                overlayEntry->loadedRamAddr = ZELDA_ARENA_MALLOC(
+                    (overlayEntry == &gActorOverlayTable[ACTOR_EN_FISHMOD]) ? ((overlaySize + 0x3FFF) & ~0x3FFF) : overlaySize,
+                    name, 0);
             }
 
             if (overlayEntry->loadedRamAddr == NULL) {

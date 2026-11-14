@@ -625,9 +625,6 @@ beginseg
     include "$(BUILD_DIR)/src/code/audio_stop_all_sfx.o"
     include "$(BUILD_DIR)/src/code/audio_thread_manager.o"
     include "$(BUILD_DIR)/src/code/title_setup.o"
-    include "$(BUILD_DIR)/src/code/fishmod.o"
-    include "$(BUILD_DIR)/src/code/fishmod_items.o"
-    include "$(BUILD_DIR)/src/code/fishmod_debug.o"
     include "$(BUILD_DIR)/src/code/game.o"
     include "$(BUILD_DIR)/src/code/gamealloc.o"
     include "$(BUILD_DIR)/src/code/graph.o"
@@ -851,6 +848,12 @@ beginseg
     include "$(BUILD_DIR)/src/libultra/mgu/mtxl2f.o"
 #endif
 #endif
+    // fish-oot: the mod's own code last in the segment, so editing it never moves the engine's code and data
+    // (their places in the instruction and data caches: fishmod_pin.c, releases/notes-frames18.md)
+    include "$(BUILD_DIR)/src/code/fishmod.o"
+    include "$(BUILD_DIR)/src/code/fishmod_items.o"
+    include "$(BUILD_DIR)/src/code/fishmod_debug.o"
+    include "$(BUILD_DIR)/src/code/fishmod_pin.o" // (each section's end on a fixed boundary: fishmod_pin.c)
 endseg
 
 beginseg

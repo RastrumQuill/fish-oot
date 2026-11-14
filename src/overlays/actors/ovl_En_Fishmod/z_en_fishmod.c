@@ -46,7 +46,7 @@ ActorProfile En_Fishmod_Profile = {
     /**/ ACTORCAT_NPC,
     /**/ FLAGS,
     /**/ OBJECT_GAMEPLAY_KEEP, // the fish and the manager take object_fish themselves (EnFishmod_Init)
-    /**/ sizeof(EnFishmod),
+    /**/ FISHMOD_INSTANCE_SIZE,
     /**/ EnFishmod_Init,
     /**/ EnFishmod_Destroy,
     /**/ EnFishmod_Update,

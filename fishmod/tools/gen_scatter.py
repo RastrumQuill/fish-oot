@@ -20,6 +20,7 @@ import random
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_profile  # noqa: E402
+import numpy as np  # noqa: E402
 import prop_kinds as pk  # noqa: E402
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -800,8 +801,55 @@ def main():
     print(f"{len(inst)} props:", ", ".join(f"{k} {v}" for k, v in sorted(counts.items(), key=lambda kv: -kv[1])))
     if args.preview:
         preview(args.scene, inst, args.preview)
+    check_caps(inst)
     if args.c:
         write_c(args.scene, inst)
+
+
+MAT_MAX = 256  # fishmod_scatter.c: material changes a frame at most
+BAND_WIDTH = 100
+
+
+def check_caps(inst):
+    """The props the game draws are never thinned at run time: each frame's buffers must hold everything in reach, from
+    anywhere. So the most props within their draw distance of any spot (in every direction: the view cone not counted),
+    the most see-through ones, and the most material changes they could need (a kind's material once per 100-unit
+    band, at most two tiers a band) must fit the profile's caps (fishmod_scatter.c: PROP_BUDGET, XLU_MAX, MAT_MAX), or
+    the build stops: too many props is a placement to fix, not something to hide while playing."""
+    prof = build_profile.load()
+    reach = prof["draw"]
+    if not inst:
+        return
+    xs = np.array([it["x"] for it in inst], float)
+    zs = np.array([it["z"] for it in inst], float)
+    def reach_of(kind):
+        dist = pk.BY_NAME[kind].get("dist", "far")
+        return reach.get(dist, reach["far"]) if isinstance(dist, str) else float(dist or reach["far"])
+    d = np.array([reach_of(it["kind"]) for it in inst], float)
+    xlu = np.array(["xlu" in pk.BY_NAME[it["kind"]].get("flags", []) for it in inst])
+    names = sorted({it["kind"] for it in inst})
+    kinds = np.array([names.index(it["kind"]) for it in inst])
+    worst = {"props": (0, None), "see-through": (0, None), "materials": (0, None)}
+    for x in np.arange(xs.min(), xs.max() + 1, 100.0):
+        for z in np.arange(zs.min(), zs.max() + 1, 100.0):
+            r2 = (xs - x) ** 2 + (zs - z) ** 2
+            inside = r2 < d ** 2
+            n = int(inside.sum())
+            if n > worst["props"][0]:
+                worst["props"] = (n, (int(x), int(z)))
+            nx = int((inside & xlu).sum())
+            if nx > worst["see-through"][0]:
+                worst["see-through"] = (nx, (int(x), int(z)))
+            bands = (np.sqrt(r2[inside]) // BAND_WIDTH).astype(int)
+            mats = 2 * len(set(zip(bands.tolist(), kinds[inside].tolist())))
+            if mats > worst["materials"][0]:
+                worst["materials"] = (mats, (int(x), int(z)))
+    caps = {"props": prof["prop_budget"], "see-through": prof["xlu_max"], "materials": MAT_MAX}
+    for k, (n, at) in worst.items():
+        print(f"  the most {k} in reach of one spot: {n} (at {at}), the cap {caps[k]}")
+        if n > caps[k]:
+            raise SystemExit(f"gen_scatter.py: {n} {k} within reach at {at}, over the cap of {caps[k]}: too many props "
+                             "there to draw them all (thin the placement, or raise the cap with the memory for it)")
 
 
 if __name__ == "__main__":

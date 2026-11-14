@@ -115,6 +115,9 @@ void Main(void* arg) {
     SysCfb_Init(0);
     systemHeapStart = (uintptr_t)_buffersSegmentEnd;
 #endif
+    // fish-oot: the heap from a 16 KB boundary (the instruction cache's size), so whatever is loaded into it (the
+    // actors' code among it) keeps its place in the caches however the code before it grows or shrinks
+    systemHeapStart = (systemHeapStart + 0x3FFF) & ~(uintptr_t)0x3FFF;
     fb = (uintptr_t)SysCfb_GetFbPtr(0);
     gSystemHeapSize = fb - systemHeapStart;
     PRINTF(T("システムヒープ初期化 %08x-%08x %08x\n", "System heap initialization %08x-%08x %08x\n"), systemHeapStart,

@@ -542,6 +542,7 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 // whatever ran then counts, a thread that took over included (the audio thread preempting a fish's update shows as
 // audio under the fish's tag)
 extern u32 gFishmodPcTag;
+extern u32 gFishmodScatterDropped[4];
 // The flat fish compared (fishmod_manager.c, LIT_DIST): set by a script (FISHMOD_FLAT_TEST_INIT), else normal
 extern s32 gFishmodFlatTest;
 #define FISHMOD_FLAT_TEST gFishmodFlatTest

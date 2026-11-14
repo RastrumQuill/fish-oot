@@ -1524,6 +1524,10 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     // the single cards face the camera: they turn about their own up, by the look's direction across the ground
     sBillboardYaw = Math_Atan2S(-lookZ, -lookX);
     sLodScale = under ? UNDER_LOD_SCALE : 1.0f;
+#if FISHMOD_DEBUG
+    // (props in view the caps leave out: the frame budget, the see-through cap, the material changes' room)
+    gFishmodScatterDropped[3] = MAX(gFishmodScatterDropped[3], (u32)candCount);
+#endif
     for (n = 0; (n < candCount) && (budget > 0); n++) {
         FishmodProp* prop = &sProps[sOrdered[n]];
         s32 k = prop->kind;
@@ -1532,6 +1536,9 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
 
         if (sKinds[k].xlu) {
             if ((xluLeft <= 0) || ((k != lastXlu) && (matsXlu >= MAT_MAX_XLU))) {
+#if FISHMOD_DEBUG
+                gFishmodScatterDropped[1]++;
+#endif
                 continue;
             }
             xluLeft--;
@@ -1541,6 +1548,9 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             }
         } else {
             if ((key != lastOpa) && (mats >= MAT_MAX)) {
+#if FISHMOD_DEBUG
+                gFishmodScatterDropped[2]++;
+#endif
                 continue;
             }
             if (key != lastOpa) {
@@ -1616,6 +1626,11 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         set->tier[set->count] = tier;
         set->prop[set->count++] = sOrdered[n];
     }
+#if FISHMOD_DEBUG
+    if (n < candCount) {
+        gFishmodScatterDropped[0] += candCount - n; // (the budget ran out: the rest, farthest first, not drawn)
+    }
+#endif
 }
 
 void EnFishmod_ScatterDraw(PlayState* play) {
