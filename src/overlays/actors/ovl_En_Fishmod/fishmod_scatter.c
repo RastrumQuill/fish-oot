@@ -1089,8 +1089,10 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
         gSPNumLights(gfx++, 0);
     }
 #endif
-    if (kind == FISHMOD_PROP_ROCK) {
-        gSPSetGeometryMode(gfx++, G_CULL_BACK); // (solid: their far sides cost nothing)
+    if ((kind == FISHMOD_PROP_ROCK) || (kind == FISHMOD_PROP_DOCK_POSTS) || (kind == FISHMOD_PROP_DOCK_DECK)) {
+        // (solid: their far sides cost nothing. The dock's posts are tall and thin: their hidden back faces cost the
+        // RDP a scanline each all the way down, as much as the faces in front)
+        gSPSetGeometryMode(gfx++, G_CULL_BACK);
     }
     if (tier == TIER_IMP) {
         gSPDisplayList(gfx++, info->materialImp);
@@ -1999,11 +2001,18 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             sDockMtx.intPart[3][2] = FISHMOD_DOCK_Z;
             sDockMtxMade = true;
         }
-        for (k = FISHMOD_PROP_DOCK_DECK; k <= FISHMOD_PROP_DOCK_POSTS; k++) {
-            opa = Scatter_Material(opa, &sKinds[k], k, TIER_NEAR);
-            opa = Scatter_PropColor(opa, TIER_NEAR, light[0], light[1], light[2], 255);
-            gSPMatrix(opa++, &sDockMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-            gSPDisplayList(opa++, sKinds[k].model);
+        {
+            // far from the dock (from its nearest point), its posts with four sides instead of six
+            f32 dx = eye.x - CLAMP(eye.x, FISHMOD_DOCK_X - 45.0f, FISHMOD_DOCK_X + 45.0f);
+            f32 dz = eye.z - CLAMP(eye.z, FISHMOD_DOCK_Z, FISHMOD_DOCK_Z + 420.0f);
+            s32 far = (SQ(dx) + SQ(dz)) > SQ(PROP_FAR_DIST);
+
+            for (k = FISHMOD_PROP_DOCK_DECK; k <= FISHMOD_PROP_DOCK_POSTS; k++) {
+                opa = Scatter_Material(opa, &sKinds[k], k, TIER_NEAR);
+                opa = Scatter_PropColor(opa, TIER_NEAR, light[0], light[1], light[2], 255);
+                gSPMatrix(opa++, &sDockMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+                gSPDisplayList(opa++, far ? sKinds[k].modelFar : sKinds[k].model);
+            }
         }
         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
     }

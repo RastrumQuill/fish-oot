@@ -788,7 +788,8 @@ def quad_uv(m, corners, col, uv):
 
 
 def mesh_dock_deck():
-    """The deck: weathered planks across it, top, sides, far end and underside (seen from under the water)."""
+    """The deck: weathered planks across it, top, sides, both ends and underside (seen from under the water). A closed
+    box, drawn with its back faces culled."""
     m = Mesh("dock_deck", "dock_planks")
     hw, L, t = DOCK_WIDTH / 2, DOCK_LENGTH, DOCK_THICK
     top, side, under = (235, 230, 220), (170, 165, 155), (110, 110, 105)
@@ -798,22 +799,92 @@ def mesh_dock_deck():
     quad_uv(m, ((hw, -t, 0), (hw, -t, L), (hw, 0, L), (hw, 0, 0)), side, (0, 0.8, rep, 1))
     quad_uv(m, ((-hw, -t, L), (-hw, -t, 0), (-hw, 0, 0), (-hw, 0, L)), side, (0, 0.8, rep, 1))
     quad_uv(m, ((hw, -t, L), (-hw, -t, L), (-hw, 0, L), (hw, 0, L)), side, (0, 0.8, 1, 1))
+    quad_uv(m, ((-hw, -t, 0), (hw, -t, 0), (hw, 0, 0), (-hw, 0, 0)), side, (0, 0.8, 1, 1))  # (the shore end)
+    return orient_outward(m, (0, -t / 2, L / 2))
+
+
+_DOCK_BED = {}
+
+
+def dock_bed_depth(x, z):
+    """How far below the deck the lake bed is at a piling (the deepest of nine points across it, from the scene's
+    collision), or None without the extracted scene."""
+    if not _DOCK_BED:
+        try:
+            import gen_watermap as gw
+            import gen_scatter as gs
+            d = os.path.join(gw.SCENES, gs.SCENES[DOCK["scene"]])
+            _DOCK_BED["finder"] = gw.FloorFinder(gw.parse_floors(gw.one(d, "*_PolyList.inc.c"),
+                                                                 gw.parse_vtx(gw.one(d, "*_VtxList.inc.c"))))
+        except Exception:
+            _DOCK_BED["finder"] = None
+    f = _DOCK_BED["finder"]
+    if f is None:
+        return None
+    ys = [f.floor(int(DOCK["x"] + x + dx), int(DOCK["z"] + z + dz), DOCK["y"] + 50)
+          for dx in (-8, 0, 8) for dz in (-8, 0, 8)]
+    ys = [y for y in ys if y is not None]
+    return (DOCK["y"] - min(ys)) if ys else None
+
+
+def orient_outward(m, centre, first=0):
+    """Turns every triangle from `first` on to face away from `centre` (a convex piece's middle), so the back faces
+    can be culled: counter-clockwise seen from outside"""
+    for i in range(first, len(m.f)):
+        a, b, c = m.f[i]
+        pa, pb, pc = (m.v[a - 1][:3], m.v[b - 1][:3], m.v[c - 1][:3])
+        e1 = [pb[k] - pa[k] for k in range(3)]
+        e2 = [pc[k] - pa[k] for k in range(3)]
+        n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
+        mid = [(pa[k] + pb[k] + pc[k]) / 3 - centre[k] for k in range(3)]
+        if sum(n[k] * mid[k] for k in range(3)) < 0:
+            m.f[i] = (a, c, b)
     return m
 
 
-def mesh_dock_posts():
-    """The pilings (pairs, down into the bed), a cross beam under the deck at each pair, and a mooring post."""
-    m = Mesh("dock_posts", "dock_wood")
+def tube(m, p0, p1, r, sides, dark, light, v_repeat, caps=(False, False)):
+    """A closed few-sided post from p0 to p1 (its faces turned outward; an end capped where it can be seen)"""
+    first = len(m.f)
+    cylinder(m, p0, p1, r, r, sides, dark, light, v_repeat=v_repeat)
+    ring0 = m.v[-2 * (sides + 1)::2][:sides]
+    ring1 = m.v[-2 * (sides + 1) + 1::2][:sides]
+    for end, ring, col in ((0, ring0, dark), (1, ring1, light)):
+        if not caps[end]:
+            continue
+        c = m.vert(p1 if end else p0, (0.5, 0.5), col)
+        ids = [m.vert(v[:3], (0.5 + 0.5 * math.cos(2 * math.pi * k / sides),
+                              0.5 + 0.5 * math.sin(2 * math.pi * k / sides)), col) for k, v in enumerate(ring)]
+        for k in range(sides):
+            m.tri(c, ids[k], ids[(k + 1) % sides])
+    return orient_outward(m, [(p0[k] + p1[k]) / 2 for k in range(3)], first)
+
+
+def mesh_dock_posts(sides=6, name="dock_posts"):
+    """The pilings (pairs, down to just under the lake bed where each stands: the rest was drawn into the ground for
+    nothing), a cross beam under the deck at each pair, and a mooring post. Each a closed post, drawn with back faces
+    culled. With fewer sides for far away (mesh_dock_posts_far)."""
+    m = Mesh(name, "dock_wood")
     dark, light = hexc("#4a3a28"), hexc("#a08a68")
     for z in DOCK_PILING_ROWS:
         for x in (-DOCK_PILING_X, DOCK_PILING_X):
-            cylinder(m, (x, -DOCK_PILING_DEPTH, z), (x, -DOCK_THICK, z), DOCK_PILING_R, DOCK_PILING_R, 6, dark, light,
-                     v_repeat=4.0)
-        cylinder(m, (-DOCK_PILING_X - 8, -DOCK_THICK - 4, z), (DOCK_PILING_X + 8, -DOCK_THICK - 4, z), 4, 4, 4, dark,
-                 light, v_repeat=1.5)
+            depth = dock_bed_depth(x, z)
+            depth = DOCK_PILING_DEPTH if depth is None else min(DOCK_PILING_DEPTH, depth + 10)
+            # (the texture keeps its scale: the repeat in proportion to the length kept)
+            tube(m, (x, -depth, z), (x, -DOCK_THICK, z), DOCK_PILING_R, sides, dark, light,
+                 4.0 * (depth - DOCK_THICK) / (DOCK_PILING_DEPTH - DOCK_THICK))
+        tube(m, (-DOCK_PILING_X - 8, -DOCK_THICK - 4, z), (DOCK_PILING_X + 8, -DOCK_THICK - 4, z), 4,
+             max(4, sides - 2), dark, light, 1.5, caps=(True, True))
     x, z, h = DOCK_MOORING
-    cylinder(m, (x, -DOCK_PILING_DEPTH, z), (x, h, z), 6, 6, 6, dark, light, v_repeat=5.0)
+    depth = dock_bed_depth(x, z)
+    depth = DOCK_PILING_DEPTH if depth is None else min(DOCK_PILING_DEPTH, depth + 10)
+    tube(m, (x, -depth, z), (x, h, z), 6, sides, dark, light, 5.0 * (depth + h) / (DOCK_PILING_DEPTH + h),
+         caps=(False, True))
     return m
+
+
+def mesh_dock_posts_far():
+    """The posts for far away (fishmod_scatter.c: past PROP_FAR_DIST from the dock): four sides instead of six"""
+    return mesh_dock_posts(4, "dock_posts_lod")
 
 
 def mesh_spatterdock():
@@ -871,6 +942,7 @@ MESHES = [
     mesh_branch,
     mesh_dock_deck,
     mesh_dock_posts,
+    mesh_dock_posts_far,
 
     lambda: crossed_cards("reed_clump", "reed_card", 40, 95, 3, hexc("#184217"), hexc("#8f9342"), 101, lean=4),
     lambda: patch("ribbon_weed", PATCH["ribbon_weed"], 22, 202, lambda i: crossed_cards(
@@ -1003,6 +1075,8 @@ def write_props_manifest():
         if not os.path.exists(mesh):
             mesh = os.path.join(MESH, kind + ".obj")
         far = os.path.join(MESH, kind + ".obj")
+        if os.path.exists(os.path.join(MESH, kind + "_lod.obj")):
+            far = os.path.join(MESH, kind + "_lod.obj")  # (a simpler model of its own for far away)
         tri = os.path.join(MESH_TRI, kind + ".obj")
         is_tri = kind in TRI_KINDS and os.path.exists(tri)
         if pad is not None:
