@@ -156,6 +156,8 @@ typedef struct EnFishmod {
     u32 scentFrame;                                // the frame it last smelled bait in the water (EnFishmod_SmellBait)
     s32 lookKey;                                   // what lookGfx was made for (species and looks), -1: not made
     Gfx lookGfx[(FISHMOD_PART_MAX + FISHMOD_TEX_ROLE_MAX) * 2]; // its tint table (EnFishmod_LookTable), made once
+    s32 bbKey;                                     // what bbColor was made for (as lookKey)
+    u8 bbColor[6][3];                              // its far shape's corner colours (EnFishmod_DrawBillboard), made once
 } EnFishmod;
 
 /* Rod controller (fishmod_rod.c) */

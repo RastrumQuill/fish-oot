@@ -942,6 +942,12 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         }
         far[j + 1] = fish;
     }
+    if (farCount > 0) {
+        // the far shapes are in world coordinates: one identity matrix for all of them
+        OPEN_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+        gSPMatrix(POLY_OPA_DISP++, &gIdentityMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        CLOSE_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+    }
     for (i = 0; i < farCount; i++) {
         if ((i == 0) || (far[i]->species != far[i - 1]->species)) {
             EnFishmod_BillboardMaterial(far[i], play);

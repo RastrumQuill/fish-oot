@@ -2700,9 +2700,13 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     if (vl < 0.001f) {
         vl = 0.001f;
     }
-    vx /= vl;
-    vy /= vl;
-    vz /= vl;
+    {
+        f32 inv = 1.0f / vl; // (one division, not three)
+
+        vx *= inv;
+        vy *= inv;
+        vz *= inv;
+    }
     {
         f32 d = fx * vx + fz * vz; // F . V (F is level)
 
@@ -2718,9 +2722,13 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
         az = -vx;
         al = sqrtf(SQ(ax) + SQ(az)) + 0.0001f;
     }
-    ax /= al;
-    ay /= al;
-    az /= al;
+    {
+        f32 inv = 1.0f / al;
+
+        ax *= inv;
+        ay *= inv;
+        az *= inv;
+    }
     fore = CLAMP(al, hh / CLAMP_MIN(hl, 1.0f), 1.0f);
     // across: at right angles to the length and the line of sight
     ux = ay * vz - az * vy;
@@ -2735,39 +2743,49 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
         uy = 1.0f;
         uz = 0.0f;
     } else {
-        ux /= ul;
-        uy /= ul;
-        uz /= ul;
+        f32 inv = 1.0f / ul;
+
+        ux *= inv;
+        uy *= inv;
+        uz *= inv;
     }
+    {
+        // its corner colours: its looks on its species' part tints, lighter on the belly, darker to the tail; they
+        // depend on nothing that moves, so made once (18 divisions and 6 colour mixes a fish a frame before)
+        s32 key = ((this->species - gFishmodSpecies) << 8) | this->look | 0x10000;
+
+        if (this->bbKey != key) {
+            this->bbKey = key;
+            for (i = 0; i < 6; i++) {
+                u8 c[3];
+                u8 shade = (i >= 4) ? 235 : (i == 3) ? 170 : 205;
+
+                EnFishmod_LookColor(this, this->species->partTint[sPart[i]], c);
+                this->bbColor[i][0] = c[0] * shade / 255;
+                this->bbColor[i][1] = c[1] * shade / 255;
+                this->bbColor[i][2] = c[2] * shade / 255;
+            }
+        }
+    }
+    // (in world coordinates: every far fish is drawn under the same identity matrix, loaded once by the caller,
+    // instead of a matrix of its own a fish)
     for (i = 0; i < 6; i++) {
         f32 along = sShape[i][0] * hl;
         f32 across = sShape[i][1] * hh;
-        // a bit darker toward the back and tail, like the real thing seen through water
-        u8 shade = (i == 3) ? 150 : (i == 0) ? 200 : 175;
 
-        vtx[i].v.ob[0] = (s16)(fx * along + ux * across);
-        vtx[i].v.ob[1] = (s16)(BILLBOARD_ALONG_Y * along + uy * across);
-        vtx[i].v.ob[2] = (s16)(fz * along + uz * across);
+        vtx[i].v.ob[0] = (s16)(this->actor.world.pos.x + fx * along + ux * across);
+        vtx[i].v.ob[1] = (s16)(this->actor.world.pos.y + BILLBOARD_ALONG_Y * along + uy * across);
+        vtx[i].v.ob[2] = (s16)(this->actor.world.pos.z + fz * along + uz * across);
         vtx[i].v.flag = 0;
-        {
-            u8 c[3];
-
-            EnFishmod_LookColor(this, this->species->partTint[sPart[i]], c);
-
-            // belly lighter, as on the model
-            shade = (i >= 4) ? 235 : (i == 3) ? 170 : 205;
-            vtx[i].v.tc[0] = (s16)((1.0f - sShape[i][0]) * texSize * 32.0f);
-            vtx[i].v.tc[1] = (s16)((1.0f - sShape[i][1]) * 0.5f * texSize * 32.0f);
-            vtx[i].v.cn[0] = c[0] * shade / 255;
-            vtx[i].v.cn[1] = c[1] * shade / 255;
-            vtx[i].v.cn[2] = c[2] * shade / 255;
-        }
+        vtx[i].v.tc[0] = (s16)((1.0f - sShape[i][0]) * texSize * 32.0f);
+        vtx[i].v.tc[1] = (s16)((1.0f - sShape[i][1]) * 0.5f * texSize * 32.0f);
+        vtx[i].v.cn[0] = this->bbColor[i][0];
+        vtx[i].v.cn[1] = this->bbColor[i][1];
+        vtx[i].v.cn[2] = this->bbColor[i][2];
         vtx[i].v.cn[3] = 255;
     }
 
     OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
-    Matrix_Translate(this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z, MTXMODE_NEW);
-    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx, "../z_en_fishmod.c", __LINE__);
     gSPVertex(POLY_OPA_DISP++, vtx, 6, 0);
     gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
     gSP2Triangles(POLY_OPA_DISP++, 0, 3, 4, 0, 0, 4, 5, 0);
@@ -2933,6 +2951,9 @@ void EnFishmod_Draw(Actor* thisx, PlayState* play) {
     if ((this->type == FISHMOD_TYPE_FISH) && !FISHMOD_PHOTO_ON && (this->fishState != FISH_STATE_CAUGHT) &&
         (Math_Vec3f_DistXYZ(&this->actor.world.pos, &play->view.eye) > FISHMOD_LOD_DIST)) {
         EnFishmod_BillboardMaterial(this, play);
+        OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
+        gSPMatrix(POLY_OPA_DISP++, &gIdentityMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW); // (world coordinates)
+        CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
         FISHMOD_PROF(FISHMOD_PROF_D_BILLBOARD, EnFishmod_DrawBillboard(this, play));
         return;
     }
