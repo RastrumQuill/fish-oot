@@ -238,9 +238,13 @@ static u8* EnFishmod_KoiPattern(s32 speciesIndex, s32 variant, s32 r) {
 }
 
 void EnFishmod_LookTable(EnFishmod* this, PlayState* play) {
-    Gfx* table = GRAPH_ALLOC(play->state.gfxCtx, (FISHMOD_PART_MAX + FISHMOD_TEX_ROLE_MAX) * 2 * sizeof(Gfx));
+    // (the table depends only on its species and looks: made once in the fish's own memory, not every frame (it cost
+    // about 48 us a fish a frame); made again if a fish is given other looks. The key's 0x10000 bit: a zeroed field
+    // never matches)
+    Gfx* table = this->lookGfx;
     Gfx* g = table;
     s32 texSet = EnFishmod_TexSet(this->species);
+    s32 key = ((this->species - gFishmodSpecies) << 8) | this->look | 0x10000;
     s32 i;
 
     if (this->species->lookFlags & FISHMOD_LOOK_KOI) {
@@ -251,6 +255,10 @@ void EnFishmod_LookTable(EnFishmod* this, PlayState* play) {
         CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
     }
 
+    if (this->lookKey == key) {
+        goto made;
+    }
+    this->lookKey = key;
     for (i = 0; i < FISHMOD_PART_MAX; i++) {
         u8 c[3];
 
@@ -266,6 +274,7 @@ void EnFishmod_LookTable(EnFishmod* this, PlayState* play) {
         g++;
         gSPEndDisplayList(g++);
     }
+made:
     OPEN_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);
     gSPSegment(POLY_OPA_DISP++, FISHMOD_SEG_LOOK, table);
     CLOSE_DISPS(play->state.gfxCtx, "../z_en_fishmod.c", __LINE__);

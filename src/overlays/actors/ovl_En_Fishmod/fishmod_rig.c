@@ -35,6 +35,7 @@
 #include "play_state.h"
 #include "ultra64/libc.h"
 #include "buffers.h"
+#include "fishmod_trig.h"
 
 
 #define RIG_MAX_LOADS 48
@@ -99,6 +100,8 @@ typedef struct FishRigSpecies {
     u8 finParent[RIG_MAX_FINS];
     Vec3f headPoint; // the head limb's origin, relative to the head bone (for the head position)
     Vec3f tailPoint; // the tail tip, relative to the last body bone
+    RigMtx rootK;    // the root's constant part (the model's turn, the species' shape, the pivot, the head frame):
+                     // root = T(position) Ry Rx Rz S(scale) rootK, made once here instead of every fish every frame
 } FishRigSpecies;
 
 /** How each model swims: body wave amplitude A(x) = a0 + a1 x + a2 x^2 (body lengths) and wavelength. */
@@ -183,9 +186,11 @@ static void Rig_Scale(RigMtx* m, f32 x, f32 y, f32 z) {
 
 /** m = m * Ry(y) */
 static void Rig_RotateY(RigMtx* m, s16 y) {
-    f32 s = Math_SinS(y);
-    f32 c = Math_CosS(y);
+    f32 s;
+    f32 c;
     s32 i;
+
+    Fishmod_SinCosBinang(y, &s, &c);
 
     for (i = 0; i < 3; i++) {
         f32 cx = m->m[i][0];
@@ -198,9 +203,11 @@ static void Rig_RotateY(RigMtx* m, s16 y) {
 
 /** m = m * Rx(x) */
 static void Rig_RotateX(RigMtx* m, s16 x) {
-    f32 s = Math_SinS(x);
-    f32 c = Math_CosS(x);
+    f32 s;
+    f32 c;
     s32 i;
+
+    Fishmod_SinCosBinang(x, &s, &c);
 
     for (i = 0; i < 3; i++) {
         f32 cy = m->m[i][1];
@@ -213,9 +220,11 @@ static void Rig_RotateX(RigMtx* m, s16 x) {
 
 /** m = m * Rz(z) */
 static void Rig_RotateZ(RigMtx* m, s16 z) {
-    f32 s = Math_SinS(z);
-    f32 c = Math_CosS(z);
+    f32 s;
+    f32 c;
     s32 i;
+
+    Fishmod_SinCosBinang(z, &s, &c);
 
     for (i = 0; i < 3; i++) {
         f32 cx = m->m[i][0];
@@ -241,12 +250,14 @@ static void Rig_RotateZYX(RigMtx* m, s16 x, s16 y, s16 z) {
 
 /** m = m * R(axis u, angle): u must be a unit vector */
 static void Rig_RotateAxis(RigMtx* m, Vec3f* u, s16 angle) {
-    f32 s = Math_SinS(angle);
-    f32 c = Math_CosS(angle);
-    f32 t = 1.0f - c;
+    f32 s;
+    f32 c;
+    f32 t;
     f32 r[3][3];
     s32 i;
 
+    Fishmod_SinCosBinang(angle, &s, &c);
+    t = 1.0f - c;
     r[0][0] = c + u->x * u->x * t;
     r[0][1] = u->x * u->y * t - u->z * s;
     r[0][2] = u->x * u->z * t + u->y * s;
@@ -966,6 +977,21 @@ static FishRigSpecies* Rig_BuildSpecies(const FishmodSpecies* species, s32 model
             }
         }
     }
+    {
+        // the root's constant part (EnFishmod_RigDraw): the model's quarter turn, the species' shape, the pivot moved
+        // to the origin, the head frame
+        const u8* shape = species->shape;
+        Vec3f pivot;
+
+        Rig_Identity(&rig->rootK);
+        if (model != FISH_RIG_SMALL) {
+            Rig_RotateY(&rig->rootK, -0x4000);
+        }
+        Rig_Scale(&rig->rootK, shape[0] * 0.01f, shape[1] * 0.01f, shape[2] * 0.01f);
+        Rig_MulPoint(&rig->headFrame, &rig->bonePos[0], &pivot);
+        Rig_Translate(&rig->rootK, -pivot.x, -pivot.y, -pivot.z);
+        Rig_Mul(&rig->rootK, &rig->rootK, &rig->headFrame);
+    }
     return rig;
 }
 
@@ -1040,22 +1066,22 @@ void EnFishmod_RigRestoreSegments(PlayState* play) {
  * The body's heading at a place along it (fraction from the snout), relative to its heading at the pivot, in binary
  * angle units: the slope of the body wave y = A(x) sin(kx - phase), plus the curve of a turn or a startle.
  */
-static s16 Rig_BodyAngle(FishRigSwim* swim, f32 x, f32 phase, f32 amp, f32 curve) {
+/** The wave's slope at x (body lengths from the snout) for this phase (without the pivot's: Rig_BodyAngle). */
+static f32 Rig_WaveSlope(FishRigSwim* swim, f32 x, f32 phase) {
     f32 k = 2.0f * M_PI / swim->wavelength;
-    f32 a;
-    f32 da;
-    f32 slope;
-    f32 slope0;
+    f32 a = swim->a0 + swim->a1 * x + swim->a2 * x * x;
+    f32 da = swim->a1 + 2.0f * swim->a2 * x;
     s16 ph = (s16)((k * x - phase) * (0x8000 / M_PI));
-    s16 ph0 = (s16)((k * RIG_PIVOT - phase) * (0x8000 / M_PI));
+    f32 sn;
+    f32 cs;
 
-    a = swim->a0 + swim->a1 * x + swim->a2 * x * x;
-    da = swim->a1 + 2.0f * swim->a2 * x;
-    slope = da * Math_SinS(ph) + a * k * Math_CosS(ph);
-    a = swim->a0 + swim->a1 * RIG_PIVOT + swim->a2 * RIG_PIVOT * RIG_PIVOT;
-    da = swim->a1 + 2.0f * swim->a2 * RIG_PIVOT;
-    slope0 = da * Math_SinS(ph0) + a * k * Math_CosS(ph0);
-    return (s16)(((slope - slope0) * amp + curve * (x - RIG_PIVOT)) * (0x8000 / M_PI));
+    Fishmod_SinCosBinang(ph, &sn, &cs); // (both at once)
+    return da * sn + a * k * cs;
+}
+
+/** slope0: Rig_WaveSlope at the pivot, the same for every bone of a fish this frame (worked out once) */
+static s16 Rig_BodyAngle(FishRigSwim* swim, f32 x, f32 phase, f32 amp, f32 curve, f32 slope0) {
+    return (s16)(((Rig_WaveSlope(swim, x, phase) - slope0) * amp + curve * (x - RIG_PIVOT)) * (0x8000 / M_PI));
 }
 
 /**
@@ -1071,8 +1097,7 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
     Mtx* mtx = GRAPH_ALLOC(gfxCtx, base->boneCount * sizeof(Mtx));
     RigMtx frames[FISH_RIG_MAX_SLOTS];
     RigMtx root;
-    Vec3f pivot;
-    const u8* shape = this->species->shape;
+    f32 slope0;
     // the wave's size from the swim strength (1500 = cruising); small fish move bigger
     f32 amp = this->swimMag * this->swimGain * (1.0f / 1500.0f) *
               ((this->lengthInches < FISHMOD_SMALL_RIG_LENGTH) ? 1.3f : 1.0f);
@@ -1099,13 +1124,7 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
     Rig_RotateX(&root, this->actor.shape.rot.x);
     Rig_RotateZ(&root, this->actor.shape.rot.z);
     Rig_Scale(&root, this->actor.scale.x, this->actor.scale.y, this->actor.scale.z);
-    if (model != FISH_RIG_SMALL) {
-        Rig_RotateY(&root, -0x4000);
-    }
-    Rig_Scale(&root, shape[0] * 0.01f, shape[1] * 0.01f, shape[2] * 0.01f);
-    Rig_MulPoint(&rig->headFrame, &rig->bonePos[0], &pivot);
-    Rig_Translate(&root, -pivot.x, -pivot.y, -pivot.z);
-    Rig_Mul(&root, &root, &rig->headFrame);
+    Rig_Mul(&root, &root, &rig->rootK); // (the rest, the same for every fish of its species: made with the rig)
 #if FISHMOD_DEBUG
     gFishmodProf[FISHMOD_PROF_D_ROOT] += FISHMOD_SINCE(profStart);
     gFishmodProfCount[FISHMOD_PROF_D_ROOT]++;
@@ -1115,12 +1134,13 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
     // the head turns about the pivot against the tail (recoil); the body bones follow the wave from the pivot back
     frames[0] = root;
     Rig_Translate(&frames[0], rig->bonePos[0].x, rig->bonePos[0].y, rig->bonePos[0].z);
-    head = Rig_BodyAngle(swim, RIG_PIVOT * 0.4f, this->swimPhase, amp, curve);
+    slope0 = Rig_WaveSlope(swim, RIG_PIVOT, this->swimPhase);
+    head = Rig_BodyAngle(swim, RIG_PIVOT * 0.4f, this->swimPhase, amp, curve, slope0);
     Rig_RotateAxis(&frames[0], &rig->up, head);
     prev = head;
     for (b = 1; b <= base->bodyBones; b++) {
         f32 mid = Rig_BoneStart(base, b) + (1.0f - RIG_PIVOT) * 0.5f / base->bodyBones;
-        s16 angle = Rig_BodyAngle(swim, mid, this->swimPhase, amp, curve);
+        s16 angle = Rig_BodyAngle(swim, mid, this->swimPhase, amp, curve, slope0);
 
         if (b == 1) {
             frames[1] = root;
@@ -1162,9 +1182,20 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
         Rig_Mul(&frames[slot], &frames[rig->finParent[b]], &rig->finPre[b]);
         Rig_RotateZYX(&frames[slot], rot->x, rot->y + dy, rot->z + dz);
     }
+#if FISHMOD_DEBUG
+    gFishmodProf[FISHMOD_PROF_D_RIG_BONES] += FISHMOD_SINCE(profStart);
+    gFishmodProfCount[FISHMOD_PROF_D_RIG_BONES]++;
+    {
+        OSTime t = FISHMOD_CLOCK();
+#endif
     for (b = 0; b < base->boneCount; b++) {
         Rig_ToMtx(&frames[b], &mtx[b]);
     }
+#if FISHMOD_DEBUG
+        gFishmodProf[FISHMOD_PROF_D_RIG_MTX] += FISHMOD_SINCE(t);
+        gFishmodProfCount[FISHMOD_PROF_D_RIG_MTX]++;
+    }
+#endif
 
     Rig_MulPoint(&frames[0], &rig->headPoint, &this->headPos);
     if (wantBounds) {
@@ -1189,7 +1220,16 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
     }
 
     // its own colours and pattern (in place of the species' tints at the same segment)
+#if FISHMOD_DEBUG
+    {
+        OSTime t = FISHMOD_CLOCK();
+#endif
     EnFishmod_LookTable(this, play);
+#if FISHMOD_DEBUG
+        gFishmodProf[FISHMOD_PROF_D_RIG_LOOK] += FISHMOD_SINCE(t);
+        gFishmodProfCount[FISHMOD_PROF_D_RIG_LOOK]++;
+    }
+#endif
     OPEN_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
     gSPSegment(POLY_OPA_DISP++, RIG_SEG_MTX, mtx);
     // the bass's display lists don't set culling (EnFishmod_PatchSkeleton): a shut mouth culls back faces, an open

@@ -154,6 +154,8 @@ typedef struct EnFishmod {
                                                    // or is on its own
     /* 0x410 */ f32 swimGain;                      // the tail beat's size on top of swimMag (small fish's bursts)
     u32 scentFrame;                                // the frame it last smelled bait in the water (EnFishmod_SmellBait)
+    s32 lookKey;                                   // what lookGfx was made for (species and looks), -1: not made
+    Gfx lookGfx[(FISHMOD_PART_MAX + FISHMOD_TEX_ROLE_MAX) * 2]; // its tint table (EnFishmod_LookTable), made once
 } EnFishmod;
 
 /* Rod controller (fishmod_rod.c) */

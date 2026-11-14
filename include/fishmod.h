@@ -528,6 +528,9 @@ typedef enum FishmodProfSlot {
     FISHMOD_PROF_U_UNSTICK,  //   (in AI) the stuck watchdog
     FISHMOD_PROF_D_SCATTER,  // the habitat props (drawn by the fish manager)
     FISHMOD_PROF_D_PARTICLES, // underwater bubbles and specks
+    FISHMOD_PROF_D_RIG_BONES, //   (in pose) the rig's bone frames: the swim wave's angles, the body and fin bones
+    FISHMOD_PROF_D_RIG_MTX,   //   (in pose) the bones' matrices converted for the RSP
+    FISHMOD_PROF_D_RIG_LOOK,  //   (in pose) the fish's own colours (its tint table)
     FISHMOD_PROF_MAX
 } FishmodProfSlot;
 extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
