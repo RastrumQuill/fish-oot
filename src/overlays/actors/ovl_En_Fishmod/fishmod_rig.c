@@ -278,24 +278,46 @@ static void Rig_RotateAxis(RigMtx* m, Vec3f* u, s16 angle) {
     }
 }
 
+/**
+ * The RSP's fixed-point matrix straight from the rig's 3x4 one (no 4x4 float copy first): the same conversion as
+ * Matrix_MtxFToMtx (16.16, integer halves then fraction halves, the bottom row 0 0 0 1), only the 12 values that vary
+ * converted. Its cache lines claimed first (written whole: no read from RAM), as Matrix_MtxFToMtx does.
+ */
 static void Rig_ToMtx(RigMtx* m, Mtx* out) {
-    MtxF f;
+    u32* d = (u32*)out;
+    s32 v[16];
+    s32 i;
 
-    f.xx = m->m[0][0];
-    f.xy = m->m[0][1];
-    f.xz = m->m[0][2];
-    f.xw = m->m[0][3];
-    f.yx = m->m[1][0];
-    f.yy = m->m[1][1];
-    f.yz = m->m[1][2];
-    f.yw = m->m[1][3];
-    f.zx = m->m[2][0];
-    f.zy = m->m[2][1];
-    f.zz = m->m[2][2];
-    f.zw = m->m[2][3];
-    f.wx = f.wy = f.wz = 0.0f;
-    f.ww = 1.0f;
-    Matrix_MtxFToMtx(&f, out);
+    if (((uintptr_t)out & 0xF) == 0) {
+        __asm__ volatile(".set push\n\t"
+                         ".set mips3\n\t"
+                         "cache 0x0D, 0(%0)\n\t"
+                         "cache 0x0D, 16(%0)\n\t"
+                         "cache 0x0D, 32(%0)\n\t"
+                         "cache 0x0D, 48(%0)\n\t"
+                         ".set pop"
+                         :
+                         : "r"(out)
+                         : "memory");
+    }
+    // (Mtx order: m[col][row] as MtxF's mf: xx yx zx wx, xy yy zy wy, xz yz zz wz, xw yw zw ww)
+    for (i = 0; i < 3; i++) {
+        v[i * 4 + 0] = m->m[0][i] * 0x10000;
+        v[i * 4 + 1] = m->m[1][i] * 0x10000;
+        v[i * 4 + 2] = m->m[2][i] * 0x10000;
+        v[i * 4 + 3] = 0;
+    }
+    v[12] = m->m[0][3] * 0x10000;
+    v[13] = m->m[1][3] * 0x10000;
+    v[14] = m->m[2][3] * 0x10000;
+    v[15] = 0x10000;
+    for (i = 0; i < 8; i++) {
+        s32 a = v[2 * i];
+        s32 b = v[2 * i + 1];
+
+        d[i] = ((u32)a & 0xFFFF0000) | ((u32)b >> 16);
+        d[8 + i] = ((u32)a << 16) | ((u32)b & 0xFFFF);
+    }
 }
 
 static void Rig_MulPoint(RigMtx* m, Vec3f* in, Vec3f* out) {
