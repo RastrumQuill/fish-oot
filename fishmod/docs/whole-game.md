@@ -77,11 +77,43 @@ stream and the picture, every frame of every animation, before and after. Link f
 |---|---|---|
 | Limb display lists cleaned at build time: state set to what it already is, pipe syncs with nothing drawn, repeated texture loads (exact) | to do | as the fish rig's (19-27% fewer commands there); proven per list by the rigcheck method; the extracted object lists are known by name, so a build pass can rewrite them safely (unlike patching them in RAM) |
 | Identical vertices merged inside each vertex load of every model (exact) | to do | fewer vertices transformed and lit by the RSP |
-| Skeleton matrices: limbs that never move relative to their parent drawn under the parent's matrix | to do | fewer matrix loads and multiplies (CPU and RSP); exact when the limb's own transform is the identity in every animation it plays |
+| Skeleton matrices: limbs that never move relative to their parent drawn under the parent's matrix | surveyed (14 Nov) | see "What the skeletons waste" below: 104 limbs can merge exactly (a matrix saved each), mostly horses, Twinrova and Ganon |
 | Skeleton animation on the CPU: frame data decoded once per frame per skeleton, the matrix stack work trimmed | to do | measure first: the profile's costliest skeleton functions |
 | Textures: CI8 for 16-bit textures of 256 colours or fewer | all assets (texpack) | in builds with `--texpack`; to put in the bench builds and test on the console |
 | Textures: CI4 for those of 16 colours or fewer, I4/IA8 for grey ones | to do | half again the bytes loaded, the same texels |
 | Models: lower-detail versions for distance (Link and the common NPCs/enemies) | to do | changes the picture far away: tested by eye |
+
+## What the skeletons waste (14 Nov survey: `fishmod/tools/skel_survey.py`)
+
+152 animated skeletons in the game (animations from the same object), 2,947 limbs: 833 without geometry (joints
+only), 1,070 whose rotation never changes in any of their animations. But OoT's rigs are not wasteful the way the
+count suggests: most of those are a pattern, a moving joint with no geometry and under it a "holder" limb with the
+geometry, at no offset and no rotation (the Tektite: 24 limbs, 9 parts that really move independently, 9 matrices
+needed; its 15 fixed limbs are holders and joints). By what merging the never-turning limbs with geometry would save:
+
+| the limb | count | a merge saves |
+|---|---|---|
+| no offset, no turn (identity), its parent without geometry (the holder pattern) | 452 | no matrix (its matrix is needed for its geometry either way); a push, a transform and a pop on the CPU (~1-2 us) |
+| identity, its parent with geometry | 104 | a matrix (CPU conversion, RSP load) and a call, exactly (the same matrix) |
+| fixed but not identity, its parent with geometry | 100 | a matrix, approximately (the vertices moved into the parent's frame once: rounding) |
+| fixed, not identity, parent without geometry | 29 | nothing |
+
+The 104 exact merges by skeleton: the phantom horse and Ganon's horse 15 each, Twinrova 12, Child Epona 9, Epona,
+Ingo's horses, the ranch horses, Zelda's horse and Ganon 8 each, the loach 3, a few others 1-2. Horses draw through
+the skin system (Skin_Draw): the harness needs that path before they're touched. Link: 21 limbs, 18 move in his
+18,495 animation frames: nothing to merge.
+
+So: the skeletons' matrix count is close to what the motion needs; the gains are per actor (the horses for Lon Lon
+Ranch and Hyrule Field), and the CPU's per-limb bookkeeping for holder limbs (small). Each needs the harness for that
+actor (posing any actor: the next harness step).
+
+## The fish (14 Nov, ares cycle timers on the bench route)
+
+A rigged fish cost 356 us of CPU a frame; now ~200-230 (its tint table made once, the root's constant part made with
+the rig, the swim wave's pivot worked out once a fish, sine and cosine together, bone matrices converted straight from
+the rig's 3x4). A far fish (billboard) 96 -> 58 us (corner colours made once, world coordinates under one identity
+matrix for all of them). The pictures: the same (studio frames identical; the route's far fish identical). The
+fish manager's draw is mostly the props: 4.4 of its 7.0 ms a frame.
 
 ## On hold
 
