@@ -4,7 +4,7 @@ by case, the pose (the joint table and the limb matrices: level 1) and the opaqu
 triangle with its vertices and the state it's drawn with: level 2). Prints the first differing cases (which
 animation, which frame, which hash) and a count per phase, or that every case is identical.
 
-Usage: fishmod/tools/animcheck_compare.py A.bin B.bin [--all]
+Usage: fishmod/tools/animcheck_compare.py A.bin B.bin [--all] [--pix]   (--pix: logs with the pictures, collog.sh --anim-pix)
 Exit status 0 only when both logs hold the same cases and every one matches.
 """
 import collections
@@ -24,11 +24,11 @@ def anim_names():
     return re.findall(r"&(gPlayerAnim_\w+),", open(p).read())
 
 
-def load(path):
+def load(path, words=8):
     d = open(path, "rb").read()
     out = collections.OrderedDict()
-    for i in range(len(d) // 32):
-        r = struct.unpack_from(">8I", d, 32 * i)
+    for i in range(len(d) // (4 * words)):
+        r = struct.unpack_from(">%dI" % words, d, 4 * words * i)
         out[r[0]] = r
     return out
 
@@ -48,7 +48,8 @@ def describe(case, names):
 
 
 def main():
-    a, b = load(sys.argv[1]), load(sys.argv[2])
+    pix = "--pix" in sys.argv
+    a, b = load(sys.argv[1], 16 if pix else 8), load(sys.argv[2], 16 if pix else 8)
     names = anim_names()
     show_all = "--all" in sys.argv
     common = [c for c in a if c in b]
@@ -56,11 +57,18 @@ def main():
     only_b = [c for c in b if c not in a]
     diff = collections.Counter()
     per_phase = collections.Counter()
+    missing = [0]
     shown = 0
     for c in common:
         ra, rb = a[c], b[c]
         per_phase[c >> 28] += 1
         what = [n for n, i in (("pose", 1), ("opaque stream", 2), ("translucent stream", 3)) if ra[i] != rb[i]]
+        if pix:
+            # (a picture not hashed in one log, the last case of a run stopped in its middle: missing, not different)
+            angles = [k for k in range(8) if ra[8 + k] and rb[8 + k] and ra[8 + k] != rb[8 + k]]
+            missing[0] += sum(1 for k in range(8) if not (ra[8 + k] and rb[8 + k]))
+            if angles:
+                what.append("pictures from angle%s %s" % ("s" if len(angles) > 1 else "", ",".join(map(str, angles))))
         if ra[4] != rb[4]:
             what.append("triangle counts %d/%d -> %d/%d" % (ra[4] >> 16, ra[4] & 0xFFFF, rb[4] >> 16, rb[4] & 0xFFFF))
         if what:
@@ -68,6 +76,8 @@ def main():
             if shown < 20 or show_all:
                 print("DIFFERS  %-60s %s" % (describe(c, names), ", ".join(what)))
                 shown += 1
+    if missing[0]:
+        print("(%d pictures not hashed in one log or the other: not compared)" % missing[0])
     flagged = sum(1 for r in list(a.values()) + list(b.values()) if r[6])
     print("\n%d cases in both (%s)" % (len(common), ", ".join("%s %d" % (PHASES[p], n) for p, n in sorted(per_phase.items()))))
     if only_a or only_b:
@@ -77,7 +87,7 @@ def main():
     if diff:
         print("DIFFERENT: %d cases (%s)" % (sum(diff.values()), ", ".join("%s %d" % (PHASES[p], n) for p, n in sorted(diff.items()))))
         sys.exit(1)
-    print("IDENTICAL: every case's pose and draw streams the same")
+    print("IDENTICAL: every case's pose and draw streams the same" + (", and its pictures from all 8 angles" if pix else ""))
     sys.exit(0 if not (only_a or only_b) else 2)
 
 

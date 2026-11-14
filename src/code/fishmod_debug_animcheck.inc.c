@@ -23,8 +23,23 @@ extern Vtx gLinkChildHeadNearVtx[];
 extern Gfx gLinkChildHeadNearDL[];
 #endif
 
+// level 3 (FISHMOD_ANIMCHECK_PIX): each case drawn from 8 camera angles in turn, one a frame, and each picture's
+// frame buffer hashed in the ROM once the RDP has finished it (two frames later): 8 more words a record
+#ifdef FISHMOD_ANIMCHECK_PIX
+#define AC_ANGLES 8
+#define AC_REC_WORDS 16
+#else
+#define AC_ANGLES 1
 #define AC_REC_WORDS 8
+#endif
 #define AC_MAX_CASES 24000
+// a share of the cases (several emulators running one each): the cases numbered FROM to TO-1, in order
+#ifndef FISHMOD_ANIMCHECK_FROM
+#define FISHMOD_ANIMCHECK_FROM 0
+#endif
+#ifndef FISHMOD_ANIMCHECK_TO
+#define FISHMOD_ANIMCHECK_TO 0x7FFFFFFF
+#endif
 
 u32* gFishmodAnimLog;
 u32 gFishmodAnimLogCount;
@@ -546,6 +561,43 @@ static s16 sAcFace;
 static Vec3s* sAcJoints;
 static Gfx* sAcOpaEnd;
 static Gfx* sAcXluEnd;
+static s32 sAcAngle; // (level 3) the camera angle this frame
+static s32 sAcSeq;   // the cases begun so far (for FISHMOD_ANIMCHECK_FROM/TO)
+static s32 sAcRec;   // the record this case's pictures go in
+static s32 sAcMax;   // the records the log holds
+
+typedef struct AcPixJob {
+    u16* fb;
+    s32 rec;
+    s32 angle;
+    s32 frame;
+} AcPixJob;
+static AcPixJob sAcJobs[4];
+static s32 sAcJobCount;
+
+/** The pictures finished by now (drawn two frames ago or more): their frame buffers hashed into their records. */
+static void Ac_PixelJobs(void) {
+    s32 i = 0;
+
+    while (i < sAcJobCount) {
+        AcPixJob* j = &sAcJobs[i];
+
+        if (sPlayFrames - j->frame >= 2) {
+            u32 h = 0x811C9DC5;
+            const u32* p = (const u32*)j->fb;
+            s32 k;
+
+            osInvalDCache(j->fb, SCREEN_WIDTH * SCREEN_HEIGHT * 2);
+            for (k = 0; k < SCREEN_WIDTH * SCREEN_HEIGHT / 2; k++) {
+                h = Ac_Mix(h, p[k]);
+            }
+            gFishmodAnimLog[j->rec * AC_REC_WORDS + 8 + j->angle] = h;
+            *j = sAcJobs[--sAcJobCount];
+        } else {
+            i++;
+        }
+    }
+}
 
 static s32 Ac_FrameCount(s32 a) {
     LinkAnimationHeader* h = SEGMENTED_TO_VIRTUAL(sAnimCheckLinkAnims[a]);
@@ -604,18 +656,38 @@ static s32 Ac_Next(void) {
     }
 }
 
-static void Ac_Camera(PlayState* play, Player* player, f32 dist) {
+static void Ac_Camera(PlayState* play, Player* player, f32 dist, s32 angle) {
+    // (the angles: front, back, his left, his right, three-quarter front-left from above, three-quarter back-right
+    // from above, from above, from below)
+    static const s16 sYaw[8] = { 0, 0x8000, 0x4000, -0x4000, 0x2000, -0x6000, 0, 0x8000 };
+    static const f32 sPitch[8] = { 0.15f, 0.15f, 0.15f, 0.15f, 0.5f, 0.5f, 1.45f, -1.2f };
     Vec3f at = player->actor.world.pos;
     Vec3f eye;
-    s16 yaw = player->actor.shape.rot.y;
+    s16 yaw = player->actor.shape.rot.y + sYaw[angle];
+    f32 flat = dist * cosf(sPitch[angle]);
 
     at.y += LINK_IS_ADULT ? 40.0f : 25.0f;
-    // from in front of him, a little above
-    eye.x = at.x + Math_SinS(yaw) * dist;
-    eye.y = at.y + dist * 0.15f;
-    eye.z = at.z + Math_CosS(yaw) * dist;
+    eye.x = at.x + Math_SinS(yaw) * flat;
+    eye.y = at.y + dist * sinf(sPitch[angle]);
+    eye.z = at.z + Math_CosS(yaw) * flat;
     Play_SetCameraAtEye(play, sAcCamId, &at, &eye);
     Play_SetCameraFov(play, sAcCamId, 60.0f);
+}
+
+/** The next case (the next phase from its start, with his default models back, when this one's done). */
+static void Ac_Advance(Player* this) {
+    sAcSeq++;
+    if (!Ac_Next()) {
+        sAcPhase++;
+        sAcA = sAcF = 0;
+        Player_SetModelGroup(this, sAcModelGroup);
+        this->currentTunic = sAcTunic;
+        this->currentBoots = sAcBoots;
+        this->actor.shape.face = sAcFace;
+        this->headLimbRot.x = this->headLimbRot.y = this->headLimbRot.z = 0;
+        this->upperLimbRot.x = this->upperLimbRot.y = this->upperLimbRot.z = 0;
+        sAcSettle = 10; // (the camera moves for the far phase)
+    }
 }
 
 s32 Fishmod_AnimCheckPlayerUpdate(Player* this, PlayState* play) {
@@ -636,8 +708,16 @@ s32 Fishmod_AnimCheckPlayerUpdate(Player* this, PlayState* play) {
         sAcFace = this->actor.shape.face;
         sAcJoints = this->skelAnime.jointTable;
         if (gFishmodAnimLog == NULL) {
-            gFishmodAnimLog = SYSTEM_ARENA_MALLOC(AC_MAX_CASES * AC_REC_WORDS * sizeof(u32), "../fishmod_debug.c",
-                                                  __LINE__);
+            // as many records as its share of the cases (the system heap can't hold a whole pixel run's: 1.4 MB),
+            // fewer if even that doesn't fit
+            s32 n = FISHMOD_ANIMCHECK_TO - FISHMOD_ANIMCHECK_FROM;
+
+            n = (n > AC_MAX_CASES) ? AC_MAX_CASES : n;
+            while ((n > 0) && ((gFishmodAnimLog = SYSTEM_ARENA_MALLOC(n * AC_REC_WORDS * sizeof(u32),
+                                                                     "../fishmod_debug.c", __LINE__)) == NULL)) {
+                n /= 2;
+            }
+            sAcMax = n;
         }
         sAcPhase = AC_PHASE_FRAMES;
         sAcA = sAcF = 0;
@@ -662,27 +742,36 @@ s32 Fishmod_AnimCheckPlayerUpdate(Player* this, PlayState* play) {
             }
         }
 #endif
+        sAcAngle = 0;
+        sAcSeq = 0;
+        // (a share of the cases: the ones before it passed over at once)
+        while ((sAcSeq < FISHMOD_ANIMCHECK_FROM) && (sAcPhase < AC_PHASE_DONE)) {
+            Ac_Advance(this);
+        }
     } else if (sAcSettle > 0) {
         sAcSettle--;
+    } else if (sAcAngle + 1 < AC_ANGLES) {
+        sAcAngle++; // (the same pose from the next angle)
     } else if (sAcPhase < AC_PHASE_DONE) {
-        if (!Ac_Next()) {
-            // the next phase, from its start, with his default models back
-            sAcPhase++;
-            sAcA = sAcF = 0;
-            Player_SetModelGroup(this, sAcModelGroup);
-            this->currentTunic = sAcTunic;
-            this->currentBoots = sAcBoots;
-            this->actor.shape.face = sAcFace;
-            this->headLimbRot.x = this->headLimbRot.y = this->headLimbRot.z = 0;
-            this->upperLimbRot.x = this->upperLimbRot.y = this->upperLimbRot.z = 0;
-            sAcSettle = 10; // (the camera moves for the far phase)
+        sAcAngle = 0;
+        Ac_Advance(this);
+        if (sAcSeq >= FISHMOD_ANIMCHECK_TO) {
+            sAcPhase = AC_PHASE_DONE;
         }
     }
+#ifdef FISHMOD_ANIMCHECK_PIX
+    Ac_PixelJobs();
+#endif
     gTimeSpeed = 0;
-    Ac_Camera(play, this, (sAcPhase == AC_PHASE_FAR) ? 450.0f : 100.0f);
+    Ac_Camera(play, this, (sAcPhase == AC_PHASE_FAR) ? 450.0f : 60.0f, sAcAngle);
     sAcCase = -1;
     if (sAcPhase >= AC_PHASE_DONE) {
-        gFishmodAnimDone = true;
+        gFishmodAnimDone = (sAcJobCount == 0);
+        return true;
+    }
+    if (sAcAngle != 0) {
+        // (the pose stays from the angle-0 frame: nothing loaded)
+        sAcCase = 0x0FFFFFFF;
         return true;
     }
     switch (sAcPhase) {
@@ -749,9 +838,26 @@ void Fishmod_AnimCheckDrawEnd(PlayState* play, Actor* actor) {
 
     sAcOpaEnd = gFishmodAnimCheck.opaEnd = play->state.gfxCtx->polyOpa.p;
     sAcXluEnd = gFishmodAnimCheck.xluEnd = play->state.gfxCtx->polyXlu.p;
-    if ((sAcCase < 0) || (gFishmodAnimLog == NULL) || (gFishmodAnimLogCount >= AC_MAX_CASES)) {
+    if ((sAcCase < 0) || (gFishmodAnimLog == NULL) || (gFishmodAnimLogCount >= sAcMax)) {
         return;
     }
+#ifdef FISHMOD_ANIMCHECK_PIX
+    if (sAcJobCount < ARRAY_COUNT(sAcJobs)) {
+        AcPixJob* j = &sAcJobs[sAcJobCount++];
+
+        j->fb = play->state.gfxCtx->curFrameBuffer;
+        j->rec = (sAcAngle == 0) ? gFishmodAnimLogCount : sAcRec;
+        if ((sAcAngle != 0) && (sAcRec < 0)) {
+            sAcJobCount--; // (its first angle wasn't logged)
+        }
+        j->angle = sAcAngle;
+        j->frame = sPlayFrames;
+    }
+#endif
+    if (sAcAngle != 0) {
+        return; // (levels 1 and 2 once a case, from the first angle)
+    }
+    sAcRec = gFishmodAnimLogCount;
     // the draw streams (each list from a clean state: the same in both builds before Link's own commands)
     bzero(w, sizeof(*w));
     Ac_Walk(w, gFishmodAnimCheck.opaStart, sAcOpaEnd);
@@ -787,6 +893,9 @@ void Fishmod_AnimCheckDrawEnd(PlayState* play, Actor* actor) {
     rec[5] = cmds;
     rec[6] = flags;
     rec[7] = sPlayFrames;
+#ifdef FISHMOD_ANIMCHECK_PIX
+    bzero(&rec[8], 8 * sizeof(u32));
+#endif
     gFishmodAnimLogCount++;
 }
 

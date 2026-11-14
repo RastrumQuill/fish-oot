@@ -16,6 +16,11 @@ if [ "${1:-}" = "--audio" ]; then
     REC=16 PTRSYM=gFishmodAudLog CNTSYM=gFishmodAudLogCount
     shift
 fi
+if [ "${1:-}" = "--anim-pix" ]; then
+    # the animation check's log with the pictures' hashes (fishmod/scripts/animcheck_pix.inc.c)
+    REC=64 PTRSYM=gFishmodAnimLog CNTSYM=gFishmodAnimLogCount
+    shift
+fi
 if [ "${1:-}" = "--anim" ]; then
     # the animation check's log (fishmod/scripts/animcheck.inc.c; compare with animcheck_compare.py)
     REC=32 PTRSYM=gFishmodAnimLog CNTSYM=gFishmodAnimLogCount

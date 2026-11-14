@@ -80,9 +80,12 @@ as the machine allows, each taking a share of the case table).
 | The display-list walker and state model (Python: `dlstat.py`, `rigcheck.py`) | exists: to port its state model to C for the in-ROM walker |
 | Raw-frame capture in ares with markers (`edge_ab_capture.py`, the ARES_AUTOSHOT patch) | exists: generalise to "capture marker N" |
 | The case table generator (animations from the extracted assets, the variant axes) | done (`gen_animcheck_cases.py`, run by build.sh) |
-| The harness script (`animcheck.inc.c`, `animcheck_adult.inc.c`): posing, drawing, hashing, logging | levels 1 and 2 done (`fishmod_debug_animcheck.inc.c`): 19,878 cases (child), about 20 minutes in ares; level 3 (the pictures from 8 angles) to build |
+| The harness script (`animcheck.inc.c`, `animcheck_adult.inc.c`): posing, drawing, hashing, logging | levels 1 and 2 done (`fishmod_debug_animcheck.inc.c`): 21,498 cases (child; with Link's head and upper body turned by his code), about 28 minutes in ares; level 3 done (`animcheck_pix`, `_1of4`..`_4of4`): each case from 8 angles at 60 units, each picture's frame buffer hashed in the ROM when the RDP has finished it (only Link drawn, on a cleared background), about an hour a quarter |
 | `animcheck_compare.py` | done |
 | A self-test | done (`animcheck_selftest1/2`): a texture coordinate of the head moved by one step: all 19,734 near-detail cases differ (the 144 far-detail ones, drawn with another head, match: right); a pipe sync made a no-op: all 19,878 match. Two runs of one ROM: all identical |
+
+Level 3: the `animcheck_pix_1of4` .. `_4of4` scripts (a quarter of the cases each: four emulators at once), saved with
+`collog.sh --anim-pix`, compared with `animcheck_compare.py --pix`. Two runs of one ROM: every picture the same.
 
 Running it: `fishmod/build.sh --script animcheck --hw --colpack --gcc-all`, then
 `DISPLAY=:98 ARES_FAST=1 fishmod/tools/collog.sh --anim ROM ELF 1400 OUT.bin` (the ELF of the same build), for the
