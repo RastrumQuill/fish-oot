@@ -843,6 +843,30 @@ static void PcProf_Update(void) {
         u32 user[6] = { 0x464D4F44 /* 'FMOD' */, 0, 0, 0, 0, 0 };
         static s32 sDoneSaid;
 
+        if (gFishmodAudioAbReport != 0) {
+            // the audio A/B's lap just ended: the audio thread's own time by part (audio/internal/synthesis.c), in
+            // microseconds, then cleared for the next lap
+            extern u64 gFishmodAudTime[];
+            static u32 sAbFrames;
+            char line[160];
+            u64 t[6];
+            OSIntMask mask = osSetIntMask(OS_IM_NONE);
+            s32 k;
+
+            for (k = 0; k < 6; k++) {
+                t[k] = gFishmodAudTime[k];
+                gFishmodAudTime[k] = 0;
+            }
+            osSetIntMask(mask);
+            sprintf(line, "FISHMOD-AUDIO lap %d level %d frames %u updates %u us %u seq %u notes %u lists %u n %u\n",
+                    gFishmodAudioAbReport, (gFishmodAudioAbReport - 1) % 3, sPlayFrames - sAbFrames, (u32)t[0],
+                    (u32)OS_CYCLES_TO_USEC(t[1]), (u32)OS_CYCLES_TO_USEC(t[2]), (u32)OS_CYCLES_TO_USEC(t[3]),
+                    (u32)OS_CYCLES_TO_USEC(t[4]), (u32)t[5]);
+            Sc64_UsbText(line);
+            sAbFrames = sPlayFrames;
+            gFishmodAudioAbReport = 0;
+        }
+
 #ifndef FISHMOD_NO_AUX // (a console test without the reboot handshake's per-frame poll of the cart)
         Sc64_AuxPoll();
 #endif

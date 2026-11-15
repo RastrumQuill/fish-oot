@@ -553,6 +553,7 @@ static void Fishmod_TourUpdate(PlayState* play) {
 #ifdef FISHMOD_HWBENCH
 static u32 sLastCpu[FISHMOD_CPU_MAX];
 #endif
+static s32 gFishmodAudioAbReport; // (the audio A/B: the lap that just ended, 1-based, for the profiler to report)
 #include "fishmod_debug_bench.inc.c" // the hardware benches: the play bench and the area bench (FISHMOD_HWBENCH)
 
 static void Fishmod_TourDraw(Gfx** gfxP) {

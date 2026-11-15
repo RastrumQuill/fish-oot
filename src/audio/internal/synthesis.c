@@ -176,6 +176,21 @@ void AudioSynth_InitNextRingBuf(s32 chunkLen, s32 updateIndex, s32 reverbIndex) 
  * note. Written wherever that bit is: the copy in Audio_InitSampleState, the two clears here, and zeroed with the
  * states (heap.c).
  */
+#if FISHMOD_DEBUG
+/*
+ * fish-oot: the audio thread's own time by part, in count cycles, for the audio A/B bench (the audio_ab script;
+ * fishmod_debug_pcprof.inc.c sends them at each lap's end and clears them): [0] updates, [1] the whole update
+ * (AudioThread_UpdateImpl), [2] the sequences (AudioSeq_ProcessSequences), [3] the notes (func_800DB03C),
+ * [4] the command lists (AudioSynth_DoOneAudioUpdate and the reverbs' ring buffers), [5] notes in the lists
+ */
+u64 gFishmodAudTime[6];
+#define FISHMOD_AUD_T0() u32 fmT0 = osGetCount()
+#define FISHMOD_AUD_T(i) (gFishmodAudTime[i] += (u32)(osGetCount() - fmT0), fmT0 = osGetCount())
+#else
+#define FISHMOD_AUD_T0() (void)0
+#define FISHMOD_AUD_T(i) (void)0
+#endif
+
 #define FISHMOD_SAMPLE_ENABLED_MAX 1024
 u8 gFishmodSampleEnabled[FISHMOD_SAMPLE_ENABLED_MAX];
 
@@ -253,13 +268,22 @@ Acmd* AudioSynth_Update(Acmd* cmdStart, s32* cmdCnt, s16* aiStart, s32 aiBufLen)
     } else {
         sCmdClaimed = sCmdClaimEnd = 0;
     }
-    for (i = gAudioCtx.audioBufferParameters.ticksPerUpdate; i > 0; i--) {
-        AudioSeq_ProcessSequences(i - 1);
-        func_800DB03C(gAudioCtx.audioBufferParameters.ticksPerUpdate - i);
+    {
+        FISHMOD_AUD_T0();
+
+        for (i = gAudioCtx.audioBufferParameters.ticksPerUpdate; i > 0; i--) {
+            AudioSeq_ProcessSequences(i - 1);
+            FISHMOD_AUD_T(2);
+            func_800DB03C(gAudioCtx.audioBufferParameters.ticksPerUpdate - i);
+            FISHMOD_AUD_T(3);
+        }
     }
 
     aiBufP = aiStart;
     gAudioCtx.curLoadedBook = NULL;
+
+    {
+    FISHMOD_AUD_T0();
 
     for (i = gAudioCtx.audioBufferParameters.ticksPerUpdate; i > 0; i--) {
         if (i == 1) {
@@ -282,6 +306,8 @@ Acmd* AudioSynth_Update(Acmd* cmdStart, s32* cmdCnt, s16* aiStart, s32 aiBufLen)
         cmdP = AudioSynth_DoOneAudioUpdate(aiBufP, chunkLen, cmdP, gAudioCtx.audioBufferParameters.ticksPerUpdate - i);
         aiBufLen -= chunkLen;
         aiBufP += 2 * chunkLen;
+    }
+    FISHMOD_AUD_T(4);
     }
 
     for (j = 0; j < gAudioCtx.numSynthesisReverbs; j++) {
@@ -787,6 +813,9 @@ Acmd* AudioSynth_DoOneAudioUpdate(s16* aiBuf, s32 aiBufLen, Acmd* cmd, s32 updat
     }
 
     aClearBuffer(cmd++, DMEM_LEFT_CH, DMEM_2CH_SIZE);
+#if FISHMOD_DEBUG
+    gFishmodAudTime[5] += count;
+#endif
 
     i = 0;
     for (reverbIndex = 0; reverbIndex < gAudioCtx.numSynthesisReverbs; reverbIndex++) {
