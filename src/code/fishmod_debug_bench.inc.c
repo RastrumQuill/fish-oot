@@ -301,6 +301,25 @@ static void Bench_SetMode(s32 mode) {
         gFishmodBench = sSweep[sBench.laps % 12];
     }
 #endif
+#ifdef FISHMOD_ANATOMY_SWEEP
+    {
+        // (the anatomy sweep, anatomy_sweep script: every other lap as shipped, between them one part of the frame left
+        // out: the terrain, Link, the other actors, the effects; then everything the sweeps can leave out at once, so
+        // what remains is the frame's own cost. The frame log's lap number says which: lap % 10;
+        // fishmod/tools/anatomy_sweep_report.py has the same list)
+        static const s32 sSweep[10] = {
+            0, FISHMOD_BENCH_NOROOMOPA,
+            0, FISHMOD_BENCH_NOLINK,
+            0, FISHMOD_BENCH_NOACTORS,
+            0, FISHMOD_BENCH_NOEFFECTS,
+            0, FISHMOD_BENCH_NOROOMOPA | FISHMOD_BENCH_NOLINK | FISHMOD_BENCH_NOACTORS | FISHMOD_BENCH_NOEFFECTS |
+                   FISHMOD_BENCH_NOPROPS | FISHMOD_BENCH_NOFISH | FISHMOD_BENCH_NOROOMXLU | FISHMOD_BENCH_NOSKY |
+                   FISHMOD_BENCH_NOHUD,
+        };
+
+        gFishmodBench = sSweep[sBench.laps % 10];
+    }
+#endif
 #ifdef FISHMOD_PROP_SWEEP
 #include "src/fishmod_data/fishmod_props_kinds.h"
     {
@@ -571,7 +590,7 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     R_AUDIOMGR_ACTIVITY_LEVEL = (sBench.laps & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
                                                   : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
 #endif
-#if defined(FISHMOD_RDP_SWEEP) || defined(FISHMOD_PROP_SWEEP)
+#if defined(FISHMOD_RDP_SWEEP) || defined(FISHMOD_PROP_SWEEP) || defined(FISHMOD_ANATOMY_SWEEP)
     sPbCond = 0; // (every lap clear dawn)
     {
         static s32 sHudOff = -1;

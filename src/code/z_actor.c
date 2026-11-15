@@ -3087,7 +3087,10 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
                 if ((actor->init == NULL) && (actor->draw != NULL) &&
                     (actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) &&
                     (!FISHMOD_PHOTO_ON ||
-                     (FISHMOD_ANIMCHECK_ON ? (actor == gFishmodAnimCheck.target) : (actor->id == ACTOR_EN_FISHMOD)))) {
+                     (FISHMOD_ANIMCHECK_ON ? (actor == gFishmodAnimCheck.target) : (actor->id == ACTOR_EN_FISHMOD))) &&
+                    !((actor->id == ACTOR_PLAYER) ? FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOLINK)
+                      : (actor->id != ACTOR_EN_FISHMOD) ? FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOACTORS)
+                                                         : false)) {
                     if ((actor->flags & ACTOR_FLAG_REACT_TO_LENS) &&
                         ((play->roomCtx.curRoom.lensMode == LENS_MODE_SHOW_ACTORS) || play->actorCtx.lensActive ||
                          (actor->room != play->roomCtx.curRoom.num))) {
@@ -3124,11 +3127,13 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         }
     }
 
-    if ((!DEBUG_FEATURES || (HREG(64) != 1) || (HREG(73) != 0)) && !FISHMOD_PHOTO_ON) {
+    if ((!DEBUG_FEATURES || (HREG(64) != 1) || (HREG(73) != 0)) && !FISHMOD_PHOTO_ON &&
+        !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOEFFECTS)) {
         Effect_DrawAll(play->state.gfxCtx);
     }
 
-    if ((!DEBUG_FEATURES || (HREG(64) != 1) || (HREG(74) != 0)) && !FISHMOD_PHOTO_ON) {
+    if ((!DEBUG_FEATURES || (HREG(64) != 1) || (HREG(74) != 0)) && !FISHMOD_PHOTO_ON &&
+        !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOEFFECTS)) {
         EffectSs_DrawAll(play);
     }
 

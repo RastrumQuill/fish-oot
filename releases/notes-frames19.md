@@ -1,5 +1,8 @@
 # frames19
 
+**Console, 15 November (run 20261115-0201), against frames18:** hitches 24.5% -> 21.7% of pictures (the fewest yet),
+frames over 52 ms 38% -> 35%, frame period 53.6 -> 53.2 ms, RDP 44.0 -> 43.6 ms, RSP graphics -0.4 ms.
+
 **`fish-oot-frames19.bps`** (`fishmod/build.sh --script pcprof_frames --hw --colpack --meshpack --gcc-all`): frames18
 with bush weed, tall weed and ribbon weed drawn with their whole cards up close (gen_habitat.py NEAR_WHOLE): the
 prop sweep (releases/notes-prop-sweep.md) measured the cut outline costing the RDP more for these three (0.46, 0.74

@@ -579,6 +579,11 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_OLDSKY (FISHMOD_BENCH_OLDSKY_FILL | FISHMOD_BENCH_OLDSKY_Z | FISHMOD_BENCH_OLDSKY_1CYC)
 #define FISHMOD_BENCH_NOSKY (1 << 7)      // no skybox
 #define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
+// (the anatomy sweep: fishmod/scripts/anatomy_sweep.inc.c)
+#define FISHMOD_BENCH_NOROOMOPA (1 << 9)   // no room opaque geometry (the terrain: the lake bed, banks and cliffs)
+#define FISHMOD_BENCH_NOLINK (1 << 10)     // Link not drawn
+#define FISHMOD_BENCH_NOACTORS (1 << 11)   // no actor drawn but Link and the fish
+#define FISHMOD_BENCH_NOEFFECTS (1 << 15)  // no effects (Effect_DrawAll, EffectSs_DrawAll: splashes, dust, sparkles)
 #define FISHMOD_BENCH_NOHUD (1 << 25)     // no HUD or minimap (the RDP sweep: fishmod/scripts/rdp_sweep.inc.c)
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;

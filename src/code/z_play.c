@@ -1408,6 +1408,9 @@ void Play_Draw(PlayState* this) {
                 if (FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOROOMXLU)) {
                     roomDrawFlags &= ~ROOM_DRAW_XLU;
                 }
+                if (FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOROOMOPA)) {
+                    roomDrawFlags &= ~ROOM_DRAW_OPA;
+                }
                 Scene_Draw(this);
                 Room_Draw(this, &this->roomCtx.curRoom, roomDrawFlags & (ROOM_DRAW_OPA | ROOM_DRAW_XLU));
                 Room_Draw(this, &this->roomCtx.prevRoom, roomDrawFlags & (ROOM_DRAW_OPA | ROOM_DRAW_XLU));
