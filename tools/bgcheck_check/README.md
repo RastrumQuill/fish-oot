@@ -41,6 +41,24 @@ A test that never fails proves nothing. Each optimization was broken on purpose,
 out of a cache's key, a flag left out of a skip mask, the line-test stamp not advanced, the lists put out of order,
 ...), and the test reported mismatches for every one.
 
+## The floor search's short way and the platforms' reach (16 November 2026)
+
+In ares on the collog route a collision question's cost is mostly cache misses: about 100 cycles for each line of
+code or data it touches that the rest of the frame has pushed out. Three changes for that, the same answers (as the
+vanilla branch, claude/collision-opt-vanilla, where they're described at length):
+
+- **the platforms' reach**: each moving-platform slot's box across the ground in a compact table, so a search passes
+  over a slot it can't reach without reading it;
+- **the floor search's index**: each lookup cell's lists as plain poly numbers, a long list cut 4 x 4 by the ground it
+  covers, made when a search first comes to the cell (boxes tested a floor search: about 30 -> 5);
+- **the floor search's short way** (`BgCheck_RaycastDownFast`): cell, piece, polys, triangle test and height in one
+  small function; the search as it was for whatever it can't answer.
+
+The index and the short way need an Expansion Pak here (their memory, about 100 KB, is from the 2 MB more the mod
+gives Play with one). On the route: collision 3.53 -> 2.81 ms a frame (-21%), every logged frame the same; in the ROM
+the short way checked against the search as it was, on the side: 67,153 answers, 97,693 platform skips, none
+different. For the console: releases/notes-frames20-col.md.
+
 ## Results (15 November 2026)
 
 **Same answers.** This test, at 60 frames × 300 questions a scene: OoT ntsc-1.2 and gc-eu-mq, with and without an

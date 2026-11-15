@@ -4,6 +4,7 @@
 #
 # Usage: tools/bgcheck_check/run.sh [--version VERSION] [--base REV] [--keep DIR] [driver args...]
 #   VERSION: an extracted version (default ntsc-1.2; `make setup VERSION=...` first)
+#   --pak-flag 0|1: the working tree's BGCHECK_EXPANSION_PAK (default 1: with --ram 8 the Pak's memory is used)
 #   --extracted NAME: the scenes from extracted/NAME instead (e.g. a packed copy: ntsc-1.2-colpack)
 #   REV: the revision to compare with (default HEAD)
 #   driver args: --frames N --queries N --scene NAME --seed N
@@ -15,6 +16,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HERE="$ROOT/tools/bgcheck_check"
 VERSION=ntsc-1.2
 EXTNAME=""
+PAKFLAG=1
 BASE=HEAD
 OUT=""
 ARGS=()
@@ -23,6 +25,7 @@ while [ $# -gt 0 ]; do
         --version) VERSION="$2"; shift ;;
         --base) BASE="$2"; shift ;;
         --extracted) EXTNAME="$2"; shift ;;
+        --pak-flag) PAKFLAG="$2"; shift ;;
         --keep) OUT="$2"; shift ;;
         *) ARGS+=("$1") ;;
     esac
@@ -62,7 +65,7 @@ COMMON="src/code/z_lib.c src/code/z_skin_matrix.c src/code/sys_math_atan.c src/l
 build_lib() { # name, dir with src/code/z_bgcheck.c and sys_math3d.c
     local name=$1 dir=$2 objs=()
     for f in "$dir/src/code/z_bgcheck.c" "$dir/src/code/sys_math3d.c"; do
-        gcc -c $CFLAGS $DEFS -include "$HERE/tables_ram.h" -I"$HERE" -I"$ROOT/include" -I"$ROOT/include/libc" \
+        gcc -c $CFLAGS $DEFS -DBGCHECK_EXPANSION_PAK=$PAKFLAG -include "$HERE/tables_ram.h" -I"$HERE" -I"$ROOT/include" -I"$ROOT/include/libc" \
             -I"$ROOT/src" -I"$ROOT" -I"$EXT" "$f" -o "$OUT/$name-$(basename "$f" .c).o"
         objs+=("$OUT/$name-$(basename "$f" .c).o")
     done
