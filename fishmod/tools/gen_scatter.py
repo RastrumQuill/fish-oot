@@ -117,6 +117,13 @@ RULES = {
     "old_posts": ((5, 200), 0.0, {2: 0.08}, (1, 2), (0.8, 1.2), False),  # old pilings by the lab's shore
     "leaf_litter": ((10, 120), 0.005, {11: 0.05, 13: 0.04, 4: 0.04}, (1, 1), (0.8, 1.3), False),
 }
+# The plants that stand out of the water (reeds, rushes, cattails, irises, marigolds): only where they'd grow, their
+# feet in at least this much water, and no cliff or wall rising out of it near them (the ground within EMERGENT_CLEAR
+# no higher than EMERGENT_WALL over the surface, less nearer in proportion)
+EMERGENT = ("reed_clump", "pond_reed", "cattails", "rush_tuft", "iris", "marigold")
+EMERGENT_MIN_DEPTH = 3
+EMERGENT_CLEAR = 180
+EMERGENT_WALL = 70
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
 # meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
 HEIGHT = dict(pk.HEIGHT)
@@ -243,6 +250,26 @@ def place(scene, seed=SEED):
     def floor_at(x, z, surf):
         return finder.floor(int(x), int(z), surf + 60)
 
+    wall_cache = {}
+
+    def shore_wall(x, z, surf):
+        """Ground rising steeply out of the water nearby: anywhere within EMERGENT_CLEAR the ground stands more than
+        EMERGENT_WALL over the surface (a cliff or a wall, not a shelving bank), by 32-unit cell."""
+        key = (int(x // 32), int(z // 32))
+        if key not in wall_cache:
+            hit = False
+            for r in (60, 120, EMERGENT_CLEAR):
+                for i in range(8):
+                    a = i * math.pi / 4
+                    g = finder.floor(int(x + math.cos(a) * r), int(z + math.sin(a) * r), surf + 2000)
+                    if g is not None and g - surf > EMERGENT_WALL * r / EMERGENT_CLEAR:
+                        hit = True
+                        break
+                if hit:
+                    break
+            wall_cache[key] = hit
+        return wall_cache[key]
+
     out = []
     # the floating leaves placed so far, by 64-unit cell: (centre x, centre z, radius)
     floats = {}
@@ -287,7 +314,11 @@ def place(scene, seed=SEED):
                 if not (drange[0] <= depth <= drange[1]):
                     continue
                 chance = base + sum(b * zin.get(zid, 0.0) for zid, b in boosts.items())
-                if kind in ("reed_clump", "pond_reed", "cattails", "rush_tuft", "iris", "marigold"):
+                if kind in EMERGENT:
+                    # where they'd grow: their feet in water (not on the bank), a soft shelving shore, not at the foot
+                    # of a cliff or a wall (the far bank under the cliffs had stands of them against the rock)
+                    if depth < EMERGENT_MIN_DEPTH or shore_wall(x, z, surf):
+                        chance = 0.0  # (not skipped: the random numbers, so every other prop, stay as they were)
                     chance *= 1.0 - min(1.0, open_shore * 3.0)
                     # standing out of the water only on gentle banks: at the foot of a cliff or the island's steep
                     # shelf they read as grass stuck on the wall
