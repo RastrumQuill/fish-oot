@@ -90,6 +90,9 @@ static StaticPolyBox* sStaticPolyBox;
 #define STATICPOLY_STEEP_FOR_Z (1 << 1) // the wall search's z pass passes it over: fabsf(nz) * invNormalXZ < 0.4f
 #define STATICPOLY_STEEP_FOR_X (1 << 2) // the x pass passes it over: fabsf(nx) * invNormalXZ < 0.4f
 #define STATICPOLY_NO_XZ (1 << 3)       // its normal has no length across the ground: the wall search computes as before
+#define STATICPOLY_LINE_X (1 << 5) // the line test's x projection may take it: fabsf(nx) > 0.5f (CollisionPoly_LineVsPoly)
+#define STATICPOLY_LINE_Y (1 << 6) // its y projection: fabsf(ny) > 0.5f
+#define STATICPOLY_LINE_Z (1 << 7) // its z projection: fabsf(nz) > 0.5f
 #define STATICPOLY_GETMINY_DIFFERS (1 << 4) // CollisionPoly_GetMinY gives another height than minY (its @bug: a poly whose
                                             // normal's y is stored as exactly 1 or -1 gives its first vertex's): the line
                                             // test asks it, as before
@@ -1366,6 +1369,51 @@ s32 BgCheck_CheckStaticCeiling(StaticLookup* lookup, u16 xpFlags, CollisionConte
 }
 
 /**
+ * collision-opt: whether CollisionPoly_LineVsPoly certainly returns false for this poly and line, by its record alone.
+ * It returns true only for a point P of the line (where it crosses the poly's plane: posA + (posB - posA) * ratio,
+ * ratio in [0, 1]) that one of its projections takes, and each projection starts with the triangle's box widened by
+ * chkDist (Math3D_CirSquareVsTriSquare): the x projection needs P.z in the box, the y projection P.x and P.z, the z
+ * projection P.x. P is within the line's own range on each axis but for the rounding of a few operations, far under
+ * a unit: so if the line's x and z ranges, widened by chkDist + 1, leave out every projection the poly can be taken by,
+ * the test can't be true (and its other output, the plane's crossing point, is only read when it is).
+ */
+static s32 BgCheck_LineMissesPoly(StaticPolyBox* box, u16 flags, Vec3f* posA, Vec3f* posB, f32 chkDist) {
+    f32 margin = chkDist + 1.0f;
+    f32 lo;
+    f32 hi;
+    s32 xIn;
+    s32 zIn;
+
+    if (posA->x < posB->x) {
+        lo = posA->x;
+        hi = posB->x;
+    } else {
+        lo = posB->x;
+        hi = posA->x;
+    }
+    xIn = !((hi < (box->minX - margin)) || ((box->maxX + margin) < lo));
+    if (posA->z < posB->z) {
+        lo = posA->z;
+        hi = posB->z;
+    } else {
+        lo = posB->z;
+        hi = posA->z;
+    }
+    zIn = !((hi < (box->minZ - margin)) || ((box->maxZ + margin) < lo));
+
+    if ((flags & STATICPOLY_LINE_X) && zIn) {
+        return false;
+    }
+    if ((flags & STATICPOLY_LINE_Y) && xIn && zIn) {
+        return false;
+    }
+    if ((flags & STATICPOLY_LINE_Z) && xIn) {
+        return false;
+    }
+    return true;
+}
+
+/**
  * Tests if line `posA` to `posB` intersects with a static poly in list `ssList`. Uses polyCheckTbl
  * returns true if such a poly exists, else false
  * `outPoly` returns the pointer of the poly intersected
@@ -1417,6 +1465,14 @@ s32 BgCheck_CheckLineAgainstSSList(SSList* ssList, CollisionContext* colCtx, u16
                    : CollisionPoly_GetMinY(curPoly, colCtx->colHeader->vtxList);
         if (posA->y < minY && posB->y < minY) {
             break;
+        }
+        // collision-opt: a poly the line can't touch, by its record, isn't tested (see BgCheck_LineMissesPoly)
+        if ((sStaticPolyBox != NULL) && BgCheck_LineMissesPoly(&sStaticPolyBox[polyId], polyFlags, posA, posB, chkDist)) {
+            if (curNode->next == SS_NULL) {
+                break;
+            }
+            curNode = &colCtx->polyNodes.tbl[curNode->next];
+            continue;
         }
         if (CollisionPoly_LineVsPoly(curPoly, colCtx->colHeader->vtxList, posA, posB, &polyIntersect,
                                      (bccFlags & BGCHECK_CHECK_ONE_FACE) != 0, chkDist)) {
@@ -2099,6 +2155,23 @@ static void BgCheck_MakeStaticTables(CollisionContext* colCtx, CollisionHeader* 
         sStaticPolyBox[i].flags = (poly->flags_vIA & 0xE000) | ((poly->normal.y < 0) ? STATICPOLY_FACES_DOWN : 0);
         if (CollisionPoly_GetMinY(poly, colHeader->vtxList) != sStaticPolyBox[i].minY) {
             sStaticPolyBox[i].flags |= STATICPOLY_GETMINY_DIFFERS;
+        }
+        // (which of the line test's projections can take it: CollisionPoly_GetNormalF's values, compared as it does)
+        {
+            f32 lnx;
+            f32 lny;
+            f32 lnz;
+
+            CollisionPoly_GetNormalF(poly, &lnx, &lny, &lnz);
+            if (fabsf(lnx) > 0.5f) {
+                sStaticPolyBox[i].flags |= STATICPOLY_LINE_X;
+            }
+            if (fabsf(lny) > 0.5f) {
+                sStaticPolyBox[i].flags |= STATICPOLY_LINE_Y;
+            }
+            if (fabsf(lnz) > 0.5f) {
+                sStaticPolyBox[i].flags |= STATICPOLY_LINE_Z;
+            }
         }
         // collision-opt: what the wall search computed for each wall it reached (BgCheck_SphVsStaticWallImpl), with
         // the same expressions: the same floats
