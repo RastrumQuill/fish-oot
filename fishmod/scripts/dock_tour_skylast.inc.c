@@ -8,7 +8,7 @@
 #define FISHMOD_SCRIPT_TIME 0x8000
 #define FISHMOD_TOUR
 #define FISHMOD_TOUR_AUTO 200
-#define FISHMOD_SCRIPT_BENCH (FISHMOD_BENCH_TERRAIN_RA | FISHMOD_BENCH_SKYLAST)
+#define FISHMOD_SCRIPT_BENCH FISHMOD_BENCH_SKYLAST
 static Vec3f sScriptStartPos = { -649.0f, -1250.0f, 3121.0f };
 static s16 sScriptStartYaw = (s16)0x8000;
 static FishmodAutoplayStep sScriptSteps[] = {

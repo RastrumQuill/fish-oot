@@ -386,11 +386,16 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 #define SWAY_MAX (FISHMOD_PROP_KIND_MAX * SWAY_PHASES)
 
 // (Scatter_Touch's: the props making way for Link)
-#define TOUCH_MAX 16
+#define TOUCH_MAX 32
 #define TOUCH_NONE 0xFF
 #define TOUCH_LEAN 1.0f      // the most a plant's top moves sideways, per unit of its height
 #define TOUCH_PUSH 32.0f     // the furthest a floating plant drifts
-#define TOUCH_FLOAT_R 50.0f  // how near a floating plant's middle Link pushes it
+#define TOUCH_FLOAT_R 46.0f  // how near a floating plant's middle Link pushes it (at scale 1; plus TOUCH_FLOAT_R0)
+#define TOUCH_FLOAT_R0 18.0f
+#define TOUCH_HANG 90.0f     // how far a hanging plant (the vine curtain) reaches down from the surface, at scale 1
+// a floating kind that hangs from the surface: it swings from where it's held, as a plant from its foot, not drifts
+#define TOUCH_HANGS(kind) ((kind) == FISHMOD_PROP_VINE_CURTAIN)
+#define TOUCH_DRIFTS(kind) (sKinds[kind].floating && !TOUCH_HANGS(kind))
 #define TOUCH_EASE 0.3f      // how fast they follow (a share of the way each frame)
 #define TOUCH_BACK 0.03f     // and come back (floating: slowly, his wake lingers, as the Fishing Pond's pads)
 #define TOUCH_SPRING 0.09f   // (a plant: springs back up, its stiffness...
@@ -1407,12 +1412,18 @@ static void Scatter_Touch(PlayState* play) {
                 f32 amount;
                 s32 slot;
 
-                if (info->floating) {
-                    // (on the surface: Link swimming, or wading where it's shallow)
+                if (TOUCH_HANGS(prop->kind)) {
+                    // (hanging down from the surface: Link anywhere along it)
+                    if ((py > prop->y + 10.0f) || (py + 50.0f < prop->y - TOUCH_HANG * k)) {
+                        continue;
+                    }
+                    r = 14.0f + CLAMP_MAX(TOUCH_HANG * k * 0.3f, 30.0f);
+                } else if (info->floating) {
+                    // (on the surface: Link swimming, or wading where it's shallow; the bigger, the further it reaches)
                     if (fabsf(py - prop->y) > 40.0f) {
                         continue;
                     }
-                    r = TOUCH_FLOAT_R;
+                    r = TOUCH_FLOAT_R0 + TOUCH_FLOAT_R * k;
                 } else if (info->plant && (info->sway != 0)) {
                     f32 top = prop->y + info->extent * k;
 
@@ -1454,7 +1465,7 @@ static void Scatter_Touch(PlayState* play) {
                     d = 1.0f;
                 }
                 amount = (r - d) / r;
-                amount = info->floating ? (amount * TOUCH_PUSH) : (amount * TOUCH_LEAN);
+                amount = TOUCH_DRIFTS(prop->kind) ? (amount * TOUCH_PUSH) : (amount * TOUCH_LEAN);
                 sTouch[slot].tx = dx / d * amount;
                 sTouch[slot].tz = dz / d * amount;
                 sTouch[slot].hit = true;
@@ -1471,7 +1482,7 @@ static void Scatter_Touch(PlayState* play) {
             t->x += (t->tx - t->x) * TOUCH_EASE;
             t->z += (t->tz - t->z) * TOUCH_EASE;
             t->vx = t->vz = 0.0f;
-        } else if (sKinds[sProps[t->prop].kind].floating) {
+        } else if (TOUCH_DRIFTS(sProps[t->prop].kind)) {
             t->x -= t->x * TOUCH_BACK;
             t->z -= t->z * TOUCH_BACK;
         } else {
@@ -1482,7 +1493,7 @@ static void Scatter_Touch(PlayState* play) {
             t->z += t->vz;
         }
         if (!t->hit &&
-            (SQ(t->x) + SQ(t->z) < SQ(sKinds[sProps[t->prop].kind].floating ? 0.3f : 0.01f)) &&
+            (SQ(t->x) + SQ(t->z) < SQ(TOUCH_DRIFTS(sProps[t->prop].kind) ? 0.3f : 0.01f)) &&
             (SQ(t->vx) + SQ(t->vz) < SQ(0.005f))) {
             t->used = false;
             sTouchSlot[t->prop] = TOUCH_NONE;
@@ -1528,7 +1539,7 @@ static void Scatter_TouchMatrices(ScatterFrame* frame) {
         MTX_SET(mtx, 2, 2, 0x10000);
         MTX_SET(mtx, 2, 3, 0);
         MTX_SET(mtx, 3, 3, 0x10000);
-        if (sKinds[prop->kind].floating) {
+        if (TOUCH_DRIFTS(prop->kind)) {
             // a move, in its own units (its scale undone)
             f32 k = 64.0f / prop->scale;
 
@@ -1549,7 +1560,10 @@ static void Scatter_TouchMatrices(ScatterFrame* frame) {
             // lean * y * (y / height): the stalk curves, its foot stays put, its top goes as far as the whole lean
             for (k = 0; k < BEND_BANDS; k++) {
                 Mtx* m = &frame->bendBand[i][k];
-                f32 f = (k + 0.5f) * (1.15f / BEND_BANDS);
+                // (a hanging plant held at its top: the bottom band leans most, and its height is below the
+                // surface, so the lean's sign turns)
+                f32 f = TOUCH_HANGS(prop->kind) ? (BEND_BANDS - k - 0.5f) * (-1.15f / BEND_BANDS)
+                                                : (k + 0.5f) * (1.15f / BEND_BANDS);
 
                 *m = *mtx;
                 MTX_SET(m, 1, 0, (s32)(a * f * 65536.0f));
@@ -2587,7 +2601,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 opa = Scatter_PropColor(opa, tier, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
             }
         }
-        if ((sTouchSlot != NULL) && (sTouchSlot[set->prop[n]] != TOUCH_NONE) && !info->floating &&
+        if ((sTouchSlot != NULL) && (sTouchSlot[set->prop[n]] != TOUCH_NONE) && !TOUCH_DRIFTS(kind) &&
             (tier == TIER_NEAR)) {
             // a touched plant, bending: its bands loaded each under its own share of the lean, then its triangles
             s32 slot = sTouchSlot[set->prop[n]];

@@ -31,7 +31,10 @@ import sys
 TARGETS = [
     ("assets/scenes/overworld/spot06", "spot06_room_0",
      ["gSpot06DL_00A400_03003270_DL", "gSpot06DL_00A400_03001240_DL", "gSpot06DL_00A400_03003EF8_DL",
-      "gSpot06DL_00A400_03004AF0_DL"]),
+      "gSpot06DL_00A400_03004AF0_DL",
+      # (the pieces with triangles under the water, the pit by the lab's among them: cut for the water fog's stubs)
+      "gSpot06DL_00A400_03008858_DL", "gSpot06DL_00A400_03008ED0_DL", "gSpot06DL_00A400_030059C0_DL",
+      "gSpot06DL_00A400_030098C8_DL"]),
 ]
 # the lake bed's caustics (combiners that blend the caustic texture into the sand by the environment alpha) faded out
 # with depth: a triangle deep under the surface drawn sand only (the caustics come from the sun through the surface;
@@ -53,6 +56,11 @@ if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
 GREY_CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_scene", ["spot06_scene_000170B8_Tex"])]
 if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
     GREY_CAUSTICS = []
+# Water fog (fishmod.c Fishmod_WaterFog): in the relit room, the cut pieces' areas wholly under the surface are drawn
+# between two stub lists of the room's, empty as built (spot06_room_0_fogOn, _fogOff; their table _fishmodFog)
+WATER_FOG = not os.environ.get("MESHPACK_NO_WATER_FOG")
+FOG_ON_CALL = "gsSPDisplayList(spot06_room_0_fogOn)"
+FOG_OFF_CALL = "gsSPDisplayList(spot06_room_0_fogOff)"
 RELIGHT = {"spot06_room_0"}  # rooms whose lit pieces read their vertices lit by the CPU (segment RELIT_SEG)
 if os.environ.get("MESHPACK_NO_RELIGHT"):  # (a test: the areas without the CPU's lighting)
     RELIGHT = set()
@@ -363,30 +371,44 @@ def cut_by_material(dl, stream, tris, cells, order):
     for t in tris:  # (the original order: the state points ascending)
         by_state.setdefault(t[0], collections.defaultdict(list))[area_of[id(t)]].append(t)
     sub_dls, sub_vtx, new_dl = [], [], []
+    sub_state = []  # (each area list, the state point it's drawn at)
     emitted = 0
     for mi, (k, areas) in enumerate(by_state.items()):
         new_dl.extend(stream[emitted:k])
         emitted = k
         for ai in sorted(areas):
-            ts = areas[ai]
-            name = "%s_mp%d_%d" % (dl, ai, mi)
-            vname = name + "_Vtx"
-            vtx = []
-            out = []
-            xs = [int(v[0]) for t in ts for v in t[1]]
-            ys = [int(v[1]) for t in ts for v in t[1]]
-            zs = [int(v[2]) for t in ts for v in t[1]]
-            for x in (min(xs), max(xs)):
-                for y in (min(ys), max(ys)):
-                    for z in (min(zs), max(zs)):
-                        vtx.append(("%d" % x, "%d" % y, "%d" % z, "0", "0", "0", "0", "0", "0"))
-            out.append("gsSPVertex(&%s[0], 8, 0)" % vname)
-            out.append("gsSPCullDisplayList(0, 7)")
-            emit_tris(ts, vname, vtx, out)
-            out.append("gsSPEndDisplayList()")
-            sub_dls.append((name, out))
-            sub_vtx.append((vname, vtx))
-            new_dl.append("gsSPDisplayList(%s)" % name)
+            # (water fog: an area's triangles touching the water, any corner under the surface, a list of their own,
+            # called between the room's fog stubs, a run of them at once: fishmod.c fills the stubs with the water's
+            # fog colour and the RSP's fog off, and back; its dry ones another)
+            wet = [t for t in areas[ai] if min(int(v[1]) for v in t[1]) < WATER_Y]
+            dry = [t for t in areas[ai] if min(int(v[1]) for v in t[1]) >= WATER_Y]
+            parts = [(areas[ai], False, "")] if not WATER_FOG else [(p, w, "w" if w else "")
+                                                                     for p, w in ((dry, False), (wet, True)) if p]
+            for ts, under, suffix in parts:
+                name = "%s_mp%d_%d%s" % (dl, ai, mi, suffix)
+                vname = name + "_Vtx"
+                vtx = []
+                out = []
+                xs = [int(v[0]) for t in ts for v in t[1]]
+                ys = [int(v[1]) for t in ts for v in t[1]]
+                zs = [int(v[2]) for t in ts for v in t[1]]
+                for x in (min(xs), max(xs)):
+                    for y in (min(ys), max(ys)):
+                        for z in (min(zs), max(zs)):
+                            vtx.append(("%d" % x, "%d" % y, "%d" % z, "0", "0", "0", "0", "0", "0"))
+                out.append("gsSPVertex(&%s[0], 8, 0)" % vname)
+                out.append("gsSPCullDisplayList(0, 7)")
+                emit_tris(ts, vname, vtx, out)
+                out.append("gsSPEndDisplayList()")
+                sub_dls.append((name, out))
+                sub_vtx.append((vname, vtx))
+                sub_state.append((name, k))
+                if under and new_dl and new_dl[-1] == FOG_OFF_CALL:
+                    new_dl.insert(len(new_dl) - 1, "gsSPDisplayList(%s)" % name)  # (into the run: before its off)
+                elif under:
+                    new_dl.extend([FOG_ON_CALL, "gsSPDisplayList(%s)" % name, FOG_OFF_CALL])
+                else:
+                    new_dl.append("gsSPDisplayList(%s)" % name)
     new_dl.extend(stream[emitted:])
     new_dl.append("gsSPEndDisplayList()")
     # check: walking the piece's list, every state command of the original once and in order, and every triangle
@@ -397,6 +419,8 @@ def cut_by_material(dl, stream, tris, cells, order):
     n_state = 0
     for it in new_dl[:-1]:
         nm = name_of(it)
+        if it in (FOG_ON_CALL, FOG_OFF_CALL):
+            continue  # (the fog stubs: no state of the piece's)
         if nm == "gsSPDisplayList" and args_of(it)[0] in subs:
             name = args_of(it)[0]
             sl = [None] * 64
@@ -431,9 +455,8 @@ def cut_by_material(dl, stream, tris, cells, order):
                 "G_LIGHTING" in [x.strip() for x in args_of(c)[0].split("|")]:
             lit = name_of(c) == "gsSPSetGeometryMode"
     entry_lit = {}
-    for mi, (k, areas) in enumerate(by_state.items()):
-        for ai in areas:
-            entry_lit["%s_mp%d_%d" % (dl, ai, mi)] = lit_at[k]
+    for name, k in sub_state:
+        entry_lit[name] = lit_at[k]
     return (sub_dls, sub_vtx, new_dl, len(tris), len(order), entry_lit), None
 
 
@@ -684,6 +707,7 @@ def main():
             if report:
                 print("meshpack: %s: %d triangles in %d areas, %d area lists" % (dl, ntri, nareas, len(area_dls)))
         table = None
+        fog_vtx = set()
         if room in RELIGHT:
             # every piece of the room (cut or not) relit
             ent = [f for f in os.listdir(d) if f.startswith(room) and f.endswith("_CullableEntries.inc.c")]
@@ -709,8 +733,18 @@ def main():
             for n in lists:
                 if n in areas:
                     areas[n] = lists[n]
+            # the water fog's vertices: every relit one the wet area lists load (their table indices)
+            fog_vtx = set()
+            for n in lists:
+                if re.match(r".*_mp\d+_\d+w$", n):
+                    for c in lists[n]:
+                        if name_of(c) == "gsSPVertex" and "(Vtx*)0x" in c:
+                            a = args_of(c)
+                            off = (int(a[0].split("0x")[1].rstrip(")"), 16) & 0xFFFFFF) // 16
+                            fog_vtx.update(range(off, off + int(a[1], 0)))
             if report:
-                print("meshpack: %s: %d vertices lit by the CPU (segment 0x%02X)" % (room, len(table), RELIT_SEG))
+                print("meshpack: %s: %d vertices lit by the CPU (segment 0x%02X), %d of them water-fogged" % (
+                    room, len(table), RELIT_SEG, len(fog_vtx)))
         for dl, cmds in pieces.items():
             p = os.path.join(d, dl + ".inc.c")
             os.remove(p)  # (a hard link: written fresh)
@@ -740,6 +774,16 @@ def main():
                 "    &%s,\n" % ORIGIN[v] for v in table)))
             defs.append("void* %s_fishmodRelit[3] = { (void*)%d, %s_relitVtx, %s_relitSrc };\n" % (
                 room, len(table), room, room))
+            if WATER_FOG:
+                # the fog stubs: four commands' room each, each list's end until the game fills them
+                for stub in ("fogOn", "fogOff"):
+                    defs.append("Gfx %s_%s[4] = { gsSPEndDisplayList(), gsSPEndDisplayList(), gsSPEndDisplayList(), "
+                                "gsSPEndDisplayList() };\n" % (room, stub))
+                fv = sorted(fog_vtx)
+                defs.append("u16 %s_fogVtx[] = { %d, %s };\n" % (room, len(fv), ", ".join(str(i) for i in fv)))
+                defs.append("void* %s_fishmodFog[3] = { %s_fogOn, %s_fogOff, %s_fogVtx };\n" % (room, room, room, room))
+        if table is not None and WATER_FOG:
+            externs.append("extern Gfx %s_fogOn[];\nextern Gfx %s_fogOff[];\n" % (room, room))
         if not defs:
             continue
         rp = os.path.join(d, room + ".c")

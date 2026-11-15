@@ -584,7 +584,9 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOLINK (1 << 10)     // Link not drawn
 #define FISHMOD_BENCH_NOACTORS (1 << 11)   // no actor drawn but Link and the fish
 #define FISHMOD_BENCH_NOEFFECTS (1 << 15)  // no effects (Effect_DrawAll, EffectSs_DrawAll: splashes, dust, sparkles)
-#define FISHMOD_BENCH_TERRAIN_RA (1 << 17) // the terrain anti-aliased without reading the picture back (Fishmod_TerrainRA)
+#define FISHMOD_BENCH_TERRAIN_AA (1 << 17) // the terrain anti-aliased reading the picture back, as vanilla (an A/B:
+                                           // the game draws it without, Fishmod_TerrainRA)
+#define FISHMOD_BENCH_NOWATERFOG (1 << 24)   // no water fog (Fishmod_WaterFog): the A/B of it
 #define FISHMOD_BENCH_NODEPTHSHADE (1 << 19) // no depth darkening (Fishmod_DepthShade): the A/B of it
 #define FISHMOD_BENCH_SKYLAST (1 << 18)     // the sky drawn after the opaque scene, only where nothing is (a test)
 #define FISHMOD_BENCH_NOHUD (1 << 25)     // no HUD or minimap (the RDP sweep: fishmod/scripts/rdp_sweep.inc.c)
@@ -739,6 +741,11 @@ void Fishmod_TerrainRA(struct PlayState* play);
 #define FISHMOD_DEPTH_TO 500.0f
 #define FISHMOD_DEPTH_MIN 0.12f
 s32 Fishmod_DepthShade(f32 depth);
+// water fog (fishmod.c Fishmod_WaterFog): the light's path through the water, where its fog starts and where it's whole
+#define FISHMOD_WATER_FOG_NEAR 30.0f
+#define FISHMOD_WATER_FOG_FAR 480.0f
+#define FISHMOD_WATER_FOG_SHADE 110 // its colour: the water's own fog colour (its light setting's) at 110/256
+extern u32 gFishmodWaterFogCycles;
 s32 Fishmod_LakeDrained(struct PlayState* play);
 #if FISHMOD_DEBUG
 // a script's plant-touch test (FISHMOD_TOUCH_TEST, _SWEEP, _PERIOD): x, y, z, sweep, period (0: off)

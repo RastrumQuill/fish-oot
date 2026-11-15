@@ -1583,6 +1583,15 @@ u32 gFishmodRelitCount;       // (the times the terrain was lit again: a check t
 s32 gFishmodRelitDirty;       // set when a room vertex's normal changes (fishmod_scatter.c's bed shading): light again
 static const Vtx* sRelitSrc;
 static s32 sRelitCount;
+extern void* spot06_room_0_fishmodFog[] __attribute__((weak)); // (meshpack builds: the water fog's stubs)
+static Gfx* sFogStub[2];        // the room's water fog stubs (on, off), or NULL
+static u16* sFogVtx;            // the relit vertices under the surface (their index)
+static s16* sFogDepth;          //   and their depth under it
+static s32 sFogCount;
+static u32 sFogKey[8];          // what the fog was last worked out for (the eye, the look, the fog's settings)
+static u32 sFogStubKey[2];      // what the stubs hold (their colours: 0 = empty)
+u32 gFishmodWaterFogCycles;     // (the last frame's cost, for the profile)
+static s32 sRelitComputed;      // the relit colours were made again this frame
 static u8* sRelitDepth;        // each vertex's share of the light left by its depth under the surface (Fishmod_DepthShade)
 static s32 sRelitDrained = -1; // the lake drained when they were made (no water: no darkening)
 static s32 sRelitFront = -1;
@@ -1614,6 +1623,18 @@ static void Fishmod_RelitFree(void) {
         ZELDA_ARENA_FREE(sRelitDepth, "../fishmod.c", __LINE__);
         sRelitDepth = NULL;
     }
+    if (sFogVtx != NULL) {
+        ZELDA_ARENA_FREE(sFogVtx, "../fishmod.c", __LINE__);
+        sFogVtx = NULL;
+    }
+    if (sFogDepth != NULL) {
+        ZELDA_ARENA_FREE(sFogDepth, "../fishmod.c", __LINE__);
+        sFogDepth = NULL;
+    }
+    sFogCount = 0;
+    sFogStub[0] = sFogStub[1] = NULL;
+    sFogStubKey[0] = sFogStubKey[1] = 0;
+    sFogKey[0] = 0;
     sRelitDrained = -1;
     if (sRelitNormal != NULL) {
         ZELDA_ARENA_FREE(sRelitNormal, "../fishmod.c", __LINE__);
@@ -1676,22 +1697,28 @@ static void Fishmod_RelitCompute(Vtx* out, Lights* lights) {
 }
 
 /*
- * The terrain's anti-aliasing without reading the picture back (FISHMOD_BENCH_TERRAIN_RA, a test): the room's opaque
- * render modes with the colour read (IM_RD) left out, as libultra's "RA" modes and the props' own. The coverage is
- * still worked out and written (the VI smooths the edges with it); what's gone is the RDP reading each pixel's colour
- * before writing it, which only the edge pixels' blend in the RDP used. Found once per room by walking its lists
- * (the room's own: calls into other segments, the scene's animated materials, aren't followed), switched by flipping
- * the bit in place.
+ * The terrain anti-aliased without reading the picture back: each loaded room's opaque render modes with the colour
+ * read (IM_RD) left out, as libultra's "RA" modes and the props' own. The coverage is still worked out and written
+ * (the VI smooths the edges with it); what's gone is the RDP reading each pixel's colour before writing it, which only
+ * the edge pixels' blend in the RDP used. The console (terrain sweep, 18 laps): 2.9 ms of RDP a frame, every leg; in
+ * ares only pixels on polygons' edges change. Found once per room by walking its lists (the room's own: calls into
+ * other segments, the scene's animated materials, aren't followed), the bit cleared in place.
+ * FISHMOD_BENCH_TERRAIN_AA: the read back, as vanilla (an A/B).
  */
+#define TERRAIN_MODES_MAX 512
+typedef struct TerrainModes {
+    void* room;             // the room's segment they were found in
+    s16 scene;              // and which room it held (rooms load into the same buffers in turn)
+    s16 num;
+    s32 count;
+    s32 ra;                 // the bit is out now
+    u32* modes[TERRAIN_MODES_MAX];
+} TerrainModes;
+static TerrainModes sTerrainModes[2]; // (the current room and the previous one, while both are loaded)
+static s16 sTerrainScene;             // (the scene the rooms are this frame's)
 s32 gFishmodSkyDepthTest; // (fishmod.h: FISHMOD_SKY_DEPTH_TEST)
 
-#define TERRAIN_MODES_MAX 512
-static u32* sTerrainModes[TERRAIN_MODES_MAX];
-static s32 sTerrainModeCount;
-static void* sTerrainModesRoom; // the room they were found in
-static s32 sTerrainRA;          // the bit is out now
-
-static void Fishmod_TerrainModesWalk(void* seg, u32 segSize, u32* dl, s32 depth) {
+static void Fishmod_TerrainModesWalk(TerrainModes* tm, void* seg, u32* dl, s32 depth) {
     s32 n;
 
     for (n = 0; n < 4096; n++, dl += 2) {
@@ -1703,72 +1730,111 @@ static void Fishmod_TerrainModesWalk(void* seg, u32 segSize, u32* dl, s32 depth)
         if ((op == G_DL) && (depth < 8)) {
             u32 a = dl[1];
 
-            if (((a >> 24) == 0x03) && ((a & 0xFFFFFF) < segSize)) {
-                Fishmod_TerrainModesWalk(seg, segSize, (u32*)((u8*)seg + (a & 0xFFFFFF)), depth + 1);
+            if (((a >> 24) == 0x03) && ((a & 0xFFFFFF) < 0x100000)) {
+                Fishmod_TerrainModesWalk(tm, seg, (u32*)((u8*)seg + (a & 0xFFFFFF)), depth + 1);
             }
             if ((dl[0] >> 16) & 0xFF) {
                 return; // (a branch: the list ends there)
             }
-        } else if ((dl[0] == 0xE200001C) && (sTerrainModeCount < TERRAIN_MODES_MAX)) {
-            // the render mode: opaque (ZMODE_OPA), anti-aliased, reading the colour back
+        } else if ((dl[0] == 0xE200001C) && (tm->count < TERRAIN_MODES_MAX)) {
+            // the render mode: opaque (ZMODE_OPA), anti-aliased, not forced to blend
             u32 m = dl[1];
 
             if ((m & AA_EN) && ((m & ZMODE_XLU) == ZMODE_OPA) && !(m & FORCE_BL)) {
                 s32 i;
 
-                for (i = 0; i < sTerrainModeCount; i++) {
-                    if (sTerrainModes[i] == &dl[1]) {
+                for (i = 0; i < tm->count; i++) {
+                    if (tm->modes[i] == &dl[1]) {
                         break;
                     }
                 }
-                if (i == sTerrainModeCount) {
-                    sTerrainModes[sTerrainModeCount++] = &dl[1];
+                if (i == tm->count) {
+                    tm->modes[tm->count++] = &dl[1];
                 }
             }
         }
     }
 }
 
-void Fishmod_TerrainRA(PlayState* play) {
-    Room* room = &play->roomCtx.curRoom;
-    s32 want = FISHMOD_BENCH_SKIP(FISHMOD_BENCH_TERRAIN_RA);
+static void Fishmod_TerrainRARoom(TerrainModes* tm, Room* room, s32 want) {
     s32 i;
 
     if ((room->segment == NULL) || (room->roomShape == NULL)) {
-        sTerrainModesRoom = NULL;
-        sTerrainModeCount = 0;
-        sTerrainRA = false;
+        tm->room = NULL;
+        tm->count = 0;
+        tm->ra = false;
         return;
     }
-    if (sTerrainModesRoom != room->segment) {
-        // a new room: its modes as loaded (the bit in)
-        sTerrainModesRoom = room->segment;
-        sTerrainModeCount = 0;
-        sTerrainRA = false;
-        if (room->roomShape->base.type == ROOM_SHAPE_TYPE_CULLABLE) {
-            // (the room's addresses are segment 3's: found from the room's own place, whatever the segment table
-            // holds now)
+    if ((tm->room == room->segment) && ((tm->scene != sTerrainScene) || (tm->num != room->num) ||
+                                         ((tm->count > 0) && tm->ra && (*tm->modes[0] & IM_RD)))) {
+        tm->room = NULL; // (another room in the same buffer, or this one loaded again: its bits as loaded)
+    }
+    if (tm->room != room->segment) {
+        // a room loaded here: its modes as loaded (the bit in). The room's addresses are segment 3's: found from
+        // the room's own place, whatever the segment table holds now
+        u8* seg = room->segment;
+        s32 type = room->roomShape->base.type;
+
+        tm->room = seg;
+        tm->scene = sTerrainScene;
+        tm->num = room->num;
+        tm->count = 0;
+        tm->ra = false;
+        if (type == ROOM_SHAPE_TYPE_CULLABLE) {
             RoomShapeCullable* shape = &room->roomShape->cullable;
-            RoomShapeCullableEntry* e = (RoomShapeCullableEntry*)((u8*)room->segment + ((u32)shape->entries & 0xFFFFFF));
-            u32 size = 0x100000;
+            RoomShapeCullableEntry* e = (RoomShapeCullableEntry*)(seg + ((u32)shape->entries & 0xFFFFFF));
 
             for (i = 0; i < shape->numEntries; i++) {
                 if ((e[i].opa != NULL) && (((u32)e[i].opa >> 24) == 0x03)) {
-                    Fishmod_TerrainModesWalk(room->segment, size,
-                                             (u32*)((u8*)room->segment + ((u32)e[i].opa & 0xFFFFFF)), 0);
+                    Fishmod_TerrainModesWalk(tm, seg, (u32*)(seg + ((u32)e[i].opa & 0xFFFFFF)), 0);
+                }
+            }
+        } else if (type == ROOM_SHAPE_TYPE_NORMAL) {
+            RoomShapeNormal* shape = &room->roomShape->normal;
+            RoomShapeDListsEntry* e = (RoomShapeDListsEntry*)(seg + ((u32)shape->entries & 0xFFFFFF));
+
+            for (i = 0; i < shape->numEntries; i++) {
+                if ((e[i].opa != NULL) && (((u32)e[i].opa >> 24) == 0x03)) {
+                    Fishmod_TerrainModesWalk(tm, seg, (u32*)(seg + ((u32)e[i].opa & 0xFFFFFF)), 0);
                 }
             }
         }
     }
-    if (want != sTerrainRA) {
-        for (i = 0; i < sTerrainModeCount; i++) {
+    if (want != tm->ra) {
+        for (i = 0; i < tm->count; i++) {
             if (want) {
-                *sTerrainModes[i] &= ~IM_RD;
+                *tm->modes[i] &= ~IM_RD;
             } else {
-                *sTerrainModes[i] |= IM_RD;
+                *tm->modes[i] |= IM_RD;
             }
         }
-        sTerrainRA = want;
+        tm->ra = want;
+    }
+}
+
+void Fishmod_TerrainRA(PlayState* play) {
+    s32 want = !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_TERRAIN_AA);
+
+    sTerrainScene = play->sceneId;
+    Room* rooms[2];
+    s32 r;
+
+    rooms[0] = &play->roomCtx.curRoom;
+    rooms[1] = &play->roomCtx.prevRoom;
+    for (r = 0; r < 2; r++) {
+        // (each room keeps the slot it was found in while it stays loaded: the current one may become the previous)
+        TerrainModes* tm = (sTerrainModes[0].room == rooms[r]->segment) ? &sTerrainModes[0]
+                           : (sTerrainModes[1].room == rooms[r]->segment) ? &sTerrainModes[1]
+                           : NULL;
+
+        if (tm == NULL) {
+            void* other = rooms[r ^ 1]->segment;
+
+            tm = ((sTerrainModes[0].room == NULL) || (sTerrainModes[0].room != other)) ? &sTerrainModes[0]
+                                                                                       : &sTerrainModes[1];
+            tm->room = NULL; // (made afresh below)
+        }
+        Fishmod_TerrainRARoom(tm, rooms[r], want);
     }
 }
 
@@ -1795,6 +1861,153 @@ s32 Fishmod_DepthShade(f32 depth) {
 
 s32 Fishmod_LakeDrained(PlayState* play) {
     return (play->sceneId == SCENE_LAKE_HYLIA) && LINK_IS_ADULT && !GET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
+}
+
+/*
+ * Water fog: with the camera above the water, the lake bed fogs toward the water's colour by the light's path through
+ * the water, not only by its distance from the eye: looking across the lake the bottom fades into the water's colour
+ * well before it would in air, straight down it stays clearer. The cut pieces' areas wholly under the surface are
+ * drawn between the room's two stubs (tools/meshpack.py): filled here with the water's fog colour and the RSP's fog
+ * off, so each vertex's alpha is its fog; and the scene's fog colour and the RSP's fog back on. Each such vertex's fog:
+ * the more of the RSP's own (by distance, the same formula) and the water's (the part of the eye's ray to it under the
+ * surface: FISHMOD_WATER_FOG_NEAR to _FAR). Worked out when the eye or the fog's settings move, into a fresh buffer
+ * (the RSP may still be reading the last). Off with the camera under water (the game's haze is the water's fog then),
+ * with the lake drained, and for the bench's A/B (FISHMOD_BENCH_NOWATERFOG).
+ */
+static void Fishmod_FogStub(Gfx* stub, u32* key, s32 on, u8 r, u8 g, u8 b, s32 fogOn) {
+    u32 k = on ? ((r << 24) | (g << 16) | (b << 8) | 1) : 0;
+
+    if (*key == k) {
+        return; // (as it is: not written while the RSP may be reading it)
+    }
+    *key = k;
+    if (!on) {
+        gSPEndDisplayList(stub);
+        return;
+    }
+    gDPPipeSync(&stub[0]);
+    gDPSetFogColor(&stub[1], r, g, b, 255);
+    if (fogOn) {
+        gSPSetGeometryMode(&stub[2], G_FOG);
+    } else {
+        gSPClearGeometryMode(&stub[2], G_FOG);
+    }
+    gSPEndDisplayList(&stub[3]);
+}
+
+static void Fishmod_WaterFog(PlayState* play) {
+    MtxF* m = &play->viewProjectionMtxF;
+    Vec3f eye = play->view.eye;
+    s32 on = (sFogStub[0] != NULL) && (sFogCount > 0) && (gFishmodHaze <= 0.0f) && (eye.y > FISHMOD_LAKE_SURFACE) &&
+             !Fishmod_LakeDrained(play) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOWATERFOG);
+    s32 near = play->lightCtx.fogNear;
+    s32 far = 1000 - (s32)((1000 - FISHMOD_HAZE_FOG_FAR) * gFishmodHaze);
+    u8 wc[3];
+    u32 key[8];
+    OSTime t0 = osGetTime();
+    s32 i;
+
+    if (!on) {
+        if (sFogStub[0] != NULL) {
+            Fishmod_FogStub(sFogStub[0], &sFogStubKey[0], false, 0, 0, 0, false);
+            Fishmod_FogStub(sFogStub[1], &sFogStubKey[1], false, 0, 0, 0, true);
+        }
+        sFogKey[0] = 0;
+        return;
+    }
+    {
+        // the water's colour: its light setting's fog (the colour the game gives the water's own fog under it), in
+        // the scene's light now (the props' measure: the ambient light and half of each directional one)
+        static u8 sWater[3] = { 30, 70, 70 };
+        EnvironmentContext* env = &play->envCtx;
+        WaterBox* box;
+        f32 surface;
+        s32 c;
+
+        if (BgCheck_GetWaterSurface(play, &play->colCtx, eye.x, eye.z, &surface, &box)) {
+            u32 li = WaterBox_GetLightIndex(&play->colCtx, box);
+
+            if ((env->lightSettingsList != NULL) && (li != WATERBOX_LIGHT_INDEX_NONE)) {
+                for (c = 0; c < 3; c++) {
+                    sWater[c] = env->lightSettingsList[li].fogColor[c];
+                }
+            }
+        }
+        for (c = 0; c < 3; c++) {
+            s32 l = play->lightCtx.ambientColor[c] + (env->dirLight1.params.dir.color[c] >> 1) +
+                    (env->dirLight2.params.dir.color[c] >> 1);
+
+            wc[c] = (sWater[c] * CLAMP_MAX(l, 255) * FISHMOD_WATER_FOG_SHADE) >> 16; // (the water deep, not its haze)
+        }
+    }
+    Fishmod_FogStub(sFogStub[0], &sFogStubKey[0], true, wc[0], wc[1], wc[2], false);
+    Fishmod_FogStub(sFogStub[1], &sFogStubKey[1], true, play->lightCtx.fogColor[0], play->lightCtx.fogColor[1],
+                    play->lightCtx.fogColor[2], true);
+    // worked out again only when the view or the fog has moved
+    key[0] = 1;
+    key[1] = *(u32*)&eye.x;
+    key[2] = *(u32*)&eye.y;
+    key[3] = *(u32*)&eye.z;
+    key[4] = *(u32*)&m->zx ^ *(u32*)&m->zz;
+    key[5] = *(u32*)&m->wx ^ *(u32*)&m->wz;
+    key[6] = (near << 16) | far;
+    key[7] = (wc[0] << 16) | (wc[1] << 8) | wc[2];
+    for (i = 0; (i < 8) && (key[i] == sFogKey[i]); i++) {}
+    if ((i == 8) && !sRelitComputed) {
+        return;
+    }
+    sRelitComputed = false;
+    bcopy(key, sFogKey, sizeof(key));
+    {
+        Vtx* out;
+        f32 fm;
+        f32 fo;
+        f32 h = eye.y - FISHMOD_LAKE_SURFACE; // (the eye's height over the water)
+        f32 wscale = 255.0f / (FISHMOD_WATER_FOG_FAR - FISHMOD_WATER_FOG_NEAR);
+
+        if (far == near) {
+            far++;
+        }
+        if (near > 996) {
+            fm = 0x7FFF;
+            fo = -0x7F00;
+        } else {
+            fm = 128000.0f / (far - near);
+            fo = (500 - near) * 256.0f / (far - near);
+        }
+        // into the front buffer where it is (the alpha alone: a frame still being drawn from it may take some of
+        // this frame's fog, a step of a moving camera's; the colours, the reason for the buffers, aren't touched)
+        out = sRelitBuf[sRelitFront];
+        for (i = 0; i < sFogCount; i++) {
+            Vtx* v = &out[sFogVtx[i]];
+            f32 x = v->v.ob[0];
+            f32 y = v->v.ob[1];
+            f32 z = v->v.ob[2];
+            f32 w = m->wx * x + m->wy * y + m->wz * z + m->ww;
+            f32 zc = m->zx * x + m->zy * y + m->zz * z + m->zw;
+            f32 depth = sFogDepth[i];
+            f32 drop = h + depth;
+            f32 inv;
+            f32 a;
+            f32 wa;
+
+            if ((w < 1.0f) || (drop < 1.0f)) {
+                v->v.cn[3] = 0;
+                continue;
+            }
+            // one division for both: 1 / (w drop)
+            inv = 1.0f / (w * drop);
+            a = zc * drop * inv * fm + fo; // (the RSP's fog, by distance: z / w)
+            // the water's: the share of the eye's ray to it under the surface (by depth over the whole drop), of
+            // the distance (the view depth w: near enough to the ray's length across the screen): w depth / drop
+            wa = (w * w * depth * inv - FISHMOD_WATER_FOG_NEAR) * wscale;
+            if (wa > a) {
+                a = wa;
+            }
+            v->v.cn[3] = (a <= 0.0f) ? 0 : (a >= 255.0f) ? 255 : (u8)a;
+        }
+    }
+    gFishmodWaterFogCycles = (u32)(osGetTime() - t0);
 }
 
 Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
@@ -1833,6 +2046,28 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
         sRelitSrc = src;
         sRelitCount = count;
         gFishmodRelitDirty = true; // (the normals gathered below)
+        if (spot06_room_0_fishmodFog != NULL) {
+            // the water fog: the room's stubs, and the relit vertices its lists load (tools/meshpack.py: those of
+            // the triangles touching the water, the shore's corners above it among them) with their depths
+            void** ft = (void**)((u8*)play->roomCtx.curRoom.segment + ((u32)spot06_room_0_fishmodFog & 0xFFFFFF));
+            u16* fv = (u16*)((u8*)play->roomCtx.curRoom.segment + ((u32)ft[2] & 0xFFFFFF));
+
+            sFogCount = fv[0];
+            sFogVtx = ZELDA_ARENA_MALLOC(sFogCount * sizeof(u16), "../fishmod.c", __LINE__);
+            sFogDepth = ZELDA_ARENA_MALLOC(sFogCount * sizeof(s16), "../fishmod.c", __LINE__);
+            if ((sFogVtx != NULL) && (sFogDepth != NULL)) {
+                for (i = 0; i < sFogCount; i++) {
+                    s32 v = (fv[1 + i] < count) ? fv[1 + i] : 0;
+
+                    sFogVtx[i] = v;
+                    sFogDepth[i] = (s16)MAX(FISHMOD_LAKE_SURFACE - src[v].v.ob[1], 0.0f); // (above it: none)
+                }
+                sFogStub[0] = (Gfx*)((u8*)play->roomCtx.curRoom.segment + ((u32)ft[0] & 0xFFFFFF));
+                sFogStub[1] = (Gfx*)((u8*)play->roomCtx.curRoom.segment + ((u32)ft[1] & 0xFFFFFF));
+            } else {
+                sFogCount = 0;
+            }
+        }
     }
     {
         // each vertex's darkening by its depth under the surface (none with the lake drained): made again when that
@@ -1906,6 +2141,7 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
 
             Fishmod_RelitCompute(sRelitBuf[next], lights);
             sRelitFront = next;
+            sRelitComputed = true; // (its fog alphas are old: Fishmod_WaterFog works them out again)
             bcopy(key, sRelitKey, len);
             sRelitKeyLen = len;
             gFishmodRelitDirty = false;
@@ -1913,6 +2149,7 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
             sRelitAge = 0;
         }
     }
+    Fishmod_WaterFog(play);
     gSPSegment(gfx++, FISHMOD_RELIT_SEG, sRelitBuf[sRelitFront]);
     return gfx;
 }

@@ -326,7 +326,9 @@ static void Bench_SetMode(s32 mode) {
         // without reading the picture back, the sky drawn last, or both. lap % 6; fishmod/tools/anatomy_sweep_report.py
         // --terrain has the same list)
         static const s32 sSweep[6] = {
-            0, FISHMOD_BENCH_TERRAIN_RA, 0, FISHMOD_BENCH_SKYLAST, 0, FISHMOD_BENCH_TERRAIN_RA | FISHMOD_BENCH_SKYLAST,
+            // (frames22 on: the terrain's RA is the game's now; the sweep's laps as it ran: its test, the read back)
+            FISHMOD_BENCH_TERRAIN_AA, 0, FISHMOD_BENCH_TERRAIN_AA, FISHMOD_BENCH_TERRAIN_AA | FISHMOD_BENCH_SKYLAST,
+            FISHMOD_BENCH_TERRAIN_AA, FISHMOD_BENCH_SKYLAST,
         };
 
         gFishmodBench = sSweep[sBench.laps % 6];
