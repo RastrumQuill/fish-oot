@@ -62,9 +62,10 @@ without it (or without a Pak) 76 of 101 scenes have the tables; with it and a Pa
 cell at a time since those were counted, so it fits wherever its table of cells does).
 
 Checked: `run.sh --pak-flag 1` and `--pak-flag 0`, `--ram 8` and `--ram 4`, ntsc-1.2 and gc-eu-mq: 10.9 million
-questions, no difference; with the index's memory cut to almost nothing, none either. 26 more deliberate bugs, each
-reported (two are not bugs: in a sorted list, ending the walk at a poly above the point and passing over every poly
-above it are the same). In fish-oot's ROM, the short way checked against the search as it was on the side, on the
+questions, no difference; with the index's memory cut to almost nothing, none either. 27 more deliberate changes, 26 of them
+bugs and each of those reported (the other isn't one: in a sorted list, ending the walk at a poly above the point and
+passing over every poly above it are the same; the one that lets unsorted lists into the index needs the full-size
+run to show). In fish-oot's ROM, the short way checked against the search as it was on the side, on the
 route in ares: 67,153 answers, 97,693 platform skips, no difference.
 
 The harness now keeps a scene's platforms within its platform buffers (the game's code doesn't check them: more
