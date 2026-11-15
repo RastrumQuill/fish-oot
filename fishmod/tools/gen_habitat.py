@@ -52,6 +52,10 @@ PX_PER_UNIT = 207.8
 # Checked with the exact A/B capture (edge_ab_capture.py, bench flag NOIMP)
 IMP_PX = 16
 TRI_KINDS = pk.flagged("tri")
+# Drawn with their whole cards up close too, not cut to the texture's outline: the console's prop sweep (14 November,
+# releases/notes-prop-sweep.md) found the cut costs the RDP more for these (bush weed 0.46 ms a frame, tall weed 0.74,
+# ribbon weed 0.26), its tall triangles each paying every scanline; for grass tuft and kelp the cut wins
+NEAR_WHOLE = {"bush_weed", "tall_weed", "ribbon_weed"}
 # upright plants that get the far single card (fishmod/tools/impostor.py): turned to face the camera, so not the flat
 # ones (floating leaves, litter, lily flowers), nor wood and the dock
 IMPOSTOR_KINDS = pk.flagged("impostor")
@@ -1217,7 +1221,7 @@ def write_props_manifest():
             textures.append({"name": "gFishmodProp_" + tex + "Tex", "src": os.path.relpath(src, ROOT),
                              "format": fmt, "out": out})
         mesh = os.path.join(MESH_TRIM, kind + ".obj")
-        if not os.path.exists(mesh):
+        if not os.path.exists(mesh) or kind in NEAR_WHOLE:
             mesh = os.path.join(MESH, kind + ".obj")
         far = os.path.join(MESH, kind + ".obj")
         if os.path.exists(os.path.join(MESH, kind + "_lod.obj")):
