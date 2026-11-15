@@ -1,5 +1,9 @@
 # terrain sweep
 
+**Console, 15 November (18 laps), against the shipped laps beside each:** terrain RA saves 2.9 ms of RDP a frame and 8
+hitch points, on every leg (1.5-4.4 ms); sky last costs 1.0 ms (the depth test on every sky pixel more than the covered
+pixels it skips); both 1.9 ms. The terrain's RA is the game's from frames23 on; the sky stays first.
+
 **`fish-oot-terrain-sweep.bps`** (`fishmod/build.sh --script terrain_sweep --hw --colpack --meshpack --gcc-all`):
 frames21's game, 18 laps of clear dawn (about 70 minutes), every other lap as shipped, between them:
 

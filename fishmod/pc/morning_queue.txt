@@ -1,5 +1,5 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# frames21 (12 minutes), the terrain sweep (18 laps, about 70 minutes), frames22 (12 minutes: compare with frames21).
-releases/fish-oot-frames21.bps 12 frames21
-releases/fish-oot-terrain-sweep.bps 90 terrain-sweep
+# frames22 (the texture pass: compare with frames21, run 20261115-1332) and frames23 (everything: compare with frames22),
+# 12 minutes each.
 releases/fish-oot-frames22.bps 12 frames22
+releases/fish-oot-frames23.bps 12 frames23
