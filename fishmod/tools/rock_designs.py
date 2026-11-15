@@ -68,6 +68,82 @@ def new_rock(seed):
     return V, uv, col, [((a, a), (b, b), (c, c)) for a, b, c in F]
 
 
+def made_for(rock, finder, seed=None, lean=False):
+    """E: a rock made for its spot (world coordinates): a stone, a boulder or an outcrop by size, its base ring 3 units
+    into the bed wherever it stands (it follows the slope: nothing deeper, no bottom face), rings of odd counts turned
+    half a side (round from few vertices: fishmod/docs/low-poly-shapes.md), an outcrop one hull round three boulders
+    (no faces inside it). Texture projected by each face's direction (no stretch), moss on what faces up."""
+    from scipy.spatial import ConvexHull
+    rnd = random.Random(seed if seed is not None else rock["x"] * 7 + rock["z"] * 13)
+    st = gs.rock_stretch(rock["x"], rock["z"])
+    k = rock["scale"]
+    r = 60.0 * k * (st[0] + st[2]) / 2
+    h = 56.0 * k * st[1]
+    cx, cz = rock["x"], rock["z"]
+    yaw = rnd.uniform(0, 2 * math.pi)
+
+    def bed(x, z):
+        f = finder.floor(int(x), int(z), int(rock["y"] + 400))
+        return rock["y"] if f is None else f
+
+    def blob(ox, oz, rr, hh, n):
+        pts = []
+        rings = ((1.0, -3.0, 0.0), (0.92, 0.5, 0.5), (0.55, 0.9, 0.0))
+        if lean:
+            rings = ((1.0, -3.0, 0.0), (0.7, 0.75, 0.5))  # (the base, one ring turned half a side, the top)
+        for ring, (fr, fh, tw) in enumerate(rings):
+            m = n if (ring < 2 and not lean) or ring == 0 else max(3, n - 2)
+            for i in range(m):
+                a = yaw + 2 * math.pi * (i + tw) / m
+                rad = rr * fr * rnd.uniform(0.85, 1.12)
+                x, z = cx + ox + math.cos(a) * rad * 1.15, cz + oz + math.sin(a) * rad * 0.9
+                b = bed(x, z)
+                y = b - 3.0 if ring == 0 else b + hh * fh * rnd.uniform(0.85, 1.1)
+                pts.append((x, y, z))
+        b = bed(cx + ox, cz + oz)
+        pts.append((cx + ox + rnd.uniform(-0.1, 0.1) * rr, b + hh * rnd.uniform(0.95, 1.08), cz + oz))
+        return pts
+
+    if k < 0.55:
+        pts = blob(0, 0, r, h * 0.55, 5)       # a stone: low, five-sided
+    elif k < 1.2:
+        pts = blob(0, 0, r, h, 5 if lean else 7)  # a boulder
+    else:
+        pts = []                              # an outcrop: three boulders, one hull
+        d = r * 0.55
+        for j, (dd, sz) in enumerate(((-d, 0.7), (0.0, 1.0), (d, 0.75))):
+            pts += blob(math.cos(yaw) * dd, math.sin(yaw) * dd, r * sz * 0.75, h * sz, 5 if lean else 7)
+    P = np.array(pts, float)
+    hull = ConvexHull(P)
+    faces = []
+    for simplex, eq in zip(hull.simplices, hull.equations):
+        if eq[1] < -0.6:
+            continue  # (the underside: on or in the bed)
+        a, b, c = simplex
+        n = np.cross(P[b] - P[a], P[c] - P[a])
+        faces.append((a, b, c) if np.dot(n, eq[:3]) > 0 else (a, c, b))
+    # per face: its own corners (the texture projected by its direction), moss by how much it faces up
+    vs, uvs, cs, fs = [], [], [], []
+    ymin = P[:, 1].min()
+    for a, b, c in faces:
+        n = np.cross(P[b] - P[a], P[c] - P[a])
+        n /= np.linalg.norm(n)
+        ax = int(np.argmax(np.abs(n)))
+        base_i = len(vs)
+        for i in (a, b, c):
+            x, y, z = P[i]
+            u, v = ((z, y), (x, z), (x, y))[ax]
+            up = max(0.0, n[1])
+            low = min(1.0, (y - ymin) / max(h, 1.0))
+            shade = 0.55 + 0.45 * low
+            moss = up ** 1.5
+            cs.append((shade * (0.62 - 0.15 * moss), shade * (0.62 + 0.1 * moss), shade * (0.58 - 0.2 * moss)))
+            vs.append((x, y, z))
+            uvs.append((u / 64.0, -v / 64.0))
+        fs.append((base_i, base_i + 1, base_i + 2))
+    return np.array(vs), np.array(uvs), np.array(cs), fs
+
+
 def orient_out(P, faces, centre):
     out = []
     for f in faces:
@@ -93,6 +169,10 @@ def clip_tri(P, UV, C, H):
 
 def rock_mesh(rock, design, finder, base):
     """one rock's world triangles for a design: (verts, uvs, cols, faces)"""
+    if design == "E":
+        return made_for(rock, finder)
+    if design == "F":
+        return made_for(rock, finder, lean=True)
     if design == "D":
         V, UV, C, F = new_rock(rock["x"] * 31 + rock["z"])
     else:
@@ -167,13 +247,13 @@ def main():
     bed_tex = np.asarray(Image.open(os.path.join(SPOT06, "spot06_scene_0000C2B8_Tex.rgba16.png")).convert("RGBA"))
     # whole lake: triangles, and how much of the rocks is under the bed
     print("%d rocks" % len(rocks))
-    for design in "ABCD":
+    for design in "AEF":
         tris = sum(len(rock_mesh(r, design, finder, base)[3]) for r in rocks)
         print("  %s: %d triangles in all" % (design, tris))
     # three views: the densest cluster, a big lone rock, a shallow one
     rocks.sort(key=lambda r: -r["scale"])
     picks = [rocks[0], rocks[len(rocks) // 2], rocks[-1]]
-    designs = [("A now", "A"), ("B pruned", "B"), ("C cut at the bed", "C"), ("D new rock, cut", "D")]
+    designs = [("A now", "A"), ("E made for its spot", "E"), ("F the same, lean", "F")]
     cw, ch = mp.W * 2, mp.H * 2
     sheet = Image.new("RGB", (cw * len(designs), 20 + (ch + 2) * len(picks)), (30, 30, 30))
     dr = ImageDraw.Draw(sheet)
