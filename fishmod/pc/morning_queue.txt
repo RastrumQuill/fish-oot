@@ -1,5 +1,12 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# frames27 (the water fog in the RSP's own fog, rope bending: compare with frames25), 12 minutes; then the audio
-# lead's A/B (claude/sleepy-faraday-ve9g2u's audio_ab: 6 laps, about 24 minutes).
+# The Expansion Pak in for all of these (the collision runs need it).
+# frames27 (the water fog in the RSP's own fog, rope bending: compare with frames25), 12 minutes.
 releases/fish-oot-frames27.bps 12 frames27
-releases/fish-oot-audio-ab.bps 30 audio-ab
+# The audio lead's A/B (claude/sleepy-faraday-ve9g2u, releases/notes-audio-ab.md): about 21 minutes.
+releases/fish-oot-audio-ab.bps 26 audio-ab
+# The collision lead's test (claude/collision-opt, releases/notes-frames20-col.md): frames20's collision and theirs,
+# the same tree and toolchain otherwise, each twice (A B A B) so the run-to-run spread shows.
+releases/fish-oot-frames20-colbase.bps 12 colbase-1
+releases/fish-oot-frames20-colnew.bps 12 colnew-1
+releases/fish-oot-frames20-colbase.bps 12 colbase-2
+releases/fish-oot-frames20-colnew.bps 12 colnew-2
