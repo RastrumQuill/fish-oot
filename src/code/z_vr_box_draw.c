@@ -49,6 +49,7 @@ void Skybox_Draw(SkyboxContext* skyboxCtx, GraphicsContext* gfxCtx, s16 skyboxId
     // through into the edges drawn over the sky
     gDPSetRenderMode(POLY_OPA_DISP++, (G_RM_OPA_SURF & ~CVG_DST_CLAMP) | CVG_DST_FULL,
                      (G_RM_OPA_SURF2 & ~CVG_DST_CLAMP) | CVG_DST_FULL);
+    FISHMOD_SKY_DEPTH_TEST(POLY_OPA_DISP++); // (fish-oot: drawn last, only where nothing is)
 
     // Enable magic square RGB dithering and bilinear filtering
     gDPSetColorDither(POLY_OPA_DISP++, G_CD_MAGICSQ);
@@ -103,6 +104,7 @@ void Skybox_Draw(SkyboxContext* skyboxCtx, GraphicsContext* gfxCtx, s16 skyboxId
         gDPSetCombineMode(POLY_OPA_DISP++, G_CC_DECALRGBA, G_CC_DECALRGBA);
         gDPSetRenderMode(POLY_OPA_DISP++, (G_RM_OPA_SURF & ~CVG_DST_CLAMP) | CVG_DST_FULL,
                          (G_RM_OPA_SURF2 & ~CVG_DST_CLAMP) | CVG_DST_FULL);
+        FISHMOD_SKY_DEPTH_TEST(POLY_OPA_DISP++);
         gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[0]); // -z face
         gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[2]); // +z face
         gSPDisplayList(POLY_OPA_DISP++, gFishmodSkyOneTex[4]); // -x face
@@ -128,6 +130,9 @@ void Skybox_Draw(SkyboxContext* skyboxCtx, GraphicsContext* gfxCtx, s16 skyboxId
     }
 
     gDPPipeSync(POLY_OPA_DISP++);
+    if (gFishmodSkyDepthTest) {
+        gDPSetDepthSource(POLY_OPA_DISP++, G_ZS_PIXEL);
+    }
 
     CLOSE_DISPS(gfxCtx, "../z_vr_box_draw.c", 125);
 }

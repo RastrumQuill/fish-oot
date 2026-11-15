@@ -1662,6 +1662,103 @@ static void Fishmod_RelitCompute(Vtx* out, Lights* lights) {
     }
 }
 
+/*
+ * The terrain's anti-aliasing without reading the picture back (FISHMOD_BENCH_TERRAIN_RA, a test): the room's opaque
+ * render modes with the colour read (IM_RD) left out, as libultra's "RA" modes and the props' own. The coverage is
+ * still worked out and written (the VI smooths the edges with it); what's gone is the RDP reading each pixel's colour
+ * before writing it, which only the edge pixels' blend in the RDP used. Found once per room by walking its lists
+ * (the room's own: calls into other segments, the scene's animated materials, aren't followed), switched by flipping
+ * the bit in place.
+ */
+s32 gFishmodSkyDepthTest; // (fishmod.h: FISHMOD_SKY_DEPTH_TEST)
+
+#define TERRAIN_MODES_MAX 512
+static u32* sTerrainModes[TERRAIN_MODES_MAX];
+static s32 sTerrainModeCount;
+static void* sTerrainModesRoom; // the room they were found in
+static s32 sTerrainRA;          // the bit is out now
+
+static void Fishmod_TerrainModesWalk(void* seg, u32 segSize, u32* dl, s32 depth) {
+    s32 n;
+
+    for (n = 0; n < 4096; n++, dl += 2) {
+        u32 op = dl[0] >> 24;
+
+        if (op == G_ENDDL) {
+            return;
+        }
+        if ((op == G_DL) && (depth < 8)) {
+            u32 a = dl[1];
+
+            if (((a >> 24) == 0x03) && ((a & 0xFFFFFF) < segSize)) {
+                Fishmod_TerrainModesWalk(seg, segSize, (u32*)((u8*)seg + (a & 0xFFFFFF)), depth + 1);
+            }
+            if ((dl[0] >> 16) & 0xFF) {
+                return; // (a branch: the list ends there)
+            }
+        } else if ((dl[0] == 0xE200001C) && (sTerrainModeCount < TERRAIN_MODES_MAX)) {
+            // the render mode: opaque (ZMODE_OPA), anti-aliased, reading the colour back
+            u32 m = dl[1];
+
+            if ((m & AA_EN) && ((m & ZMODE_XLU) == ZMODE_OPA) && !(m & FORCE_BL)) {
+                s32 i;
+
+                for (i = 0; i < sTerrainModeCount; i++) {
+                    if (sTerrainModes[i] == &dl[1]) {
+                        break;
+                    }
+                }
+                if (i == sTerrainModeCount) {
+                    sTerrainModes[sTerrainModeCount++] = &dl[1];
+                }
+            }
+        }
+    }
+}
+
+void Fishmod_TerrainRA(PlayState* play) {
+    Room* room = &play->roomCtx.curRoom;
+    s32 want = FISHMOD_BENCH_SKIP(FISHMOD_BENCH_TERRAIN_RA);
+    s32 i;
+
+    if ((room->segment == NULL) || (room->roomShape == NULL)) {
+        sTerrainModesRoom = NULL;
+        sTerrainModeCount = 0;
+        sTerrainRA = false;
+        return;
+    }
+    if (sTerrainModesRoom != room->segment) {
+        // a new room: its modes as loaded (the bit in)
+        sTerrainModesRoom = room->segment;
+        sTerrainModeCount = 0;
+        sTerrainRA = false;
+        if (room->roomShape->base.type == ROOM_SHAPE_TYPE_CULLABLE) {
+            // (the room's addresses are segment 3's: found from the room's own place, whatever the segment table
+            // holds now)
+            RoomShapeCullable* shape = &room->roomShape->cullable;
+            RoomShapeCullableEntry* e = (RoomShapeCullableEntry*)((u8*)room->segment + ((u32)shape->entries & 0xFFFFFF));
+            u32 size = 0x100000;
+
+            for (i = 0; i < shape->numEntries; i++) {
+                if ((e[i].opa != NULL) && (((u32)e[i].opa >> 24) == 0x03)) {
+                    Fishmod_TerrainModesWalk(room->segment, size,
+                                             (u32*)((u8*)room->segment + ((u32)e[i].opa & 0xFFFFFF)), 0);
+                }
+            }
+        }
+    }
+    if (want != sTerrainRA) {
+        for (i = 0; i < sTerrainModeCount; i++) {
+            if (want) {
+                *sTerrainModes[i] &= ~IM_RD;
+            } else {
+                *sTerrainModes[i] |= IM_RD;
+            }
+        }
+        sTerrainRA = want;
+    }
+}
+
 Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
     void** table;
     const Vtx* src;

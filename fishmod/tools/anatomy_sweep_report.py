@@ -4,7 +4,8 @@ saves, against the shipped laps on either side of its lap: the RDP's frame time,
 texture loading (TMEM busy), the hitches; then the whole route. And the RDP's idle time (its frame time less its
 pipeline's busy time: waiting for commands from the RSP, or for the frame to start), as shipped and with each part out.
 
-Usage: fishmod/tools/anatomy_sweep_report.py RUN_FOLDER   (the run's folder: packets-NNN.zip)
+Usage: fishmod/tools/anatomy_sweep_report.py RUN_FOLDER [--terrain]   (the run's folder: packets-NNN.zip)
+  --terrain: the terrain sweep's laps instead (fishmod/scripts/terrain_sweep.inc.c, FISHMOD_TERRAIN_SWEEP)
 """
 import collections
 import glob
@@ -13,9 +14,12 @@ import struct
 import sys
 import zipfile
 
-# fishmod_debug_bench.inc.c, FISHMOD_ANATOMY_SWEEP's sSweep: the lap's condition is lap % 10
+# fishmod_debug_bench.inc.c, FISHMOD_ANATOMY_SWEEP's sSweep: the lap's condition is lap % len(SWEEP)
 SWEEP = ["shipped", "no terrain", "shipped", "no Link", "shipped", "no other actors", "shipped", "no effects", "shipped",
          "nothing (all sweeps' parts out)"]
+# FISHMOD_TERRAIN_SWEEP's (lap % 6): the terrain anti-aliased without reading back, the sky last, both
+if "--terrain" in sys.argv:
+    SWEEP = ["shipped", "terrain RA", "shipped", "sky last", "shipped", "RA + sky last"]
 
 
 def records(folder):
@@ -34,7 +38,7 @@ def records(folder):
 
 
 def main():
-    rs = [r for r in records(sys.argv[1]) if r[1] & 1]  # (the counted frames)
+    rs = [r for r in records([a for a in sys.argv[1:] if not a.startswith("--")][0]) if r[1] & 1]  # (the counted frames)
     # the lap number: word 1 bits 16-23, counted on (it wraps at 256)
     by = collections.defaultdict(list)  # (lap, leg) -> records
     for r in rs:
@@ -54,7 +58,7 @@ def main():
     saved = collections.defaultdict(lambda: collections.defaultdict(list))  # cond -> leg -> [deltas dict]
     drift = []
     for lap in laps:
-        cond = SWEEP[lap % 10]
+        cond = SWEEP[lap % len(SWEEP)]
         if cond == "shipped":
             continue
         for leg in legs:
@@ -66,7 +70,7 @@ def main():
             base = {k: st.mean(x[k] for x in ref) for k in keys}
             saved[cond][leg].append({k: base[k] - s[k] for k in keys})
     for lap in laps:
-        if SWEEP[lap % 10] == "shipped":
+        if SWEEP[lap % len(SWEEP)] == "shipped":
             x = [r for leg in legs for r in by.get((lap, leg), [])]
             if x:
                 drift.append((lap, stat(x)["rdp"]))
@@ -80,13 +84,13 @@ def main():
         if not all_:
             continue
         m = {k: st.mean(d[k] for d in all_) for k in keys}
-        n = len({lap for lap in laps if SWEEP[lap % 10] == cond})
+        n = len({lap for lap in laps if SWEEP[lap % len(SWEEP)] == cond})
         print(f"| {cond} | {n} | {m['rdp']:.2f} | {m['pipe']:.2f} | {m['tmem']:.2f} | {m['frame']:.2f} | {m['late']:+.1f} |")
     print("\n## The RDP's idle time (frame time less pipeline busy), ms a frame\n")
     print("| condition | RDP | pipeline busy | idle |")
     print("|---|---|---|---|")
     for cond in sorted(set(SWEEP), key=SWEEP.index):
-        x = [r for lap in laps if SWEEP[lap % 10] == cond for leg in legs for r in by.get((lap, leg), [])]
+        x = [r for lap in laps if SWEEP[lap % len(SWEEP)] == cond for leg in legs for r in by.get((lap, leg), [])]
         if x:
             s_ = stat(x)
             print(f"| {cond} | {s_['rdp']:.1f} | {s_['pipe']:.1f} | {s_['rdp'] - s_['pipe']:.1f} |")

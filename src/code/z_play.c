@@ -1215,6 +1215,10 @@ void Play_Draw(PlayState* this) {
     GraphicsContext* gfxCtx = this->state.gfxCtx;
     Lights* sp228;
     Vec3f sp21C;
+    // fish-oot (FISHMOD_BENCH_SKYLAST, a test): the normal sky drawn after the opaque scene
+    s32 skyLast = FISHMOD_BENCH_SKIP(FISHMOD_BENCH_SKYLAST) && (this->skyboxId == SKYBOX_NORMAL_SKY) &&
+                  !this->envCtx.skyboxDisabled && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSKY) && !FISHMOD_NO_SKY() &&
+                  (R_PAUSE_BG_PRERENDER_STATE != PAUSE_BG_PRERENDER_READY);
 
     OPEN_DISPS(gfxCtx, "../z_play.c", 3907);
 
@@ -1353,8 +1357,11 @@ void Play_Draw(PlayState* this) {
                 !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOSKY) && !FISHMOD_NO_SKY()) {
                 if ((this->skyboxId == SKYBOX_NORMAL_SKY) || (this->skyboxId == SKYBOX_CUTSCENE_MAP)) {
                     Environment_UpdateSkybox(this->skyboxId, &this->envCtx, &this->skyboxCtx);
-                    Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, this->envCtx.skyboxBlend, this->view.eye.x,
-                                this->view.eye.y, this->view.eye.z);
+                    // (fish-oot: FISHMOD_BENCH_SKYLAST: drawn after the opaque scene instead, below)
+                    if (!skyLast) {
+                        Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, this->envCtx.skyboxBlend,
+                                    this->view.eye.x, this->view.eye.y, this->view.eye.z);
+                    }
                     // fish-oot: at Lake Hylia the sky and the scene cover the whole screen, and the sky's render mode
                     // reads nothing back: the colour clear under it changes nothing (and costs the RDP 0.9 ms)
                     if ((this->sceneId == SCENE_LAKE_HYLIA) && (gFishmodColorFill != NULL) &&
@@ -1374,7 +1381,7 @@ void Play_Draw(PlayState* this) {
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) ||
             (R_PLAY_DRAW_ENV_FLAGS & PLAY_ENV_DRAW_SUN_AND_MOON)) {
-            if (!this->envCtx.sunMoonDisabled) {
+            if (!this->envCtx.sunMoonDisabled && !skyLast) {
                 Environment_DrawSunAndMoon(this);
             }
         }
@@ -1412,6 +1419,7 @@ void Play_Draw(PlayState* this) {
                     roomDrawFlags &= ~ROOM_DRAW_OPA;
                 }
                 Scene_Draw(this);
+                Fishmod_TerrainRA(this); // (fish-oot: the terrain's render modes as the bench says)
                 Room_Draw(this, &this->roomCtx.curRoom, roomDrawFlags & (ROOM_DRAW_OPA | ROOM_DRAW_XLU));
                 Room_Draw(this, &this->roomCtx.prevRoom, roomDrawFlags & (ROOM_DRAW_OPA | ROOM_DRAW_XLU));
             }
@@ -1439,6 +1447,19 @@ void Play_Draw(PlayState* this) {
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_DRAW_ACTORS) {
             Actor_DrawAll(this, &this->actorCtx);
+        }
+
+        if (skyLast) {
+            // fish-oot (FISHMOD_BENCH_SKYLAST): the sky, then the sun and moon, after everything opaque, each pixel
+            // drawn only where nothing is (a fixed depth beyond the scene: FISHMOD_SKY_DEPTH_TEST). The see-through
+            // things come after, as before.
+            gFishmodSkyDepthTest = true;
+            Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, this->envCtx.skyboxBlend, this->view.eye.x,
+                        this->view.eye.y, this->view.eye.z);
+            if (!this->envCtx.sunMoonDisabled) {
+                Environment_DrawSunAndMoon(this);
+            }
+            gFishmodSkyDepthTest = false;
         }
 
         if (!DEBUG_FEATURES || (R_HREG_MODE != HREG_MODE_PLAY) || R_PLAY_DRAW_LENS_FLARES) {

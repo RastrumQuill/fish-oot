@@ -584,6 +584,8 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOLINK (1 << 10)     // Link not drawn
 #define FISHMOD_BENCH_NOACTORS (1 << 11)   // no actor drawn but Link and the fish
 #define FISHMOD_BENCH_NOEFFECTS (1 << 15)  // no effects (Effect_DrawAll, EffectSs_DrawAll: splashes, dust, sparkles)
+#define FISHMOD_BENCH_TERRAIN_RA (1 << 17) // the terrain anti-aliased without reading the picture back (Fishmod_TerrainRA)
+#define FISHMOD_BENCH_SKYLAST (1 << 18)     // the sky drawn after the opaque scene, only where nothing is (a test)
 #define FISHMOD_BENCH_NOHUD (1 << 25)     // no HUD or minimap (the RDP sweep: fishmod/scripts/rdp_sweep.inc.c)
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;
@@ -729,5 +731,17 @@ void Fishmod_DebugFault(struct OSThread* thread, const char* exp1, const char* e
 struct Lights;
 // the lake's terrain lit by the CPU (fishmod.c, meshpack builds): sets its vertex segment for this frame
 Gfx* Fishmod_Relight(struct PlayState* play, struct Lights* lights, Gfx* gfx);
+void Fishmod_TerrainRA(struct PlayState* play);
+// The sky last (FISHMOD_BENCH_SKYLAST, a test): drawn after the opaque scene, depth-tested at a fixed depth beyond
+// anything in the scene (the cleared depth buffer's is the only one further), so it fills only the pixels nothing
+// covers: the same picture, without drawing the sky under the terrain first. The sun and moon the same.
+extern s32 gFishmodSkyDepthTest; // (z_play.c sets it around the sky's draw)
+#define FISHMOD_SKY_DEPTH_TEST(gfx)                              \
+    if (gFishmodSkyDepthTest) {                                    \
+        gDPSetDepthSource(gfx, G_ZS_PRIM);                         \
+        gDPSetPrimDepth(gfx, 0x7FFE, 0);                           \
+        gSPSetOtherMode(gfx, G_SETOTHERMODE_L, 4, 1, Z_CMP);       \
+    }                                                              \
+    (void)0
 
 #endif

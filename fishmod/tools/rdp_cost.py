@@ -201,6 +201,92 @@ def tri_cost_geom(c0, c1, c2):
     return area, lines, sa
 
 
+class ZRaster:
+    """--overdraw: the frame's opaque triangles rasterized with a depth buffer, as the RDP draws them in order: per list,
+    the pixels it drew that passed the depth test, and the pixels of the finished picture that are still its own. The
+    difference is work covered later by something nearer (drawn, then drawn over)."""
+
+    def __init__(self):
+        self.z = np.full((H, W), np.inf)
+        self.owner = np.full((H, W), -1, np.int32)
+        self.keys = []
+        self.kid = {}
+        self.passed = collections.Counter()
+        self.failed = collections.Counter()
+        self.cover = collections.Counter()  # (covered list, the list drawn over it): pixels
+
+    def draw(self, cs, key, om_l):
+        eps = 1e-4
+        poly = clip_poly([np.asarray(c, float) for c in cs], lambda v: v[3] > eps,
+                         lambda a, b: a + (b - a) * ((eps - a[3]) / (b[3] - a[3])))
+        if len(poly) < 3:
+            return
+        sp = [(W / 2 + W / 2 * v[0] / v[3], H / 2 - H / 2 * v[1] / v[3], v[2] / v[3]) for v in poly]
+        if key not in self.kid:
+            self.kid[key] = len(self.keys)
+            self.keys.append(key)
+        k = self.kid[key]
+        zcmp, zupd = om_l & 0x10, om_l & 0x20
+        xlu = (om_l & 0x0C00) == 0x0800
+        if xlu or (EXCLUDE and EXCLUDE.search(key)):
+            return  # (see-through: it covers nothing; or left out: --exclude)
+        for i in range(1, len(sp) - 1):
+            (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) = sp[0], sp[i], sp[i + 1]
+            a2 = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
+            if abs(a2) < 1e-9:
+                continue
+            bx0, bx1 = max(int(math.floor(min(x0, x1, x2))), 0), min(int(math.ceil(max(x0, x1, x2))), W - 1)
+            by0, by1 = max(int(math.floor(min(y0, y1, y2))), 0), min(int(math.ceil(max(y0, y1, y2))), H - 1)
+            if bx0 > bx1 or by0 > by1:
+                continue
+            ys, xs = np.mgrid[by0:by1 + 1, bx0:bx1 + 1] + 0.5
+            w0 = ((x1 - xs) * (y2 - ys) - (x2 - xs) * (y1 - ys)) / a2
+            w1 = ((x2 - xs) * (y0 - ys) - (x0 - xs) * (y2 - ys)) / a2
+            w2 = 1 - w0 - w1
+            inside = (w0 >= 0) & (w1 >= 0) & (w2 >= 0)
+            if not inside.any():
+                continue
+            z = w0 * z0 + w1 * z1 + w2 * z2
+            zb = self.z[by0:by1 + 1, bx0:bx1 + 1]
+            ok = inside & ((z < zb) if zcmp else True)
+            self.failed[key] += int((inside & ~ok).sum())
+            self.passed[key] += int(ok.sum())
+            if zupd:
+                zb[ok] = z[ok]
+            ow = self.owner[by0:by1 + 1, bx0:bx1 + 1]
+            prev = ow[ok]
+            for pk_, c in zip(*np.unique(prev[prev >= 0], return_counts=True)):
+                if pk_ != k:
+                    self.cover[(self.keys[pk_], key)] += int(c)
+            ow[ok] = k
+
+    def report(self, label, top=20):
+        vis = collections.Counter()
+        ids, counts = np.unique(self.owner[self.owner >= 0], return_counts=True)
+        for i, c in zip(ids, counts):
+            vis[self.keys[i]] = int(c)
+        rows = sorted(self.passed, key=lambda k: -(self.passed[k] - vis[k]))
+        print("\n| list | drawn (depth passed) | still seen | covered later | depth failed |")
+        print("|---|---|---|---|---|")
+        tot = [0, 0, 0]
+        for k in rows:
+            tot[0] += self.passed[k]
+            tot[1] += vis[k]
+            tot[2] += self.failed[k]
+        for k in rows[:top]:
+            print("| %s | %d | %d | %d | %d |" % (label(k), self.passed[k], vis[k], self.passed[k] - vis[k],
+                                                 self.failed[k]))
+        print("| all | %d | %d | %d | %d |" % (tot[0], tot[1], tot[0] - tot[1], tot[2]))
+        print("\n| covered | by | pixels |")
+        print("|---|---|---|")
+        for (a, b), c in self.cover.most_common(top):
+            print("| %s | %s | %d |" % (label(a), label(b), c))
+
+
+ZR = None  # (--overdraw)
+EXCLUDE = None  # (--exclude: lists the overdraw leaves out, as the HUD's)
+
+
 def mode_of(om_h, om_l, tex_on):
     cyc = (om_h >> 20) & 3
     if cyc >= 2:
@@ -343,6 +429,8 @@ def walk(fr, start, fits, culldir):
                 if (geom & 0x200) and sa * culldir > 0:
                     continue
                 ns = a + b * lines + c * area
+                if ZR is not None:
+                    ZR.draw(vs, key, om_l)
                 if TRACE and ns >= TRACE:
                     print("  tri at %08X (%s): %.0f us, %d px, %s, texture %08X" % (pc, key, ns / 1000, area, mode,
                                                                                     timg[1] if timg else 0))
@@ -390,9 +478,14 @@ def main():
     ap.add_argument("--cull", type=int, default=-1, help="which signed area is the back (-1: as F3DEX3 culls)")
     ap.add_argument("--json", help="also write every list's numbers here")
     ap.add_argument("--trace", type=float, default=0, help="print each triangle or rectangle costing this many us")
+    ap.add_argument("--overdraw", action="store_true", help="also: per list, pixels drawn and then covered (ZRaster)")
+    ap.add_argument("--exclude", help="REGEX: lists the overdraw leaves out (the HUD's, whose projection isn't walked)")
     args = ap.parse_args()
-    global TRACE
+    global TRACE, ZR, EXCLUDE
     TRACE = args.trace * 1000
+    if args.overdraw:
+        ZR = ZRaster()
+        EXCLUDE = re.compile(args.exclude) if args.exclude else None
     fr = Frame(open(args.ram, "rb").read(), args.elf)
     start = args.start or fr.last_list()
     fits = fit()
@@ -421,6 +514,8 @@ def main():
     for k, e in sorted(per.items(), key=lambda kv: -(kv[1][0] + kv[1][4]))[:args.top]:
         print("| %s | %.3f | %d | %.0f | %.0f | %d |" % (k, (e[0] + e[4]) / 1e6, e[1], e[2], e[2] / max(e[1], 1),
                                                        e[3]))
+    if ZR is not None:
+        ZR.report(str, args.top)
 
 
 if __name__ == "__main__":

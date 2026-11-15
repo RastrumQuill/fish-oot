@@ -405,6 +405,7 @@ typedef struct ScatterTouch {
 static ScatterTouch sTouch[TOUCH_MAX];
 static u8* sTouchSlot; // [sScatter->count]: each prop's touch, or TOUCH_NONE
 static u32 sTouchGen;  // a touch begun or ended
+static u8 sTouchable[FISHMOD_PROP_KIND_MAX]; // the kinds that make way (swaying plants, floating ones)
 
 // The props' commands, two frames' worth (the RSP reads last frame's while this one is built), in buffers of their
 // own rather than the frame's display buffer, which the scene and the fish need.
@@ -619,6 +620,14 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     }
 #endif
     Scatter_InitKinds();
+    {
+        // (the kinds that make way for Link: Scatter_Touch)
+        s32 k;
+
+        for (k = 0; k < FISHMOD_PROP_KIND_MAX; k++) {
+            sTouchable[k] = sKinds[k].floating || (sKinds[k].plant && (sKinds[k].sway != 0));
+        }
+    }
 }
 
 /**
@@ -1332,8 +1341,23 @@ static void Scatter_Touch(PlayState* play) {
                 continue;
             }
             c = gz * sScatter->width + gx;
+            if ((sChunkStart[c] == sChunkStart[c + 1]) ||
+                (SQ(px - (sScatter->x0 + (gx + 0.5f) * sScatter->chunk)) +
+                     SQ(pz - (sScatter->z0 + (gz + 0.5f) * sScatter->chunk)) >
+                 SQ(sScatter->chunk * 0.7072f + 60.0f))) {
+                continue; // (empty, or no nearer to Link than the reach of its corner)
+            }
             for (n = sChunkStart[c]; n < sChunkStart[c + 1]; n++) {
                 FishmodProp* prop = &sProps[n];
+
+                if (!sTouchable[prop->kind]) {
+                    // (kinds that don't make way, as rocks, logs, the dock: past them all at once, the props being
+                    // in kind order)
+                    if (sChunkKindRow != NULL) {
+                        n = sChunkKindPool[sChunkKindRow[c] * (FISHMOD_PROP_KIND_MAX + 1) + prop->kind + 1] - 1;
+                    }
+                    continue;
+                }
                 FishmodPropKindInfo* info = &sKinds[prop->kind];
                 f32 k = prop->scale * (1.0f / 64.0f);
                 f32 mx;

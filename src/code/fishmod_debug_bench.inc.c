@@ -320,6 +320,18 @@ static void Bench_SetMode(s32 mode) {
         gFishmodBench = sSweep[sBench.laps % 10];
     }
 #endif
+#ifdef FISHMOD_TERRAIN_SWEEP
+    {
+        // (the terrain sweep, terrain_sweep script: every other lap as shipped, between them the terrain anti-aliased
+        // without reading the picture back, the sky drawn last, or both. lap % 6; fishmod/tools/anatomy_sweep_report.py
+        // --terrain has the same list)
+        static const s32 sSweep[6] = {
+            0, FISHMOD_BENCH_TERRAIN_RA, 0, FISHMOD_BENCH_SKYLAST, 0, FISHMOD_BENCH_TERRAIN_RA | FISHMOD_BENCH_SKYLAST,
+        };
+
+        gFishmodBench = sSweep[sBench.laps % 6];
+    }
+#endif
 #ifdef FISHMOD_PROP_SWEEP
 #include "src/fishmod_data/fishmod_props_kinds.h"
     {
@@ -590,7 +602,8 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     R_AUDIOMGR_ACTIVITY_LEVEL = (sBench.laps & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
                                                   : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
 #endif
-#if defined(FISHMOD_RDP_SWEEP) || defined(FISHMOD_PROP_SWEEP) || defined(FISHMOD_ANATOMY_SWEEP)
+#if defined(FISHMOD_RDP_SWEEP) || defined(FISHMOD_PROP_SWEEP) || defined(FISHMOD_ANATOMY_SWEEP) || \
+    defined(FISHMOD_TERRAIN_SWEEP)
     sPbCond = 0; // (every lap clear dawn)
     {
         static s32 sHudOff = -1;

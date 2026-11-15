@@ -39,18 +39,18 @@ TARGETS = [
 # CAUSTIC_STEPS steps from CAUSTIC_FROM (as before) to CAUSTIC_TO (sand only, 255, as the scene draws its drained lake):
 # the steps between call segment 0x0A's lists, an environment colour each (Scene_DrawConfigLakeHylia makes them each
 # frame from the scene's own colour: the drained lake's is 255, so every step is too)
+# (the lists drawing the caustic texture, 000170B8. The shore's lists blend two grass textures the same way, 00018CB8
+# into 000184B8: not caustics, left alone)
 CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_room_0",
-             ["gSpot06DL_00A400_03003270_DL", "gSpot06DL_00A400_03001240_DL", "gSpot06DL_00A400_03002040_DL",
-              "gSpot06DL_00A400_03008858_DL", "gSpot06DL_00A400_03008ED0_DL", "gSpot06DL_00A400_03001628_DL"])]
+             ["gSpot06DL_00A400_03003270_DL", "gSpot06DL_00A400_03008858_DL", "gSpot06DL_00A400_03008ED0_DL"])]
 WATER_Y = -1313
 CAUSTIC_FROM, CAUSTIC_TO = 150, 550   # depths (units) where the fade starts and where it's sand only
 CAUSTIC_STEPS = 4                      # steps of the fade (the lists in segment 0x0A: CAUSTIC_STEPS - 1 of them)
 if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
     CAUSTICS = []
-# ... and the caustic textures themselves made light alone: their brightness (i8), no colour (the water's colour is
+# ... and the caustic texture itself made light alone: their brightness (i8), no colour (the water's colour is
 # the fog's; the rocks' caustics are the same light: fishmod_scatter.c). Half the size to load.
-GREY_CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_scene",
-                  ["spot06_scene_000170B8_Tex", "spot06_scene_00018CB8_Tex"])]
+GREY_CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_scene", ["spot06_scene_000170B8_Tex"])]
 if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
     GREY_CAUSTICS = []
 RELIGHT = {"spot06_room_0"}  # rooms whose lit pieces read their vertices lit by the CPU (segment RELIT_SEG)

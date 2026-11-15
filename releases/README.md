@@ -21,6 +21,8 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-prop-sweep.bps` | about 5.5 hours: every other lap shipped, between them one plant kind left out, drawn whole, or with its cut split low (21 tests) | [notes](notes-prop-sweep.md) |
 | `fish-oot-frames19.bps` | frames18 with bush, tall and ribbon weed drawn with whole cards up close (the prop sweep: the cut cost more for these) | [notes](notes-frames19.md) |
 | `fish-oot-frames20.bps` | frames19 with the caustics faded with depth and colourless, the rocks made for where they lie, plants making way for Link | [notes](notes-frames20.md) |
+| `fish-oot-frames21.bps` | frames20 with the shore grass in colour again and a cheaper touch check | [notes](notes-frames21.md) |
+| `fish-oot-terrain-sweep.bps` | 18 laps: the terrain anti-aliased without reading back, the sky drawn last, both, against shipped | [notes](notes-terrain-sweep.md) |
 | `fish-oot-anatomy-sweep.bps` | about 3.3 hours: every other lap shipped, between them the terrain, Link, the other actors, the effects, or everything left out; and the RDP's idle time | [notes](notes-anatomy-sweep.md) |
 | `fish-oot-frames14.bps` | frames13 with the fish rig's lists cleaned, the lake terrain cut into areas the RSP culls and lit by the CPU | [notes](notes-frames14.md) |
 | `fish-oot-rsp-ab.bps` | The RSP test: frames13's bench for 4 laps (about 16 minutes), the audio's RSP work on, off, on, off | (rsp_ab script) |

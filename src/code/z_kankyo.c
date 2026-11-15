@@ -1484,6 +1484,7 @@ void Environment_DrawSunAndMoon(PlayState* play) {
         Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_kankyo.c", 2364);
         Gfx_SetupDL_54Opa(play->state.gfxCtx);
+        FISHMOD_SKY_DEPTH_TEST(POLY_OPA_DISP++); // (fish-oot: with the sky drawn last)
         gSPDisplayList(POLY_OPA_DISP++, gSunDL);
 
         Matrix_Translate(play->view.eye.x - play->envCtx.sunPos.x, play->view.eye.y - play->envCtx.sunPos.y,
@@ -1504,10 +1505,15 @@ void Environment_DrawSunAndMoon(PlayState* play) {
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../z_kankyo.c", 2406);
             Gfx_SetupDL_51Opa(play->state.gfxCtx);
             gDPPipeSync(POLY_OPA_DISP++);
+            FISHMOD_SKY_DEPTH_TEST(POLY_OPA_DISP++);
             gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 240, 255, 180, alpha);
             gDPSetEnvColor(POLY_OPA_DISP++, 80, 70, 20, alpha);
             gSPDisplayList(POLY_OPA_DISP++, gMoonDL);
         }
+    }
+    if (gFishmodSkyDepthTest) {
+        gDPPipeSync(POLY_OPA_DISP++);
+        gDPSetDepthSource(POLY_OPA_DISP++, G_ZS_PIXEL);
     }
 
     CLOSE_DISPS(play->state.gfxCtx, "../z_kankyo.c", 2429);
