@@ -15,6 +15,7 @@
 #include "translation.h"
 #include "z_lib.h"
 #include "bgcheck.h"
+#include "sys_cfb.h"
 #include "play_state.h"
 #include "player.h"
 #include "skin_matrix.h"
@@ -2136,6 +2137,96 @@ static void BgCheck_CompactStaticLists(CollisionContext* colCtx) {
     SYSTEM_ARENA_FREE(old, "../z_bgcheck.c", __LINE__);
 }
 
+/**
+ * collision-opt: the scene's vertices as floats (CollisionPoly_GetVertices) and each poly's record (StaticPolyBox), made
+ * once the lookup is built. Their memory, without taking any from what the game had (the play state's memory left after
+ * the scene is set up becomes the actors' heap, so it isn't taken from there):
+ * - the static node table's unused end (the table gets all of the scene's collision memory the lookup doesn't, and
+ *   nothing uses its nodes past the last one the lookup took);
+ * - or, when the scene's tables don't fit there, the Expansion Pak's memory, if there is one and the game left it
+ *   unused (a retail build puts its frame buffers below 0x80400000, and nothing above them: SysCfb_Init);
+ * - or none: then every search runs as it did (each has its way without the tables), the same answers either way.
+ * fish-oot: before none, the play state's memory (as the mod's tables always took): the mod gives Play 2 MB more with
+ * an Expansion Pak (and moves its frame buffers above 0x80400000, so the second choice above never applies).
+ */
+#ifndef BGCHECK_TABLES_RAM
+#define BGCHECK_TABLES_RAM 0x80400000
+#endif
+#define BGCHECK_TABLES_RAM_SIZE 0x100000
+
+static void BgCheck_MakeStaticTables(CollisionContext* colCtx, PlayState* play, CollisionHeader* colHeader) {
+    SSNodeList* nodes = &colCtx->polyNodes;
+    u32 vtxSize = ALIGN16(colHeader->numVertices * sizeof(Vec3f));
+    u32 size = vtxSize + colHeader->numPolygons * sizeof(StaticPolyBox);
+    uintptr_t start = ALIGN16((uintptr_t)&nodes->tbl[nodes->count]);
+    uintptr_t mem;
+    s32 i;
+
+    if ((nodes->tbl != NULL) && (start + size <= (uintptr_t)&nodes->tbl[nodes->max])) {
+        mem = start;
+    } else if ((osMemSize >= 0x800000) && ((uintptr_t)SysCfb_GetFbEnd() <= (uintptr_t)BGCHECK_TABLES_RAM) &&
+               (size <= BGCHECK_TABLES_RAM_SIZE)) {
+        mem = (uintptr_t)BGCHECK_TABLES_RAM;
+    } else {
+        mem = (uintptr_t)GAME_STATE_ALLOC(&play->state, size + 15, "../z_bgcheck.c", __LINE__);
+        if (mem == 0) {
+            return;
+        }
+        mem = ALIGN16(mem);
+    }
+
+    sStaticVtxF = (Vec3f*)mem;
+    for (i = 0; i < colHeader->numVertices; i++) {
+        BgCheck_Vec3sToVec3f(&colHeader->vtxList[i], &sStaticVtxF[i]);
+    }
+
+    // (a record a cache line: 16 bytes, from a 16-byte boundary)
+    sStaticPolyBox = (StaticPolyBox*)(mem + vtxSize);
+    sWallRecordsUsable = true;
+    for (i = 0; i < colHeader->numPolygons; i++) {
+        CollisionPoly* poly = &colHeader->polyList[i];
+        Vec3s* va = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIA)];
+        Vec3s* vb = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIB)];
+        Vec3s* vc = &colHeader->vtxList[poly->vIC];
+
+        sStaticPolyBox[i].minZ = MIN(MIN(va->z, vb->z), vc->z);
+        sStaticPolyBox[i].maxZ = MAX(MAX(va->z, vb->z), vc->z);
+        sStaticPolyBox[i].minX = MIN(MIN(va->x, vb->x), vc->x);
+        sStaticPolyBox[i].maxX = MAX(MAX(va->x, vb->x), vc->x);
+        sStaticPolyBox[i].minY = MIN(MIN(va->y, vb->y), vc->y);
+        sStaticPolyBox[i].flags = (poly->flags_vIA & 0xE000) | ((poly->normal.y < 0) ? STATICPOLY_FACES_DOWN : 0);
+        if (CollisionPoly_GetMinY(poly, colHeader->vtxList) != sStaticPolyBox[i].minY) {
+            sStaticPolyBox[i].flags |= STATICPOLY_GETMINY_DIFFERS;
+        }
+        // collision-opt: what the wall search computed for each wall it reached (BgCheck_SphVsStaticWallImpl), with
+        // the same expressions: the same floats
+        {
+            f32 nx = COLPOLY_GET_NORMAL(poly->normal.x);
+            f32 nz = COLPOLY_GET_NORMAL(poly->normal.z);
+            f32 normalXZ = sqrtf(SQ(nx) + SQ(nz));
+
+            if (normalXZ == 0.0f) {
+                sStaticPolyBox[i].invNormalXZ = 0.0f;
+                sStaticPolyBox[i].flags |= STATICPOLY_NO_XZ;
+                // (a wall like this, in a wall list (StaticLookup_AddPoly): the wall search as it was)
+                if ((poly->normal.y <= COLPOLY_SNORMAL(0.5f)) && (poly->normal.y >= COLPOLY_SNORMAL(-0.8f))) {
+                    sWallRecordsUsable = false;
+                }
+            } else {
+                f32 invNormalXZ = 1.0f / normalXZ;
+
+                sStaticPolyBox[i].invNormalXZ = invNormalXZ;
+                if ((fabsf(nz) * invNormalXZ) < 0.4f) {
+                    sStaticPolyBox[i].flags |= STATICPOLY_STEEP_FOR_Z;
+                }
+                if ((fabsf(nx) * invNormalXZ) < 0.4f) {
+                    sStaticPolyBox[i].flags |= STATICPOLY_STEEP_FOR_X;
+                }
+            }
+        }
+    }
+}
+
 void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader* colHeader) {
     static BgCheckSceneSubdivisionEntry sceneSubdivisionList[] = {
         { SCENE_SHADOW_TEMPLE, { 23, 7, 14 }, -1 },
@@ -2157,68 +2248,10 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
         bzero(sWallCache, sizeof(sWallCache));
         sFloorCacheGen = 1;
     }
-    // fishmod: the scene's vertices as floats, once (CollisionPoly_GetVertices)
+    // collision-opt: no tables for this scene's collision until BgCheck_MakeStaticTables makes them (after the lookup)
     sStaticVtxS = colHeader->vtxList;
-    sStaticVtxF = GAME_STATE_ALLOC(&play->state, colHeader->numVertices * sizeof(Vec3f), "../z_bgcheck.c", __LINE__);
-    if (sStaticVtxF != NULL) {
-        s32 i;
-
-        for (i = 0; i < colHeader->numVertices; i++) {
-            BgCheck_Vec3sToVec3f(&colHeader->vtxList[i], &sStaticVtxF[i]);
-        }
-    }
-    // fishmod: each poly's box on the ground (the floor check's early out)
-    sStaticPolyBox = GAME_STATE_ALLOC(&play->state, colHeader->numPolygons * sizeof(StaticPolyBox) + 15,
-                                      "../z_bgcheck.c", __LINE__);
-    if (sStaticPolyBox != NULL) {
-        sStaticPolyBox = (StaticPolyBox*)ALIGN16((uintptr_t)sStaticPolyBox); // (a record a cache line)
-        s32 i;
-
-        sWallRecordsUsable = true;
-
-        for (i = 0; i < colHeader->numPolygons; i++) {
-            CollisionPoly* poly = &colHeader->polyList[i];
-            Vec3s* va = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIA)];
-            Vec3s* vb = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIB)];
-            Vec3s* vc = &colHeader->vtxList[poly->vIC];
-
-            sStaticPolyBox[i].minZ = MIN(MIN(va->z, vb->z), vc->z);
-            sStaticPolyBox[i].maxZ = MAX(MAX(va->z, vb->z), vc->z);
-            sStaticPolyBox[i].minX = MIN(MIN(va->x, vb->x), vc->x);
-            sStaticPolyBox[i].maxX = MAX(MAX(va->x, vb->x), vc->x);
-            sStaticPolyBox[i].minY = MIN(MIN(va->y, vb->y), vc->y);
-            sStaticPolyBox[i].flags = (poly->flags_vIA & 0xE000) | ((poly->normal.y < 0) ? STATICPOLY_FACES_DOWN : 0);
-            if (CollisionPoly_GetMinY(poly, colHeader->vtxList) != sStaticPolyBox[i].minY) {
-                sStaticPolyBox[i].flags |= STATICPOLY_GETMINY_DIFFERS;
-            }
-            // collision-opt: what the wall search computed for each wall it reached (BgCheck_SphVsStaticWallImpl), with
-            // the same expressions: the same floats
-            {
-                f32 nx = COLPOLY_GET_NORMAL(poly->normal.x);
-                f32 nz = COLPOLY_GET_NORMAL(poly->normal.z);
-                f32 normalXZ = sqrtf(SQ(nx) + SQ(nz));
-
-                if (normalXZ == 0.0f) {
-                    sStaticPolyBox[i].invNormalXZ = 0.0f;
-                    sStaticPolyBox[i].flags |= STATICPOLY_NO_XZ;
-                    // (a wall like this, in a wall list (StaticLookup_AddPoly): the wall search as it was)
-                    if ((poly->normal.y <= COLPOLY_SNORMAL(0.5f)) && (poly->normal.y >= COLPOLY_SNORMAL(-0.8f))) {
-                        sWallRecordsUsable = false;
-                    }
-                } else {
-                    f32 invNormalXZ = 1.0f / normalXZ;
-
-                    sStaticPolyBox[i].invNormalXZ = invNormalXZ;
-                    if ((fabsf(nz) * invNormalXZ) < 0.4f) {
-                        sStaticPolyBox[i].flags |= STATICPOLY_STEEP_FOR_Z;
-                    }
-                    if ((fabsf(nx) * invNormalXZ) < 0.4f) {
-                        sStaticPolyBox[i].flags |= STATICPOLY_STEEP_FOR_X;
-                    }
-                }
-            }
-        }
-    }
+    sStaticVtxF = NULL;
+    sStaticPolyBox = NULL;
     customNodeListMax = -1;
 
     PRINTF(T("/*---------------- BGCheck バッファーメモリサイズ -------------*/\n",
@@ -2322,6 +2355,7 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
 #ifndef FISHMOD_NO_COMPACT_LISTS
     BgCheck_CompactStaticLists(colCtx);
 #endif
+    BgCheck_MakeStaticTables(colCtx, play, colCtx->colHeader);
 #if FISHMOD_DEBUG
     Fishmod_DebugColNodes(play->sceneId, colCtx->polyNodes.count, colCtx->polyNodes.max);
 #endif
