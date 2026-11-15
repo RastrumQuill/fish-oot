@@ -1,5 +1,6 @@
 #include "libc64/qrand.h"
 #include "gfx.h"
+#include "fishmod.h"
 #if PLATFORM_N64
 #include "n64dd.h"
 #endif
@@ -1253,13 +1254,15 @@ void Scene_DrawConfigLakeHylia(PlayState* play) {
     // scene's colour and 255 (sand only, as here when the lake is drained), a list each
     {
         s32 base = play->roomCtx.drawParams[0] + 168;
-        Gfx* steps = GRAPH_ALLOC(play->state.gfxCtx, 3 * 2 * sizeof(Gfx));
+        // (then the water fog's lists, the lake bed's bands under the surface seen from above: fishmod.c)
+        Gfx* steps = GRAPH_ALLOC(play->state.gfxCtx, (3 * 2 + (FISHMOD_WATER_BANDS + 1) * 4) * sizeof(Gfx));
         s32 i;
 
         for (i = 0; i < 3; i++) {
             gDPSetEnvColor(&steps[i * 2], 0, 0, 0, base + (255 - base) * (i + 1) / 4);
             gSPEndDisplayList(&steps[i * 2 + 1]);
         }
+        Fishmod_WaterFogBands(play, &steps[3 * 2]);
         gSPSegment(POLY_OPA_DISP++, 0x0A, steps);
     }
 
