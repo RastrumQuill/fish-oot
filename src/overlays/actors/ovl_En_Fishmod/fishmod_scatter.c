@@ -336,7 +336,6 @@ static void Scatter_InitKinds(void) {
 }
 
 static FishmodScatterHeader* sScatter;
-static s32 sDepthShadeOn; // props darkened by their depth under the water (not with the lake drained)
 static Gfx** sRockList; // each rock's own list (made for where it lies: rock_mesh.py), by its prop's yaw; or NULL
 /*
  * The rocks in Lake Hylia's shallows have the bed's caustics on them (FISHMOD_PROP_ROCK_LIT): the bed's own blend, the
@@ -430,8 +429,8 @@ static u8 sTouchable[FISHMOD_PROP_KIND_MAX]; // the kinds that make way (swaying
 // The props' commands, two frames' worth (the RSP reads last frame's while this one is built), in buffers of their
 // own rather than the frame's display buffer, which the scene and the fish need.
 typedef struct ScatterFrame {
-    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96 + TOUCH_MAX * (BEND_BANDS * 4 + 2)]; // (the dock, the far edge
-                                                                                     // mode's material, the touched)
+    // (the dock, the far edge mode's material, the touched; the props' water fog's copied models)
+    Gfx opa[PROP_BUDGET * 7 + MAT_MAX * 16 + 96 + TOUCH_MAX * (BEND_BANDS * 4 + 2)];
     Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4 + TOUCH_MAX * (BEND_BANDS * 4 + 2)];
     Mtx sway[SWAY_MAX];
     Mtx bend[TOUCH_MAX]; // the props Link is touching: bent or pushed aside (Scatter_Touch)
@@ -497,6 +496,9 @@ typedef struct ScatterKeep {
     s32 lastXlu;
     s32 lastNear;
     s32 edgeNear;
+    u32 fogKey;     // the props' water fog's settings (Scatter_PropFogSetup)
+    s32 fogVtxUsed; // its copies where they end
+    s32 fogCmdUsed;
 } ScatterKeep;
 static ScatterKeep sKeep[2]; // a frame buffer's each
 static Mtx* sPropMtx;     // each prop's own matrix, kept once made ([sScatter->count]), or NULL: no room
@@ -504,10 +506,15 @@ static u8* sPropMtxMade;  // [sScatter->count]
 static s32 sSwayInit[2];     // a frame buffer's sway matrices have their fixed entries
 static u32 sSetGen; // a new set every Scatter_Build
 
+static void Scatter_FogAlloc(void);
+static void Scatter_FogFree(void);
+static void* Scatter_BendAddr(u32 a, u8* seg6);
+
 static void Scatter_AllocBuffers(void) {
     if (sBufs == NULL) {
         sBufs = ZeldaArena_Malloc(sizeof(ScatterBuffers));
     }
+    Scatter_FogAlloc();
     sKeep[0].opaLen = sKeep[1].opaLen = 0;
     sSwayInit[0] = sSwayInit[1] = false;
     sSetAge = 1000;
@@ -518,6 +525,7 @@ static void Scatter_FreeBuffers(void) {
         ZeldaArena_Free(sBufs);
         sBufs = NULL;
     }
+    Scatter_FogFree();
     sKeep[0].opaLen = sKeep[1].opaLen = 0;
     sSwayInit[0] = sSwayInit[1] = false;
 }
@@ -1140,6 +1148,279 @@ static s32 Scatter_CheckSame(Gfx* a, Gfx* b, s32 n, s32 list) {
 #endif
 
 /** Where the kept part ends (the first fading prop, or the end): noted if it was made, checked if verifying. */
+/*
+ * The props' water fog, with the camera over the lake's water: the same fog as the bed's (fishmod.c
+ * Fishmod_WaterFogAmount: the camera-under-water fog over the length of the eye's ray inside the water), in the
+ * props' colours, under the scene's own fog (left on, by distance, to the haze). A prop near the camera gets it vertex
+ * by vertex: its model's commands copied with its vertices copied too, each one's colour blended toward the colour
+ * that, times its texture's mean and the prop's light, is the water's (so a tall plant is clearer at its top than its
+ * foot); a far one (a few pixels: no difference to see) by its middle, in its light. Above the water, nothing.
+ * From the set's own eye (the kept commands hold while the set does).
+ */
+#define WATERFOG_VTX_MAX 3072                 // copied vertices a frame at most
+#define WATERFOG_CMD_MAX (PROP_BUDGET * 3)    // and commands for them (the lists are sized for these)
+#define WATERFOG_VERTEX_DIST 1100.0f          // vertex by vertex within this (across the ground)
+#define WATERFOG_TPL_CMDS 128
+typedef struct ScatterFogTpl {
+    s16 n;       // commands (the model's, its end left off)
+    s16 nv;      // vertices loaded, in all
+    s16 nLoads;
+    u8 vmean[3]; // the model's vertex colours' mean
+    Gfx* cmds;
+    u8* loadAt;  // each load's command
+    Vtx** loadSrc;
+} ScatterFogTpl;
+static ScatterFogTpl* sFogTplKind[FISHMOD_PROP_KIND_MAX][2]; // (near model, far model)
+static u8 sFogTplTried[FISHMOD_PROP_KIND_MAX][2];
+static ScatterFogTpl** sFogTplRock; // [256]: each rock's
+static u8* sFogTplRockTried;
+static Vtx* sFogVtxPool[2];         // a frame buffer's each
+static const u8 sKindMean[FISHMOD_PROP_KIND_MAX][3] = {
+#define X(id, r, g, b) [FISHMOD_PROP_##id] = { r, g, b },
+    FISHMOD_PROP_KINDS_MEAN(X)
+#undef X
+};
+static struct {
+    s32 on;
+    Vec3f eye;
+    f32 h;            // the eye's height over the water
+    u8 water[3];
+    u32 key;
+    s32 vtxUsed;      // this frame's copies so far
+    s32 cmdUsed;
+} sPropFog;
+
+static void Scatter_PropFogSetup(void) {
+    s32 c;
+
+    sPropFog.on = gFishmodWaterFogOn && (sSetEye.y > FISHMOD_LAKE_SURFACE) && (sFogVtxPool[0] != NULL);
+    sPropFog.eye = sSetEye;
+    sPropFog.h = sSetEye.y - FISHMOD_LAKE_SURFACE;
+    for (c = 0; c < 3; c++) {
+        sPropFog.water[c] = gFishmodWaterFogColor[c];
+    }
+    sPropFog.key = !sPropFog.on ? 0
+                                : (0x80000000 | ((u32)sPropFog.water[0] << 16) | ((u32)sPropFog.water[1] << 8) |
+                                   sPropFog.water[2]) ^ (u32)(gFishmodWaterFog.fo * 16.0f);
+}
+
+static void Scatter_FogAlloc(void) {
+    s32 i;
+
+    for (i = 0; i < 2; i++) {
+        if (sFogVtxPool[i] == NULL) {
+            sFogVtxPool[i] = ZeldaArena_Malloc(WATERFOG_VTX_MAX * sizeof(Vtx));
+        }
+    }
+    if ((sFogVtxPool[0] == NULL) || (sFogVtxPool[1] == NULL)) {
+        Scatter_FogFree(); // (no room: the props' water fog off, as everything else goes on)
+        return;
+    }
+    if (sFogTplRock == NULL) {
+        sFogTplRock = ZeldaArena_Malloc(256 * (sizeof(ScatterFogTpl*) + 1));
+        if (sFogTplRock != NULL) {
+            sFogTplRockTried = (u8*)(sFogTplRock + 256);
+            bzero(sFogTplRock, 256 * (sizeof(ScatterFogTpl*) + 1));
+        }
+    }
+}
+
+/** (at a scene's end: the copies' sources, the reed's among them in object_fish, move with the next scene) */
+static void Scatter_FogFree(void) {
+    s32 i;
+    s32 w;
+
+    for (i = 0; i < 2; i++) {
+        if (sFogVtxPool[i] != NULL) {
+            ZeldaArena_Free(sFogVtxPool[i]);
+            sFogVtxPool[i] = NULL;
+        }
+    }
+    for (i = 0; i < FISHMOD_PROP_KIND_MAX; i++) {
+        for (w = 0; w < 2; w++) {
+            if (sFogTplKind[i][w] != NULL) {
+                ZeldaArena_Free(sFogTplKind[i][w]);
+                sFogTplKind[i][w] = NULL;
+            }
+            sFogTplTried[i][w] = false;
+        }
+    }
+    if (sFogTplRock != NULL) {
+        for (i = 0; i < 256; i++) {
+            if (sFogTplRock[i] != NULL) {
+                ZeldaArena_Free(sFogTplRock[i]);
+            }
+        }
+        ZeldaArena_Free(sFogTplRock);
+        sFogTplRock = NULL;
+        sFogTplRockTried = NULL;
+    }
+}
+
+/** A model's commands, its vertex loads noted (NULL if it isn't one this can copy: a branch, too long). */
+static ScatterFogTpl* Scatter_FogTplBuild(Gfx* dlIn, u8* seg6) {
+    u32* w = Scatter_BendAddr((u32)dlIn, seg6);
+    ScatterFogTpl* tpl;
+    s32 n;
+    s32 loads = 0;
+    s32 nv = 0;
+    s32 i;
+    u32 sum[3] = { 0, 0, 0 };
+
+    if (w == NULL) {
+        return NULL;
+    }
+    for (n = 0; n < WATERFOG_TPL_CMDS; n++) {
+        u32 op = w[n * 2] >> 24;
+
+        if (op == G_ENDDL) {
+            break;
+        }
+        if ((op == G_DL) && (((w[n * 2] >> 16) & 0xFF) != G_DL_PUSH)) {
+            return NULL; // (a branch: the rest isn't this list's)
+        }
+        if (op == G_VTX) {
+            if (Scatter_BendAddr(w[n * 2 + 1], seg6) == NULL) {
+                return NULL;
+            }
+            loads++;
+            nv += (w[n * 2] >> 12) & 0xFF;
+        }
+    }
+    if ((n == WATERFOG_TPL_CMDS) || (loads == 0) || (nv > 255)) {
+        return NULL;
+    }
+    tpl = ZeldaArena_Malloc(sizeof(ScatterFogTpl) + n * sizeof(Gfx) + loads * (sizeof(Vtx*) + 1) + 8);
+    if (tpl == NULL) {
+        return NULL;
+    }
+    tpl->n = n;
+    tpl->nv = nv;
+    tpl->nLoads = loads;
+    tpl->cmds = (Gfx*)(tpl + 1);
+    tpl->loadSrc = (Vtx**)(tpl->cmds + n);
+    tpl->loadAt = (u8*)(tpl->loadSrc + loads);
+    bcopy(w, tpl->cmds, n * sizeof(Gfx));
+    loads = 0;
+    nv = 0;
+    for (i = 0; i < n; i++) {
+        u32* c = (u32*)&tpl->cmds[i];
+
+        if ((c[0] >> 24) == G_VTX) {
+            s32 cnt = (c[0] >> 12) & 0xFF;
+            Vtx* v = Scatter_BendAddr(c[1], seg6);
+            s32 k;
+
+            tpl->loadAt[loads] = i;
+            tpl->loadSrc[loads++] = v;
+            for (k = 0; k < cnt; k++) {
+                sum[0] += v[k].v.cn[0];
+                sum[1] += v[k].v.cn[1];
+                sum[2] += v[k].v.cn[2];
+            }
+            nv += cnt;
+        }
+    }
+    for (i = 0; i < 3; i++) {
+        tpl->vmean[i] = CLAMP(sum[i] / nv, 16, 255);
+    }
+    return tpl;
+}
+
+/** How much of the water's fog is at a point (0-1), with the water's surface over it at surf. */
+static f32 Scatter_FogAt(f32 x, f32 y, f32 z, s32 surf) {
+    f32 depth = surf - y;
+    f32 dx, dy, dz;
+
+    if (depth <= 0.0f) {
+        return 0.0f;
+    }
+    dx = x - sPropFog.eye.x;
+    dy = y - sPropFog.eye.y;
+    dz = z - sPropFog.eye.z;
+    return Fishmod_WaterFogAmount(sqrtf(SQ(dx) + SQ(dy) + SQ(dz)) * depth / (sPropFog.h + depth));
+}
+
+/** The prop's surface (its chunk's), or -0x8000: none, or its fog's off. */
+static s32 Scatter_FogSurface(FishmodProp* prop, FishmodPropKindInfo* info) {
+    s32 cx;
+    s32 cz;
+
+    if (!sPropFog.on || info->floating || info->xlu) {
+        return -0x8000;
+    }
+    cx = (s32)((prop->x - sScatter->x0) / sScatter->chunk);
+    cz = (s32)((prop->z - sScatter->z0) / sScatter->chunk);
+    if ((cx < 0) || (cz < 0) || (cx >= sScatter->width) || (cz >= sScatter->depth)) {
+        return -0x8000;
+    }
+    return sChunkSurface[cz * sScatter->width + cx];
+}
+
+/** The colour that, times this mean (of the texture, and of the vertex colours or the prop's light), is the water's. */
+static u32 Scatter_FogTarget(s32 c, u32 mean1, u32 mean2) {
+    u32 t = (u32)sPropFog.water[c] * 255 * 255 / (MAX(mean1, 1) * MAX(mean2, 1));
+
+    return CLAMP_MAX(t, 255);
+}
+
+/** The prop's model as commands of its own, its vertices copied, each coloured by its water fog (NULL: no room). */
+static Gfx* Scatter_FogEmit(Gfx* gfx, ScatterFogTpl* tpl, FishmodProp* prop, s32 kind, s32 surf, u32 r, u32 g,
+                            u32 b) {
+    Vtx* out;
+    f32 k = SCATTER_IS_ROCK(kind) ? 1.0f : prop->scale * (1.0f / 64.0f);
+    f32 c = SCATTER_IS_ROCK(kind) ? 1.0f : Math_CosS(prop->yaw << 8);
+    f32 sn = SCATTER_IS_ROCK(kind) ? 0.0f : Math_SinS(prop->yaw << 8);
+    u32 target[3];
+    s32 i;
+    s32 at = 0;
+    s32 load = 0;
+
+    if ((sPropFog.vtxUsed + tpl->nv > WATERFOG_VTX_MAX) || (sPropFog.cmdUsed + tpl->n > WATERFOG_CMD_MAX)) {
+        return NULL;
+    }
+    out = &sFogVtxPool[sFrame][sPropFog.vtxUsed];
+    sPropFog.vtxUsed += tpl->nv;
+    sPropFog.cmdUsed += tpl->n;
+    target[0] = Scatter_FogTarget(0, sKindMean[kind][0], r);
+    target[1] = Scatter_FogTarget(1, sKindMean[kind][1], g);
+    target[2] = Scatter_FogTarget(2, sKindMean[kind][2], b);
+    for (i = 0; i < tpl->n; i++) {
+        if ((load < tpl->nLoads) && (tpl->loadAt[load] == i)) {
+            u32 w0 = ((u32*)&tpl->cmds[i])[0];
+            s32 cnt = (w0 >> 12) & 0xFF;
+            Vtx* src = tpl->loadSrc[load++];
+            s32 v;
+
+            for (v = 0; v < cnt; v++) {
+                Vtx* o = &out[at + v];
+                f32 lx = src[v].v.ob[0] * k;
+                f32 lz = src[v].v.ob[2] * k;
+                // (turned as the prop's matrix turns it: x to (c, -sn), z to (sn, c))
+                f32 a = Scatter_FogAt(prop->x + lx * c + lz * sn, prop->y + src[v].v.ob[1] * k,
+                                      prop->z - lx * sn + lz * c, surf);
+                s32 ch;
+
+                *o = src[v];
+                if (a > 0.0f) {
+                    s32 ai = (s32)(a * 256.0f);
+
+                    for (ch = 0; ch < 3; ch++) {
+                        o->v.cn[ch] = src[v].v.cn[ch] + ((((s32)target[ch] - src[v].v.cn[ch]) * ai) >> 8);
+                    }
+                }
+            }
+            ((u32*)gfx)[0] = w0;
+            ((u32*)gfx)[1] = (u32)&out[at];
+            gfx++;
+            at += cnt;
+        } else {
+            *gfx++ = tpl->cmds[i];
+        }
+    }
+    return gfx;
+}
+
 static void Scatter_KeepAt(ScatterKeep* keep, s32 kept, Gfx* opa0, Gfx* opa, Gfx* xlu0, Gfx* xlu, ScatterKeep* now,
                            s32 lastOpa, s32 lastXlu, s32 lastNear) {
     if (!kept) {
@@ -1150,6 +1431,8 @@ static void Scatter_KeepAt(ScatterKeep* keep, s32 kept, Gfx* opa0, Gfx* opa, Gfx
         keep->lastXlu = lastXlu;
         keep->lastNear = lastNear;
         keep->edgeNear = sEdgeNear;
+        keep->fogVtxUsed = sPropFog.vtxUsed;
+        keep->fogCmdUsed = sPropFog.cmdUsed;
         return;
     }
 #ifdef SCATTER_VERIFY
@@ -1626,7 +1909,20 @@ static s32 Bend_Clip(BendV* in, s32 n, BendV* out, f32 h, s32 keep) {
     return m;
 }
 
-static ScatterBend* Scatter_BendBuild(Gfx* model) {
+/** A model's address the CPU can read: as it is (in RAM), or in segment 6 (object_fish's: the Fishing Pond's reed)
+ * at where that object is loaded (seg6); NULL for any other. */
+static void* Scatter_BendAddr(u32 a, u8* seg6) {
+    if ((a >> 24) == 0x80) {
+        return (void*)a;
+    }
+    if (((a >> 24) == 0x06) && (seg6 != NULL)) {
+        return seg6 + (a & 0xFFFFFF);
+    }
+    return NULL;
+}
+
+static ScatterBend* Scatter_BendBuild(Gfx* modelIn, u8* seg6) {
+    Gfx* model = Scatter_BendAddr((u32)modelIn, seg6);
     static BendV sTri[BEND_TRI_MAX][3];
     static Vtx sOut[64];
     static u8 sOutBand[64];
@@ -1643,9 +1939,9 @@ static ScatterBend* Scatter_BendBuild(Gfx* model) {
     s32 n;
     ScatterBend* b;
 
-    if (((u32)model >> 24) != 0x80) {
-        // (a model in an object's segment, as the Fishing Pond's reeds: its address isn't one the CPU can read here
-        // (reading it was the crash: a TLB exception on 0x06...); the plant leans whole instead)
+    if (model == NULL) {
+        // (an address the CPU can't read: reading the reed's segment address as it was is what crashed, a TLB
+        // exception on 0x06...; such a plant leans whole)
         return NULL;
     }
     bzero(slot, sizeof(slot));
@@ -1658,9 +1954,9 @@ static ScatterBend* Scatter_BendBuild(Gfx* model) {
         } else if (op == G_VTX) {
             s32 cnt = (w[0] >> 12) & 0xFF;
             s32 v0 = ((w[0] & 0xFF) >> 1) - cnt;
-            Vtx* v = (Vtx*)w[1];
+            Vtx* v = Scatter_BendAddr(w[1], seg6);
 
-            if ((v0 < 0) || (v0 + cnt > 64) || ((w[1] >> 24) != 0x80)) {
+            if ((v0 < 0) || (v0 + cnt > 64) || (v == NULL)) {
                 return NULL;
             }
             for (i = 0; i < cnt; i++) {
@@ -2449,7 +2745,6 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         return;
     }
     Scatter_UpdateDry(play);
-    sDepthShadeOn = FISHMOD_DEPTH_SHADE && !Fishmod_LakeDrained(play) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODEPTHSHADE);
     sBedFrame++;
     sBedLoads = 0;
     // a camera being set up can give a nonsense eye for a frame (and turning a NaN into an integer is a crash on
@@ -2573,6 +2868,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         keepNow.oneCycle = SCATTER_ONE_CYCLE();
         keepNow.numLights = (sSceneLights != NULL) ? sSceneLights->numLights : -1;
         keepNow.touchGen = sTouchGen;
+        Scatter_PropFogSetup();
+        keepNow.fogKey = sPropFog.key;
 #if FISHMOD_DEBUG
         keepNow.bench = (u32)gFishmodBench;
 #else
@@ -2583,7 +2880,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                      (keep->light[0] == keepNow.light[0]) && (keep->light[1] == keepNow.light[1]) &&
                      (keep->light[2] == keepNow.light[2]) && (keep->oneCycle == keepNow.oneCycle) &&
                      (keep->numLights == keepNow.numLights) && (keep->bench == keepNow.bench) &&
-                     (keep->touchGen == keepNow.touchGen)
+                     (keep->touchGen == keepNow.touchGen) && (keep->fogKey == keepNow.fogKey)
 #if FISHMOD_DEBUG
                      && !gFishmodLodTest.active
 #endif
@@ -2592,6 +2889,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 #endif
             ;
         cacheStart = 0;
+        sPropFog.vtxUsed = sPropFog.cmdUsed = 0;
         if (!cacheValid) {
             keep->opaLen = 0; // (the buffer is about to be written over: nothing kept until this frame's are noted)
         } else {
@@ -2613,12 +2911,17 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             lastXlu = keep->lastXlu;
             lastNear = keep->lastNear;
             sEdgeNear = keep->edgeNear;
+            sPropFog.vtxUsed = keep->fogVtxUsed;
+            sPropFog.cmdUsed = keep->fogCmdUsed;
             cacheStart = cacheUntil;
 #endif
         }
     }
     for (n = cacheStart; n < set->count; n++) {
         FishmodProp* prop = &sProps[set->prop[n]];
+        ScatterFogTpl* fogTpl;
+        s32 fogSurf;
+        u32 fogCol[3];
         FishmodPropKindInfo* info;
         Gfx** disp;
         f32 dSq;
@@ -2660,20 +2963,13 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             }
             *disp = Scatter_Material(*disp, info, kind, tier);
         }
+        fogSurf = -0x8000;
+        fogTpl = NULL;
         if (!info->xlu) {
             u32 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
             s32 a = 255;
+            u32 col[3];
 
-            if (sDepthShadeOn && !info->floating) {
-                // (deep water darker: as the bed it stands on, by its depth under its chunk's surface)
-                s32 c = ((prop->z - sScatter->z0) / sScatter->chunk) * sScatter->width +
-                        (prop->x - sScatter->x0) / sScatter->chunk;
-                s16 surf = sChunkSurface[c];
-
-                if (surf != -32768) {
-                    t = (t * Fishmod_DepthShade(surf - prop->y)) >> 8;
-                }
-            }
             if ((tier == TIER_IMP) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)
 #if FISHMOD_DEBUG
                 && !gFishmodLodTest.active
@@ -2692,11 +2988,62 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 static const u8 sStone[4][3] = { { 255, 255, 255 }, { 255, 240, 222 }, { 228, 240, 255 }, { 240, 248, 232 } };
                 const u8* c = sStone[((u32)(prop->x * 7 + prop->z * 13) >> 4) & 3];
 
-                opa = Scatter_PropColor(opa, tier, (t * light[0] * c[0]) >> 16, (t * light[1] * c[1]) >> 16,
-                                        (t * light[2] * c[2]) >> 16, a);
+                col[0] = (t * light[0] * c[0]) >> 16;
+                col[1] = (t * light[1] * c[1]) >> 16;
+                col[2] = (t * light[2] * c[2]) >> 16;
             } else {
-                opa = Scatter_PropColor(opa, tier, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
+                col[0] = (t * light[0]) >> 8;
+                col[1] = (t * light[1]) >> 8;
+                col[2] = (t * light[2]) >> 8;
             }
+            // the water's fog over it, seen from above: near, vertex by vertex (its model copied); else by its middle
+            fogSurf = Scatter_FogSurface(prop, info);
+            if ((fogSurf != -0x8000) && (prop->y < fogSurf)) {
+                s32 isRock = SCATTER_IS_ROCK(kind) && (sRockList != NULL);
+
+                if ((dSq < SQ(WATERFOG_VERTEX_DIST)) && (tier != TIER_IMP) && (tier != TIER_HALF) &&
+                    !((sTouchSlot != NULL) && (sTouchSlot[set->prop[n]] != TOUCH_NONE))) {
+                    if (isRock) {
+                        if ((sFogTplRock != NULL) && !sFogTplRockTried[prop->yaw]) {
+                            sFogTplRockTried[prop->yaw] = true;
+                            sFogTplRock[prop->yaw] = Scatter_FogTplBuild(sRockList[prop->yaw], NULL);
+                        }
+                        fogTpl = (sFogTplRock != NULL) ? sFogTplRock[prop->yaw] : NULL;
+                    } else {
+                        s32 which = (tier == TIER_FAR);
+
+                        if (!sFogTplTried[kind][which]) {
+                            s32 objSlot = Object_GetSlot(&play->objectCtx, OBJECT_FISH);
+
+                            sFogTplTried[kind][which] = true;
+                            sFogTplKind[kind][which] = Scatter_FogTplBuild(
+                                which ? info->modelFar : info->model,
+                                (objSlot >= 0) ? (u8*)play->objectCtx.slots[objSlot].segment : NULL);
+                        }
+                        fogTpl = sFogTplKind[kind][which];
+                    }
+                }
+                if (fogTpl == NULL) {
+                    // by its middle: its light blended toward the water's (over the texture's and the vertex
+                    // colours' means)
+                    f32 k = SCATTER_IS_ROCK(kind) ? 1.0f : prop->scale * (1.0f / 64.0f);
+                    f32 fa = Scatter_FogAt(prop->x, prop->y + info->extent * k * 0.5f, prop->z, fogSurf);
+                    s32 ai = (s32)(fa * 256.0f);
+                    s32 ch;
+
+                    for (ch = 0; ch < 3; ch++) {
+                        s32 tc = Scatter_FogTarget(ch, sKindMean[kind][ch], 160);
+
+                        col[ch] = col[ch] + (((tc - (s32)col[ch]) * ai) >> 8);
+                    }
+                }
+            } else {
+                fogSurf = -0x8000;
+            }
+            opa = Scatter_PropColor(opa, tier, col[0], col[1], col[2], a);
+            fogCol[0] = col[0];
+            fogCol[1] = col[1];
+            fogCol[2] = col[2];
         }
         if ((sTouchSlot != NULL) && (sTouchSlot[set->prop[n]] != TOUCH_NONE) && !TOUCH_DRIFTS(kind) &&
             (tier == TIER_NEAR)) {
@@ -2706,7 +3053,13 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 
             if (!sBendTried[kind]) {
                 sBendTried[kind] = true;
-                sBend[kind] = Scatter_BendBuild(info->model);
+                {
+                    // (object_fish's place, for the Fishing Pond's reed: segment 6 as the props' manager set it)
+                    s32 objSlot = Object_GetSlot(&play->objectCtx, OBJECT_FISH);
+
+                    sBend[kind] = Scatter_BendBuild(
+                        info->model, (objSlot >= 0) ? (u8*)play->objectCtx.slots[objSlot].segment : NULL);
+                }
             }
             bend = sBend[kind];
             if (bend != NULL) {
@@ -2754,6 +3107,15 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                                                                          : near;
             }
 #endif
+            if (fogTpl != NULL) {
+                // (its model's commands, its vertices its own, coloured by the water's fog)
+                Gfx* g = Scatter_FogEmit(*disp, fogTpl, prop, kind, fogSurf, fogCol[0], fogCol[1], fogCol[2]);
+
+                if (g != NULL) {
+                    *disp = g;
+                    continue;
+                }
+            }
             if (SCATTER_IS_ROCK(kind) && (sRockList != NULL)) {
                 near = sRockList[prop->yaw]; // (its own, near or far: few triangles, all of them shown)
                 gSPDisplayList((*disp)++, near);

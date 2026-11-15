@@ -27,6 +27,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-frames23.bps` | frames22 with the terrain's RA, depth darkening, water fog from above, floating plants that move | [notes](notes-frames23.md) |
 | `fish-oot-frames24.bps` | frames23 with the water fog's dark band and pillars fixed (the fog in the vertex colours, the haze left on), cheaper; lily pads and reeds fixed | [notes](notes-frames24.md) |
 | `fish-oot-frames25.bps` | frames24 with the bend-plant crash fixed, plants bending as if held up by the water, no depth darkening | [notes](notes-frames25.md) |
+| `fish-oot-frames26.bps` | frames25 with the water fog from above being the underwater fog, by the ray's length in the water (bed and props, vertex by vertex), nothing poking out of the water, reeds bending | [notes](notes-frames26.md) |
 | `fish-oot-anatomy-sweep.bps` | about 3.3 hours: every other lap shipped, between them the terrain, Link, the other actors, the effects, or everything left out; and the RDP's idle time | [notes](notes-anatomy-sweep.md) |
 | `fish-oot-frames14.bps` | frames13 with the fish rig's lists cleaned, the lake terrain cut into areas the RSP culls and lit by the CPU | [notes](notes-frames14.md) |
 | `fish-oot-rsp-ab.bps` | The RSP test: frames13's bench for 4 laps (about 16 minutes), the audio's RSP work on, off, on, off | (rsp_ab script) |

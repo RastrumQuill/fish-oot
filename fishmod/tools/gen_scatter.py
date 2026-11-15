@@ -15,6 +15,7 @@ import argparse
 import importlib.util
 import json
 import math
+import re
 import os
 import random
 import sys
@@ -118,7 +119,29 @@ RULES = {
 }
 # How tall each underwater kind is at scale 1 (gen_habitat.py): scaled down where the water is shallower, so nothing
 # meant to be under water pokes out of it. Emergent kinds (reeds, rushes) are meant to stand above it.
-HEIGHT = pk.HEIGHT
+HEIGHT = dict(pk.HEIGHT)
+
+
+def _model_tops():
+    """Each generated kind's real top at scale 1: the highest vertex of any of its models (gen_habitat.py wrote them,
+    before this runs). prop_kinds.json's heights are the cards' nominal size and fall short of some models (the grass
+    tuft: 16 there, 23 in its model), and those poked out of the shallows."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src", "fishmod_data",
+                        "fishmod_props.inc.c")
+    tops = {}
+    if not os.path.exists(path):
+        return tops
+    text = open(path).read()
+    for m in re.finditer(r"Vtx gFishmodProp_(\w+?)DL(?:Far|FarH|Low|Alt)?Vtx\[\d+\] = \{(.*?)\};", text, re.S):
+        ys = [int(v) for v in re.findall(r"VTX\(\s*-?\d+,\s*(-?\d+),", m.group(2))]
+        if ys:
+            tops[m.group(1)] = max(tops.get(m.group(1), 0), max(ys))
+    return tops
+
+
+for _k, _top in _model_tops().items():
+    if _k in HEIGHT:
+        HEIGHT[_k] = max(HEIGHT[_k], _top)
 # How far apart a clump's plants are scattered (the rest: 14): tight, so a clump reads as one plant mass
 CLUSTER_SPREAD = pk.field("cluster_spread")
 # The bed plants are lushest where the camera spends its time, the shallows by the shores, and thin out toward the
@@ -348,6 +371,16 @@ def place(scene, seed=SEED):
                         r = FOOTPRINT.get(kind, 20) * sc
                         y, tilt = lie_on_bed(floor_at, px, pz, ps, pf, yaw, r, r)
                         tilt = tuple(max(-SLOPE_MAX, min(SLOPE_MAX, t)) for t in tilt)
+                    if kind in HEIGHT and kind not in ROCK_KINDS and kind not in TILTED:
+                        # the top where it really ends up: its model's top, leaning with any tilt (its footprint's
+                        # edge raised too), under the surface above it with a margin; smaller, or not at all
+                        tl = max(abs(tilt[0]), abs(tilt[1]))
+                        per = HEIGHT[kind] * math.cos(tl) + FOOTPRINT.get(kind, 20) * math.sin(tl)
+                        room = ps - y - 8
+                        if per * sc > room:
+                            sc = room / per
+                            if sc < 0.35:
+                                continue
                     if kind in FLOAT_SPACE:
                         circle = leaf_circle(kind, px, pz, yaw, sc)
                         if not leaf_free(circle):
@@ -871,8 +904,37 @@ def main():
     if args.preview:
         preview(args.scene, inst, args.preview)
     check_caps(inst)
+    check_under(inst)
     if args.c:
         write_c(args.scene, inst)
+
+
+def check_under(inst):
+    """Nothing meant to be under water pokes out: every placed prop of a kind with a height (the emergent and floating
+    kinds have none), its top (its model's, at its scale, leaning with its tilt) at least 4 under the surface above
+    it. The build stops otherwise: a placement to fix."""
+    surface_at = BED[0] if BED else None
+    if surface_at is None:
+        return
+    bad = []
+    for it in inst:
+        k = it["kind"]
+        if k not in HEIGHT or k in ROCK_KINDS or k in TILTED:
+            continue
+        ps = surface_at(it["x"], it["z"])
+        if ps is None:
+            bad.append((k, it["x"], it["z"], "no water"))
+            continue
+        tl = max(abs(it["tilt"][0]), abs(it["tilt"][1])) if it.get("tilt") else 0.0
+        sc = int(it["scale"] * 64) / 64.0  # (as the game keeps it)
+        top = it["y"] + sc * (HEIGHT[k] * math.cos(tl) + FOOTPRINT.get(k, 20) * math.sin(tl))
+        if top > ps - 4:
+            bad.append((k, round(it["x"]), round(it["z"]), round(top - ps, 1)))
+    print(f"  props poking out of the water: {len(bad)}")
+    if bad:
+        for b in bad[:20]:
+            print("   ", b)
+        raise SystemExit("gen_scatter.py: props meant to be under water poke out of it (above)")
 
 
 MAT_MAX = 256  # fishmod_scatter.c: material changes a frame at most

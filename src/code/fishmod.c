@@ -1594,6 +1594,9 @@ static u16 sFogInv[FISHMOD_FOG_COLOURS * 3]; // each texture colour's inverse (6
 static s32 sFogColourCount;
 static u32 sFogKey[4];          // what the fog was last worked out for (the eye, the water's colour)
 u32 gFishmodWaterFogCycles;     // (the last frame's cost, for the profile)
+FishmodWaterFog gFishmodWaterFog; // the water fog as worked out this frame (the props' too: fishmod_scatter.c)
+u8 gFishmodWaterFogColor[3];    // the water fog's colour this frame (the props' water fog: fishmod_scatter.c)
+s32 gFishmodWaterFogOn;         // and whether it's on (the camera over the lake's water)
 static s32 sRelitComputed;      // the relit colours were made again this frame
 static s32 sFogParity;          // the half of the water fog's vertices worked out last
 static s32 sFogHalfOwed;        // the other half still to do (the view moved, then held still)
@@ -1876,19 +1879,31 @@ s32 Fishmod_LakeDrained(PlayState* play) {
 }
 
 /*
- * Water fog: with the camera above the water, the lake bed fades toward the water's colour by the light's path through
- * the water, not only by its distance from the eye: looking across the lake the bottom fades into the water well
- * before it would in air, straight down it stays clearer. In the relit vertices' colours (tools/meshpack.py lists
- * those under the surface, each with its texture's mean colour): each one's lit colour blended toward the colour that,
- * times its texture, is the water's, by its share of the water (the part of the eye's ray to it under the surface:
- * FISHMOD_WATER_FOG_NEAR to _FAR). The game's own fog (by distance, to the sky's haze) is left on over it: far off the
- * bed hazes as everything else does (the fog colour swapped for the water's, the first way, made the far lake and the
- * pillars standing in it dark against the haze). Worked out when the eye or the water's colour moves, half the
- * vertices a frame while it moves (each a frame behind at most), into the front buffer where it is (a frame still
- * being drawn from it may take some of this frame's: the change is smooth); all of them when the colours were made
- * again. Off with the camera under water (the game's haze is the water's fog then), with the lake drained, and for
- * the bench's A/B (FISHMOD_BENCH_NOWATERFOG).
+ * Water fog: with the camera above the water, what's under it is fogged as it would be from under it: by the length
+ * of the view's ray inside the water (its distance to the point, times the point's depth over the whole drop from the
+ * eye), the camera-under-water fog's strength at that distance (Fishmod_WaterFogAmount: the same start and end, the
+ * water's own colour); then the scene's own fog, by the whole distance, to the haze, over it. So the bed seen from an
+ * inch over the surface is as hidden as from an inch under it, and the far lake hazes as everything else does.
+ * Here the lake bed's relit vertices (tools/meshpack.py lists those under the surface, each with its texture's mean
+ * colour): each one's lit colour blended toward the colour that, times its texture, is the water's; the props the same
+ * way vertex by vertex (fishmod_scatter.c). Worked out when the eye or the water's colour moves, half the vertices a
+ * frame while it moves, into the front buffer where it is (a frame still being drawn from it may take some of this
+ * frame's: the change is smooth); all of them when the colours were made again. Off with the camera under water (the
+ * game's own fog is the water's then), with the lake drained, and for the bench's A/B (FISHMOD_BENCH_NOWATERFOG).
  */
+/** The water fog over a path of this length through the water (0-1): the camera-under-water fog's at that distance,
+ * so the lake bed seen from just over the surface is as hidden as from just under it. */
+f32 Fishmod_WaterFogAmount(f32 path) {
+    f32 a;
+
+    if (path < 1.0f) {
+        return 0.0f;
+    }
+    a = ((gFishmodWaterFog.zA - gFishmodWaterFog.zB / path) * gFishmodWaterFog.fm + gFishmodWaterFog.fo) *
+        (1.0f / 255.0f);
+    return CLAMP(a, 0.0f, 1.0f);
+}
+
 static void Fishmod_WaterFogRestore(void) {
     Vtx* out = sRelitBuf[sRelitFront];
     s32 i;
@@ -1912,6 +1927,7 @@ static void Fishmod_WaterFog(PlayState* play) {
     Vtx* out;
     s32 i;
 
+    gFishmodWaterFogOn = false;
     if (sFogCount == 0) {
         return;
     }
@@ -1953,13 +1969,34 @@ static void Fishmod_WaterFog(PlayState* play) {
                 }
             }
         }
-        for (c = 0; c < 3; c++) {
-            s32 l = play->lightCtx.ambientColor[c] + (env->dirLight1.params.dir.color[c] >> 1) +
-                    (env->dirLight2.params.dir.color[c] >> 1);
+        static s32 sWaterNear = 945;
+        f32 n = play->view.zNear;
+        f32 f = play->view.zFar;
 
-            wc[c] = (sWater[c] * CLAMP_MAX(l, 255) * FISHMOD_WATER_FOG_SHADE) >> 16; // (the water deep, not its haze)
+        if (BgCheck_GetWaterSurface(play, &play->colCtx, eye.x, eye.z, &surface, &box)) {
+            u32 li = WaterBox_GetLightIndex(&play->colCtx, box);
+
+            if ((env->lightSettingsList != NULL) && (li != WATERBOX_LIGHT_INDEX_NONE)) {
+                sWaterNear = env->lightSettingsList[li].blendRateAndFogNear & 0x3FF;
+            }
         }
+        // the camera-under-water fog exactly (Fishmod_UpdateHaze's: its start no further than HAZE_FOG_NEAR, its end
+        // FISHMOD_HAZE_FOG_FAR; the water's own light setting's colour), as the RSP works it out by view depth
+        sWaterNear = MIN(sWaterNear, HAZE_FOG_NEAR);
+        for (c = 0; c < 3; c++) {
+            wc[c] = sWater[c];
+        }
+        gFishmodWaterFog.zA = (f + n) / (f - n);
+        gFishmodWaterFog.zB = 2.0f * f * n / (f - n);
+        gFishmodWaterFog.fm = 128000.0f / (FISHMOD_HAZE_FOG_FAR - sWaterNear);
+        gFishmodWaterFog.fo = (500 - sWaterNear) * 256.0f / (FISHMOD_HAZE_FOG_FAR - sWaterNear);
+        gFishmodWaterFog.h = eye.y - FISHMOD_LAKE_SURFACE;
+        gFishmodWaterFog.eye = eye;
     }
+    gFishmodWaterFogOn = true;
+    gFishmodWaterFogColor[0] = wc[0];
+    gFishmodWaterFogColor[1] = wc[1];
+    gFishmodWaterFogColor[2] = wc[2];
     // worked out again only when the eye or the water's colour has moved (not the look: the path is the eye's)
     key[0] = 1;
     key[1] = *(u32*)&eye.x;
@@ -1972,7 +2009,6 @@ static void Fishmod_WaterFog(PlayState* play) {
     bcopy(key, sFogKey, sizeof(key));
     {
         f32 h = eye.y - FISHMOD_LAKE_SURFACE; // (the eye's height over the water)
-        f32 wscale = 256.0f / (FISHMOD_WATER_FOG_FAR - FISHMOD_WATER_FOG_NEAR);
         u16 tc[FISHMOD_FOG_COLOURS][3];
         s32 first = 0;
         s32 step = 1;
@@ -2005,8 +2041,7 @@ static void Fishmod_WaterFog(PlayState* play) {
             s32 a;
 
             // the path under the surface: the eye's ray to it, by its depth over the whole drop
-            a = (s32)((sqrtf(dx * dx + dy * dy + dz * dz) * depth / (h + depth) - FISHMOD_WATER_FOG_NEAR) * wscale);
-            a = CLAMP(a, 0, 256);
+            a = (s32)(Fishmod_WaterFogAmount(sqrtf(dx * dx + dy * dy + dz * dz) * depth / (h + depth)) * 256.0f);
             for (c = 0; c < 3; c++) {
                 v->v.cn[c] = base[c] + (((t[c] - base[c]) * a) >> 8);
             }

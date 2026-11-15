@@ -744,11 +744,18 @@ void Fishmod_TerrainRA(struct PlayState* play);
 #define FISHMOD_DEPTH_TO 500.0f
 #define FISHMOD_DEPTH_MIN 0.12f
 s32 Fishmod_DepthShade(f32 depth);
-// water fog (fishmod.c Fishmod_WaterFog): the light's path through the water, where its fog starts and where it's whole
-#define FISHMOD_WATER_FOG_NEAR 30.0f
-#define FISHMOD_WATER_FOG_FAR 480.0f
-#define FISHMOD_WATER_FOG_SHADE 110 // its colour: the water's own fog colour (its light setting's) at 110/256
+// water fog (fishmod.c Fishmod_WaterFog): the camera-under-water fog over the view ray's length inside the water
 extern u32 gFishmodWaterFogCycles;
+typedef struct FishmodWaterFog {
+    f32 zA, zB;   // the projection's z / w at view depth d: zA - zB / d
+    f32 fm, fo;   // the camera-under-water fog's (the RSP's: alpha = z / w * fm + fo)
+    f32 h;        // the eye's height over the lake's surface
+    Vec3f eye;
+} FishmodWaterFog;
+extern FishmodWaterFog gFishmodWaterFog;
+f32 Fishmod_WaterFogAmount(f32 path);
+extern u8 gFishmodWaterFogColor[3];
+extern s32 gFishmodWaterFogOn;
 s32 Fishmod_LakeDrained(struct PlayState* play);
 #if FISHMOD_DEBUG
 // a script's plant-touch test (FISHMOD_TOUCH_TEST, _SWEEP, _PERIOD): x, y, z, sweep, period (0: off)

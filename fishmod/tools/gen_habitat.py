@@ -1344,6 +1344,23 @@ def write_props_manifest():
         f.write("#define FISHMOD_PROP_KINDS_IMP(X) \\\n")
         for k, d in imp_kinds:
             f.write(f"    X({k.upper()}, {k}, {d}) \\\n")
+        # each generated kind's texture's mean colour (of the texels seen: by their alpha; an intensity texture's grey):
+        # the water fog seen from above makes a prop's vertex colours the ones that, times this, are the water's
+        f.write("\n// each generated kind's texture's mean colour (by alpha): kind, r, g, b (the water fog's, fishmod_scatter.c)\n")
+        f.write("#define FISHMOD_PROP_KINDS_MEAN(X) \\\n")
+        tex_src = {t["name"]: t["src"] for t in textures}
+        for k, tex, fmt in PROP_KINDS:
+            src = tex_src.get("gFishmodProp_%sTex" % tex)
+            mean = (160, 160, 160)
+            if src and os.path.exists(os.path.join(ROOT, src)):
+                im = Image.open(os.path.join(ROOT, src)).convert("RGBA")
+                px = list(im.getdata())
+                w = sum(q[3] for q in px) or 1
+                mean = tuple(max(16, min(255, round(sum(q[c] * q[3] for q in px) / w))) for c in range(3))
+                if fmt.startswith("i"):
+                    g = round(sum(mean) / 3)
+                    mean = (g, g, g)
+            f.write(f"    X({k.upper()}, {mean[0]}, {mean[1]}, {mean[2]}) \\\n")
         f.write("\n// each kind's settings (fishmod/data/prop_kinds.json): kind, draw distance (above water; under it, 0 for\n"
                 "// the same), flags, sway amount and rate, height (the cards), reach (0: its height, else 150)\n")
         f.write("#define FISHMOD_PROP_KIND_INFO(X) \\\n")
