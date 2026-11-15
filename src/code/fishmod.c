@@ -1583,15 +1583,20 @@ u32 gFishmodRelitCount;       // (the times the terrain was lit again: a check t
 s32 gFishmodRelitDirty;       // set when a room vertex's normal changes (fishmod_scatter.c's bed shading): light again
 static const Vtx* sRelitSrc;
 static s32 sRelitCount;
-extern void* spot06_room_0_fishmodFog[] __attribute__((weak)); // (meshpack builds: the water fog's stubs)
-static Gfx* sFogStub[2];        // the room's water fog stubs (on, off), or NULL
+extern void* spot06_room_0_fishmodFog[] __attribute__((weak)); // (meshpack builds: the water fog's table)
+#define FISHMOD_FOG_COLOURS 16
 static u16* sFogVtx;            // the relit vertices under the surface (their index)
-static s16* sFogDepth;          //   and their depth under it
+static s16* sFogDepth;          //   their depth under it
+static u8* sFogColour;          //   their texture's mean colour (its number)
+static u8* sFogBase;            //   their colours as lit (r, g, b)
 static s32 sFogCount;
-static u32 sFogKey[8];          // what the fog was last worked out for (the eye, the look, the fog's settings)
-static u32 sFogStubKey[2];      // what the stubs hold (their colours: 0 = empty)
+static u16 sFogInv[FISHMOD_FOG_COLOURS * 3]; // each texture colour's inverse (64 * 255 / mean)
+static s32 sFogColourCount;
+static u32 sFogKey[4];          // what the fog was last worked out for (the eye, the water's colour)
 u32 gFishmodWaterFogCycles;     // (the last frame's cost, for the profile)
 static s32 sRelitComputed;      // the relit colours were made again this frame
+static s32 sFogParity;          // the half of the water fog's vertices worked out last
+static s32 sFogHalfOwed;        // the other half still to do (the view moved, then held still)
 static u8* sRelitDepth;        // each vertex's share of the light left by its depth under the surface (Fishmod_DepthShade)
 static s32 sRelitDrained = -1; // the lake drained when they were made (no water: no darkening)
 static s32 sRelitFront = -1;
@@ -1631,10 +1636,17 @@ static void Fishmod_RelitFree(void) {
         ZELDA_ARENA_FREE(sFogDepth, "../fishmod.c", __LINE__);
         sFogDepth = NULL;
     }
+    if (sFogColour != NULL) {
+        ZELDA_ARENA_FREE(sFogColour, "../fishmod.c", __LINE__);
+        sFogColour = NULL;
+    }
+    if (sFogBase != NULL) {
+        ZELDA_ARENA_FREE(sFogBase, "../fishmod.c", __LINE__);
+        sFogBase = NULL;
+    }
     sFogCount = 0;
-    sFogStub[0] = sFogStub[1] = NULL;
-    sFogStubKey[0] = sFogStubKey[1] = 0;
     sFogKey[0] = 0;
+    sFogHalfOwed = false;
     sRelitDrained = -1;
     if (sRelitNormal != NULL) {
         ZELDA_ARENA_FREE(sRelitNormal, "../fishmod.c", __LINE__);
@@ -1864,55 +1876,63 @@ s32 Fishmod_LakeDrained(PlayState* play) {
 }
 
 /*
- * Water fog: with the camera above the water, the lake bed fogs toward the water's colour by the light's path through
- * the water, not only by its distance from the eye: looking across the lake the bottom fades into the water's colour
- * well before it would in air, straight down it stays clearer. The cut pieces' areas wholly under the surface are
- * drawn between the room's two stubs (tools/meshpack.py): filled here with the water's fog colour and the RSP's fog
- * off, so each vertex's alpha is its fog; and the scene's fog colour and the RSP's fog back on. Each such vertex's fog:
- * the more of the RSP's own (by distance, the same formula) and the water's (the part of the eye's ray to it under the
- * surface: FISHMOD_WATER_FOG_NEAR to _FAR). Worked out when the eye or the fog's settings move, into a fresh buffer
- * (the RSP may still be reading the last). Off with the camera under water (the game's haze is the water's fog then),
- * with the lake drained, and for the bench's A/B (FISHMOD_BENCH_NOWATERFOG).
+ * Water fog: with the camera above the water, the lake bed fades toward the water's colour by the light's path through
+ * the water, not only by its distance from the eye: looking across the lake the bottom fades into the water well
+ * before it would in air, straight down it stays clearer. In the relit vertices' colours (tools/meshpack.py lists
+ * those under the surface, each with its texture's mean colour): each one's lit colour blended toward the colour that,
+ * times its texture, is the water's, by its share of the water (the part of the eye's ray to it under the surface:
+ * FISHMOD_WATER_FOG_NEAR to _FAR). The game's own fog (by distance, to the sky's haze) is left on over it: far off the
+ * bed hazes as everything else does (the fog colour swapped for the water's, the first way, made the far lake and the
+ * pillars standing in it dark against the haze). Worked out when the eye or the water's colour moves, half the
+ * vertices a frame while it moves (each a frame behind at most), into the front buffer where it is (a frame still
+ * being drawn from it may take some of this frame's: the change is smooth); all of them when the colours were made
+ * again. Off with the camera under water (the game's haze is the water's fog then), with the lake drained, and for
+ * the bench's A/B (FISHMOD_BENCH_NOWATERFOG).
  */
-static void Fishmod_FogStub(Gfx* stub, u32* key, s32 on, u8 r, u8 g, u8 b, s32 fogOn) {
-    u32 k = on ? ((r << 24) | (g << 16) | (b << 8) | 1) : 0;
+static void Fishmod_WaterFogRestore(void) {
+    Vtx* out = sRelitBuf[sRelitFront];
+    s32 i;
 
-    if (*key == k) {
-        return; // (as it is: not written while the RSP may be reading it)
+    for (i = 0; i < sFogCount; i++) {
+        Vtx* v = &out[sFogVtx[i]];
+
+        v->v.cn[0] = sFogBase[i * 3 + 0];
+        v->v.cn[1] = sFogBase[i * 3 + 1];
+        v->v.cn[2] = sFogBase[i * 3 + 2];
     }
-    *key = k;
-    if (!on) {
-        gSPEndDisplayList(stub);
-        return;
-    }
-    gDPPipeSync(&stub[0]);
-    gDPSetFogColor(&stub[1], r, g, b, 255);
-    if (fogOn) {
-        gSPSetGeometryMode(&stub[2], G_FOG);
-    } else {
-        gSPClearGeometryMode(&stub[2], G_FOG);
-    }
-    gSPEndDisplayList(&stub[3]);
 }
 
 static void Fishmod_WaterFog(PlayState* play) {
-    MtxF* m = &play->viewProjectionMtxF;
     Vec3f eye = play->view.eye;
-    s32 on = (sFogStub[0] != NULL) && (sFogCount > 0) && (gFishmodHaze <= 0.0f) && (eye.y > FISHMOD_LAKE_SURFACE) &&
+    s32 on = (sFogCount > 0) && (sRelitFront >= 0) && (gFishmodHaze <= 0.0f) && (eye.y > FISHMOD_LAKE_SURFACE) &&
              !Fishmod_LakeDrained(play) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOWATERFOG);
-    s32 near = play->lightCtx.fogNear;
-    s32 far = 1000 - (s32)((1000 - FISHMOD_HAZE_FOG_FAR) * gFishmodHaze);
     u8 wc[3];
-    u32 key[8];
+    u32 key[4];
     OSTime t0 = osGetTime();
+    Vtx* out;
     s32 i;
 
+    if (sFogCount == 0) {
+        return;
+    }
+    out = sRelitBuf[sRelitFront];
+    if (sRelitComputed) {
+        // fresh colours: each one's own, kept (the fog's blend is from it)
+        for (i = 0; i < sFogCount; i++) {
+            Vtx* v = &out[sFogVtx[i]];
+
+            sFogBase[i * 3 + 0] = v->v.cn[0];
+            sFogBase[i * 3 + 1] = v->v.cn[1];
+            sFogBase[i * 3 + 2] = v->v.cn[2];
+        }
+    }
     if (!on) {
-        if (sFogStub[0] != NULL) {
-            Fishmod_FogStub(sFogStub[0], &sFogStubKey[0], false, 0, 0, 0, false);
-            Fishmod_FogStub(sFogStub[1], &sFogStubKey[1], false, 0, 0, 0, true);
+        if (sFogKey[0] != 0) {
+            Fishmod_WaterFogRestore(); // (as they were lit)
         }
         sFogKey[0] = 0;
+        sRelitComputed = false;
+        sFogHalfOwed = false;
         return;
     }
     {
@@ -1940,71 +1960,56 @@ static void Fishmod_WaterFog(PlayState* play) {
             wc[c] = (sWater[c] * CLAMP_MAX(l, 255) * FISHMOD_WATER_FOG_SHADE) >> 16; // (the water deep, not its haze)
         }
     }
-    Fishmod_FogStub(sFogStub[0], &sFogStubKey[0], true, wc[0], wc[1], wc[2], false);
-    Fishmod_FogStub(sFogStub[1], &sFogStubKey[1], true, play->lightCtx.fogColor[0], play->lightCtx.fogColor[1],
-                    play->lightCtx.fogColor[2], true);
-    // worked out again only when the view or the fog has moved
+    // worked out again only when the eye or the water's colour has moved (not the look: the path is the eye's)
     key[0] = 1;
     key[1] = *(u32*)&eye.x;
     key[2] = *(u32*)&eye.y;
-    key[3] = *(u32*)&eye.z;
-    key[4] = *(u32*)&m->zx ^ *(u32*)&m->zz;
-    key[5] = *(u32*)&m->wx ^ *(u32*)&m->wz;
-    key[6] = (near << 16) | far;
-    key[7] = (wc[0] << 16) | (wc[1] << 8) | wc[2];
-    for (i = 0; (i < 8) && (key[i] == sFogKey[i]); i++) {}
-    if ((i == 8) && !sRelitComputed) {
+    key[3] = *(u32*)&eye.z ^ ((wc[0] << 16) | (wc[1] << 8) | wc[2]);
+    for (i = 0; (i < 4) && (key[i] == sFogKey[i]); i++) {}
+    if ((i == 4) && !sRelitComputed && !sFogHalfOwed) {
         return;
     }
-    sRelitComputed = false;
     bcopy(key, sFogKey, sizeof(key));
     {
-        Vtx* out;
-        f32 fm;
-        f32 fo;
         f32 h = eye.y - FISHMOD_LAKE_SURFACE; // (the eye's height over the water)
-        f32 wscale = 255.0f / (FISHMOD_WATER_FOG_FAR - FISHMOD_WATER_FOG_NEAR);
+        f32 wscale = 256.0f / (FISHMOD_WATER_FOG_FAR - FISHMOD_WATER_FOG_NEAR);
+        u16 tc[FISHMOD_FOG_COLOURS][3];
+        s32 first = 0;
+        s32 step = 1;
+        s32 c;
 
-        if (far == near) {
-            far++;
+        // each texture colour's target: the water's colour over the texture's mean (64ths), at most full
+        for (i = 0; i < sFogColourCount; i++) {
+            for (c = 0; c < 3; c++) {
+                tc[i][c] = CLAMP_MAX((wc[c] * sFogInv[i * 3 + c]) >> 6, 255);
+            }
         }
-        if (near > 996) {
-            fm = 0x7FFF;
-            fo = -0x7F00;
+        // half of them a frame, turn about, while the eye moves; all of them when the colours were made again
+        if (!sRelitComputed) {
+            sFogParity ^= 1;
+            first = sFogParity;
+            step = 2;
+            sFogHalfOwed = !sFogHalfOwed || (i != 4);
         } else {
-            fm = 128000.0f / (far - near);
-            fo = (500 - near) * 256.0f / (far - near);
+            sFogHalfOwed = false;
         }
-        // into the front buffer where it is (the alpha alone: a frame still being drawn from it may take some of
-        // this frame's fog, a step of a moving camera's; the colours, the reason for the buffers, aren't touched)
-        out = sRelitBuf[sRelitFront];
-        for (i = 0; i < sFogCount; i++) {
+        sRelitComputed = false;
+        for (i = first; i < sFogCount; i += step) {
             Vtx* v = &out[sFogVtx[i]];
-            f32 x = v->v.ob[0];
-            f32 y = v->v.ob[1];
-            f32 z = v->v.ob[2];
-            f32 w = m->wx * x + m->wy * y + m->wz * z + m->ww;
-            f32 zc = m->zx * x + m->zy * y + m->zz * z + m->zw;
+            u8* base = &sFogBase[i * 3];
+            u16* t = tc[sFogColour[i]];
+            f32 dx = v->v.ob[0] - eye.x;
+            f32 dy = v->v.ob[1] - eye.y;
+            f32 dz = v->v.ob[2] - eye.z;
             f32 depth = sFogDepth[i];
-            f32 drop = h + depth;
-            f32 inv;
-            f32 a;
-            f32 wa;
+            s32 a;
 
-            if ((w < 1.0f) || (drop < 1.0f)) {
-                v->v.cn[3] = 0;
-                continue;
+            // the path under the surface: the eye's ray to it, by its depth over the whole drop
+            a = (s32)((sqrtf(dx * dx + dy * dy + dz * dz) * depth / (h + depth) - FISHMOD_WATER_FOG_NEAR) * wscale);
+            a = CLAMP(a, 0, 256);
+            for (c = 0; c < 3; c++) {
+                v->v.cn[c] = base[c] + (((t[c] - base[c]) * a) >> 8);
             }
-            // one division for both: 1 / (w drop)
-            inv = 1.0f / (w * drop);
-            a = zc * drop * inv * fm + fo; // (the RSP's fog, by distance: z / w)
-            // the water's: the share of the eye's ray to it under the surface (by depth over the whole drop), of
-            // the distance (the view depth w: near enough to the ray's length across the screen): w depth / drop
-            wa = (w * w * depth * inv - FISHMOD_WATER_FOG_NEAR) * wscale;
-            if (wa > a) {
-                a = wa;
-            }
-            v->v.cn[3] = (a <= 0.0f) ? 0 : (a >= 255.0f) ? 255 : (u8)a;
         }
     }
     gFishmodWaterFogCycles = (u32)(osGetTime() - t0);
@@ -2047,23 +2052,30 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
         sRelitCount = count;
         gFishmodRelitDirty = true; // (the normals gathered below)
         if (spot06_room_0_fishmodFog != NULL) {
-            // the water fog: the room's stubs, and the relit vertices its lists load (tools/meshpack.py: those of
-            // the triangles touching the water, the shore's corners above it among them) with their depths
+            // the water fog: the relit vertices under the surface (tools/meshpack.py), with their depths and their
+            // textures' colours: { count, colours, each colour's inverse (r, g, b), each vertex's index and colour }
             void** ft = (void**)((u8*)play->roomCtx.curRoom.segment + ((u32)spot06_room_0_fishmodFog & 0xFFFFFF));
-            u16* fv = (u16*)((u8*)play->roomCtx.curRoom.segment + ((u32)ft[2] & 0xFFFFFF));
+            u16* fv = (u16*)((u8*)play->roomCtx.curRoom.segment + ((u32)ft[0] & 0xFFFFFF));
+            u16* pairs;
 
             sFogCount = fv[0];
+            sFogColourCount = MIN(fv[1], FISHMOD_FOG_COLOURS);
+            for (i = 0; i < sFogColourCount * 3; i++) {
+                sFogInv[i] = fv[2 + i];
+            }
+            pairs = &fv[2 + fv[1] * 3];
             sFogVtx = ZELDA_ARENA_MALLOC(sFogCount * sizeof(u16), "../fishmod.c", __LINE__);
             sFogDepth = ZELDA_ARENA_MALLOC(sFogCount * sizeof(s16), "../fishmod.c", __LINE__);
-            if ((sFogVtx != NULL) && (sFogDepth != NULL)) {
+            sFogColour = ZELDA_ARENA_MALLOC(sFogCount, "../fishmod.c", __LINE__);
+            sFogBase = ZELDA_ARENA_MALLOC(sFogCount * 3, "../fishmod.c", __LINE__);
+            if ((sFogVtx != NULL) && (sFogDepth != NULL) && (sFogColour != NULL) && (sFogBase != NULL)) {
                 for (i = 0; i < sFogCount; i++) {
-                    s32 v = (fv[1 + i] < count) ? fv[1 + i] : 0;
+                    s32 v = (pairs[i * 2] < count) ? pairs[i * 2] : 0;
 
                     sFogVtx[i] = v;
-                    sFogDepth[i] = (s16)MAX(FISHMOD_LAKE_SURFACE - src[v].v.ob[1], 0.0f); // (above it: none)
+                    sFogColour[i] = (pairs[i * 2 + 1] < sFogColourCount) ? pairs[i * 2 + 1] : 0;
+                    sFogDepth[i] = (s16)MAX(FISHMOD_LAKE_SURFACE - src[v].v.ob[1], 0.0f);
                 }
-                sFogStub[0] = (Gfx*)((u8*)play->roomCtx.curRoom.segment + ((u32)ft[0] & 0xFFFFFF));
-                sFogStub[1] = (Gfx*)((u8*)play->roomCtx.curRoom.segment + ((u32)ft[1] & 0xFFFFFF));
             } else {
                 sFogCount = 0;
             }
@@ -2141,7 +2153,7 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
 
             Fishmod_RelitCompute(sRelitBuf[next], lights);
             sRelitFront = next;
-            sRelitComputed = true; // (its fog alphas are old: Fishmod_WaterFog works them out again)
+            sRelitComputed = true; // (fresh colours: Fishmod_WaterFog keeps them and fogs them again)
             bcopy(key, sRelitKey, len);
             sRelitKeyLen = len;
             gFishmodRelitDirty = false;
