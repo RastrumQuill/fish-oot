@@ -336,6 +336,7 @@ static void Scatter_InitKinds(void) {
 }
 
 static FishmodScatterHeader* sScatter;
+static s32 sDepthShadeOn; // props darkened by their depth under the water (not with the lake drained)
 static Gfx** sRockList; // each rock's own list (made for where it lies: rock_mesh.py), by its prop's yaw; or NULL
 /*
  * The rocks in Lake Hylia's shallows have the bed's caustics on them (FISHMOD_PROP_ROCK_LIT): the bed's own blend, the
@@ -2337,6 +2338,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         return;
     }
     Scatter_UpdateDry(play);
+    sDepthShadeOn = !Fishmod_LakeDrained(play) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODEPTHSHADE);
     sBedFrame++;
     sBedLoads = 0;
     // a camera being set up can give a nonsense eye for a frame (and turning a NaN into an integer is a crash on
@@ -2551,6 +2553,16 @@ void EnFishmod_ScatterDraw(PlayState* play) {
             u32 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
             s32 a = 255;
 
+            if (sDepthShadeOn && !info->floating) {
+                // (deep water darker: as the bed it stands on, by its depth under its chunk's surface)
+                s32 c = ((prop->z - sScatter->z0) / sScatter->chunk) * sScatter->width +
+                        (prop->x - sScatter->x0) / sScatter->chunk;
+                s16 surf = sChunkSurface[c];
+
+                if (surf != -32768) {
+                    t = (t * Fishmod_DepthShade(surf - prop->y)) >> 8;
+                }
+            }
             if ((tier == TIER_IMP) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)
 #if FISHMOD_DEBUG
                 && !gFishmodLodTest.active

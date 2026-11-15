@@ -585,6 +585,7 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOACTORS (1 << 11)   // no actor drawn but Link and the fish
 #define FISHMOD_BENCH_NOEFFECTS (1 << 15)  // no effects (Effect_DrawAll, EffectSs_DrawAll: splashes, dust, sparkles)
 #define FISHMOD_BENCH_TERRAIN_RA (1 << 17) // the terrain anti-aliased without reading the picture back (Fishmod_TerrainRA)
+#define FISHMOD_BENCH_NODEPTHSHADE (1 << 19) // no depth darkening (Fishmod_DepthShade): the A/B of it
 #define FISHMOD_BENCH_SKYLAST (1 << 18)     // the sky drawn after the opaque scene, only where nothing is (a test)
 #define FISHMOD_BENCH_NOHUD (1 << 25)     // no HUD or minimap (the RDP sweep: fishmod/scripts/rdp_sweep.inc.c)
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
@@ -732,6 +733,13 @@ struct Lights;
 // the lake's terrain lit by the CPU (fishmod.c, meshpack builds): sets its vertex segment for this frame
 Gfx* Fishmod_Relight(struct PlayState* play, struct Lights* lights, Gfx* gfx);
 void Fishmod_TerrainRA(struct PlayState* play);
+// depth darkening (fishmod.c): the share of the light left at a depth under the surface, of 256
+#define FISHMOD_LAKE_SURFACE -1313.0f // (Lake Hylia's, full)
+#define FISHMOD_DEPTH_FROM 40.0f
+#define FISHMOD_DEPTH_TO 500.0f
+#define FISHMOD_DEPTH_MIN 0.12f
+s32 Fishmod_DepthShade(f32 depth);
+s32 Fishmod_LakeDrained(struct PlayState* play);
 #if FISHMOD_DEBUG
 // a script's plant-touch test (FISHMOD_TOUCH_TEST, _SWEEP, _PERIOD): x, y, z, sweep, period (0: off)
 extern f32 gFishmodTouchTest[5];

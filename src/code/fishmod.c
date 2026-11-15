@@ -1583,6 +1583,8 @@ u32 gFishmodRelitCount;       // (the times the terrain was lit again: a check t
 s32 gFishmodRelitDirty;       // set when a room vertex's normal changes (fishmod_scatter.c's bed shading): light again
 static const Vtx* sRelitSrc;
 static s32 sRelitCount;
+static u8* sRelitDepth;        // each vertex's share of the light left by its depth under the surface (Fishmod_DepthShade)
+static s32 sRelitDrained = -1; // the lake drained when they were made (no water: no darkening)
 static s32 sRelitFront = -1;
 static u8 sRelitKey[64]; // the lights last used (to see when they change)
 static s32 sRelitKeyLen = -1;
@@ -1608,6 +1610,11 @@ static void Fishmod_RelitFree(void) {
             sRelitBuf[i] = NULL;
         }
     }
+    if (sRelitDepth != NULL) {
+        ZELDA_ARENA_FREE(sRelitDepth, "../fishmod.c", __LINE__);
+        sRelitDepth = NULL;
+    }
+    sRelitDrained = -1;
     if (sRelitNormal != NULL) {
         ZELDA_ARENA_FREE(sRelitNormal, "../fishmod.c", __LINE__);
         sRelitNormal = NULL;
@@ -1656,6 +1663,12 @@ static void Fishmod_RelitCompute(Vtx* out, Lights* lights) {
         r = r / (128 * 128);
         g = g / (128 * 128);
         b = b / (128 * 128);
+        if (sRelitDepth != NULL) {
+            // (deep water darker: the light that reaches the bed through it)
+            r = (r * sRelitDepth[i]) >> 8;
+            g = (g * sRelitDepth[i]) >> 8;
+            b = (b * sRelitDepth[i]) >> 8;
+        }
         v->v.cn[0] = (r > 255) ? 255 : r;
         v->v.cn[1] = (g > 255) ? 255 : g;
         v->v.cn[2] = (b > 255) ? 255 : b;
@@ -1759,6 +1772,31 @@ void Fishmod_TerrainRA(PlayState* play) {
     }
 }
 
+/*
+ * Depth darkening: deep water lets less of the light through, so the lake bed, and what stands on it, darkens with
+ * its depth under the surface, from FISHMOD_DEPTH_FROM down to FISHMOD_DEPTH_TO, to FISHMOD_DEPTH_MIN of its light.
+ * Seen from above the water the surface's tint then lies over a darker bed: the deep water reads as deep, its bottom
+ * hard to make out. Baked: the bed's vertices once (their lighting is the CPU's already), the props by where they
+ * stand. Nothing when the lake is drained.
+ */
+s32 Fishmod_DepthShade(f32 depth) {
+    f32 f;
+
+    if (depth <= FISHMOD_DEPTH_FROM) {
+        return 256;
+    }
+    f = (depth - FISHMOD_DEPTH_FROM) / (FISHMOD_DEPTH_TO - FISHMOD_DEPTH_FROM);
+    if (f > 1.0f) {
+        f = 1.0f;
+    }
+    f = f * (2.0f - f); // (eased: the most change near the top, settling to the floor)
+    return (s32)(256.0f * (1.0f - (1.0f - FISHMOD_DEPTH_MIN) * f));
+}
+
+s32 Fishmod_LakeDrained(PlayState* play) {
+    return (play->sceneId == SCENE_LAKE_HYLIA) && LINK_IS_ADULT && !GET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
+}
+
 Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
     void** table;
     const Vtx* src;
@@ -1795,6 +1833,24 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
         sRelitSrc = src;
         sRelitCount = count;
         gFishmodRelitDirty = true; // (the normals gathered below)
+    }
+    {
+        // each vertex's darkening by its depth under the surface (none with the lake drained): made again when that
+        // changes, and then the bed relit at once
+        s32 drained = Fishmod_LakeDrained(play) || FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODEPTHSHADE);
+
+        if (drained != sRelitDrained) {
+            if (sRelitDepth == NULL) {
+                sRelitDepth = ZELDA_ARENA_MALLOC(sRelitCount, "../fishmod.c", __LINE__);
+            }
+            if (sRelitDepth != NULL) {
+                for (i = 0; i < sRelitCount; i++) {
+                    sRelitDepth[i] = drained ? 255 : CLAMP_MAX(Fishmod_DepthShade(FISHMOD_LAKE_SURFACE - sRelitSrc[i].v.ob[1]), 255);
+                }
+            }
+            sRelitDrained = drained;
+            gFishmodRelitDirty = true;
+        }
     }
     {
         // the lights this frame (their count, the ambient colour, each light's colour and direction: the bytes that
