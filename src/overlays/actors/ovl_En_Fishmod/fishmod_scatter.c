@@ -388,7 +388,7 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 // (Scatter_Touch's: the props making way for Link)
 #define TOUCH_MAX 32
 #define TOUCH_NONE 0xFF
-#define TOUCH_LEAN 1.0f      // the most a plant's top moves sideways, per unit of its height
+#define TOUCH_LEAN 0.6f      // the most a plant's top moves sideways, per unit of its height (held up by the water)
 #define TOUCH_PUSH 32.0f     // the furthest a floating plant drifts
 #define TOUCH_FLOAT_R 46.0f  // how near a floating plant's middle Link pushes it (at scale 1; plus TOUCH_FLOAT_R0)
 #define TOUCH_FLOAT_R0 18.0f
@@ -398,7 +398,7 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 #define TOUCH_DRIFTS(kind) (sKinds[kind].floating && !TOUCH_HANGS(kind))
 #define TOUCH_EASE 0.3f      // how fast they follow (a share of the way each frame)
 #define TOUCH_BACK 0.03f     // and come back (floating: slowly, his wake lingers, as the Fishing Pond's pads)
-#define TOUCH_SPRING 0.09f   // (a plant: springs back up, its stiffness...
+#define TOUCH_SPRING 0.13f   // (a plant: springs back up, its stiffness (its buoyancy)...
 #define TOUCH_DAMP 0.22f     //  ...and how quickly its swing dies down: a little past upright, back, and still)
 // A touched plant bends, not tips: its vertices loaded in bands up its height, each band under more of the lean than
 // the one below (Scatter_Bend): the top goes furthest and the stalk curves. The kind's model cut into the bands once.
@@ -1562,11 +1562,16 @@ static void Scatter_TouchMatrices(ScatterFrame* frame) {
                 Mtx* m = &frame->bendBand[i][k];
                 // (a hanging plant held at its top: the bottom band leans most, and its height is below the
                 // surface, so the lean's sign turns)
-                f32 f = TOUCH_HANGS(prop->kind) ? (BEND_BANDS - k - 0.5f) * (-1.15f / BEND_BANDS)
-                                                : (k + 0.5f) * (1.15f / BEND_BANDS);
+                // (a rooted plant, held up by the water: bent most at its foot, its top turning back up toward
+                // upright: a vertex at height t (of the whole) moves lean * t * (2 - t), steepest at the foot, level
+                // at the top; shortened as it leans, so the stalk keeps its length rather than stretching)
+                f32 t = (k + 0.5f) / BEND_BANDS;
+                f32 f = TOUCH_HANGS(prop->kind) ? (BEND_BANDS - k - 0.5f) * (-1.15f / BEND_BANDS) : (2.0f - t);
+                f32 sh = SQ(a * f) + SQ(b * f);
 
                 *m = *mtx;
                 MTX_SET(m, 1, 0, (s32)(a * f * 65536.0f));
+                MTX_SET(m, 1, 1, (s32)(65536.0f / sqrtf(1.0f + sh)));
                 MTX_SET(m, 1, 2, (s32)(b * f * 65536.0f));
             }
         }
@@ -1638,6 +1643,11 @@ static ScatterBend* Scatter_BendBuild(Gfx* model) {
     s32 n;
     ScatterBend* b;
 
+    if (((u32)model >> 24) != 0x80) {
+        // (a model in an object's segment, as the Fishing Pond's reeds: its address isn't one the CPU can read here
+        // (reading it was the crash: a TLB exception on 0x06...); the plant leans whole instead)
+        return NULL;
+    }
     bzero(slot, sizeof(slot));
     // the model's triangles (a list of vertex loads and triangles)
     for (n = 0; n < 1024; n++, w += 2) {
@@ -1925,6 +1935,8 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     static u16 sKindStart[ARRAY_COUNT(sVisible)][FISHMOD_PROP_KIND_MAX + 1]; // each kind's first prop in the chunk
     Vec3f eye = *eyeP;
     s32 bandStart[BANDS + 1];
+    s32 bandCount[BANDS];   // the props gathered in each band
+    s32 bandLimit = BANDS;  // (gathered only nearer than this band: past it let go, the list being full)
     s32 candCount = 0;
     s32 visibleCount = 0;
     s32 chunk = sScatter->chunk;
@@ -2008,6 +2020,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     }
 #endif
 
+    bzero(bandCount, sizeof(bandCount));
     // the chunks within reach of the camera
     cx0 = CLAMP((s32)((eye.x - distFar - sScatter->x0) / chunk), 0, sScatter->width - 1);
     cx1 = CLAMP((s32)((eye.x + distFar - sScatter->x0) / chunk), 0, sScatter->width - 1);
@@ -2026,9 +2039,15 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             if ((sChunkStart[c] == sChunkStart[c + 1]) || (d > SQ(distFar + chunk))) {
                 continue;
             }
-            // the whole chunk outside the view cone (the same test as each prop's, with the chunk's size and the
-            // water's depth as room)
-            my = ((sChunkSurface[c] != -0x8000) ? sChunkSurface[c] - 150.0f : eye.y) - eye.y;
+            // the whole chunk outside the view cone (the same test as each prop's, with the chunk's size as room),
+            // at the height in it nearest the look's line: its props are anywhere from its bed to its surface (one
+            // assumed height, 150 under the surface, could cull a deep bed's chunk beside a swimmer near the bottom
+            // with its props on screen; fishmod/tools/popin_check.py found no prop missing on the bench's route
+            // either way: a guard)
+            my = (lookY / sqrtf(MAX(1.0f - SQ(lookY), 0.0001f))) * sqrtf(d); // (the look's line, this far out)
+            if ((sChunkSurface[c] != -0x8000) && (my > sChunkSurface[c] + sExtentMax - eye.y)) {
+                my = sChunkSurface[c] + sExtentMax - eye.y; // (nothing above the surface but what floats there)
+            }
             front = mx * lookX + my * lookY + mz * lookZ + chunk * 0.71f + PROP_RADIUS + sExtentMax + viewRoom;
             if (((front < 0.0f) || (SQ(front) < SQ(viewCos) * (d + SQ(my)))) && (d > SQ(chunk * 1.5f))) {
                 continue;
@@ -2036,6 +2055,20 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             if (visibleCount < ARRAY_COUNT(sVisible)) {
                 sChunkDistSq[visibleCount] = d;
                 sVisible[visibleCount++] = c;
+            } else {
+                // (full: in place of the farthest, if this one is nearer, rather than whichever the grid reaches last,
+                // a side of the view; the bench's views come nowhere near full: a guard)
+                s32 far = 0;
+
+                for (v = 1; v < visibleCount; v++) {
+                    if (sChunkDistSq[v] > sChunkDistSq[far]) {
+                        far = v;
+                    }
+                }
+                if (d < sChunkDistSq[far]) {
+                    sChunkDistSq[far] = d;
+                    sVisible[far] = c;
+                }
             }
         }
     }
@@ -2179,8 +2212,38 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                         hidden = (fabsf(x) > (tanH * z + room * secH)) || (fabsf(y) > (tanV * z + room * secV));
                     }
                 }
-                if (candCount < VISIBLE_MAX) {
-                    sCandBand[candCount] = CLAMP_MAX((s32)(sqrtf(dSq) * (1.0f / BAND_WIDTH)), BANDS - 1);
+                {
+                    s32 b = CLAMP_MAX((s32)(sqrtf(dSq) * (1.0f / BAND_WIDTH)), BANDS - 1);
+
+                    if (b >= bandLimit) {
+                        continue;
+                    }
+                    if (candCount == VISIBLE_MAX) {
+                        // full: the farthest band there is let go (all of it: the props are gathered kind by kind,
+                        // chunk by chunk, so what came last is a kind or a side of the view, not the farthest), if
+                        // this one is nearer
+                        s32 far = bandLimit - 1;
+                        s32 m;
+
+                        while ((far > 0) && (bandCount[far] == 0)) {
+                            far--;
+                        }
+                        if (far <= b) {
+                            continue;
+                        }
+                        bandLimit = far;
+                        for (n = 0, m = 0; n < candCount; n++) {
+                            if (sCandBand[n] < bandLimit) {
+                                sCandBand[m] = sCandBand[n];
+                                sCandHidden[m] = sCandHidden[n];
+                                sCand[m++] = sCand[n];
+                            }
+                        }
+                        candCount = m;
+                        bandCount[far] = 0;
+                    }
+                    bandCount[b]++;
+                    sCandBand[candCount] = b;
                     sCandHidden[candCount] = hidden;
                     sCand[candCount++] = i;
                 }
@@ -2316,6 +2379,40 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     if (n < candCount) {
         gFishmodScatterDropped[0] += candCount - n; // (the budget ran out: the rest, farthest first, not drawn)
     }
+    {
+        // (for fishmod/tools/popin_check.py: what this set was made from, to check it against every prop in view)
+        static f32 sView[12];
+        static u8 sCardChunk[BEDCARD_SET_MAX + 1];
+        s32 v2;
+        s32 nc = 0;
+
+        sView[0] = eye.x;
+        sView[1] = eye.y;
+        sView[2] = eye.z;
+        sView[3] = lookX;
+        sView[4] = lookY;
+        sView[5] = lookZ;
+        sView[6] = play->view.up.x;
+        sView[7] = play->view.up.y;
+        sView[8] = play->view.up.z;
+        sView[9] = play->view.fovy;
+        sView[10] = under;
+        sView[11] = distFar;
+        for (v2 = 0; (v2 < visibleCount) && (nc < BEDCARD_SET_MAX); v2++) {
+            if (sUseCard[v2]) {
+                sCardChunk[1 + nc++] = 0; // (count only: the chunks' numbers don't fit a byte)
+            }
+        }
+        sCardChunk[0] = nc;
+        gFishmodScatterDbg[0] = sScatter;
+        gFishmodScatterDbg[1] = sProps;
+        gFishmodScatterDbg[2] = set;
+        gFishmodScatterDbg[3] = sKindMax;
+        gFishmodScatterDbg[4] = sView;
+        gFishmodScatterDbg[5] = sChunkDry;
+        gFishmodScatterDbg[6] = sCardChunk;
+        gFishmodScatterDbg[7] = sKinds;
+    }
 #endif
 }
 
@@ -2352,7 +2449,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         return;
     }
     Scatter_UpdateDry(play);
-    sDepthShadeOn = !Fishmod_LakeDrained(play) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODEPTHSHADE);
+    sDepthShadeOn = FISHMOD_DEPTH_SHADE && !Fishmod_LakeDrained(play) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODEPTHSHADE);
     sBedFrame++;
     sBedLoads = 0;
     // a camera being set up can give a nonsense eye for a frame (and turning a NaN into an integer is a crash on

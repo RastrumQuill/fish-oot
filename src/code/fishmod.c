@@ -2084,7 +2084,7 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
     {
         // each vertex's darkening by its depth under the surface (none with the lake drained): made again when that
         // changes, and then the bed relit at once
-        s32 drained = Fishmod_LakeDrained(play) || FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODEPTHSHADE);
+        s32 drained = !FISHMOD_DEPTH_SHADE || Fishmod_LakeDrained(play) || FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODEPTHSHADE);
 
         if (drained != sRelitDrained) {
             if (sRelitDepth == NULL) {

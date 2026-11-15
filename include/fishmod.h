@@ -543,6 +543,7 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 // audio under the fish's tag)
 extern u32 gFishmodPcTag;
 extern u32 gFishmodScatterDropped[4];
+extern void* gFishmodScatterDbg[8]; // (the props' last set and what it was made from: fishmod/tools/popin_check.py)
 // The prop sweep (fishmod_debug_bench.inc.c, FISHMOD_PROP_SWEEP): one prop kind drawn another way for a lap
 typedef enum FishmodPropTestMode {
     FISHMOD_PROPTEST_NONE,
@@ -737,6 +738,8 @@ Gfx* Fishmod_Relight(struct PlayState* play, struct Lights* lights, Gfx* gfx);
 void Fishmod_TerrainRA(struct PlayState* play);
 // depth darkening (fishmod.c): the share of the light left at a depth under the surface, of 256
 #define FISHMOD_LAKE_SURFACE -1313.0f // (Lake Hylia's, full)
+// (off: the bed and the props deep down went to black shapes in the haze; the water's fog shows depth instead)
+#define FISHMOD_DEPTH_SHADE 0
 #define FISHMOD_DEPTH_FROM 40.0f
 #define FISHMOD_DEPTH_TO 500.0f
 #define FISHMOD_DEPTH_MIN 0.12f

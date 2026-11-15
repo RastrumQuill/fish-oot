@@ -822,6 +822,7 @@ OSTime gFishmodProf[FISHMOD_PROF_MAX];
 u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 u32 gFishmodPcTag; // the PC profile's tag for its samples now (FISHMOD_PCTAG_*)
 u32 gFishmodScatterDropped[4];
+void* gFishmodScatterDbg[8];
 FishmodPropTest gFishmodPropTest; // props in view left out by the props' caps: budget, see-through, materials; and the most in view
 #ifndef FISHMOD_FLAT_TEST_INIT
 #define FISHMOD_FLAT_TEST_INIT 0
