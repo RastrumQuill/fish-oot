@@ -15,7 +15,6 @@ KIND_MAX = 32
 PROP_BUDGET = 900
 BEDCARD_DIST = 1300.0
 FADE_BAND = 0.15
-NEAR_SKIP = 0.6
 
 
 def main():
@@ -88,8 +87,8 @@ def main():
         h = inf["height"] * k
         mid = y + inf["extent"] * k * 0.5
         dy = mid - eye[1]
-        if inf["card"] and (dist * dist + (y + h * 0.5 - eye[1]) ** 2) < (h * NEAR_SKIP + 40) ** 2:
-            continue
+        if inf["card"] and dist < 30.0 * k + 10.0 and y - 10 < eye[1] < y + h + 10:
+            continue  # (the camera inside it: fishmod_scatter.c NEAR_SKIP_R)
         zc = dx * look[0] + dy * look[1] + dz * look[2]
         if zc < 30:
             continue
