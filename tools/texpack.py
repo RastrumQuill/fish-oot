@@ -35,7 +35,8 @@ The display lists that load them are rewritten to match:
   16-bit textures (a small texture with many colours stays);
 - a texture converts only if every use of its name anywhere is a load this pass rewrites (not one used by code, an
   animated-material table or a load it doesn't know), and a list only if it calls no other list and nothing skips its
-  end (a cull before its first load is fine);
+  end (a cull before its first load is fine); to an indexed one only where the list draws with it (not a material
+  list whose drawing is another list's: the lookup mode goes back off at its end);
 - a pipe sync with no drawing or loading since the previous one in the same list goes (the pipeline is already empty).
 
 The original tree isn't touched: the output is a copy (hard links for every file the pass doesn't change), which the
@@ -376,10 +377,17 @@ def main():
 
     ok_lists = {inc for inc in lists if list_ok(inc)}
     group_of = {}
+    open_group = set()  # (list, first load) of the groups with no drawing after them in their list
     for inc in lists:
-        for g in groups(inc):
+        gs = groups(inc)
+        for g in gs:
             for k in g:
                 group_of[(inc, k)] = g
+        cmds = lists[inc]
+        if gs and not any(DRAW.match(n) for n, _ in cmds[gs[-1][-1] + 1:]):
+            # a material list (its loads, then the list's end: the drawing is another list's, as the Fishing Pond's
+            # lily pad's): its texture can't be indexed, the lookup mode going back off at this list's end
+            open_group.add((inc, gs[-1][0]))
 
     def find_root(parent, t):
         while parent[t] != t:
@@ -409,7 +417,8 @@ def main():
             for ld in by_tex[name]:
                 g = group_of[(ld.dl, ld.index)]
                 g_loads = [Load(ld.dl, k, *lists[ld.dl][k]) for k in g]
-                bad = ld.dl not in ok_lists or any(x.tex not in eligible for x in g_loads)
+                bad = ld.dl not in ok_lists or any(x.tex not in eligible for x in g_loads) or \
+                    (ld.dl, g[0]) in open_group
                 for x in g_loads:
                     try:
                         bad |= int(x.tmem, 0) % 2 != 0
