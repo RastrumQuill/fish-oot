@@ -1,0 +1,31 @@
+[
+ {
+  "run": 1,
+  "label": "frames21",
+  "patch": "releases\\fish-oot-frames21.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-15 05:18:38",
+  "patch_sha1": "94bfce9d8b00b6c1db408780a82f0a5f4753591a",
+  "upload_check": "ok",
+  "packets": 424,
+  "bytes": 3211328,
+  "packs": 1,
+  "seconds": 229
+ },
+ {
+  "run": 2,
+  "label": "terrain-sweep",
+  "patch": "releases\\fish-oot-terrain-sweep.bps",
+  "minutes_max": 90.0,
+  "status": "incomplete",
+  "started": "2026-11-15 05:22:30",
+  "patch_sha1": "3a6318b2a6d5c0d2c039a756651db186dc85507f",
+  "upload_check": "ok",
+  "error": "still running after 90 minutes: stopped",
+  "packets": 2984,
+  "bytes": 24397184,
+  "packs": 1,
+  "seconds": 5401
+ }
+]
