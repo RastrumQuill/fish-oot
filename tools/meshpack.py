@@ -33,6 +33,20 @@ TARGETS = [
      ["gSpot06DL_00A400_03003270_DL", "gSpot06DL_00A400_03001240_DL", "gSpot06DL_00A400_03003EF8_DL",
       "gSpot06DL_00A400_03004AF0_DL"]),
 ]
+# the lake bed's caustics (combiners that blend the caustic texture into the sand by the environment alpha) faded out
+# with depth: a triangle deep under the surface drawn sand only (the caustics come from the sun through the surface;
+# deep down, where the surface can't be seen, they don't belong). By each triangle's centre depth below WATER_Y, in
+# CAUSTIC_STEPS steps from CAUSTIC_FROM (as before) to CAUSTIC_TO (sand only, 255, as the scene draws its drained lake):
+# the steps between call segment 0x0A's lists, an environment colour each (Scene_DrawConfigLakeHylia makes them each
+# frame from the scene's own colour: the drained lake's is 255, so every step is too)
+CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_room_0",
+             ["gSpot06DL_00A400_03003270_DL", "gSpot06DL_00A400_03001240_DL", "gSpot06DL_00A400_03002040_DL",
+              "gSpot06DL_00A400_03008858_DL", "gSpot06DL_00A400_03008ED0_DL", "gSpot06DL_00A400_03001628_DL"])]
+WATER_Y = -1313
+CAUSTIC_FROM, CAUSTIC_TO = 150, 550   # depths (units) where the fade starts and where it's sand only
+CAUSTIC_STEPS = 4                      # steps of the fade (the lists in segment 0x0A: CAUSTIC_STEPS - 1 of them)
+if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
+    CAUSTICS = []
 RELIGHT = {"spot06_room_0"}  # rooms whose lit pieces read their vertices lit by the CPU (segment RELIT_SEG)
 if os.environ.get("MESHPACK_NO_RELIGHT"):  # (a test: the areas without the CPU's lighting)
     RELIGHT = set()
@@ -118,6 +132,8 @@ def state_key(c):
     if n in ("gsDPLoadMultiBlock", "gsDPLoadMultiBlock_4b", "gsDPSetTile", "gsDPSetTileSize"):
         return (n, args_of(c)[1] if len(args_of(c)) > 1 else "")  # (by its texture memory address or tile)
     if n == "gsSPDisplayList":
+        if args_of(c)[0].startswith("0x0A"):
+            return "gsDPSetEnvColor"  # (caustic_fade's middle tier: an environment colour)
         return (n, args_of(c)[0])
     return n
 
@@ -452,6 +468,135 @@ def relight(lists, arrays_of, entry_lit=None):
     return table, None
 
 
+ADDED = "\x00"  # (caustic_fade: a command it added, marked for its check)
+
+
+def caustic_fade(dirpath, dl):
+    """The piece's caustic triangles regrouped by depth (see CAUSTICS): each run of vertex loads and triangles under a
+    caustic combiner redrawn as its shallow triangles, then (if any) its middle ones after the middle tier's colour,
+    then its deep ones after 255, then the colour the run started with set again. Returns ({vertex array: vertices},
+    triangles moved) and rewrites the piece's list; ({}, 0) when nothing is deep enough to change."""
+    path = os.path.join(dirpath, dl + ".inc.c")
+    items = split_items(open(path).read())
+    arrays = {}
+    slots = [None] * 64
+    caustic = False
+    env_src = None      # the command that set the environment colour last (a literal or a segment's list)
+    out, run, new_arrays, moved = [], [], {}, 0
+
+    def tier(vs):
+        depth = WATER_Y - sum(int(v[1]) for v in vs) / 3.0
+        f = min(max((depth - CAUSTIC_FROM) / float(CAUSTIC_TO - CAUSTIC_FROM), 0.0), 1.0)
+        return int(round(f * CAUSTIC_STEPS))
+
+    def end_run():
+        nonlocal moved
+        if not run:
+            return
+        tris = [t for kind, t in run if kind == "tri"]
+        tiers = [tier(t) for t in tris]
+        if not caustic or not any(tiers) or env_src is None:
+            out.extend(c for kind, c in run if kind == "cmd")
+            run.clear()
+            return
+        vname = "%s_cf%d_Vtx" % (dl, len(new_arrays))
+        vtx = []
+        for t_ in range(CAUSTIC_STEPS + 1):
+            ts = [(None, t) for t, k in zip(tris, tiers) if k == t_]
+            if not ts:
+                continue
+            if t_ == CAUSTIC_STEPS:
+                step = "gsDPSetEnvColor(0, 0, 0, 255)"
+            elif t_ > 0 and name_of(env_src) == "gsDPSetEnvColor":
+                a = args_of(env_src)  # (a colour of the list's own: the step's own colour)
+                a0 = int(a[3], 0)
+                step = "gsDPSetEnvColor(%s, %s, %s, %d)" % (a[0], a[1], a[2], a0 + (255 - a0) * t_ // CAUSTIC_STEPS)
+            elif t_ > 0:
+                step = "gsSPDisplayList(0x%08X)" % (0x0A000000 + (t_ - 1) * 16)
+            if t_ > 0:
+                out.extend([ADDED + "gsDPPipeSync()", ADDED + step])
+            emit_tris(ts, vname, vtx, out)
+        out.extend([ADDED + "gsDPPipeSync()", ADDED + env_src])
+        new_arrays[vname] = vtx
+        moved += sum(1 for k in tiers if k)
+        run.clear()
+
+    for it in items:
+        n = name_of(it)
+        if n == "gsSPVertex":
+            a = args_of(it)
+            m = VTX_REF.fullmatch(a[0].strip())
+            arr, base = m.group(1), int(m.group(2) or 0)
+            if arr not in arrays:
+                arrays[arr] = load_vtx(dirpath, arr)
+            cnt, v0 = int(a[1], 0), int(a[2], 0)
+            for k in range(cnt):
+                slots[v0 + k] = arrays[arr][base + k]
+            run.append(("cmd", it))
+            continue
+        if n in ("gsSP1Triangle", "gsSP2Triangles"):
+            a = [int(x, 0) for x in args_of(it)]
+            for g in ([a[0:3]] if n == "gsSP1Triangle" else [a[0:3], a[4:7]]):
+                run.append(("tri", tuple(slots[i] for i in g)))
+            run.append(("cmd", it))
+            continue
+        if n == "gsSPCullDisplayList":
+            # (the box load before it is in the run: no triangles yet, so the run is passed through as it was)
+            run.append(("cmd", it))
+            end_run()
+            continue
+        end_run()
+        if n == "gsDPSetCombineLERP":
+            caustic = "ENV_ALPHA" in args_of(it)[:4]
+        elif n == "gsDPSetEnvColor" or (n == "gsSPDisplayList" and args_of(it)[0] in ("0x08000000", "0x09000000")):
+            env_src = it
+        out.append(it)
+    end_run()
+    if not moved:
+        return {}, 0
+    # check: every triangle once, with the same vertices, after the same original state commands
+    def tris_of(cmds, extra):
+        got = collections.Counter()
+        sl = [None] * 64
+        k = 0
+        for c in cmds:
+            if c.startswith(ADDED):
+                continue
+            nm = name_of(c)
+            if nm == "gsSPVertex":
+                a = args_of(c)
+                m = VTX_REF.fullmatch(a[0].strip())
+                src = extra.get(m.group(1)) or arrays[m.group(1)]
+                for j in range(int(a[1], 0)):
+                    sl[int(a[2], 0) + j] = src[int(m.group(2) or 0) + j]
+            elif nm in ("gsSP1Triangle", "gsSP2Triangles"):
+                a = [int(x, 0) for x in args_of(c)]
+                for g in ([a[0:3]] if nm == "gsSP1Triangle" else [a[0:3], a[4:7]]):
+                    got[(k, tuple(sl[i] for i in g))] += 1
+            elif nm != "gsSPCullDisplayList":
+                k += 1
+        return got
+    if tris_of(out, new_arrays) != tris_of(items, {}):
+        sys.exit("meshpack: caustic_fade check failed for %s" % dl)
+    out = [c[len(ADDED):] if c.startswith(ADDED) else c for c in out]
+    os.remove(path)
+    open(path, "w").write("".join("    %s,\n" % c for c in out))
+    for vname, vtx in new_arrays.items():
+        open(os.path.join(dirpath, vname + ".inc.c"), "w").write("".join("VTX(%s),\n" % ", ".join(v) for v in vtx))
+    return new_arrays, moved
+
+
+def unsize(dirpath, room, dl):
+    """the list's declared length (the room's .c and .h give each list its original length) left to its contents"""
+    for ext in (".c", ".h"):
+        p = os.path.join(dirpath, room + ext)
+        text = open(p).read()
+        new = re.sub(r"\b%s\[\d+\]" % re.escape(dl), dl + "[]", text)
+        if new != text:
+            os.remove(p)  # (a hard link: written fresh)
+            open(p, "w").write(new)
+
+
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
@@ -461,6 +606,16 @@ def main():
         shutil.rmtree(out)
     # a copy of the tree of hard links (the files changed below are written fresh, breaking their link)
     shutil.copytree(src, out, copy_function=os.link)
+    fade_arrays = collections.defaultdict(dict)  # room -> {vertex array: vertices} (caustic_fade's)
+    for scene_dir, room, dls in CAUSTICS:
+        d = os.path.join(out, scene_dir)
+        for dl in dls:
+            arrs, moved = caustic_fade(d, dl)
+            fade_arrays[room].update(arrs)
+            if moved:
+                unsize(d, room, dl)
+            if report:
+                print("meshpack: %s: %d caustic triangles faded with depth" % (dl, moved))
     for scene_dir, room, dls in TARGETS:
         d = os.path.join(out, scene_dir)
         areas = {}      # area list name -> commands
@@ -514,6 +669,9 @@ def main():
             open(p, "w").write("".join("    %s,\n" % c for c in cmds))
         defs = []
         externs = []
+        for vname, vtx in fade_arrays.pop(room, {}).items():
+            externs.append("extern Vtx %s[];\n" % vname)
+            defs.append("Vtx %s[] = {\n%s};\n\n" % (vname, "".join("    VTX(%s),\n" % ", ".join(v) for v in vtx)))
         for name, cmds in areas.items():
             vname = name + "_Vtx"
             externs.append("extern Vtx %s[];\nextern Gfx %s[];\n" % (vname, name))

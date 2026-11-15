@@ -578,7 +578,7 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_OLDSKY_1CYC (1 << 23) //   the sky in 2-cycle always
 #define FISHMOD_BENCH_OLDSKY (FISHMOD_BENCH_OLDSKY_FILL | FISHMOD_BENCH_OLDSKY_Z | FISHMOD_BENCH_OLDSKY_1CYC)
 #define FISHMOD_BENCH_NOSKY (1 << 7)      // no skybox
-#define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry (the water surface)
+#define FISHMOD_BENCH_NOROOMXLU (1 << 8)  // no room translucent geometry, nor Lake Hylia's water plane (the water surface)
 // (the anatomy sweep: fishmod/scripts/anatomy_sweep.inc.c)
 #define FISHMOD_BENCH_NOROOMOPA (1 << 9)   // no room opaque geometry (the terrain: the lake bed, banks and cliffs)
 #define FISHMOD_BENCH_NOLINK (1 << 10)     // Link not drawn

@@ -7,6 +7,7 @@
 #include "z_bg_spot06_objects.h"
 
 #include "array_count.h"
+#include "fishmod.h"
 #include "gfx.h"
 #include "gfx_setupdl.h"
 #include "ichain.h"
@@ -442,6 +443,10 @@ void BgSpot06Objects_Update(Actor* thisx, PlayState* play) {
 void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) {
     STACK_PAD(s32);
     s32 gameplayFrames;
+
+    if (FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOROOMXLU)) {
+        return; // fish-oot: (the bench's view without the water's surface: the lake bed seen clearly)
+    }
 
     OPEN_DISPS(play->state.gfxCtx, "../z_bg_spot06_objects.c", 844);
 

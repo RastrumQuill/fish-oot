@@ -1249,6 +1249,19 @@ void Scene_DrawConfigLakeHylia(PlayState* play) {
     gSPSegment(POLY_OPA_DISP++, 0x09,
                Gfx_TwoTexScrollEnvColor(play->state.gfxCtx, G_TX_RENDERTILE, -gameplayFrames, -gameplayFrames, 32, 32,
                                         1, 0, 0, 16, 64, 0, 0, 0, play->roomCtx.drawParams[0] + 168));
+    // fish-oot: the lake bed's caustics fading with depth (tools/meshpack.py's caustic_fade): the steps between the
+    // scene's colour and 255 (sand only, as here when the lake is drained), a list each
+    {
+        s32 base = play->roomCtx.drawParams[0] + 168;
+        Gfx* steps = GRAPH_ALLOC(play->state.gfxCtx, 3 * 2 * sizeof(Gfx));
+        s32 i;
+
+        for (i = 0; i < 3; i++) {
+            gDPSetEnvColor(&steps[i * 2], 0, 0, 0, base + (255 - base) * (i + 1) / 4);
+            gSPEndDisplayList(&steps[i * 2 + 1]);
+        }
+        gSPSegment(POLY_OPA_DISP++, 0x0A, steps);
+    }
 
     gDPPipeSync(POLY_OPA_DISP++);
     gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 128);
