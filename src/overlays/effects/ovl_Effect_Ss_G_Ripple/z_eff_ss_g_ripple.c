@@ -69,6 +69,21 @@ u32 EffectSsGRipple_Init(PlayState* play, u32 index, EffectSs* this, void* initP
     return 1;
 }
 
+/*
+ * fish-oot: a ripple drawn right after another (nothing between them in the list) doesn't load the texture again:
+ * gEffWaterRippleDL without its load, TMEM and the tiles still holding the last one's (the setup list and colours
+ * between don't touch them). The same picture: a schooling fish's ripples come many to a frame, each loaded 4 KB.
+ */
+static Gfx sRippleNoLoadDL[] = {
+    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),
+    gsSPClearGeometryMode(G_CULL_BACK),
+    gsSPVertex(gEffWaterRippleVtx, 4, 0),
+    gsSP2Triangles(0, 1, 2, 0, 0, 2, 3, 0),
+    gsSPEndDisplayList(),
+};
+static Gfx* sRippleListEnd; // where the last ripple's commands ended, and in which frame
+static u32 sRippleFrame;
+
 void EffectSsGRipple_DrawRipple(PlayState* play2, EffectSs* this, void* segment) {
     PlayState* play = play2;
     f32 radius;
@@ -76,8 +91,12 @@ void EffectSsGRipple_DrawRipple(PlayState* play2, EffectSs* this, void* segment)
     MtxF mfResult;
     Mtx* mtx;
     f32 yPos;
+    s32 loaded;
 
     OPEN_DISPS(gfxCtx, "../z_eff_ss_g_ripple.c", 199);
+
+    loaded = (POLY_XLU_DISP == sRippleListEnd) && (sRippleFrame == play->state.frames) &&
+             (this->gfx == SEGMENTED_TO_VIRTUAL(gEffWaterRippleDL));
 
     radius = this->rRadius * 0.0025f;
 
@@ -117,7 +136,11 @@ void EffectSsGRipple_DrawRipple(PlayState* play2, EffectSs* this, void* segment)
         gDPSetEnvColor(POLY_XLU_DISP++, this->rEnvColorR, this->rEnvColorG, this->rEnvColorB, this->rEnvColorA);
         gDPSetAlphaDither(POLY_XLU_DISP++, G_AD_NOISE);
         gDPSetColorDither(POLY_XLU_DISP++, G_CD_NOISE);
-        gSPDisplayList(POLY_XLU_DISP++, this->gfx);
+        gSPDisplayList(POLY_XLU_DISP++, loaded ? sRippleNoLoadDL : this->gfx);
+        if (this->gfx == SEGMENTED_TO_VIRTUAL(gEffWaterRippleDL)) {
+            sRippleListEnd = POLY_XLU_DISP;
+            sRippleFrame = play->state.frames;
+        }
     }
 
     CLOSE_DISPS(gfxCtx, "../z_eff_ss_g_ripple.c", 247);

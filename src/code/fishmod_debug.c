@@ -80,6 +80,8 @@ typedef struct FishmodLodView {
     u8 under;
 } FishmodLodView;
 
+f32 gFishmodTouchTest[5]; // (fishmod.h: a script's plant-touch test)
+
 #ifdef FISHMOD_SCRIPT
 #include FISHMOD_SCRIPT
 #else
@@ -749,6 +751,17 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.gameMode = GAMEMODE_NORMAL;
 
     gFishmodBench |= sScript.bench;
+#ifdef FISHMOD_TOUCH_TEST
+    {
+        static const f32 sAt[3] = FISHMOD_TOUCH_TEST;
+
+        gFishmodTouchTest[0] = sAt[0];
+        gFishmodTouchTest[1] = sAt[1];
+        gFishmodTouchTest[2] = sAt[2];
+        gFishmodTouchTest[3] = FISHMOD_TOUCH_SWEEP;
+        gFishmodTouchTest[4] = FISHMOD_TOUCH_PERIOD;
+    }
+#endif
     if (sScript.flags & FISHMOD_SCRIPT_F_ALTEDGE) {
         gFishmodBench |= FISHMOD_BENCH_ALTEDGE; // the props' other edge mode from the start
     }

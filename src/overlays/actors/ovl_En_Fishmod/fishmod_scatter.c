@@ -387,12 +387,17 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 // (Scatter_Touch's: the props making way for Link)
 #define TOUCH_MAX 16
 #define TOUCH_NONE 0xFF
-#define TOUCH_LEAN 0.85f     // the most a plant leans (its top's sideways move per unit of height)
+#define TOUCH_LEAN 1.0f      // the most a plant's top moves sideways, per unit of its height
 #define TOUCH_PUSH 32.0f     // the furthest a floating plant drifts
 #define TOUCH_FLOAT_R 50.0f  // how near a floating plant's middle Link pushes it
 #define TOUCH_EASE 0.3f      // how fast they follow (a share of the way each frame)
 #define TOUCH_BACK 0.03f     // and come back (floating: slowly, his wake lingers, as the Fishing Pond's pads)
-#define TOUCH_SPRING 0.12f   // (a plant: springs back up)
+#define TOUCH_SPRING 0.09f   // (a plant: springs back up, its stiffness...
+#define TOUCH_DAMP 0.22f     //  ...and how quickly its swing dies down: a little past upright, back, and still)
+// A touched plant bends, not tips: its vertices loaded in bands up its height, each band under more of the lean than
+// the one below (Scatter_Bend): the top goes furthest and the stalk curves. The kind's model cut into the bands once.
+#define BEND_BANDS 4
+#define BEND_VTX_MAX (ENABLE_F3DEX3 ? 56 : 32) // (the microcode's vertex buffer: every band's vertices in it at once)
 typedef struct ScatterTouch {
     u16 prop;
     u8 used;
@@ -401,7 +406,16 @@ typedef struct ScatterTouch {
     f32 z;
     f32 tx; // where it's heading this frame
     f32 tz;
+    f32 vx; // (a plant springing back: how fast)
+    f32 vz;
 } ScatterTouch;
+typedef struct ScatterBend {
+    Vtx* vtx;                     // the model's vertices cut at the bands' heights, band by band
+    u8 start[BEND_BANDS + 1];     // each band's first
+    Gfx* tris;                    // the triangles, drawn once every band is loaded
+} ScatterBend;
+static ScatterBend* sBend[FISHMOD_PROP_KIND_MAX]; // (made the first time one of the kind is touched)
+static u8 sBendTried[FISHMOD_PROP_KIND_MAX];
 static ScatterTouch sTouch[TOUCH_MAX];
 static u8* sTouchSlot; // [sScatter->count]: each prop's touch, or TOUCH_NONE
 static u32 sTouchGen;  // a touch begun or ended
@@ -410,10 +424,12 @@ static u8 sTouchable[FISHMOD_PROP_KIND_MAX]; // the kinds that make way (swaying
 // The props' commands, two frames' worth (the RSP reads last frame's while this one is built), in buffers of their
 // own rather than the frame's display buffer, which the scene and the fish need.
 typedef struct ScatterFrame {
-    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96 + TOUCH_MAX]; // (and the dock, the far edge mode's material, the touched)
-    Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4 + TOUCH_MAX];
+    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96 + TOUCH_MAX * (BEND_BANDS * 4 + 2)]; // (the dock, the far edge
+                                                                                     // mode's material, the touched)
+    Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4 + TOUCH_MAX * (BEND_BANDS * 4 + 2)];
     Mtx sway[SWAY_MAX];
     Mtx bend[TOUCH_MAX]; // the props Link is touching: bent or pushed aside (Scatter_Touch)
+    Mtx bendBand[TOUCH_MAX][BEND_BANDS]; // (a touched plant's bands' leans: Scatter_Bend)
     Gfx rockScroll[5];   // the shallow rocks' caustics scrolled (Scatter_RockCaustics)
     Lights lights; // the scene's lights, this frame's (here so the kept commands' address for them stays the same)
 } ScatterFrame;
@@ -832,6 +848,17 @@ void EnFishmod_ScatterUnload(void) {
     if (sTouchSlot != NULL) {
         ZeldaArena_Free(sTouchSlot);
         sTouchSlot = NULL;
+    }
+    {
+        s32 k;
+
+        for (k = 0; k < FISHMOD_PROP_KIND_MAX; k++) {
+            if (sBend[k] != NULL) {
+                ZeldaArena_Free(sBend[k]);
+                sBend[k] = NULL;
+            }
+            sBendTried[k] = false;
+        }
     }
     if (sPropMtx != NULL) {
         ZeldaArena_Free(sPropMtx);
@@ -1329,6 +1356,16 @@ static void Scatter_Touch(PlayState* play) {
         px = player->actor.world.pos.x;
         py = player->actor.world.pos.y;
         pz = player->actor.world.pos.z;
+#if FISHMOD_DEBUG
+        if (gFishmodTouchTest[4] > 0.0f) {
+            // (a script's test, FISHMOD_TOUCH_TEST: a point swept to and fro through a bed along x instead of Link)
+            s16 ang = (s16)(play->gameplayFrames * (s32)(65536.0f / gFishmodTouchTest[4]));
+
+            px = gFishmodTouchTest[0] + Math_SinS(ang) * gFishmodTouchTest[3];
+            py = gFishmodTouchTest[1];
+            pz = gFishmodTouchTest[2];
+        }
+#endif
         cx = (s32)((px - sScatter->x0) / sScatter->chunk);
         cz = (s32)((pz - sScatter->z0) / sScatter->chunk);
         for (i = 0; i < 9; i++) {
@@ -1405,6 +1442,7 @@ static void Scatter_Touch(PlayState* play) {
                     sTouch[slot].used = true;
                     sTouch[slot].prop = n;
                     sTouch[slot].x = sTouch[slot].z = 0.0f;
+                    sTouch[slot].vx = sTouch[slot].vz = 0.0f;
                     sTouchSlot[n] = slot;
                     sTouchGen++;
                 }
@@ -1428,13 +1466,23 @@ static void Scatter_Touch(PlayState* play) {
         if (!t->used) {
             continue;
         }
-        {
-            f32 rate = t->hit ? TOUCH_EASE : sKinds[sProps[t->prop].kind].floating ? TOUCH_BACK : TOUCH_SPRING;
-
-            t->x += (t->tx - t->x) * rate;
-            t->z += (t->tz - t->z) * rate;
+        if (t->hit) {
+            t->x += (t->tx - t->x) * TOUCH_EASE;
+            t->z += (t->tz - t->z) * TOUCH_EASE;
+            t->vx = t->vz = 0.0f;
+        } else if (sKinds[sProps[t->prop].kind].floating) {
+            t->x -= t->x * TOUCH_BACK;
+            t->z -= t->z * TOUCH_BACK;
+        } else {
+            // a spring with a little damping: up, a little past, back
+            t->vx += -t->x * TOUCH_SPRING - t->vx * TOUCH_DAMP;
+            t->vz += -t->z * TOUCH_SPRING - t->vz * TOUCH_DAMP;
+            t->x += t->vx;
+            t->z += t->vz;
         }
-        if (!t->hit && (SQ(t->x) + SQ(t->z) < SQ(sKinds[sProps[t->prop].kind].floating ? 0.3f : 0.01f))) {
+        if (!t->hit &&
+            (SQ(t->x) + SQ(t->z) < SQ(sKinds[sProps[t->prop].kind].floating ? 0.3f : 0.01f)) &&
+            (SQ(t->vx) + SQ(t->vz) < SQ(0.005f))) {
             t->used = false;
             sTouchSlot[t->prop] = TOUCH_NONE;
             sTouchGen++;
@@ -1489,13 +1537,237 @@ static void Scatter_TouchMatrices(ScatterFrame* frame) {
             MTX_SET(mtx, 3, 1, 0);
             MTX_SET(mtx, 3, 2, (s32)(b * k * 65536.0f));
         } else {
+            s32 k;
+
             MTX_SET(mtx, 1, 0, (s32)(a * 65536.0f));
             MTX_SET(mtx, 1, 2, (s32)(b * 65536.0f));
             MTX_SET(mtx, 3, 0, 0);
             MTX_SET(mtx, 3, 1, 0);
             MTX_SET(mtx, 3, 2, 0);
+            // the bands' (Scatter_Bend): each a share of the lean by its height, so a vertex at height y moves about
+            // lean * y * (y / height): the stalk curves, its foot stays put, its top goes as far as the whole lean
+            for (k = 0; k < BEND_BANDS; k++) {
+                Mtx* m = &frame->bendBand[i][k];
+                f32 f = (k + 0.5f) * (1.15f / BEND_BANDS);
+
+                *m = *mtx;
+                MTX_SET(m, 1, 0, (s32)(a * f * 65536.0f));
+                MTX_SET(m, 1, 2, (s32)(b * f * 65536.0f));
+            }
         }
     }
+}
+
+/**
+ * A kind's model cut into BEND_BANDS height bands (its triangles clipped at the bands' heights, their corners
+ * interpolated), the vertices band by band: loaded each under its own band's lean and then all the triangles drawn,
+ * each vertex is moved once, so nothing parts. NULL if the model isn't one this reads (geometry only), or its
+ * vertices don't all fit the vertex buffer at once (the plant then leans whole).
+ */
+#define BEND_TRI_MAX 160
+typedef struct BendV {
+    f32 p[3];
+    f32 st[2];
+    f32 c[4];
+} BendV;
+
+static void Bend_Lerp(BendV* out, BendV* a, BendV* b, f32 f) {
+    s32 i;
+
+    for (i = 0; i < 3; i++) {
+        out->p[i] = a->p[i] + (b->p[i] - a->p[i]) * f;
+    }
+    for (i = 0; i < 2; i++) {
+        out->st[i] = a->st[i] + (b->st[i] - a->st[i]) * f;
+    }
+    for (i = 0; i < 4; i++) {
+        out->c[i] = a->c[i] + (b->c[i] - a->c[i]) * f;
+    }
+}
+
+/** the part of polygon in (n corners) on the side y >= h (keep > 0) or y <= h (keep < 0) */
+static s32 Bend_Clip(BendV* in, s32 n, BendV* out, f32 h, s32 keep) {
+    s32 m = 0;
+    s32 i;
+
+    for (i = 0; i < n; i++) {
+        BendV* a = &in[i];
+        BendV* b = &in[(i + 1) % n];
+        s32 ia = (a->p[1] - h) * keep >= 0.0f;
+        s32 ib = (b->p[1] - h) * keep >= 0.0f;
+
+        if (ia) {
+            out[m++] = *a;
+        }
+        if (ia != ib) {
+            Bend_Lerp(&out[m++], a, b, (h - a->p[1]) / (b->p[1] - a->p[1]));
+        }
+    }
+    return m;
+}
+
+static ScatterBend* Scatter_BendBuild(Gfx* model) {
+    static BendV sTri[BEND_TRI_MAX][3];
+    static Vtx sOut[64];
+    static u8 sOutBand[64];
+    static u8 sIdx[BEND_TRI_MAX * 3][3];
+    Vtx* slot[64];
+    u32* w = (u32*)model;
+    s32 nTri = 0;
+    s32 nOut = 0;
+    s32 nIdx = 0;
+    f32 y0 = 1e9f;
+    f32 y1 = -1e9f;
+    s32 i;
+    s32 k;
+    s32 n;
+    ScatterBend* b;
+
+    bzero(slot, sizeof(slot));
+    // the model's triangles (a list of vertex loads and triangles)
+    for (n = 0; n < 1024; n++, w += 2) {
+        u32 op = w[0] >> 24;
+
+        if (op == G_ENDDL) {
+            break;
+        } else if (op == G_VTX) {
+            s32 cnt = (w[0] >> 12) & 0xFF;
+            s32 v0 = ((w[0] & 0xFF) >> 1) - cnt;
+            Vtx* v = (Vtx*)w[1];
+
+            if ((v0 < 0) || (v0 + cnt > 64) || ((w[1] >> 24) != 0x80)) {
+                return NULL;
+            }
+            for (i = 0; i < cnt; i++) {
+                slot[v0 + i] = &v[i];
+            }
+        } else if ((op == G_TRI1) || (op == G_TRI2)) {
+            s32 t;
+
+            for (t = 0; t < ((op == G_TRI2) ? 2 : 1); t++) {
+                u32 x = (t == 0) ? w[0] : w[1];
+                s32 c;
+
+                if (nTri >= BEND_TRI_MAX) {
+                    return NULL;
+                }
+                for (c = 0; c < 3; c++) {
+                    Vtx* v = slot[((x >> (16 - 8 * c)) & 0xFF) >> 1];
+                    BendV* o = &sTri[nTri][c];
+
+                    if (v == NULL) {
+                        return NULL;
+                    }
+                    o->p[0] = v->v.ob[0];
+                    o->p[1] = v->v.ob[1];
+                    o->p[2] = v->v.ob[2];
+                    o->st[0] = v->v.tc[0];
+                    o->st[1] = v->v.tc[1];
+                    o->c[0] = v->v.cn[0];
+                    o->c[1] = v->v.cn[1];
+                    o->c[2] = v->v.cn[2];
+                    o->c[3] = v->v.cn[3];
+                    y0 = MIN(y0, o->p[1]);
+                    y1 = MAX(y1, o->p[1]);
+                }
+                nTri++;
+            }
+        } else if ((op != G_RDPPIPESYNC) && (op != G_CULLDL) && (op != G_NOOP)) {
+            return NULL; // (not geometry alone)
+        }
+    }
+    if ((nTri == 0) || (y1 - y0 < 1.0f)) {
+        return NULL;
+    }
+    // each triangle cut at the bands' heights; the pieces' corners, the same ones merged
+    for (i = 0; i < nTri; i++) {
+        for (k = 0; k < BEND_BANDS; k++) {
+            BendV a[8];
+            BendV c[8];
+            f32 lo = y0 + (y1 - y0) * k / BEND_BANDS;
+            f32 hi = y0 + (y1 - y0) * (k + 1) / BEND_BANDS;
+            s32 m = Bend_Clip(sTri[i], 3, a, lo, 1);
+            s32 j;
+            u8 ids[8];
+
+            m = Bend_Clip(a, m, c, hi, -1);
+            if (m < 3) {
+                continue;
+            }
+            for (j = 0; j < m; j++) {
+                Vtx v;
+                s32 q;
+
+                v.v.ob[0] = (s16)(c[j].p[0] + ((c[j].p[0] < 0.0f) ? -0.5f : 0.5f));
+                v.v.ob[1] = (s16)(c[j].p[1] + ((c[j].p[1] < 0.0f) ? -0.5f : 0.5f));
+                v.v.ob[2] = (s16)(c[j].p[2] + ((c[j].p[2] < 0.0f) ? -0.5f : 0.5f));
+                v.v.flag = 0;
+                v.v.tc[0] = (s16)(c[j].st[0] + ((c[j].st[0] < 0.0f) ? -0.5f : 0.5f));
+                v.v.tc[1] = (s16)(c[j].st[1] + ((c[j].st[1] < 0.0f) ? -0.5f : 0.5f));
+                v.v.cn[0] = (u8)(c[j].c[0] + 0.5f);
+                v.v.cn[1] = (u8)(c[j].c[1] + 0.5f);
+                v.v.cn[2] = (u8)(c[j].c[2] + 0.5f);
+                v.v.cn[3] = (u8)(c[j].c[3] + 0.5f);
+                for (q = 0; q < nOut; q++) {
+                    if (bcmp(&sOut[q], &v, sizeof(Vtx)) == 0) {
+                        break;
+                    }
+                }
+                if (q == nOut) {
+                    if (nOut >= BEND_VTX_MAX) {
+                        return NULL;
+                    }
+                    sOut[nOut] = v;
+                    // (its band by its height: a corner on a band's edge belongs to the one above)
+                    sOutBand[nOut] = CLAMP((s32)((v.v.ob[1] - y0) * BEND_BANDS / (y1 - y0)), 0, BEND_BANDS - 1);
+                    nOut++;
+                }
+                ids[j] = q;
+            }
+            for (j = 1; j < m - 1; j++) {
+                if (nIdx >= BEND_TRI_MAX * 3) {
+                    return NULL;
+                }
+                sIdx[nIdx][0] = ids[0];
+                sIdx[nIdx][1] = ids[j];
+                sIdx[nIdx][2] = ids[j + 1];
+                nIdx++;
+            }
+        }
+    }
+    b = ZeldaArena_Malloc(sizeof(ScatterBend) + nOut * sizeof(Vtx) + ((nIdx + 1) / 2 + 1) * sizeof(Gfx) + 16);
+    if (b == NULL) {
+        return NULL;
+    }
+    {
+        // the vertices band by band; the triangles in those numbers
+        u8 at[64];
+        s32 o = 0;
+        Gfx* g;
+
+        b->vtx = (Vtx*)ALIGN16((u32)(b + 1));
+        for (k = 0; k < BEND_BANDS; k++) {
+            b->start[k] = o;
+            for (i = 0; i < nOut; i++) {
+                if (sOutBand[i] == k) {
+                    at[i] = o;
+                    b->vtx[o++] = sOut[i];
+                }
+            }
+        }
+        b->start[BEND_BANDS] = o;
+        g = b->tris = (Gfx*)(b->vtx + nOut);
+        for (i = 0; i < nIdx; i += 2) {
+            if (i + 1 < nIdx) {
+                gSP2Triangles(g++, at[sIdx[i][0]], at[sIdx[i][1]], at[sIdx[i][2]], 0, at[sIdx[i + 1][0]],
+                              at[sIdx[i + 1][1]], at[sIdx[i + 1][2]], 0);
+            } else {
+                gSP1Triangle(g++, at[sIdx[i][0]], at[sIdx[i][1]], at[sIdx[i][2]], 0);
+            }
+        }
+        gSPEndDisplayList(g++);
+    }
+    return b;
 }
 
 /** The sway shears for this frame: per swaying kind, a few phases. */
@@ -2301,6 +2573,40 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                                         (t * light[2] * c[2]) >> 16, a);
             } else {
                 opa = Scatter_PropColor(opa, tier, (t * light[0]) >> 8, (t * light[1]) >> 8, (t * light[2]) >> 8, a);
+            }
+        }
+        if ((sTouchSlot != NULL) && (sTouchSlot[set->prop[n]] != TOUCH_NONE) && !info->floating &&
+            (tier == TIER_NEAR)) {
+            // a touched plant, bending: its bands loaded each under its own share of the lean, then its triangles
+            s32 slot = sTouchSlot[set->prop[n]];
+            ScatterBend* bend;
+
+            if (!sBendTried[kind]) {
+                sBendTried[kind] = true;
+                sBend[kind] = Scatter_BendBuild(info->model);
+            }
+            bend = sBend[kind];
+            if (bend != NULL) {
+                s32 k;
+
+                for (k = 0; k < BEND_BANDS; k++) {
+                    s32 cnt = bend->start[k + 1] - bend->start[k];
+
+                    if (cnt == 0) {
+                        continue;
+                    }
+                    gSPMatrix((*disp)++, set->mtxp[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+                    if (info->sway != 0) {
+                        s32 ph = ((prop->x + prop->z) >> 7) & (SWAY_PHASES - 1);
+
+                        gSPMatrix((*disp)++, &frame->sway[kind * SWAY_PHASES + ph],
+                                  G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
+                    }
+                    gSPMatrix((*disp)++, &frame->bendBand[slot][k], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
+                    gSPVertex((*disp)++, &bend->vtx[bend->start[k]], cnt, bend->start[k]);
+                }
+                gSPDisplayList((*disp)++, bend->tris);
+                continue;
             }
         }
         gSPMatrix((*disp)++, set->mtxp[n], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);

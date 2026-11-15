@@ -284,6 +284,7 @@ class ZRaster:
 
 
 ZR = None  # (--overdraw)
+LOADS = None  # (--loads: texture image address -> [loads, bytes])
 EXCLUDE = None  # (--exclude: lists the overdraw leaves out, as the HUD's)
 
 
@@ -405,6 +406,9 @@ def walk(fr, start, fits, culldir):
             else:
                 b = ((((w1 >> 12) & 0xFFF) >> 2) + 1) * 2
             ns = LOAD_NS + LOAD_NS_PER_KB * b / 1024.0
+            if LOADS is not None:
+                LOADS[timg[1]][0] += 1
+                LOADS[timg[1]][1] += b
             for k in (key,):
                 per[k][3] += 1
                 per[k][4] += ns
@@ -479,10 +483,13 @@ def main():
     ap.add_argument("--json", help="also write every list's numbers here")
     ap.add_argument("--trace", type=float, default=0, help="print each triangle or rectangle costing this many us")
     ap.add_argument("--overdraw", action="store_true", help="also: per list, pixels drawn and then covered (ZRaster)")
+    ap.add_argument("--loads", action="store_true", help="also: the textures loaded, by bytes (with --json: saved)")
     ap.add_argument("--exclude", help="REGEX: lists the overdraw leaves out (the HUD's, whose projection isn't walked)")
     args = ap.parse_args()
-    global TRACE, ZR, EXCLUDE
+    global TRACE, ZR, EXCLUDE, LOADS
     TRACE = args.trace * 1000
+    if args.loads:
+        LOADS = collections.defaultdict(lambda: [0, 0])
     if args.overdraw:
         ZR = ZRaster()
         EXCLUDE = re.compile(args.exclude) if args.exclude else None
@@ -516,6 +523,31 @@ def main():
                                                        e[3]))
     if ZR is not None:
         ZR.report(str, args.top)
+    if LOADS is not None:
+        print("\n| texture | loads | bytes |")
+        print("|---|---|---|")
+        out = subprocess.run(["mips-linux-gnu-nm", args.elf], capture_output=True, text=True).stdout
+        at = collections.defaultdict(list)
+        for line in out.splitlines():
+            f = line.split()
+            if len(f) == 3:
+                at[int(f[0], 16)].append(f[2])
+
+        def tex_name(a):
+            # a segmented address: the symbols linked there (each scene, room and object is linked at its segment's
+            # base, so several share it: Lake Hylia's and the keeps' first)
+            if a >> 24 in range(1, 16):
+                cands = [n for n in at.get(a, []) if "Tex" in n or "TLUT" in n] or at.get(a, [])
+                for pref in ("spot06", "gameplay_keep", "gameplay_field_keep"):
+                    for n in cands:
+                        if n.startswith(pref) or pref in n:
+                            return n
+                return cands[0] if cands else "%08X" % a
+            return fr.name(a & 0x1FFFFFFF) if a else "-"
+        for a, (n, b) in sorted(LOADS.items(), key=lambda kv: -kv[1][1])[:args.top]:
+            print("| %s | %d | %d |" % (tex_name(a), n, b))
+        print("| all %d textures | %d | %d |" % (len(LOADS), sum(v[0] for v in LOADS.values()),
+                                                 sum(v[1] for v in LOADS.values())))
 
 
 if __name__ == "__main__":

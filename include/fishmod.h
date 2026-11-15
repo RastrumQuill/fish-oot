@@ -732,6 +732,10 @@ struct Lights;
 // the lake's terrain lit by the CPU (fishmod.c, meshpack builds): sets its vertex segment for this frame
 Gfx* Fishmod_Relight(struct PlayState* play, struct Lights* lights, Gfx* gfx);
 void Fishmod_TerrainRA(struct PlayState* play);
+#if FISHMOD_DEBUG
+// a script's plant-touch test (FISHMOD_TOUCH_TEST, _SWEEP, _PERIOD): x, y, z, sweep, period (0: off)
+extern f32 gFishmodTouchTest[5];
+#endif
 // The sky last (FISHMOD_BENCH_SKYLAST, a test): drawn after the opaque scene, depth-tested at a fixed depth beyond
 // anything in the scene (the cleared depth buffer's is the only one further), so it fills only the pixels nothing
 // covers: the same picture, without drawing the sky under the terrain first. The sun and moon the same.

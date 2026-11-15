@@ -1,4 +1,5 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# frames21: the route profiled (12 minutes), then the terrain sweep: 18 laps, about 70 minutes.
+# frames21 (12 minutes), the terrain sweep (18 laps, about 70 minutes), frames22 (12 minutes: compare with frames21).
 releases/fish-oot-frames21.bps 12 frames21
 releases/fish-oot-terrain-sweep.bps 90 terrain-sweep
+releases/fish-oot-frames22.bps 12 frames22

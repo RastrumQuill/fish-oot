@@ -67,7 +67,8 @@ SAFE_STATE = {"gsDPPipeSync", "gsSPClearGeometryMode", "gsSPSetGeometryMode", "g
               "gsDPSetRenderMode", "gsDPSetPrimColor", "gsDPSetEnvColor", "gsSPDisplayList",
               "gsDPLoadTextureBlock_4b", "gsDPLoadMultiBlock_4b", "gsDPSetTile", "gsDPSetTileSize",
               "gsDPLoadSync", "gsDPTileSync", "gsDPSetTextureImage", "gsDPLoadBlock", "gsDPSetFogColor",
-              "gsDPLoadTLUT_pal16", "gsDPLoadTLUT_pal256", "gsDPLoadTextureBlock_4b"}
+              "gsDPLoadTLUT_pal16", "gsDPLoadTLUT_pal256", "gsDPLoadTextureBlock_4b", "gsDPLoadTLUT",
+              "gsDPLoadMultiBlock_4b"}  # (the palette loads and 4-bit textures of tools/texpack.py's output)
 
 
 def split_items(text):
@@ -193,11 +194,13 @@ def cut(dirpath, dl):
     # every kind of state the list changes must be set before its first triangle: then an area replaying the list's
     # state up to its own triangles sets every one of them to what the original had there, whatever an area before it
     # left (one changed only later could still hold a later value when an earlier triangle is drawn)
+    # (the material cut, the default, keeps every state command where it was and only regroups the triangles between
+    # two of them: this holds for the per-area cut alone)
     first = tris[0][0]
     early = {state_key(c) for c in stream[:first]}
     for c in stream[first:]:
         k = state_key(c)
-        if k is not None and k not in early:
+        if BY_AREA and k is not None and k not in early:
             return None, "state first set after a triangle (%s)" % name_of(c)
     # the original's bounding box load and cull come first in its stream (state only around them): the cull itself is
     # dropped here, the box vertices aren't in `stream` (vertex loads aren't state)
