@@ -77,7 +77,7 @@ typedef struct FishmodPropKindInfo {
     u8 xlu;      // drawn see-through (the Fishing Pond's reed, as vanilla draws it)
     u8 sway;     // how far its top sways (per mille of its height per unit of height); 0: still
     u8 swayRate; // how fast (a turn takes 0x10000 / (swayRate * 16) frames)
-    u8 card;     // a big plant card: not drawn with the camera inside it (NEAR_SKIP)
+    u8 card;     // a big plant card: not drawn with the camera inside it (NEAR_SKIP_R)
     u8 faceCam;  // one card turned about its up, at most enough to stay within 45 degrees of facing the camera
     u16 height;  // how tall it is at scale 1 (gen_scatter.py HEIGHT), for the camera-inside test
     u16 extent;  // how far it reaches from where it stands at scale 1 (up, or down for hanging ones): the view test
@@ -119,9 +119,11 @@ typedef struct FishmodPropKindInfo {
 #define XLU_MAX FISHMOD_PROFILE_XLU_MAX
 // Under water the haze hides everything past about this far, whatever the kind (the measured distances can be less)
 #define DIST_UNDER_FOG FISHMOD_PROFILE_DIST_UNDER_FOG
-// A plant the camera is inside or right against isn't drawn: one card there is a blur across the whole screen, at
-// the RDP's full cost (closer than this times the plant's height, plus a little)
-#define NEAR_SKIP 0.6f
+// A plant the camera is inside isn't drawn: one card there is a blur across the whole screen, at the RDP's full cost.
+// Inside: within its width across the ground (NEAR_SKIP_R at scale 1, plus a little) and between its foot and its
+// top. (It was a sphere of 0.6 of its height round its middle: 170 units for a big kelp, about where the camera keeps
+// behind Link, so the plants between them were left out and popped in as the camera moved.)
+#define NEAR_SKIP_R 30.0f
 // the cut-outs' edges smoothed by the VI alone, from the coverage the RDP writes (no read of the colour buffer):
 // see Scatter_Material. Only for props nearer than PROP_EDGE_RA_DIST: far ones are a few pixels across, mostly edge,
 // and lose those partly covered pixels without the blend (small lotus flowers vanished in the exact A/B capture,
@@ -2316,11 +2318,12 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 }
 #endif
                 if (info->card) {
-                    // the camera inside it or right against it
-                    f32 h = info->height * prop->scale * (1.0f / 64.0f);
-                    f32 r = h * NEAR_SKIP + 20.0f;
+                    // the camera inside it
+                    f32 k = prop->scale * (1.0f / 64.0f);
+                    f32 h = info->height * k;
+                    f32 r = NEAR_SKIP_R * k + 10.0f;
 
-                    if ((dSq + SQ(prop->y + h * 0.5f - eye.y)) < SQ(r)) {
+                    if ((dSq < SQ(r)) && (eye.y > prop->y - 10.0f) && (eye.y < prop->y + h + 10.0f)) {
                         continue;
                     }
                 }
