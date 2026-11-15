@@ -1,0 +1,4 @@
+Morning runs 20261115-0722
+
+ 1. frames22                     done        428 packets    3.2 MB   225 s  
+ 2. frames23                     done        439 packets    3.3 MB   228 s  

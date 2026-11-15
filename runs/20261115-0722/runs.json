@@ -1,0 +1,30 @@
+[
+ {
+  "run": 1,
+  "label": "frames22",
+  "patch": "releases\\fish-oot-frames22.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-15 07:22:25",
+  "patch_sha1": "2466274ed40e267fbe070baca1486f7673e922e3",
+  "upload_check": "ok",
+  "packets": 428,
+  "bytes": 3242552,
+  "packs": 1,
+  "seconds": 225
+ },
+ {
+  "run": 2,
+  "label": "frames23",
+  "patch": "releases\\fish-oot-frames23.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-15 07:26:13",
+  "patch_sha1": "26069dca05b6a3ffb0c3d79800c8fb4276155b73",
+  "upload_check": "ok",
+  "packets": 439,
+  "bytes": 3324528,
+  "packs": 1,
+  "seconds": 228
+ }
+]
