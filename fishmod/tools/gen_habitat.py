@@ -1307,6 +1307,16 @@ def write_props_manifest():
         # which a palette's texture can't share the texture memory with)
         textures.append({"name": "gFishmodProp_rockvcTexRGBA", "src": os.path.relpath(rv[1], ROOT),
                          "format": "rgba16", "out": out})
+        # and the lake bed's caustics as light alone (its brightness, i8): added to the shallow rocks (less its average:
+        # fishmod_scatter.c sRockLitMaterial), in the bed's own pattern, without its colour
+        caus = vanilla("scenes/overworld/spot06/spot06_scene_000170B8_Tex.rgba16.png")
+        grey = Image.new("L", caus.size)
+        grey.putdata([int(round(luma(c))) for c in caus.getdata()])
+        cpath = os.path.join(ART_ROM, "caustic_light.png")
+        grey.convert("RGBA").save(cpath)
+        print("caustic light: average %.1f" % (sum(grey.getdata()) / float(caus.size[0] * caus.size[1])))
+        textures.append({"name": "gFishmodProp_causticTex", "src": os.path.relpath(cpath, ROOT), "format": "i8",
+                         "out": out})
     with open(os.path.join(DATA, "props_manifest.json"), "w") as f:
         json.dump({"textures": textures, "materials": materials, "models": models}, f, indent=1)
     kinds = pk.GAME

@@ -345,14 +345,15 @@ static Gfx** sRockList; // each rock's own list (made for where it lies: rock_me
  */
 #define ROCK_STEPS 4
 #define ROCK_STEP_TOKEN 0xF15C0000 // (rock_mesh.py STEP_TOKEN)
+#define ROCK_LIGHT 28 // the caustics' light on a rock, sixteenths of the bed's share (its 87 of 255: about 0.6)
 static Gfx sRockStep[ROCK_STEPS][2];
 static Gfx* sRockScroll; // this frame's (in its buffer: ScatterFrame.rockScroll)
-extern u64 spot06_scene_000170B8_Tex[]; // (Lake Hylia's caustics: its scene's, where the rocks are drawn)
 static s32 sRockStepBase = -1;
 static Gfx sRockLitMaterial[] = {
     gsDPSetTextureLUT(G_TT_NONE),
-    // tile 0: the bed's caustics (on the rock's own coordinates at a quarter: about the bed's size in the world)
-    gsDPLoadTextureBlock(spot06_scene_000170B8_Tex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
+    // tile 0: the bed's caustics as light (their brightness: gen_habitat.py), on the rock's own coordinates at a
+    // quarter (about the bed's size in the world)
+    gsDPLoadTextureBlock(gFishmodProp_causticTex, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
                          G_TX_NOMIRROR | G_TX_WRAP, 5, 5, 2, 2),
     // tile 1: the rock
     gsDPLoadMultiBlock(gFishmodProp_rockvcTexRGBA, 0x100, 1, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0,
@@ -1219,12 +1220,14 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
     }
 #if ENABLE_F3DEX3
     if ((kind == FISHMOD_PROP_ROCK_LIT) && SCATTER_ONE_CYCLE() && (sRockList != NULL) && (sRockScroll != NULL)) {
-        // a rock in the shallows: the bed's caustics on it (2-cycle: the caustic texture blended into the rock's by
-        // the environment alpha, its step of the fade set by each rock's list; then the props' light and the vertex
-        // colours, as the others)
+        // a rock in the shallows: the bed's caustics on it as light (2-cycle: the rock's texture, plus the caustic
+        // light less its own average, times a strength: brighter under the bright lines, a little darker
+        // between. The bed's blend toward the caustic texture shows on its light sand, but only tints a dark rock.)
+        // The strength is each rock's step of the fade (its list calls sRockStep's: the environment colour); then the
+        // props' light and the vertex colours, as the others
         gDPPipeSync(gfx++);
         gDPSetCycleType(gfx++, G_CYC_2CYCLE);
-        gDPSetCombineLERP(gfx++, TEXEL1, TEXEL0, ENV_ALPHA, TEXEL0, 0, 0, 0, 1, COMBINED, 0, SHADE, 0, 0, 0, 0,
+        gDPSetCombineLERP(gfx++, TEXEL0, ENVIRONMENT, ENV_ALPHA, TEXEL1, 0, 0, 0, 1, COMBINED, 0, SHADE, 0, 0, 0, 0,
                           COMBINED);
         gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_OPA_SURF2);
         gSPDisplayList(gfx++, sRockLitMaterial);
@@ -1264,7 +1267,11 @@ static void Scatter_RockCaustics(PlayState* play, ScatterFrame* frame) {
 
         sRockStepBase = base;
         for (i = 0; i < ROCK_STEPS; i++) {
-            gDPSetEnvColor(&sRockStep[i][0], 0, 0, 0, base + (255 - base) * i / ROCK_STEPS);
+            // (the bed's step: its share of the caustics, 255 less its alpha, made the light's strength; the colour
+            // the caustic light's average brightness, so the light adds nothing on the whole)
+            s32 bed = base + (255 - base) * i / ROCK_STEPS;
+
+            gDPSetEnvColor(&sRockStep[i][0], 103, 103, 103, CLAMP_MAX((255 - bed) * ROCK_LIGHT / 16, 255));
             gSPEndDisplayList(&sRockStep[i][1]);
         }
     }

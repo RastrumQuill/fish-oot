@@ -47,6 +47,12 @@ CAUSTIC_FROM, CAUSTIC_TO = 150, 550   # depths (units) where the fade starts and
 CAUSTIC_STEPS = 4                      # steps of the fade (the lists in segment 0x0A: CAUSTIC_STEPS - 1 of them)
 if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
     CAUSTICS = []
+# ... and the caustic textures themselves made light alone: their brightness (i8), no colour (the water's colour is
+# the fog's; the rocks' caustics are the same light: fishmod_scatter.c). Half the size to load.
+GREY_CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_scene",
+                  ["spot06_scene_000170B8_Tex", "spot06_scene_00018CB8_Tex"])]
+if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
+    GREY_CAUSTICS = []
 RELIGHT = {"spot06_room_0"}  # rooms whose lit pieces read their vertices lit by the CPU (segment RELIT_SEG)
 if os.environ.get("MESHPACK_NO_RELIGHT"):  # (a test: the areas without the CPU's lighting)
     RELIGHT = set()
@@ -586,6 +592,40 @@ def caustic_fade(dirpath, dl):
     return new_arrays, moved
 
 
+def grey_caustics(dirpath, scene, texs, dls):
+    """each caustic texture made i8 (its brightness) in place: its picture, its array's size, and its loads in the
+    caustic lists (dls). Returns how many loads changed."""
+    from PIL import Image
+    for t in texs:
+        src = os.path.join(dirpath, t + ".rgba16.png")
+        im = Image.open(src).convert("RGB")
+        grey = Image.new("L", im.size)
+        grey.putdata([int(round((r * 299 + g * 587 + b * 114) / 1000.0)) for r, g, b in im.getdata()])
+        os.remove(src)
+        grey.save(os.path.join(dirpath, t + ".i8.png"))
+    for ext in (".c", ".h"):
+        p = os.path.join(dirpath, scene + ext)
+        text = open(p).read()
+        for t in texs:
+            text = text.replace("%s_WIDTH, %s_HEIGHT, 16)]" % (t, t), "%s_WIDTH, %s_HEIGHT, 8)]" % (t, t))
+            text = text.replace("%s.rgba16.inc.c" % t, "%s.i8.inc.c" % t)
+        os.remove(p)
+        open(p, "w").write(text)
+    n = 0
+    for dl in dls:
+        p = os.path.join(dirpath, dl + ".inc.c")
+        text = open(p).read()
+        for t in texs:
+            old = "gsDPLoadTextureBlock(%s, G_IM_FMT_RGBA, G_IM_SIZ_16b," % t
+            n += text.count(old)
+            text = text.replace(old, "gsDPLoadTextureBlock(%s, G_IM_FMT_I, G_IM_SIZ_8b," % t)
+            if re.search(r"gsDPLoad\w*\(%s,[^)]*G_IM_FMT_RGBA" % t, text):
+                sys.exit("meshpack: %s loaded some other way in %s" % (t, dl))
+        os.remove(p)
+        open(p, "w").write(text)
+    return n
+
+
 def unsize(dirpath, room, dl):
     """the list's declared length (the room's .c and .h give each list its original length) left to its contents"""
     for ext in (".c", ".h"):
@@ -606,6 +646,11 @@ def main():
         shutil.rmtree(out)
     # a copy of the tree of hard links (the files changed below are written fresh, breaking their link)
     shutil.copytree(src, out, copy_function=os.link)
+    for scene_dir, scene, texs in GREY_CAUSTICS:
+        dls = [dl for sd, _, ds in CAUSTICS if sd == scene_dir for dl in ds]
+        n = grey_caustics(os.path.join(out, scene_dir), scene, texs, dls)
+        if report:
+            print("meshpack: %s: %d caustic textures made light alone (i8), %d loads" % (scene, len(texs), n))
     fade_arrays = collections.defaultdict(dict)  # room -> {vertex array: vertices} (caustic_fade's)
     for scene_dir, room, dls in CAUSTICS:
         d = os.path.join(out, scene_dir)
