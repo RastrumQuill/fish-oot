@@ -20,7 +20,7 @@ Laps 2-3 and 5-6 are silent. No Expansion Pak needed (nothing here uses one).
 
 ## Reading it
 
-- **The frame log** (`framelog.py`, by lap): frame period and frames over 52 ms. Laps 1 and 4 against 2 and 5 is the
+- **The frame log** (`framelog.py FOLDER --by-leg`, its lap column): frame period and frames over 52 ms. Laps 1 and 4 against 2 and 5 is the
   RSP's audio work; 2 and 5 against 3 and 6 is the audio driver's CPU work; 1 against 4 (and so on) is the run's drift.
 - **`debug.log`**, one line at each lap's end, counted by the console itself:
 
@@ -36,6 +36,16 @@ Laps 2-3 and 5-6 are silent. No Expansion Pak needed (nothing here uses one).
 
 ## In ares (the emulator's timing, not the console's)
 
-The run completes all its laps, the driver-off lap included, and says FISHMOD-DONE. Lap 1: 3756 frames, 11844 updates,
-45.4 s in the update (12.1 ms a game frame): 23.0 s the sequences and notes, 0.9 s the note bookkeeping, 19.3 s the
-command lists; 51 notes an update. ares has no RDRAM wait, so the console's numbers are the ones that count.
+The run completes all six laps, the driver-off laps included (the audio comes back in lap 4), and says FISHMOD-DONE.
+
+| lap | audio | frames over 52 ms | audio update, ms a game frame | sequences and notes | command lists |
+|---|---|---|---|---|---|
+| 1 | whole | 33% | 12.1 | 6.1 | 5.1 |
+| 2 | no RSP tasks | 22% | 11.2 | 5.8 | 4.5 |
+| 3 | no driver | 0% | 0 | | |
+| 4 | whole | 26% | 11.0 | 5.6 | 4.6 |
+| 5 | no RSP tasks | 22% | 10.7 | 5.5 | 4.3 |
+| 6 | no driver | 0% | 0 | | |
+
+About 51 notes an update (17 a tick). ares has no RDRAM wait and doesn't time the RSP as the console does, so the
+console's numbers are the ones that count.
