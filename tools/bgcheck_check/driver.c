@@ -447,6 +447,8 @@ __attribute__((weak)) void BgCheckCheck_PrepareScene(BgCheckCheckScene* scene) {
 static void Run_Scene(Lib* libs, s32 numLibs, BgCheckCheckScene* scene, s32 frames, s32 queries) {
     PlatformPlan plans[MAX_PLATFORMS];
     s32 numPlatforms = 0;
+    s32 platVtx = 0;
+    s32 platPolys = 0;
     s32 i;
     s32 l;
     Query qy;
@@ -476,6 +478,19 @@ static void Run_Scene(Lib* libs, s32 numLibs, BgCheckCheckScene* scene, s32 fram
         PlatformPlan* p = &plans[i];
 
         p->col = gBgCheckCheckPlatforms[Rng_Below(gBgCheckCheckPlatformCount)];
+        // (only what the scene's platform buffers hold, as the game's own scenes keep to: the code doesn't check)
+        {
+            DynaCollisionContext* dyna = &libs[0].play->colCtx.dyna;
+
+            if ((platVtx + p->col->numVertices > dyna->vtxListMax) ||
+                (platPolys + p->col->numPolygons > dyna->polyListMax) ||
+                (platPolys + p->col->numPolygons > dyna->polyNodesMax)) {
+                numPlatforms = i;
+                break;
+            }
+            platVtx += p->col->numVertices;
+            platPolys += p->col->numPolygons;
+        }
         p->base.x = a->x;
         p->base.y = a->y + Rng_F(-50.0f, 100.0f);
         p->base.z = a->z;

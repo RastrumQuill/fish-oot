@@ -41,6 +41,38 @@ A test that never fails proves nothing. Each optimization was broken on purpose,
 out of a cache's key, a flag left out of a skip mask, the line-test stamp not advanced, the lists put out of order,
 ...), and the test reported mismatches for every one.
 
+## The floor search's short way, the platforms' reach, and BGCHECK_EXPANSION_PAK (16 November 2026)
+
+Measured in ares on fish-oot's Lake Hylia route, a collision question's cost is mostly cache misses: about 100 cycles
+for each line of code or data it touches that the rest of the frame has pushed out, the arithmetic almost nothing.
+Three changes for that, each with the same answers:
+
+- **The platforms' reach** (`sDynaReach`): each moving-platform slot's bounding box across the ground, all the slots'
+  in a few cache lines, so a search passes over a slot it can't reach without reading the slot.
+- **The floor search's index** (`SubCell`): each lookup cell's lists again as plain poly numbers, a long list cut 4 x 4
+  by the ground it covers; made a cell at a time, when a search first comes to the cell. Boxes tested a floor search:
+  about 30 -> 5.
+- **The floor search's short way** (`BgCheck_RaycastDownFast`): the usual search (cell, piece, polys, triangle test,
+  height) in one small function, stepping down the cells as the search's loop does; the search as it was for whatever
+  it can't answer (a list not sorted by lowest vertex, a point out of the scene's box, a chkDist over 1).
+
+`BGCHECK_EXPANSION_PAK` (z_bgcheck.c, default 0): 1 lets the tables and the index use the Expansion Pak's memory that
+a retail build leaves unused (from 0x80400000), when they don't fit in the collision memory's spare. In ntsc-1.2:
+without it (or without a Pak) 76 of 101 scenes have the tables; with it and a Pak, all 101 (the index is made a
+cell at a time since those were counted, so it fits wherever its table of cells does).
+
+Checked: `run.sh --pak-flag 1` and `--pak-flag 0`, `--ram 8` and `--ram 4`, ntsc-1.2 and gc-eu-mq: 10.9 million
+questions, no difference; with the index's memory cut to almost nothing, none either. 26 more deliberate bugs, each
+reported (two are not bugs: in a sorted list, ending the walk at a poly above the point and passing over every poly
+above it are the same). In fish-oot's ROM, the short way checked against the search as it was on the side, on the
+route in ares: 67,153 answers, 97,693 platform skips, no difference.
+
+The harness now keeps a scene's platforms within its platform buffers (the game's code doesn't check them: more
+overran memory in both builds).
+
+Code and static data: about 22 KB more than the unchanged game in all (ntsc-1.2: 80 KB of the system heap's spare
+left over what Play asks for, of 102 KB).
+
 ## Results (15 November 2026)
 
 **Same answers.** This test, at 60 frames × 300 questions a scene: OoT ntsc-1.2 and gc-eu-mq, with and without an
