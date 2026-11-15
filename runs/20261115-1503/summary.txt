@@ -1,0 +1,8 @@
+Morning runs 20261115-1503
+
+ 1. frames27                     done        446 packets    3.4 MB   236 s  
+ 2. audio-ab                     done       2397 packets   18.2 MB  1196 s  
+ 3. colbase-1                    done        420 packets    3.2 MB   240 s  
+ 4. colnew-1                     done        413 packets    3.1 MB   227 s  
+ 5. colbase-2                    done        420 packets    3.2 MB   255 s  
+ 6. colnew-2                     done        414 packets    3.1 MB   226 s  
