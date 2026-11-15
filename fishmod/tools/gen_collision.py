@@ -2,11 +2,11 @@
 """Collision for the solid habitat props (rocks): baked at build time, added to the scene's own collision when it
 loads (fishmod.c), so it costs nothing per frame beyond the lookups BgCheck already does.
 
-Each rock's collision is its own drawn mesh (the vanilla rock's 16 triangles, placed as the game draws it), so Link
-stands on what he sees: the earlier convex hulls over clusters of rocks floated him over gaps and let him into the
+Each rock's collision is its own drawn mesh (each rock is made for where it lies: rock_mesh.py, the same mesh the game
+draws), so Link stands on what he sees: the earlier convex hulls over clusters of rocks floated him over gaps and let him into the
 rocks from below (test 5). Triangles wholly under the lake bed are dropped (nobody can touch them).
 
-Reads the placed props (src/fishmod_data/fishmod_sc_<scene>.c, from gen_scatter.py --c) and the vanilla rock model;
+Reads the placed props (src/fishmod_data/fishmod_sc_<scene>.c, from gen_scatter.py --c) and makes their rocks again;
 writes src/fishmod_data/fishmod_col_<scene>.c (the game's data) and fishmod_col_<scene>.json (the triangles, for
 gen_watermap.py, so the fish's map of the bed has the rocks too). Generated at build time, not committed.
 
@@ -158,13 +158,16 @@ def main():
             continue
         d = os.path.join(gw.SCENES, folder)
         finder = gw.FloorFinder(gw.parse_floors(gw.one(d, "*_PolyList.inc.c"), gw.parse_vtx(gw.one(d, "*_VtxList.inc.c"))))
-        rocks = [p for p in props(base) if p["kind"] == "rock"]
+        rocks = [p for p in props(base) if p["kind"] in ("rock", "rock_lit")]
+        rock_mesh = load_tool("rock_mesh")
         bed_type_rock = bed_surface_type(d)
         tris = []
         buried = 0
         low_rocks = 0
         for r in rocks:
-            world = [tuple(int(round(c)) for c in v) for v in place(r, pts)]
+            # its own mesh, as drawn (rock_mesh.py: the same rock from the same placed prop)
+            vs, _, _, faces = rock_mesh.make(r["x"], r["y"], r["z"], r["scale"], finder)
+            world = [(int(round(r["x"] + v[0])), int(round(r["y"] + v[1])), int(round(r["z"] + v[2]))) for v in vs]
             # a low rock (no taller above the bed than Link steps up without climbing) needs only its top: he steps up
             # onto it as onto any low ledge. Its sides are walls he'd only ever brush with his feet, and walls are
             # what every actor's every move is checked against.

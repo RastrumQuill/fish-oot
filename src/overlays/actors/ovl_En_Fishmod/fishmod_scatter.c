@@ -83,6 +83,8 @@ typedef struct FishmodPropKindInfo {
     u16 extent;  // how far it reaches from where it stands at scale 1 (up, or down for hanging ones): the view test
 } FishmodPropKindInfo;
 
+#define SCATTER_IS_ROCK(kind) (((kind) == FISHMOD_PROP_ROCK) || ((kind) == FISHMOD_PROP_ROCK_LIT))
+
 // the flags in each kind's settings (FISHMOD_PROP_KIND_INFO, from fishmod/data/prop_kinds.json)
 #define PROPF_PLANT (1 << 0)
 #define PROPF_FLOATING (1 << 1)
@@ -241,6 +243,11 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_POND_REED].modelFar = gFishingReedModelDL;
     sKinds[FISHMOD_PROP_LILY_PAD].modelFar = gFishingLilyPadModelDL;
     sKinds[FISHMOD_PROP_ROCK].modelFar = gFishmodProp_rockvcDL;
+    // the rocks in the lake's shallows: the same, the bed's caustics on them too (Scatter_Material: in 2-cycle mode,
+    // with F3DEX3's lighting for the props' colour; else drawn as the others)
+    sKinds[FISHMOD_PROP_ROCK_LIT].material = gFishmodProp_rockvcDLMaterial;
+    sKinds[FISHMOD_PROP_ROCK_LIT].model = gFishmodProp_rockvcDL;
+    sKinds[FISHMOD_PROP_ROCK_LIT].modelFar = gFishmodProp_rockvcDL;
     {
         s32 i;
 
@@ -329,6 +336,30 @@ static void Scatter_InitKinds(void) {
 }
 
 static FishmodScatterHeader* sScatter;
+static Gfx** sRockList; // each rock's own list (made for where it lies: rock_mesh.py), by its prop's yaw; or NULL
+/*
+ * The rocks in Lake Hylia's shallows have the bed's caustics on them (FISHMOD_PROP_ROCK_LIT): the bed's own blend, the
+ * caustic texture into the rock's by the environment alpha, scrolled as the bed's is, and faded with depth in the
+ * bed's steps (tools/meshpack.py caustic_fade; gen_scatter.py gives each rock its step, a call to sRockStep's list).
+ * Not through the scene's segments: other actors' draws use them for their own by the time the props are drawn.
+ */
+#define ROCK_STEPS 4
+#define ROCK_STEP_TOKEN 0xF15C0000 // (rock_mesh.py STEP_TOKEN)
+static Gfx sRockStep[ROCK_STEPS][2];
+static Gfx* sRockScroll; // this frame's (in its buffer: ScatterFrame.rockScroll)
+extern u64 spot06_scene_000170B8_Tex[]; // (Lake Hylia's caustics: its scene's, where the rocks are drawn)
+static s32 sRockStepBase = -1;
+static Gfx sRockLitMaterial[] = {
+    gsDPSetTextureLUT(G_TT_NONE),
+    // tile 0: the bed's caustics (on the rock's own coordinates at a quarter: about the bed's size in the world)
+    gsDPLoadTextureBlock(spot06_scene_000170B8_Tex, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                         G_TX_NOMIRROR | G_TX_WRAP, 5, 5, 2, 2),
+    // tile 1: the rock
+    gsDPLoadMultiBlock(gFishmodProp_rockvcTexRGBA, 0x100, 1, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0,
+                       G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 5, 5, G_TX_NOLOD, G_TX_NOLOD),
+    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),
+    gsSPEndDisplayList(),
+};
 static u16* sChunkStart;
 // each non-empty chunk's kind boundaries (where each kind's props start in it: they're sorted by kind), made once at
 // load instead of by a pass over the chunk's props in every build; sChunkKindRow[c] its row in sChunkKindPool
@@ -352,12 +383,36 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 #define SWAY_PHASES 4
 #define SWAY_MAX (FISHMOD_PROP_KIND_MAX * SWAY_PHASES)
 
+// (Scatter_Touch's: the props making way for Link)
+#define TOUCH_MAX 16
+#define TOUCH_NONE 0xFF
+#define TOUCH_LEAN 0.85f     // the most a plant leans (its top's sideways move per unit of height)
+#define TOUCH_PUSH 32.0f     // the furthest a floating plant drifts
+#define TOUCH_FLOAT_R 50.0f  // how near a floating plant's middle Link pushes it
+#define TOUCH_EASE 0.3f      // how fast they follow (a share of the way each frame)
+#define TOUCH_BACK 0.03f     // and come back (floating: slowly, his wake lingers, as the Fishing Pond's pads)
+#define TOUCH_SPRING 0.12f   // (a plant: springs back up)
+typedef struct ScatterTouch {
+    u16 prop;
+    u8 used;
+    u8 hit; // touched this frame
+    f32 x;  // the lean (or the drift, floating), in the world's x and z
+    f32 z;
+    f32 tx; // where it's heading this frame
+    f32 tz;
+} ScatterTouch;
+static ScatterTouch sTouch[TOUCH_MAX];
+static u8* sTouchSlot; // [sScatter->count]: each prop's touch, or TOUCH_NONE
+static u32 sTouchGen;  // a touch begun or ended
+
 // The props' commands, two frames' worth (the RSP reads last frame's while this one is built), in buffers of their
 // own rather than the frame's display buffer, which the scene and the fish need.
 typedef struct ScatterFrame {
-    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96]; // (and the dock, and the far edge mode's material)
-    Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4];
+    Gfx opa[PROP_BUDGET * 4 + MAT_MAX * 16 + 96 + TOUCH_MAX]; // (and the dock, the far edge mode's material, the touched)
+    Gfx xlu[XLU_MAX * 3 + MAT_MAX_XLU * 16 + 4 + TOUCH_MAX];
     Mtx sway[SWAY_MAX];
+    Mtx bend[TOUCH_MAX]; // the props Link is touching: bent or pushed aside (Scatter_Touch)
+    Gfx rockScroll[5];   // the shallow rocks' caustics scrolled (Scatter_RockCaustics)
     Lights lights; // the scene's lights, this frame's (here so the kept commands' address for them stays the same)
 } ScatterFrame;
 // What's drawn and the props' matrices: made when the camera has moved, and kept while it holds still (fishing,
@@ -413,6 +468,7 @@ typedef struct ScatterKeep {
     s32 oneCycle;
     s32 numLights;
     u32 bench;
+    u32 touchGen; // the touched props (Scatter_Touch): which have a bend matrix
     s32 lastOpa; // the loop's state where they end
     s32 lastXlu;
     s32 lastNear;
@@ -454,6 +510,27 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     sChunkStart = (u16*)((u8*)sScatter + sScatter->chunkStartOffset);
     sChunkSurface = (s16*)((u8*)sScatter + sScatter->chunkSurfaceOffset);
     sProps = (FishmodProp*)((u8*)sScatter + sScatter->propsOffset);
+    sRockList = NULL;
+    if (sScatter->rockCount != 0) {
+        // the rocks' lists: offsets in the file made addresses, and their vertex loads too
+        u32* list = (u32*)((u8*)sScatter + sScatter->rockListOffset);
+        s32 i;
+
+        for (i = 0; i < sScatter->rockCount; i++) {
+            u32* w = (u32*)((u8*)sScatter + list[i]);
+
+            list[i] = (u32)w;
+            for (; (w[0] >> 24) != G_ENDDL; w += 2) {
+                if ((w[0] >> 24) == G_VTX) {
+                    w[1] += (u32)sScatter;
+                } else if (((w[0] >> 24) == G_DL) && ((w[1] & 0xFFFF0000) == ROCK_STEP_TOKEN)) {
+                    w[1] = (u32)sRockStep[CLAMP_MAX(w[1] & 0xFFFF, ROCK_STEPS - 1)];
+                }
+            }
+        }
+        osWritebackDCache((u8*)sScatter + sScatter->rockDataOffset, sScatter->rockDataWords * sizeof(u32));
+        sRockList = (Gfx**)list;
+    }
     sChunkDry = ZeldaArena_Malloc(sScatter->width * sScatter->depth);
     sDryMade = false;
     {
@@ -502,6 +579,15 @@ void EnFishmod_ScatterLoad(PlayState* play) {
     }
     sBedShadedRoom = NULL;
     Scatter_AllocBuffers();
+    sTouchSlot = ZeldaArena_Malloc(sScatter->count);
+    if (sTouchSlot != NULL) {
+        s32 i;
+
+        for (i = 0; i < sScatter->count; i++) {
+            sTouchSlot[i] = TOUCH_NONE;
+        }
+    }
+    bzero(sTouch, sizeof(sTouch));
     if (osMemSize >= 0x800000) {
         // (the Expansion Pak: room for every prop's matrix; without it, or if it doesn't fit, made in each set)
         sPropMtx = ZeldaArena_Malloc(sScatter->count * sizeof(Mtx));
@@ -719,6 +805,7 @@ void EnFishmod_ScatterUnload(void) {
         ZeldaArena_Free(sScatter);
         sScatter = NULL;
     }
+    sRockList = NULL;
     if (sChunkDry != NULL) {
         ZeldaArena_Free(sChunkDry);
         sChunkDry = NULL;
@@ -732,6 +819,10 @@ void EnFishmod_ScatterUnload(void) {
         sChunkKindPool = NULL;
     }
     Scatter_FreeBuffers();
+    if (sTouchSlot != NULL) {
+        ZeldaArena_Free(sTouchSlot);
+        sTouchSlot = NULL;
+    }
     if (sPropMtx != NULL) {
         ZeldaArena_Free(sPropMtx);
         sPropMtx = NULL;
@@ -790,6 +881,30 @@ static void Scatter_MatrixInto(Mtx* mtx, FishmodProp* prop, s32 flatScale, s16 y
     s32 c = (s32)(Math_CosS(yaw) * s);
     s32 sn = (s32)(Math_SinS(yaw) * s);
 
+    if (SCATTER_IS_ROCK(prop->kind) && (sRockList != NULL)) {
+        // (a rock of its own: its mesh is made where it lies, in the world's directions: only placed)
+        MTX_SET(mtx, 0, 0, 0x10000);
+        MTX_SET(mtx, 0, 1, 0);
+        MTX_SET(mtx, 0, 2, 0);
+        MTX_SET(mtx, 0, 3, 0);
+        MTX_SET(mtx, 1, 0, 0);
+        MTX_SET(mtx, 1, 1, 0x10000);
+        MTX_SET(mtx, 1, 2, 0);
+        MTX_SET(mtx, 1, 3, 0);
+        MTX_SET(mtx, 2, 0, 0);
+        MTX_SET(mtx, 2, 1, 0);
+        MTX_SET(mtx, 2, 2, 0x10000);
+        MTX_SET(mtx, 2, 3, 0);
+        mtx->intPart[3][0] = prop->x;
+        mtx->intPart[3][1] = prop->y;
+        mtx->intPart[3][2] = prop->z;
+        mtx->intPart[3][3] = 1;
+        mtx->fracPart[3][0] = 0;
+        mtx->fracPart[3][1] = 0;
+        mtx->fracPart[3][2] = 0;
+        mtx->fracPart[3][3] = 0;
+        return;
+    }
     if ((prop->tiltX != 0) || (prop->tiltZ != 0) || (prop->kind == FISHMOD_PROP_ROCK)) {
         // lying on the bed (logs, rocks): tilted about its length and width before it is turned,
         // M = stretch * Rz * Rx * Ry * scale (only rocks are stretched)
@@ -1097,11 +1212,26 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
         gSPNumLights(gfx++, 0);
     }
 #endif
-    if ((kind == FISHMOD_PROP_ROCK) || (kind == FISHMOD_PROP_DOCK_POSTS) || (kind == FISHMOD_PROP_DOCK_DECK)) {
+    if (SCATTER_IS_ROCK(kind) || (kind == FISHMOD_PROP_DOCK_POSTS) || (kind == FISHMOD_PROP_DOCK_DECK)) {
         // (solid: their far sides cost nothing. The dock's posts are tall and thin: their hidden back faces cost the
         // RDP a scanline each all the way down, as much as the faces in front)
         gSPSetGeometryMode(gfx++, G_CULL_BACK);
     }
+#if ENABLE_F3DEX3
+    if ((kind == FISHMOD_PROP_ROCK_LIT) && SCATTER_ONE_CYCLE() && (sRockList != NULL) && (sRockScroll != NULL)) {
+        // a rock in the shallows: the bed's caustics on it (2-cycle: the caustic texture blended into the rock's by
+        // the environment alpha, its step of the fade set by each rock's list; then the props' light and the vertex
+        // colours, as the others)
+        gDPPipeSync(gfx++);
+        gDPSetCycleType(gfx++, G_CYC_2CYCLE);
+        gDPSetCombineLERP(gfx++, TEXEL1, TEXEL0, ENV_ALPHA, TEXEL0, 0, 0, 0, 1, COMBINED, 0, SHADE, 0, 0, 0, 0,
+                          COMBINED);
+        gDPSetRenderMode(gfx++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_OPA_SURF2);
+        gSPDisplayList(gfx++, sRockLitMaterial);
+        gSPDisplayList(gfx++, sRockScroll);
+        return gfx;
+    }
+#endif
     if (tier == TIER_IMP) {
         gSPDisplayList(gfx++, info->materialImp);
     } else if (tier == TIER_HALF) {
@@ -1110,6 +1240,231 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
         gSPDisplayList(gfx++, info->material);
     }
     return gfx;
+}
+
+/**
+ * The shallow rocks' caustics for this frame: scrolled as the bed's (Scene_DrawConfigLakeHylia: a quarter texel a
+ * frame), and the fade's steps from the scene's own colour (255 when the lake is drained: no caustics).
+ */
+static void Scatter_RockCaustics(PlayState* play, ScatterFrame* frame) {
+    u32 t = (u32)play->gameplayFrames % (512 << 2);
+    Gfx* g = frame->rockScroll;
+    s32 base = (play->sceneId == SCENE_LAKE_HYLIA) ? (play->roomCtx.drawParams[0] + 168) : 255;
+
+    gDPTileSync(g++);
+    gDPSetTileSize(g++, G_TX_RENDERTILE, t, t, t + (31 << 2), t + (31 << 2));
+    gDPTileSync(g++);
+    gDPSetTileSize(g++, 1, 0, 0, 31 << 2, 31 << 2);
+    gSPEndDisplayList(g++);
+    sRockScroll = frame->rockScroll;
+    base = CLAMP(base, 0, 255);
+    if (base != sRockStepBase) {
+        // (only when it changes: the RSP may be reading them)
+        s32 i;
+
+        sRockStepBase = base;
+        for (i = 0; i < ROCK_STEPS; i++) {
+            gDPSetEnvColor(&sRockStep[i][0], 0, 0, 0, base + (255 - base) * i / ROCK_STEPS);
+            gSPEndDisplayList(&sRockStep[i][1]);
+        }
+    }
+}
+
+/*
+ * fish-oot: plants make way for Link, as the game's own grass and the Fishing Pond's reeds and lily pads do. A plant
+ * he walks or swims into leans away from him (a shear: its foot stays, its top goes), and a floating one (lily pads,
+ * their flowers, floating leaves) drifts aside; both ease back once he has gone. A few at a time (TOUCH_MAX), each
+ * with a matrix of this frame's (ScatterFrame.bend) multiplied in after its own, in its own frame (before its turn).
+ */
+
+/** A floating prop's middle: the lily pad's leaf is off its model's origin (gen_scatter.py float_space). */
+static void Scatter_TouchMiddle(FishmodProp* prop, f32* x, f32* z) {
+    *x = prop->x;
+    *z = prop->z;
+    if (prop->kind == FISHMOD_PROP_LILY_PAD) {
+        f32 k = prop->scale * (1.0f / 64.0f);
+        f32 c = Math_CosS(prop->yaw << 8);
+        f32 sn = Math_SinS(prop->yaw << 8);
+
+        // (the model's (-8, 5), turned as Scatter_MatrixInto turns it)
+        *x += (-8.0f * c + 5.0f * sn) * k;
+        *z += (8.0f * sn + 5.0f * c) * k;
+    }
+}
+
+/** Which props Link touches this frame, and how far each has gone toward making way. */
+static void Scatter_Touch(PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    f32 px;
+    f32 py;
+    f32 pz;
+    s32 cx;
+    s32 cz;
+    s32 i;
+
+    if (sTouchSlot == NULL) {
+        return;
+    }
+    for (i = 0; i < TOUCH_MAX; i++) {
+        sTouch[i].hit = false;
+        sTouch[i].tx = sTouch[i].tz = 0.0f;
+    }
+    if (player != NULL) {
+        px = player->actor.world.pos.x;
+        py = player->actor.world.pos.y;
+        pz = player->actor.world.pos.z;
+        cx = (s32)((px - sScatter->x0) / sScatter->chunk);
+        cz = (s32)((pz - sScatter->z0) / sScatter->chunk);
+        for (i = 0; i < 9; i++) {
+            s32 gx = cx + (i % 3) - 1;
+            s32 gz = cz + (i / 3) - 1;
+            s32 c;
+            s32 n;
+
+            if ((gx < 0) || (gz < 0) || (gx >= sScatter->width) || (gz >= sScatter->depth)) {
+                continue;
+            }
+            c = gz * sScatter->width + gx;
+            for (n = sChunkStart[c]; n < sChunkStart[c + 1]; n++) {
+                FishmodProp* prop = &sProps[n];
+                FishmodPropKindInfo* info = &sKinds[prop->kind];
+                f32 k = prop->scale * (1.0f / 64.0f);
+                f32 mx;
+                f32 mz;
+                f32 dx;
+                f32 dz;
+                f32 r;
+                f32 d;
+                f32 amount;
+                s32 slot;
+
+                if (info->floating) {
+                    // (on the surface: Link swimming, or wading where it's shallow)
+                    if (fabsf(py - prop->y) > 40.0f) {
+                        continue;
+                    }
+                    r = TOUCH_FLOAT_R;
+                } else if (info->plant && (info->sway != 0)) {
+                    f32 top = prop->y + info->extent * k;
+
+                    // (his feet to his head against its foot to its top; hanging ones reach down instead)
+                    if ((py > MAX(top, prop->y) + 5.0f) || (py + 50.0f < MIN(top, prop->y))) {
+                        continue;
+                    }
+                    r = 14.0f + CLAMP_MAX(info->height * k * 0.3f, 30.0f);
+                } else {
+                    continue;
+                }
+                Scatter_TouchMiddle(prop, &mx, &mz);
+                dx = mx - px;
+                dz = mz - pz;
+                if ((fabsf(dx) > r) || (fabsf(dz) > r)) {
+                    continue;
+                }
+                d = sqrtf(SQ(dx) + SQ(dz));
+                if (d >= r) {
+                    continue;
+                }
+                slot = sTouchSlot[n];
+                if (slot == TOUCH_NONE) {
+                    for (slot = 0; (slot < TOUCH_MAX) && sTouch[slot].used; slot++) {}
+                    if (slot == TOUCH_MAX) {
+                        continue; // (a few at a time)
+                    }
+                    sTouch[slot].used = true;
+                    sTouch[slot].prop = n;
+                    sTouch[slot].x = sTouch[slot].z = 0.0f;
+                    sTouchSlot[n] = slot;
+                    sTouchGen++;
+                }
+                if (d < 1.0f) {
+                    // (right on it: away the way Link faces)
+                    dx = Math_SinS(player->actor.shape.rot.y);
+                    dz = Math_CosS(player->actor.shape.rot.y);
+                    d = 1.0f;
+                }
+                amount = (r - d) / r;
+                amount = info->floating ? (amount * TOUCH_PUSH) : (amount * TOUCH_LEAN);
+                sTouch[slot].tx = dx / d * amount;
+                sTouch[slot].tz = dz / d * amount;
+                sTouch[slot].hit = true;
+            }
+        }
+    }
+    for (i = 0; i < TOUCH_MAX; i++) {
+        ScatterTouch* t = &sTouch[i];
+
+        if (!t->used) {
+            continue;
+        }
+        {
+            f32 rate = t->hit ? TOUCH_EASE : sKinds[sProps[t->prop].kind].floating ? TOUCH_BACK : TOUCH_SPRING;
+
+            t->x += (t->tx - t->x) * rate;
+            t->z += (t->tz - t->z) * rate;
+        }
+        if (!t->hit && (SQ(t->x) + SQ(t->z) < SQ(sKinds[sProps[t->prop].kind].floating ? 0.3f : 0.01f))) {
+            t->used = false;
+            sTouchSlot[t->prop] = TOUCH_NONE;
+            sTouchGen++;
+        }
+    }
+}
+
+/**
+ * The touched props' matrices for this frame, in each prop's own frame (they're multiplied in before its turn and
+ * scale): a lean (x += a y, z += b y) or a drift (a move of its own, along the water).
+ */
+static void Scatter_TouchMatrices(ScatterFrame* frame) {
+    s32 i;
+
+    for (i = 0; i < TOUCH_MAX; i++) {
+        ScatterTouch* t = &sTouch[i];
+        FishmodProp* prop;
+        Mtx* mtx;
+        f32 c;
+        f32 sn;
+        f32 a;
+        f32 b;
+
+        if (!t->used) {
+            continue;
+        }
+        prop = &sProps[t->prop];
+        mtx = &frame->bend[i];
+        // the world's direction in the prop's own frame (Scatter_MatrixInto turns x to (c, -sn), z to (sn, c))
+        c = Math_CosS(prop->yaw << 8);
+        sn = Math_SinS(prop->yaw << 8);
+        a = t->x * c - t->z * sn;
+        b = t->x * sn + t->z * c;
+        MTX_SET(mtx, 0, 0, 0x10000);
+        MTX_SET(mtx, 0, 1, 0);
+        MTX_SET(mtx, 0, 2, 0);
+        MTX_SET(mtx, 0, 3, 0);
+        MTX_SET(mtx, 1, 1, 0x10000);
+        MTX_SET(mtx, 1, 3, 0);
+        MTX_SET(mtx, 2, 0, 0);
+        MTX_SET(mtx, 2, 1, 0);
+        MTX_SET(mtx, 2, 2, 0x10000);
+        MTX_SET(mtx, 2, 3, 0);
+        MTX_SET(mtx, 3, 3, 0x10000);
+        if (sKinds[prop->kind].floating) {
+            // a move, in its own units (its scale undone)
+            f32 k = 64.0f / prop->scale;
+
+            MTX_SET(mtx, 1, 0, 0);
+            MTX_SET(mtx, 1, 2, 0);
+            MTX_SET(mtx, 3, 0, (s32)(a * k * 65536.0f));
+            MTX_SET(mtx, 3, 1, 0);
+            MTX_SET(mtx, 3, 2, (s32)(b * k * 65536.0f));
+        } else {
+            MTX_SET(mtx, 1, 0, (s32)(a * 65536.0f));
+            MTX_SET(mtx, 1, 2, (s32)(b * 65536.0f));
+            MTX_SET(mtx, 3, 0, 0);
+            MTX_SET(mtx, 3, 1, 0);
+            MTX_SET(mtx, 3, 2, 0);
+        }
+    }
 }
 
 /** The sway shears for this frame: per swaying kind, a few phases. */
@@ -1772,6 +2127,9 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         sSceneLights = &frame->lights;
     }
     Scatter_Sway(play, frame);
+    Scatter_Touch(play);
+    Scatter_TouchMatrices(frame);
+    Scatter_RockCaustics(play, frame);
 #if FISHMOD_DEBUG
     gFishmodScatterDrawn = set->count;
 #endif
@@ -1798,6 +2156,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         keepNow.light[2] = light[2];
         keepNow.oneCycle = SCATTER_ONE_CYCLE();
         keepNow.numLights = (sSceneLights != NULL) ? sSceneLights->numLights : -1;
+        keepNow.touchGen = sTouchGen;
 #if FISHMOD_DEBUG
         keepNow.bench = (u32)gFishmodBench;
 #else
@@ -1807,7 +2166,8 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                      (keep->until == keepNow.until) && (keep->setGen == keepNow.setGen) &&
                      (keep->light[0] == keepNow.light[0]) && (keep->light[1] == keepNow.light[1]) &&
                      (keep->light[2] == keepNow.light[2]) && (keep->oneCycle == keepNow.oneCycle) &&
-                     (keep->numLights == keepNow.numLights) && (keep->bench == keepNow.bench)
+                     (keep->numLights == keepNow.numLights) && (keep->bench == keepNow.bench) &&
+                     (keep->touchGen == keepNow.touchGen)
 #if FISHMOD_DEBUG
                      && !gFishmodLodTest.active
 #endif
@@ -1901,7 +2261,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                     a = CLAMP(a, 0, 255);
                 }
             }
-            if (kind == FISHMOD_PROP_ROCK) {
+            if (SCATTER_IS_ROCK(kind)) {
                 // each rock a slightly different stone: neutral, warmer or cooler grey (by where it stands)
                 static const u8 sStone[4][3] = { { 255, 255, 255 }, { 255, 240, 222 }, { 228, 240, 255 }, { 240, 248, 232 } };
                 const u8* c = sStone[((u32)(prop->x * 7 + prop->z * 13) >> 4) & 3];
@@ -1919,6 +2279,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 
             gSPMatrix((*disp)++, &frame->sway[kind * SWAY_PHASES + ph], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
         }
+        if ((sTouchSlot != NULL) && (sTouchSlot[set->prop[n]] != TOUCH_NONE)) {
+            // (making way for Link)
+            gSPMatrix((*disp)++, &frame->bend[sTouchSlot[set->prop[n]]], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
+        }
         {
             Gfx* near = info->model;
 
@@ -1930,10 +2294,15 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                                                                          : near;
             }
 #endif
-            gSPDisplayList((*disp)++, (tier == TIER_IMP)    ? info->modelImp
-                                      : (tier == TIER_HALF) ? info->modelHalf
-                                      : (tier == TIER_FAR)  ? info->modelFar
-                                                            : near);
+            if (SCATTER_IS_ROCK(kind) && (sRockList != NULL)) {
+                near = sRockList[prop->yaw]; // (its own, near or far: few triangles, all of them shown)
+                gSPDisplayList((*disp)++, near);
+            } else {
+                gSPDisplayList((*disp)++, (tier == TIER_IMP)    ? info->modelImp
+                                          : (tier == TIER_HALF) ? info->modelHalf
+                                          : (tier == TIER_FAR)  ? info->modelFar
+                                                                : near);
+            }
         }
     }
     if (cacheUntil == set->count) { // (no fading prop: the whole loop is the part kept)

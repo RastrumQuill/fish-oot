@@ -32,6 +32,7 @@
   {"name": "pond_reed", "vanilla": true, "dist": "mid", "flags": ["plant", "xlu"], "extent": 240, "sway": [18, 72]},
   {"name": "lily_pad", "vanilla": true, "dist": "far", "flags": ["plant", "on_surface", "floating"], "float_space": [58.0, -8.0, 5.0], "float_spread": 45.0},
   {"name": "rock", "vanilla": true, "dist": "far", "flags": ["rock"], "height": 20},
+  {"name": "rock_lit", "vanilla": true, "dist": "far", "flags": ["rock"], "height": 20, "doc": "a rock in the lake's shallows, the bed's caustics on it too (gen_scatter.py write_c chooses: rock_mesh.py)"},
   {"name": "boulder", "placed_as": "rock", "flags": ["rock"], "height": 20}
  ]
 }

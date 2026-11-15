@@ -6,7 +6,7 @@
 // A scene's scattered habitat props, placed at build time by fishmod/tools/gen_scatter.py and drawn by the fish
 // manager (fishmod_scatter.c). Props are sorted by chunk (a grid over the scene), then by kind.
 
-#define FISHMOD_SCATTER_MAGIC 0x46534331 // "FSC1"
+#define FISHMOD_SCATTER_MAGIC 0x46534332 // "FSC2"
 
 typedef struct FishmodProp {
     /* 0x00 */ s16 x;
@@ -31,6 +31,12 @@ typedef struct FishmodScatterHeader {
     /* 0x10 */ u32 chunkStartOffset;   // u16[width * depth + 1]: each chunk's first prop
     /* 0x14 */ u32 chunkSurfaceOffset; // s16[width * depth]: the water level each chunk was placed for
     /* 0x18 */ u32 propsOffset;        // FishmodProp[count]
-} FishmodScatterHeader; // size = 0x1C
+    // the rocks: each its own mesh, made for where it lies (fishmod/tools/rock_mesh.py), its prop's yaw its index
+    /* 0x1C */ u32 rockListOffset;     // u32[rockCount]: each rock's display list, an offset (an address once loaded)
+    /* 0x20 */ u16 rockCount;
+    /* 0x22 */ u16 pad;
+    /* 0x24 */ u32 rockDataOffset;     // their vertices and lists (the lists' vertex loads offsets until loaded)
+    /* 0x28 */ u32 rockDataWords;
+} FishmodScatterHeader; // size = 0x2C
 
 #endif

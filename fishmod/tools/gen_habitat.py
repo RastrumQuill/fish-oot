@@ -1303,6 +1303,10 @@ def write_props_manifest():
                          "out": out})
         models.append({"name": "gFishmodProp_rockvcDL", "src": os.path.relpath(rv[0], ROOT),
                        "texture": "gFishmodProp_rockvcTex", "out": out, "separateMaterial": True})
+        # (and in full colour, for the rocks in the lake's shallows: drawn with the bed's caustic texture beside it,
+        # which a palette's texture can't share the texture memory with)
+        textures.append({"name": "gFishmodProp_rockvcTexRGBA", "src": os.path.relpath(rv[1], ROOT),
+                         "format": "rgba16", "out": out})
     with open(os.path.join(DATA, "props_manifest.json"), "w") as f:
         json.dump({"textures": textures, "materials": materials, "models": models}, f, indent=1)
     kinds = pk.GAME

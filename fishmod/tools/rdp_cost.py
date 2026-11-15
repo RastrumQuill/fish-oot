@@ -26,6 +26,7 @@ import sys
 import numpy as np
 
 W, H = 320, 240
+TRACE = 0  # (--trace: ns)
 
 # rdpbench2 (console, 12 November): pipeline ns per quad (two triangles, s scanlines, s*s pixels) by mode, s = 2/8/32/128
 CAL = {
@@ -342,6 +343,9 @@ def walk(fr, start, fits, culldir):
                 if (geom & 0x200) and sa * culldir > 0:
                     continue
                 ns = a + b * lines + c * area
+                if TRACE and ns >= TRACE:
+                    print("  tri at %08X (%s): %.0f us, %d px, %s, texture %08X" % (pc, key, ns / 1000, area, mode,
+                                                                                    timg[1] if timg else 0))
                 e = per[key]
                 e[0] += ns
                 e[1] += 1
@@ -361,6 +365,9 @@ def walk(fr, start, fits, culldir):
             else:
                 rm = "1cyc rd" if om_l & 0x40 else "1cyc"
             ns = RECT_NS + RECT_NS_PX[rm] * px
+            if TRACE and ns >= TRACE:
+                print("  rect at %08X (%s): %.0f us, %d px, %s, texture %08X" % (pc, key, ns / 1000, px, rm,
+                                                                                timg[1] if timg else 0))
             e = per[key]
             e[0] += ns
             e[2] += px
@@ -382,7 +389,10 @@ def main():
     ap.add_argument("--group", action="append", default=[], help="NAME=REGEX: also total the lists matching")
     ap.add_argument("--cull", type=int, default=-1, help="which signed area is the back (-1: as F3DEX3 culls)")
     ap.add_argument("--json", help="also write every list's numbers here")
+    ap.add_argument("--trace", type=float, default=0, help="print each triangle or rectangle costing this many us")
     args = ap.parse_args()
+    global TRACE
+    TRACE = args.trace * 1000
     fr = Frame(open(args.ram, "rb").read(), args.elf)
     start = args.start or fr.last_list()
     fits = fit()
