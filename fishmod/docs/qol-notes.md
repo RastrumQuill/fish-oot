@@ -30,15 +30,18 @@ Gathered from the roadmap (fishmod/docs/roadmap.md, its quality-of-life lists), 
   z_message.c: B held fills the box (as A does after its delay); a "read" bit per message id (a small bitfield in the
   mod's save block) to offer the skip.
 
-- **Movement that feels more responsive**, two parts:
-  - *The delay from a press to the picture*: the frame log measures it (press to picture, the TV's own delay not
-    included): about 120 ms on average now (frames28 set: mean 118-127 ms, 90% under 140-149 ms), about six refreshes
-    at 20 fps. Shorter by reading the controller later in the frame (as late as the update can still use it), by
-    fewer hitches (a late frame holds the last picture a refresh longer), and run-ahead's buffering (already made
-    consistent, not faster) looked at again for a frame it could give back.
-  - *How Link moves*: his speed builds and turns from the stick (z_player.c's acceleration and turn rates) are slow
-    to answer at 20 fps; tighter acceleration and turning on the ground and in the water, by feel, without changing
-    what he can reach (jumps, ledges and the like stay as they are).
+- **Movement that feels more responsive**: mostly how Link answers the stick, partly the delay before the picture
+  shows it.
+  - *Turning and answering the stick* (the main part): his speed builds slowly from a standstill, he turns in a wide
+    arc at a run, he skids and turns round instead of reversing, and he slides on a little after the stick lets go
+    (z_player.c: the acceleration, turn rate and deceleration by state). Tighter starts, a sharper turn at speed, a
+    quicker turn-round and a shorter stop, on the ground and in the water, by feel; without changing what he can
+    reach (jump distances, ledges, what the game's puzzles expect stay as they are).
+  - *The delay from a press to the picture*: the frame log measures it (the TV's own delay not included): about
+    120 ms on average now (the frames28 set: mean 118-127 ms), about six refreshes at 20 fps. Shorter by reading the
+    controller later in the frame (as late as the update can still use it), by fewer hitches (a late frame holds the
+    last picture a refresh longer), and run-ahead's buffering (made for consistency, not speed) looked at again for a
+    frame it could give back.
 
 ## Ideas from play
 
