@@ -49,6 +49,8 @@ u32 gFishmodAudCmdDump[0x1000];
 u32 gFishmodAudCmdDumpSize;
 s16 gFishmodAudFilterDump[8][24][8];
 u32 gFishmodAudFilterAddr[8][24];
+u32 gFishmodAudDataHash[8][512];
+u32 gFishmodAudCmds[8][1024];
 
 static void Fishmod_AudLog_Task(AudioTask* task) {
     static u32 sDumpAt = 0xFFFFFFFF;
@@ -74,6 +76,24 @@ static void Fishmod_AudLog_Task(AudioTask* task) {
         u32 t = gFishmodAudCmdLogCount - sDumpAt;
         u32 k = 0;
 
+        bcopy(w, gFishmodAudCmds[t], (n > 1024 ? 1024 : n) * 4);
+
+        // (and a hash of what each command's address points at: 32 bytes, or a buffer load's whole length)
+        for (i = 0; (i + 1 < n) && (i / 2 < 512); i += 2) {
+            u32 hh = 0;
+
+            if ((w[i + 1] >> 24) == 0x80) {
+                u32 len = ((w[i] >> 24) == 0x14) ? (((w[i] >> 16) & 0xFF) << 4) : 32;
+                u8* b = (u8*)w[i + 1];
+                u32 q;
+
+                hh = 2166136261u;
+                for (q = 0; q < len; q++) {
+                    hh = (hh ^ b[q]) * 16777619u;
+                }
+            }
+            gFishmodAudDataHash[t][i / 2] = hh;
+        }
         for (i = 0; (i + 1 < n) && (k < 24); i += 2) {
             if (((w[i] >> 24) == 0x07) && (((w[i] >> 16) & 0xFF) == 2)) {
                 bcopy((void*)w[i + 1], gFishmodAudFilterDump[t][k], 16);
