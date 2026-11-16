@@ -1,8 +1,8 @@
 diff --git a/ares/n64/cpu/cpu.cpp b/ares/n64/cpu/cpu.cpp
-index ec4a52d..1ce7f72 100644
+index ec4a52d..e2a4fbd 100644
 --- a/ares/n64/cpu/cpu.cpp
 +++ b/ares/n64/cpu/cpu.cpp
-@@ -121,7 +121,67 @@ auto CPU::interruptPoll() -> void {
+@@ -121,7 +121,80 @@ auto CPU::interruptPoll() -> void {
    }
  }
  
@@ -15,6 +15,7 @@ index ec4a52d..1ce7f72 100644
 +static CpuProfEntry* cpuProf = nullptr;
 +u32 cpuProfFills = 0, cpuProfWritebacks = 0;
 +u32* cpuProfLines = nullptr;
++u32* cpuProfBytes = nullptr;
 +u32 cpuProfLo = 0, cpuProfHi = 0;
 +static u64 cpuProfTotal = 0;
 +static auto cpuProfWrite() -> void {
@@ -41,6 +42,17 @@ index ec4a52d..1ce7f72 100644
 +    fclose(fp);
 +    rename(ltmp, string{cpuProfPath, ".lines"});
 +  }
++  //<file>.bytes: every byte the code range read or wrote through the cache: records of (u32 address, u32 reads, u32 writes)
++  string btmp{cpuProfPath, ".bytes.tmp"};
++  if(auto fp = fopen(btmp, "wb")) {
++    for(u32 n : range(0x800000)) {
++      if(!cpuProfBytes[n * 2] && !cpuProfBytes[n * 2 + 1]) continue;
++      u32 rec[3] = {0x80000000u + n, cpuProfBytes[n * 2], cpuProfBytes[n * 2 + 1]};
++      fwrite(rec, 4, 3, fp);
++    }
++    fclose(fp);
++    rename(btmp, string{cpuProfPath, ".bytes"});
++  }
 +}
 +
  auto CPU::instruction() -> bool {
@@ -48,6 +60,7 @@ index ec4a52d..1ce7f72 100644
 +    if(!cpuProf) {
 +      cpuProf = (CpuProfEntry*)calloc(0x200000, sizeof(CpuProfEntry));
 +      cpuProfLines = (u32*)calloc(0x80000 * 2, sizeof(u32));
++      if(getenv("ARES_CPUPROF_LO")) cpuProfBytes = (u32*)calloc(0x800000 * 2, sizeof(u32));
 +      if(auto lo = getenv("ARES_CPUPROF_LO")) cpuProfLo = strtoul(lo, nullptr, 16);
 +      if(auto hi = getenv("ARES_CPUPROF_HI")) cpuProfHi = strtoul(hi, nullptr, 16);
 +    }
@@ -70,7 +83,7 @@ index ec4a52d..1ce7f72 100644
    if(auto interrupts = scc.cause.interruptPending & scc.status.interruptMask) {
      if(scc.status.interruptEnable && !scc.status.exceptionLevel && !scc.status.errorLevel) {
        debugger.interrupt(scc.cause.interruptPending);
-@@ -145,7 +205,7 @@ auto CPU::instruction() -> bool {
+@@ -145,7 +218,7 @@ auto CPU::instruction() -> bool {
    auto access = devirtualize<Read, Word>(ipu.pc);
    if(!access) return true;
  
@@ -93,12 +106,13 @@ index ada6b68..87b201d 100644
    template<bool Recompiled> auto instructionEpilogue() -> void;
    auto raiseCoprocessor1Exception() -> void;
 diff --git a/ares/n64/cpu/dcache.cpp b/ares/n64/cpu/dcache.cpp
-index 5496d75..5526d19 100644
+index 5496d75..0a17c86 100644
 --- a/ares/n64/cpu/dcache.cpp
 +++ b/ares/n64/cpu/dcache.cpp
-@@ -1,9 +1,20 @@
+@@ -1,9 +1,21 @@
 +extern u32 cpuProfFills, cpuProfWritebacks;
 +extern u32* cpuProfLines;
++extern u32* cpuProfBytes;
 +extern u32 cpuProfLo, cpuProfHi;
 +
  auto CPU::DataCache::Line::hit(u32 paddr) const -> bool {
@@ -117,7 +131,7 @@ index 5496d75..5526d19 100644
    cpu.step(40 * 2);
    const u32 tag = paddr & ~0x0000'0fffu;
    dirty  = 0;
-@@ -13,6 +24,7 @@ auto CPU::DataCache::Line::fill(u32 paddr) -> void {
+@@ -13,6 +25,7 @@ auto CPU::DataCache::Line::fill(u32 paddr) -> void {
  }
  
  auto CPU::DataCache::Line::writeBack() -> void {
@@ -125,3 +139,25 @@ index 5496d75..5526d19 100644
    cpu.step(40 * 2);
    const u32 tag = tagKey & ~0x0000'0fffu;
    dirty = 0;
+@@ -51,6 +64,10 @@ auto CPU::DataCache::Line::write(u32 paddr, u64 data) -> void {
+ template<u32 Size>
+ auto CPU::DataCache::read(u64 vaddr, u32 paddr) -> u64 {
+   auto& line = this->line(vaddr);
++  if(cpuProfBytes) {
++    u32 pc = (u32)cpu.ipu.pc;
++    if(pc >= cpuProfLo && pc < cpuProfHi) for(u32 n : range(Size)) cpuProfBytes[((paddr + n) & 0x7fffff) * 2 + 0]++;
++  }
+   if(!line.hit(paddr)) {
+     if(line.valid() && line.dirty) {
+       line.writeBack();
+@@ -80,6 +97,10 @@ auto CPU::DataCache::readDebug(u64 vaddr, u32 paddr) -> u64 {
+ template<u32 Size>
+ auto CPU::DataCache::write(u64 vaddr, u32 paddr, u64 data) -> void {
+   auto& line = this->line(vaddr);
++  if(cpuProfBytes) {
++    u32 pc = (u32)cpu.ipu.pc;
++    if(pc >= cpuProfLo && pc < cpuProfHi) for(u32 n : range(Size)) cpuProfBytes[((paddr + n) & 0x7fffff) * 2 + 1]++;
++  }
+   if(!line.hit(paddr)) {
+     if(line.valid() && line.dirty) {
+       line.writeBack();
