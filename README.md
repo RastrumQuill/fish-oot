@@ -83,6 +83,7 @@ To check the toolchain on an unmodified tree, `make VERSION=ntsc-1.2 REGION=US r
 | `src/code/fishmod.c` | which scenes have fish, the rod's controller (any scene), saving, the weather |
 | `fishmod/data/profiles.json` | the build profiles (`build.sh --profile emu\|hw`): draw distances, prop budgets, thinning, F3DEX3 |
 | `fishmod/build.sh --debug` | debug build: boots straight into Kokiri with the rod and shows debug text |
+| `fishmod/build.sh --expak` | a ROM that needs the Expansion Pak: code under `#if FISHMOD_EXPAK` can count on the 8 MB, and without the pak the game says so at power-on instead of starting. Without the flag the game uses the pak when it's there |
 | `fishmod/build.sh --f3dex3` | build with the [F3DEX3](fishmod/docs/f3dex3.md) graphics microcode whatever the profile says (the `hw` profile has it; HLE emulators can't run it) |
 | `fishmod/build.sh --script NAME` | debug build that plays `fishmod/scripts/NAME.inc.c` (where Link starts, the save he starts from, the input steps): `angler` (a bot that fishes by itself), `shore` (the bot, standing back from the water), `follow` (camera chases a fish), `photo` (wiki renders), `anim` (the animation studio), `hwbench_play` / `hwbench_area` (benchmarks), `cast` |
 | `fishmod/tools/photo_capture.py` | captures the wiki renders from the photo build in ares |

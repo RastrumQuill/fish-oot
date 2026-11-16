@@ -35,7 +35,7 @@ void Audio_InitSampleState(Note* note, NoteSampleState* sampleState, NoteSampleS
     // other branch leaves as they were (zero: the slots start zeroed), as zero until headset output is first used
     // (then the slots are read and written as they always were).
     if (!sFishmodHaasUsed && (((u32)sampleState & 0xF) == 0)) {
-        __asm__ volatile("cache 0x0D, 0(%0)\n\tcache 0x0D, 16(%0)" : : "r"(sampleState) : "memory");
+        __asm__ volatile(".set push\n\t.set mips3\n\tcache 0x0D, 0(%0)\n\tcache 0x0D, 16(%0)\n\t.set pop" : : "r"(sampleState) : "memory");
         sampleState->haasEffectLeftDelaySize = 0;
         sampleState->haasEffectRightDelaySize = 0;
         __builtin_memset(sampleState->pad_18, 0, sizeof(sampleState->pad_18));

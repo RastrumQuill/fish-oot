@@ -80,6 +80,11 @@ AudioTask* AudioThread_UpdateImpl(void) {
     s32 sp48;
     s32 i;
 
+#if FISHMOD_DEBUG
+    extern u64 gFishmodAudTime[];
+    u32 fmStart = osGetCount();
+#endif
+
     gAudioCtx.totalTaskCount++;
     if ((gAudioCtx.totalTaskCount % gAudioCtx.audioBufferParameters.specUnk4) != 0) {
         if (gAudioCustomUpdateFunction != NULL) {
@@ -248,6 +253,10 @@ AudioTask* AudioThread_UpdateImpl(void) {
     if (sMaxAbiCmdCnt < abiCmdCnt) {
         sMaxAbiCmdCnt = abiCmdCnt;
     }
+#if FISHMOD_DEBUG
+    gFishmodAudTime[0]++;
+    gFishmodAudTime[1] += (u32)(osGetCount() - fmStart);
+#endif
 
     if (gAudioCtx.audioBufferParameters.specUnk4 == 1) {
         return gAudioCtx.curTask;

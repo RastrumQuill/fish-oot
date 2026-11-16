@@ -63,3 +63,116 @@ notes collect what the console runs have shown so far, the tests that would show
 
 Each change that alters the sound gets a recording against the build before it; each that shouldn't gets the
 audlog check.
+
+## What the exact profiles show (16 November, ares; the console's laps in releases/notes-audio-ab.md)
+
+Two profilers in ares, both exact and the same from run to run: `rspprof.py` (the RSP's instructions by audio
+command) and `cpuprof.py` (the CPU's instructions, cycles, data cache fills and write-backs, and instruction cache
+fills, by function). Measure the CPU on a bench build without the PC sampler (`--script hwbench_play`): the sampler's
+interrupt, ten times an audio update, evicts the code being measured.
+
+**On the console the audio is 32 points of slow frames at the lake** (45% with it, 13% without): 14 the RSP's
+tasks, 18 the driver's CPU work (12 to 13 ms a game frame: about half the sequences and notes, a bit under half the
+command lists).
+
+**The audio thread's time is cache misses, not instructions.** An update (three ticks, about 15 notes) in ares:
+
+| | per update | share of its 229,000 cycles |
+|---|---|---|
+| instructions | 71,100 | 31% |
+| data cache fills | 1,550 (40 cycles each) | 27% |
+| data cache write-backs | 830 | 14% |
+| instruction cache fills | 770 (48 cycles each) | 16% |
+| the rest (multiplies, divides, floating point) | | 12% |
+
+- The data a tick touches doesn't fit the 8 KB data cache: about 820 lines (13 KB) take nine tenths of the fills,
+  the notes most (350 fills an update: an active note is read across 13 of its 14 lines, three ticks an update, and
+  again for the command lists), then the channels (233), the driver's globals (130), the layers (106), the notes'
+  per-tick states (102) and the audio thread's own stack (122).
+- The code an update runs is 14 KB of hot instructions inside 37 KB of functions; each update starts with it cold
+  (the game ran in between).
+
+**Tried, each with the same sound (the audio check), and what it gave:**
+
+| change | audio thread's cycles an update |
+|---|---|
+| A lean copy of the note's command builder for the common case, the game's own for the rest (15% fewer instructions in that stage, checked command for command against the game's: 59,916 notes, none different) | no change: the same misses. Not kept |
+| The driver on clang with a sample profile and hot/cold splitting | -1.4% (it calls 44 KB hot) |
+| The driver built for size (`GCC_AUDIO_OPT=Os`) | +4%: more instructions, the same fills |
+| The hot functions placed together in the order an update runs them (`fishmod/data/audio_text_order.txt`) | -0.9% (-4.5% under the PC sampler). Kept |
+| An update every two refreshes (`FISHMOD_AUDIO_EVERY2`, six ticks) | -2.8% a tick: the code is filled less, the data as much |
+
+So no rearrangement of the driver as it stands is worth more than a few percent: the cost is the amount of data
+and code each tick walks, 180 ticks a second. What's left that can keep every sample:
+
+- **Fewer, larger commands to the RSP** (a note's decode, resample, filter and envelope as one command, its state in
+  one block): the command lists are 4.2 KB an update (524 commands) that the CPU writes line by line and the RSP
+  reads back; the RSP's own share of dispatch, moves, codebook reloads and load waits is 15 to 20% of its audio work.
+  Needs a second audio microcode (the game's fills all but 80 bytes of the RSP's instruction memory).
+- **Less data a tick**: the script state and the I/O ports of a channel in one line, the notes' unused bytes out,
+  the per-tick note states smaller. A few percent each.
+
+## The measure for a change to the driver, and where it stands (16 November)
+
+The bench builds don't run the same audio twice (the game's frames fall differently against the refreshes: 4% more or
+fewer instructions from one run to the next), so a change of a percent can't be read from them. The audio check's
+build does (lockstep: three updates a game frame, the same notes every run): **`cpuprof.py` on the audlog build, the
+audio thread's cycles an update**, is exact to a few tenths of a percent, and the same build proves the sound.
+
+    fishmod/build.sh --script audlog --hw --texpack --colpack --meshpack --gcc-all
+    ARES_CPUPROF=cpu.bin fishmod/tools/ares_run.sh 0 ROM 150
+    fishmod/tools/cpuprof.py cpu.bin --elf ELF --per-calls AudioThread_UpdateImpl \
+        --match '^(Audio|func_800D|func_800E|Fishmod_Sample)' --top 0
+
+| the driver | instructions | cycles an update | data fills | write-backs | code fills |
+|---|---|---|---|---|---|
+| before any of this (frames25's) | 68,515 | 217,288 | 1,496 | 828 | 636 |
+| the hot functions together; the note's fields in a tick's order | 68,695 | 215,147 (-1.0%) | 1,452 | 826 | 623 |
+
+(The function sections cost the command-line claim its inlining, 900 instructions an update: forced back.)
+
+**What the exact changes left are worth, from the bytes each tick reads** (`cpuprof`'s `.bytes`): the channel's script
+state and I/O ports beside its head, about 1%; the note's per-tick state reused when its inputs haven't changed, about
+2%; the driver's scattered globals and its stack, 1 to 2%; one compact record a note to the RSP instead of 13 commands
+(a second microcode that expands it), about 4% of the CPU's and 3% of the RSP's audio time. All of it together is
+near a tenth of the driver's 12 ms a frame. The rest is the work itself: about 15 notes and 14 channels walked 180
+times a second, through an 8 KB data cache that the walk doesn't fit in, with the code cold at every refresh.
+
+## The memory bus (16 November, ares: `fishmod/tools/busprof.py`)
+
+`ARES_BUSPROF` counts every byte moved to or from RDRAM by who asked. The play bench at the lake, per game frame
+(50 ms). (The RDP's drawing isn't in it: ares draws on the GPU. The video interface's read-out isn't either.)
+
+| KB a game frame | read | written |
+|---|---|---|
+| CPU: the audio driver's code filled | 56.5 | |
+| CPU: the audio driver's data filled / written back | 67.7 | 37.2 |
+| RSP: the audio tasks' DMAs | 79.2 | 31.2 |
+| **the audio's, together: 272 KB** | | |
+| CPU: the rest's code | 459 | |
+| CPU: the rest's data | 259 | 157 |
+| RSP: the graphics tasks' DMAs | 438 | 401 |
+| RDP: its commands fetched | 248 | |
+
+The audio is about an eighth of what's counted. The game's own code is the largest single reader (459 KB a frame of
+instruction cache fills: the 16 KB cache, 20 times a second), then the graphics microcode's loads and its output to
+the RDP.
+
+**The audio's RSP DMAs, by what they carry** (1,543 a game frame, 112 KB):
+
+| | DMAs | KB |
+|---|---|---|
+| the reverbs' ring buffers, in and out | 72 | 24.4 |
+| the command list, 64 bytes (8 commands) at a time | 240 | 14.9 |
+| the microcode itself, text and data, each task | 6 | 14.1 |
+| the notes' sample data | ~190 | ~14 |
+| the notes' states (32 bytes each, in and out) | 438 | 13.7 |
+| the ADPCM codebooks | 111 | 8.8 |
+| the finished sound out | 9 | 6.3 |
+| the decoder's last frame in, and other small states | ~480 | ~16 |
+
+What can come off it and keep every sample: the command list (a compact record a note: about 10 of its 15 KB, and
+its 240 DMAs to about 20 with larger pieces); the microcode's own load and the driver's cold code, by waking the
+driver less often (every second refresh: -11% of the audio's traffic, measured; releases/notes-audio-laps.md); the
+codebooks, if DMEM had room to keep them (it doesn't, as laid out). The reverbs, the samples, the states and the
+sound itself are the work.

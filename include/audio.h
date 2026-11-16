@@ -383,25 +383,27 @@ typedef struct AdsrSettings {
 } AdsrSettings; // size = 0x8
 
 typedef struct AdsrState {
-    /* 0x00 */ union {
+    // fish-oot: what a tick doesn't read first (the target and the envelope, read when a point is reached), so the
+    // five words it does read end the struct, next to the vibrato's in the note (see Note)
+    /* 0x00 */ f32 target;
+    /* 0x04 */ char unk_18[4];
+    /* 0x08 */ EnvelopePoint* envelope;
+    /* 0x0C */ union {
         struct A {
-            /* 0x00 */ u8 unused : 1;
-            /* 0x00 */ u8 hang : 1;
-            /* 0x00 */ u8 decay : 1;
-            /* 0x00 */ u8 release : 1;
-            /* 0x00 */ u8 state : 4;
+            /* 0x0C */ u8 unused : 1;
+            /* 0x0C */ u8 hang : 1;
+            /* 0x0C */ u8 decay : 1;
+            /* 0x0C */ u8 release : 1;
+            /* 0x0C */ u8 state : 4;
         } s;
-        /* 0x00 */ u8 asByte;
+        /* 0x0C */ u8 asByte;
     } action;
-    /* 0x01 */ u8 envIndex;
-    /* 0x02 */ s16 delay;
-    /* 0x04 */ f32 sustain;
-    /* 0x08 */ f32 velocity;
-    /* 0x0C */ f32 fadeOutVel;
-    /* 0x10 */ f32 current;
-    /* 0x14 */ f32 target;
-    /* 0x18 */ char unk_18[4];
-    /* 0x1C */ EnvelopePoint* envelope;
+    /* 0x0D */ u8 envIndex;
+    /* 0x0E */ s16 delay;
+    /* 0x10 */ f32 sustain;
+    /* 0x14 */ f32 fadeOutVel;
+    /* 0x18 */ f32 velocity;
+    /* 0x1C */ f32 current;
 } AdsrState; // size = 0x20
 
 typedef struct StereoData {
@@ -568,21 +570,20 @@ typedef struct NoteSynthesisState {
     /* 0x0C */ NoteSynthesisBuffers* synthesisBuffers;
     /* 0x10 */ s16 curVolLeft;
     /* 0x12 */ s16 curVolRight;
-    /* 0x14 */ char unk_14[0x6];
-    /* 0x1A */ u8 combFilterNeedsInit;
-    /* 0x1C */ char unk_1C[0x4];
-} NoteSynthesisState; // size = 0x20
+    /* 0x14 */ u8 combFilterNeedsInit; // (fish-oot: was at 0x1A, among 10 unused bytes: the struct is 8 shorter)
+} NoteSynthesisState; // size = 0x18
 
 typedef struct VibratoState {
+    // fish-oot: what every tick reads first (five words), then what only a sounding vibrato does (see Note)
     /* 0x00 */ struct SequenceChannel* channel;
-    /* 0x04 */ u32 time;
-    /* 0x08 */ s16* curve; // sineWave
-    /* 0x0C */ f32 depth;
-    /* 0x10 */ f32 rate;
-    /* 0x14 */ u8 active;
-    /* 0x16 */ u16 rateChangeTimer;
-    /* 0x18 */ u16 depthChangeTimer;
-    /* 0x1A */ u16 delay;
+    /* 0x04 */ f32 depth;
+    /* 0x08 */ f32 rate;
+    /* 0x0C */ u8 active;
+    /* 0x0E */ u16 rateChangeTimer;
+    /* 0x10 */ u16 depthChangeTimer;
+    /* 0x12 */ u16 delay;
+    /* 0x14 */ u32 time;
+    /* 0x18 */ s16* curve; // sineWave
 } VibratoState; // size = 0x1C
 
 typedef struct NotePlaybackState {
@@ -593,18 +594,21 @@ typedef struct NotePlaybackState {
     /* 0x04 */ u8 unk_04;
     /* 0x05 */ u8 stereoHeadsetEffects;
     /* 0x06 */ s16 adsrVolScaleUnused;
-    // fishmod: the layer pointers first, in the same 16-byte cache line as priority and unk_04 (Note + 0x30): the
-    // update's check of each note (Audio_ProcessNotes) reads those three, and an idle note nothing else. (Were: the two
-    // frequency scales at 0x08 and 0x0C, the layers at 0x10-0x18.)
-    /* 0x08 */ SequenceLayer* prevParentLayer;
-    /* 0x0C */ SequenceLayer* parentLayer;
-    /* 0x10 */ SequenceLayer* wantedParentLayer;
-    /* 0x14 */ f32 portamentoFreqScale;
-    /* 0x18 */ f32 vibratoFreqScale;
-    /* 0x1C */ NoteAttributes attributes;
-    /* 0x40 */ AdsrState adsr;
-    /* 0x60 */ Portamento portamento;
-    /* 0x6C */ VibratoState vibratoState;
+    // fish-oot: the note's layer in the same 16-byte cache line as priority and unk_04 (Note + 0x10): the update's
+    // check of each note (Audio_ProcessNotes) reads those three, and an idle note nothing else. After it, what a
+    // playing note's tick reads, in as few lines as the structs allow: the frequency scales, the attributes (their
+    // filter's own buffer, read when it's set, last), the envelope's and the vibrato's five words each, back to
+    // back (AdsrState, VibratoState); then what a tick seldom reads (the portamento, the other two layers).
+    // 8 of the note's lines a tick, were 11 (fishmod/tools/cpuprof.py: the bytes read and written).
+    /* 0x08 */ SequenceLayer* parentLayer;
+    /* 0x0C */ f32 portamentoFreqScale;
+    /* 0x10 */ f32 vibratoFreqScale;
+    /* 0x14 */ NoteAttributes attributes;
+    /* 0x38 */ AdsrState adsr;
+    /* 0x58 */ VibratoState vibratoState;
+    /* 0x74 */ Portamento portamento;
+    /* 0x80 */ SequenceLayer* prevParentLayer;
+    /* 0x84 */ SequenceLayer* wantedParentLayer;
 } NotePlaybackState; // size = 0x88
 
 // JAudio: "commonch"
@@ -647,11 +651,13 @@ typedef struct NoteSampleState {
 // JAudio: "channel"
 typedef struct Note {
     /* 0x00 */ AudioListItem listItem;
-    /* 0x10 */ NoteSynthesisState synthesisState;
-    /* 0x30 */ NotePlaybackState playbackState;
-    /* 0xB8 */ char unk_B8[0x4];
-    /* 0xBC */ u32 startSamplePos; // initial position/index to start processing s16 samples
-    /* 0xC0 */ NoteSampleState sampleState;
+    // fish-oot: the playback state first (what the sequences' and notes' ticks read), then the synthesis state (what
+    // the command lists read), each in its own lines
+    /* 0x10 */ NotePlaybackState playbackState;
+    /* 0x98 */ NoteSynthesisState synthesisState;
+    /* 0xB0 */ NoteSampleState sampleState;
+    /* 0xD0 */ u32 startSamplePos; // initial position/index to start processing s16 samples
+    /* 0xD4 */ char unk_D4[0xC];
 } Note; // size = 0xE0
 
 typedef struct ReverbSettings {

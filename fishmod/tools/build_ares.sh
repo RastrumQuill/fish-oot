@@ -21,6 +21,10 @@ git -C "$DIR" fetch -q --depth 1 origin tag "$REV"
 git -C "$DIR" checkout -q -f "$REV"
 git -C "$DIR" apply "$PATCH"
 git -C "$DIR" apply "$(dirname "$PATCH")/ares-sc64.patch" # ARES_SC64_DIR=<dir>: a minimal SummerCart64, its USB packets saved there
+# the profilers (one patch: they share files): ARES_RSPPROF=<file> the RSP's instructions by PC (rspprof.py);
+# ARES_CPUPROF=<file> the CPU's instructions, cycles and cache fills by PC (cpuprof.py); ARES_BUSPROF=<file> the bytes
+# moved to and from RDRAM by who asked (busprof.py)
+git -C "$DIR" apply "$(dirname "$PATCH")/ares-prof.patch"
 cmake -S "$DIR" -B "$DIR/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DARES_CORES=n64 -DARES_ENABLE_LIBRASHADER=OFF \
     -DARES_ENABLE_SDL=OFF
 ninja -C "$DIR/build"

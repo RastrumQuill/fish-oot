@@ -13,12 +13,39 @@ static void write_progbits_section(FILE *fout, struct Segment *seg, const char *
 {
     fprintf(fout, "    .%s :\n    {\n", section_name);
 
+    // fish-oot: the audio driver's hot functions together and in the order an update runs them, ahead of the rest of
+    // the driver's code (fishmod/data/audio_text_order.txt, one function a line; '#' comments). The driver is built
+    // with each function in its own section (.text.NAME: GCC's -ffunction-sections, the Makefile's GCC_AUDIO), and
+    // the linker takes the listed ones first, where the driver's code starts. The code an update runs then sits in
+    // two stretches that each fit the 16 KB instruction cache (the sequences and notes; the command lists) instead of
+    // spread through 80 KB, each line of it evicting another's. Built otherwise (IDO), the lines match nothing.
+    FILE *order = NULL;
+    int ordered = 0;
+
+    if (strcmp(section_name, "text") == 0) {
+        order = fopen("fishmod/data/audio_text_order.txt", "r");
+    }
     for (int i = 0; i < seg->includesCount; i++) {
+        if (order != NULL && !ordered && strstr(seg->includes[i].fpath, "/src/audio/internal/") != NULL) {
+            char line[256];
+
+            while (fgets(line, sizeof(line), order) != NULL) {
+                char name[256];
+
+                if (sscanf(line, " %255[A-Za-z0-9_.*]", name) == 1) {
+                    fprintf(fout, "        *(.text.%s)\n", name);
+                }
+            }
+            ordered = 1;
+        }
         fprintf(fout, "        %s(.%s*)\n", seg->includes[i].fpath, section_name);
         if (with_padding && seg->includes[i].linkerPadding != 0)
             fprintf(fout, "        . += 0x%X;\n", seg->includes[i].linkerPadding);
     }
 
+    if (order != NULL) {
+        fclose(order);
+    }
     fprintf(fout, "    }\n");
 }
 

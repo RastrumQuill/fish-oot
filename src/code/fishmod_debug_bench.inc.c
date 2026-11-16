@@ -587,6 +587,17 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     sPbActive = true;
 
     if (sBench.laps >= FISHMOD_BENCH_LAPS) {
+#ifdef FISHMOD_AUDIO_AB
+        if (!gFishmodBenchDone) {
+            gFishmodAudioAbReport = sBench.laps; // (the last lap's)
+            R_AUDIOMGR_ACTIVITY_LEVEL = 0;
+        }
+#endif
+#ifdef FISHMOD_AUDIO_LAPS
+        if (!gFishmodBenchDone) {
+            gFishmodAudioAbReport = sBench.laps; // (the last lap's)
+        }
+#endif
         Bench_SetMode(BENCH_BASE);
         sPbActive = false;
         gFishmodBenchDone = true; // (the profiler stops here: fishmod_debug_pcprof.inc.c)
@@ -603,6 +614,38 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     sPbCond = 0;
     R_AUDIOMGR_ACTIVITY_LEVEL = (sBench.laps & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
                                                   : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
+#endif
+#ifdef FISHMOD_AUDIO_LAPS
+    // (the audio laps, audio_laps script: every lap the same time and weather, nothing switched; each lap's end sends
+    // the audio thread's own time by part, as the audio A/B does)
+    sPbCond = 0;
+    {
+        static s32 sLapsLap = -1;
+
+        if (sLapsLap != sBench.laps) {
+            if (sLapsLap >= 0) {
+                gFishmodAudioAbReport = sLapsLap + 1;
+            }
+            sLapsLap = sBench.laps;
+        }
+    }
+#endif
+#ifdef FISHMOD_AUDIO_AB
+    // (the audio A/B, audio_ab script: every lap the same time and weather; the audio whole, then without its RSP
+    // tasks (the driver still runs and builds them), then without the driver's update either, twice round. Each
+    // lap's end sends the audio thread's own time by part: FISHMOD-AUDIO, fishmod_debug_pcprof.inc.c)
+    sPbCond = 0;
+    {
+        static s32 sAbLap = -1;
+
+        if (sAbLap != sBench.laps) {
+            if (sAbLap >= 0) {
+                gFishmodAudioAbReport = sAbLap + 1;
+            }
+            sAbLap = sBench.laps;
+        }
+        R_AUDIOMGR_ACTIVITY_LEVEL = sBench.laps % 3; // AUDIOMGR_ACTIVITY_LEVEL_ALL, _NO_RSP, _NO_UPDATE
+    }
 #endif
 #if defined(FISHMOD_RDP_SWEEP) || defined(FISHMOD_PROP_SWEEP) || defined(FISHMOD_ANATOMY_SWEEP) || \
     defined(FISHMOD_TERRAIN_SWEEP)
