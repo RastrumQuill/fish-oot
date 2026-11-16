@@ -1,5 +1,4 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# The audio lead's laps bench (claude/sleepy-faraday-ve9g2u at 0d99181, releases/notes-audio-laps.md): the audio
-# driver woken every refresh, then every second refresh; three laps each, about 12 minutes each.
-releases/fish-oot-audio-laps.bps 16 audio-laps
-releases/fish-oot-audio-laps-every2.bps 16 audio-laps-every2
+# rc1's bench, the baseline later builds are measured against (releases/notes-rc1.md), twice. Expansion Pak in.
+releases/fish-oot-rc1-bench.bps 12 rc1-1
+releases/fish-oot-rc1-bench.bps 12 rc1-2

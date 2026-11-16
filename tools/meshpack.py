@@ -68,10 +68,13 @@ WATER_BANDS = [0, 12, 30, 60, 100, 160, 250, 400]   # each band's top, by depth 
 # (the game's band lists: these 8, by their middles' depths, fishmod.c sWaterBandMid)
 GAME_BAND_MID = [6, 21, 45, 80, 130, 205, 325, 520]
 # tests: MESHPACK_FOG_BANDS="0,30,100,250" cuts at fewer depths (each band's fog the game's list nearest its middle);
-# MESHPACK_FOG_NOCUT=1 cuts nothing: each whole triangle in the band of its middle's depth
+# uncut (the default): each whole triangle in the band of its middle's depth
 if os.environ.get("MESHPACK_FOG_BANDS"):
     WATER_BANDS = [int(x) for x in os.environ["MESHPACK_FOG_BANDS"].split(",")]
-FOG_NOCUT = bool(os.environ.get("MESHPACK_FOG_NOCUT"))
+# (the default since rc1: the cuts made long thin slivers, each scanline of each a triangle setup for the RDP: the
+# console's frames28 set, 8 cut bands 54% hitches and 17.2 fps, uncut 32% and 18.2 fps, no bed fog at all 30-31%.
+# MESHPACK_FOG_CUT=1 cuts again)
+FOG_NOCUT = not os.environ.get("MESHPACK_FOG_CUT")
 
 
 def game_band(k):
