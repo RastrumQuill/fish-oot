@@ -1139,6 +1139,24 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         Stress_Update(play);
     }
 #endif
+#ifdef FISHMOD_AUDWORLD
+    // The audio check's tour of the game (the audlog_world script): the audio isn't the same driver everywhere (11
+    // session settings by scene: other reverbs, one of them downsampled; other voice counts, fonts and music), so
+    // the check walks one or two scenes of each. Every FISHMOD_AUDWORLD_FRAMES frames, the next entrance; the
+    // script's steps (run, roll, swing) go round and round meanwhile.
+    if (sPlacedPlayer && (play->transitionTrigger == TRANS_TRIGGER_OFF) && (play->transitionMode == TRANS_MODE_OFF)) {
+        static const s16 sAudWorldEntrances[] = { FISHMOD_AUDWORLD_ENTRANCES };
+        static s32 sAudWorldIndex;
+        static s32 sAudWorldTimer;
+
+        if ((++sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES) && (sAudWorldIndex < (s32)ARRAY_COUNT(sAudWorldEntrances))) {
+            sAudWorldTimer = 0;
+            play->nextEntranceIndex = sAudWorldEntrances[sAudWorldIndex++];
+            play->transitionTrigger = TRANS_TRIGGER_START;
+            play->transitionType = TRANS_TYPE_FADE_BLACK;
+        }
+    }
+#endif
 #ifdef FISHMOD_PCPROF
     PcProf_Update();
 #endif
@@ -1297,8 +1315,13 @@ void Fishmod_AutoplayInput(GameState* gameState, Input* inputs) {
     }
 
     if (sScriptStepIndex >= sScript.numSteps) {
+#ifdef FISHMOD_AUDWORLD
+        sScriptStepIndex = 0; // (the tour's steps go round)
+        sScriptStepFrame = 0;
+#else
         sScriptActive = false;
         return;
+#endif
     }
 
     step = &sScript.steps[sScriptStepIndex];

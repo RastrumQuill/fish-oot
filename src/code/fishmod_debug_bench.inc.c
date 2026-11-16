@@ -615,13 +615,15 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     R_AUDIOMGR_ACTIVITY_LEVEL = (sBench.laps & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
                                                   : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
 #endif
-#if defined(FISHMOD_AUDIO_AHEAD_AB) && FISHMOD_EXPAK
-    // (the build-ahead A/B, audio_ahead_ab script: the audio's updates built ahead in the even laps (1, 3), one a
-    // refresh as always in the odd ones; audio/internal/thread.c)
+#if defined(FISHMOD_AUDIO_SCHED_AB) && FISHMOD_EXPAK
+    // (the audio scheduling A/B, audio_sched_ab script: by lap, round and round: as always; the updates built ahead
+    // (audio/internal/thread.c); the RSP tasks sent with time to spare (audio_thread_manager.c); both)
     {
         extern u8 gFishmodAudioAhead;
+        extern u8 gFishmodAudioLazy;
 
-        gFishmodAudioAhead = !(sBench.laps & 1);
+        gFishmodAudioAhead = (sBench.laps & 1) != 0;
+        gFishmodAudioLazy = (sBench.laps & 2) != 0;
     }
 #endif
 #ifdef FISHMOD_AUDIO_LAPS

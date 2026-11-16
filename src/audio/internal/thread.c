@@ -69,6 +69,9 @@ static s32 sFishmodCallSlot; // the output buffer ring's slot of the refresh bei
 u8 gFishmodAudioAhead = false; // updates built ahead when the driver is steady: off until the console says it
                                 // pays (the audio_ahead_ab bench switches it by lap; the audio check's build has it on)
 u8 gFishmodTaskRing = 2;      // the command lists and tasks in use: 6, or the heap's 2 for a spec too big (heap.c)
+u8 gFishmodBuiltCount;        // the updates built by the last call (0: its update was built ahead; 1-3), for the audio
+AudioTask* gFishmodBuilt[3];  // manager (code/audio_thread_manager.c): their tasks, in order,
+u8 gFishmodBuiltDmas;         // and the sample loads the last of them started (its task can't run until they're done)
 static u8 sFishmodAhead;      // updates built and not yet due (0-2)
 static AudioTask* sFishmodAheadTask[2];
 #define FISHMOD_TASK_RING_NOW gFishmodTaskRing
@@ -348,6 +351,7 @@ AudioTask* AudioThread_UpdateImpl(void) {
             rspTask = sFishmodAheadTask[0];
             sFishmodAheadTask[0] = sFishmodAheadTask[1];
             sFishmodAhead--;
+            gFishmodBuiltCount = 0;
             return rspTask;
         }
 #endif
@@ -377,6 +381,11 @@ AudioTask* AudioThread_UpdateImpl(void) {
                 &cmdsAhead);
             sFishmodAhead++;
         }
+        gFishmodBuilt[0] = rspTask;
+        gFishmodBuilt[1] = sFishmodAheadTask[0];
+        gFishmodBuilt[2] = sFishmodAheadTask[1];
+        gFishmodBuiltCount = 1 + sFishmodAhead;
+        gFishmodBuiltDmas = (gAudioCtx.curAudioFrameDmaCount > 255) ? 255 : gAudioCtx.curAudioFrameDmaCount;
 #endif
         gFishmodDmaTtlAhead = 0;
         return rspTask;
