@@ -626,22 +626,55 @@ void AudioSynth_Stub_800DBE6C(void) {
  * built (the updates built ahead: thread.c) would filter with the later ones. So such a task is given its own
  * copy: gFishmodFilterSnap points at room for the next one (NULL: none wanted, or the room's all used: the
  * driver's own, as always).
+ *
+ * The copy is of what the filter holds when the update is finished, not when the command is written: an update is
+ * several ticks, a filter can change between them, and the game's task, run after its update, filters all of them
+ * with the last tick's (the sweep's scenes found the difference: sound effects whose filter moves, in the first
+ * frames of five scenes). So each filter an update uses has one copy, filled in by AudioSynth_FishmodFilterFinish
+ * at the update's end.
  */
 s16* gFishmodFilterSnap;
 s16* gFishmodFilterSnapEnd;
+static s16* sFishmodFilterSrc[160];
+static s16* sFishmodFilterDst[160];
+static s32 sFishmodFilterCount;
 
 static void* AudioSynth_FishmodFilter(void* addr) {
     s16* snap = gFishmodFilterSnap;
     s32 i;
 
-    if ((snap == NULL) || (snap + 8 > gFishmodFilterSnapEnd)) {
+    if (snap == NULL) {
         return addr;
     }
-    for (i = 0; i < 8; i++) {
-        snap[i] = ((s16*)addr)[i];
+    for (i = sFishmodFilterCount - 1; i >= 0; i--) {
+        if (sFishmodFilterSrc[i] == (s16*)addr) {
+            return sFishmodFilterDst[i];
+        }
     }
+    if ((snap + 8 > gFishmodFilterSnapEnd) || (sFishmodFilterCount >= 160)) {
+        return addr;
+    }
+    sFishmodFilterSrc[sFishmodFilterCount] = (s16*)addr;
+    sFishmodFilterDst[sFishmodFilterCount] = snap;
+    sFishmodFilterCount++;
     gFishmodFilterSnap = snap + 8;
     return snap;
+}
+
+// The update's commands are written: its filters' copies are made (thread.c calls this after AudioSynth_Update).
+void AudioSynth_FishmodFilterFinish(void) {
+    s32 i;
+    s32 j;
+
+    for (i = 0; i < sFishmodFilterCount; i++) {
+        s16* src = sFishmodFilterSrc[i];
+        s16* dst = sFishmodFilterDst[i];
+
+        for (j = 0; j < 8; j++) {
+            dst[j] = src[j];
+        }
+    }
+    sFishmodFilterCount = 0;
 }
 #else
 #define AudioSynth_FishmodFilter(addr) (addr)

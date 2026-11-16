@@ -13,6 +13,7 @@
 #include "speed_meter.h"
 #include "translation.h"
 #include "dma.h"
+#include "carthandle.h"
 #include "libc64/malloc.h"
 
 #if FISHMOD_DEBUG
@@ -35,6 +36,57 @@ static OSMesgQueue sAudDoneQueue;
 static OSMesg sAudDoneMsg[4];
 static u32 sAudUpdates;
 static u32 sAudGameFrame; // the game state (its overlay's index) << 24 | its frame, as the update was handed over
+
+/*
+ * The audio check's second log: each RSP task's command list as it is sent (its hash and length), so two builds
+ * whose samples differ can be told apart: other commands, or the same commands over other data. And one task's
+ * whole list kept (the task numbered by the word at 0x34 of the ROM's header, which nothing uses; 0: none), to
+ * compare command by command.
+ */
+u32 gFishmodAudCmdLog[12000 * 2]; // [task][2]: hash of its command list, its length in bytes (the first 12,000)
+u32 gFishmodAudCmdLogCount;
+u32 gFishmodAudCmdDump[0x1000];
+u32 gFishmodAudCmdDumpSize;
+s16 gFishmodAudFilterDump[8][24][8];
+u32 gFishmodAudFilterAddr[8][24];
+
+static void Fishmod_AudLog_Task(AudioTask* task) {
+    static u32 sDumpAt = 0xFFFFFFFF;
+    u32 h = 2166136261u;
+    u32* w = (u32*)task->task.t.data_ptr;
+    u32 n = task->task.t.data_size / 4;
+    u32 i;
+
+    if (sDumpAt == 0xFFFFFFFF) {
+        sDumpAt = 0;
+        osEPiReadIo(gCartHandle, 0x34, &sDumpAt);
+    }
+    gFishmodAudCmdLogCount++;
+    if (gFishmodAudCmdLogCount <= 12000) {
+        for (i = 0; i < n; i++) {
+            h = (h ^ w[i]) * 16777619u;
+        }
+        gFishmodAudCmdLog[(gFishmodAudCmdLogCount - 1) * 2 + 0] = h;
+        gFishmodAudCmdLog[(gFishmodAudCmdLogCount - 1) * 2 + 1] = n * 4;
+    }
+    if ((sDumpAt != 0) && (gFishmodAudCmdLogCount >= sDumpAt) && (gFishmodAudCmdLogCount < sDumpAt + 8)) {
+        // (and the filters' coefficients as the RSP is about to read them, for the eight tasks from that one)
+        u32 t = gFishmodAudCmdLogCount - sDumpAt;
+        u32 k = 0;
+
+        for (i = 0; (i + 1 < n) && (k < 24); i += 2) {
+            if (((w[i] >> 24) == 0x07) && (((w[i] >> 16) & 0xFF) == 2)) {
+                bcopy((void*)w[i + 1], gFishmodAudFilterDump[t][k], 16);
+                gFishmodAudFilterAddr[t][k] = w[i + 1];
+                k++;
+            }
+        }
+    }
+    if ((gFishmodAudCmdLogCount == sDumpAt) && (n <= ARRAY_COUNT(gFishmodAudCmdDump))) {
+        bcopy(w, gFishmodAudCmdDump, n * 4);
+        gFishmodAudCmdDumpSize = n * 4;
+    }
+}
 
 void Fishmod_AudLog_Buffer(s16* buf, s32 samples) {
     u32 h = 2166136261u;
@@ -186,6 +238,7 @@ static void AudioMgr_HandleRetraceLockstep(AudioMgr* audioMgr) {
     }
     AudioThread_LockstepWaitDmas();
     if (audioMgr->rspTask != NULL) {
+        Fishmod_AudLog_Task(audioMgr->rspTask);
         audioMgr->audioTask.next = NULL;
         audioMgr->audioTask.flags = OS_SC_NEEDS_RSP;
         audioMgr->audioTask.framebuffer = NULL;

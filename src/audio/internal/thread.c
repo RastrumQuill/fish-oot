@@ -243,6 +243,13 @@ static AudioTask* AudioThread_Body(u32 samplesRemainingInAi, u32 taskCount, s32 
 
     gAudioCtx.curAbiCmdBuf =
         AudioSynth_Update(gAudioCtx.curAbiCmdBuf, &abiCmdCnt, curAiBuffer, gAudioCtx.aiBufLengths[index]);
+#if FISHMOD_EXPAK
+    {
+        void AudioSynth_FishmodFilterFinish(void);
+
+        AudioSynth_FishmodFilterFinish(); // (the task's own copies of its filters, as the update leaves them)
+    }
+#endif
 
     // Update audioRandom to the next random number
 #if FISHMOD_DEBUG
