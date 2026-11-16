@@ -1,5 +1,5 @@
 diff --git a/ares/n64/cpu/cpu.cpp b/ares/n64/cpu/cpu.cpp
-index ec4a52d..e2a4fbd 100644
+index ec4a52d..360fef1 100644
 --- a/ares/n64/cpu/cpu.cpp
 +++ b/ares/n64/cpu/cpu.cpp
 @@ -121,7 +121,80 @@ auto CPU::interruptPoll() -> void {
@@ -44,7 +44,7 @@ index ec4a52d..e2a4fbd 100644
 +  }
 +  //<file>.bytes: every byte the code range read or wrote through the cache: records of (u32 address, u32 reads, u32 writes)
 +  string btmp{cpuProfPath, ".bytes.tmp"};
-+  if(auto fp = fopen(btmp, "wb")) {
++  if(cpuProfBytes) if(auto fp = fopen(btmp, "wb")) {
 +    for(u32 n : range(0x800000)) {
 +      if(!cpuProfBytes[n * 2] && !cpuProfBytes[n * 2 + 1]) continue;
 +      u32 rec[3] = {0x80000000u + n, cpuProfBytes[n * 2], cpuProfBytes[n * 2 + 1]};
