@@ -459,6 +459,13 @@ static void Fishmod_TourUpdate(PlayState* play) {
         s32 since = sTourFrame - (TOUR_GLIDE + 40);
 
         sPopAbVariant = -1;
+#ifdef FISHMOD_POP_AB_STOPS
+        // (only the stops asked for, a bit each from stop 1: the others passed at once)
+        if (!((FISHMOD_POP_AB_STOPS >> sTourStop) & 1) && (sTourStop + 1 < (s32)ARRAY_COUNT(sTourStops))) {
+            Fishmod_TourGo(sTourStop + 1);
+            since = -1;
+        }
+#endif
         if (since >= 0) {
             s32 variant = since / POP_AB_FRAMES;
             f32 step = ((variant == 0) || (variant == POP_AB_VARIANTS - 1)) ? 0.0f

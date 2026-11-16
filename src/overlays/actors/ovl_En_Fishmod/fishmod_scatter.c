@@ -17,6 +17,7 @@
 #include "stddef.h"
 #include "fishmod.h"
 #include "fishmod_scatter.h"
+#include "fishmod_lod_pop.h"
 
 #include "gfx.h"
 #include "gfx_setupdl.h"
@@ -155,8 +156,9 @@ static f32 sKindMax[FISHMOD_PROP_KIND_MAX]; // how far each kind is drawn, as la
 static s16 sBillboardYaw;                    // the single cards' turn: facing the camera (as last built)
 // Under water the haze hides detail much sooner, and the kinds' distances are shorter (500-900): the tiers' distances
 // are this much nearer there, so the far tiers still do their work
-#define UNDER_LOD_SCALE 0.5f
+#define UNDER_LOD_SCALE FISHMOD_UNDER_LOD_SCALE // (fishmod_lod_pop.h: was 0.5)
 static f32 sLodScale = 1.0f; // (as last built: UNDER_LOD_SCALE under water)
+static f32 sNearScale[FISHMOD_PROP_KIND_MAX]; // each kind's near distance over PROP_FAR_DIST (fishmod_lod_pop.h; 0: 1)
 // With the camera under water, each kind's distances as the LOD tuning measured them (fishmod_lod_tune.h: the
 // shortest that changed no view, per time of day), at the prop's scale; 0: the defaults. Above water the defaults
 // (set by eye: the tuning's views there were harsher than the game's).
@@ -274,6 +276,13 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_##id].materialImp = gFishmodProp_##name##DLImpMaterial; \
     sKinds[FISHMOD_PROP_##id].impDist = (dist);
     FISHMOD_PROP_KINDS_IMP(X)
+#undef X
+    // (the single cards' distances as the pop-in test set them: fishmod_lod_pop.h)
+#define X(id, card, half, near)                   \
+    sKinds[FISHMOD_PROP_##id].impDist *= (card);  \
+    sKinds[FISHMOD_PROP_##id].halfDist *= (half); \
+    sNearScale[FISHMOD_PROP_##id] = (near);
+    FISHMOD_LOD_POP(X)
 #undef X
     // each kind's settings (fishmod/data/prop_kinds.json); swaying: weed slowly with the water's movement, reeds above
     // it faster in the wind (the shear moves a point by its height, so tall kinds get less of it: every tip moves about
@@ -2100,7 +2109,7 @@ static void Scatter_Sway(PlayState* play, ScatterFrame* frame, ScatterSet* set) 
 /** How a prop at this (squared, flat) distance is drawn: see ScatterTier. */
 static s32 Scatter_Tier(FishmodProp* prop, FishmodPropKindInfo* info, s32 kind, f32 dSq, f32 eyeY) {
     f32 s = prop->scale * (1.0f / 64.0f) * sLodScale;
-    f32 farDist = PROP_FAR_DIST * sLodScale;
+    f32 farDist = PROP_FAR_DIST * sLodScale * ((sNearScale[kind] > 0.0f) ? sNearScale[kind] : 1.0f);
     f32 dy = eyeY - prop->y;
     f32 impDist = (sTunedImp[kind] > 0.0f) ? sTunedImp[kind] * prop->scale * (1.0f / 64.0f) : info->impDist * s;
     f32 halfDist = (sTunedHalf[kind] > 0.0f) ? sTunedHalf[kind] * prop->scale * (1.0f / 64.0f) : info->halfDist * s;

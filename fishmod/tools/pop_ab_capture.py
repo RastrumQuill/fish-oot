@@ -225,7 +225,7 @@ def capture(args):
     have = set()
     t0 = time.time()
     try:
-        while time.time() - t0 < args.timeout and len(have) < VARIANTS * args.stops:
+        while time.time() - t0 < args.timeout and len(have) < VARIANTS * (len(args.only) if args.only else args.stops):
             names = sorted(os.listdir(frames_dir))
             for name in names[:-1]:  # (the newest may still be being written)
                 path = os.path.join(frames_dir, name)
@@ -235,7 +235,7 @@ def capture(args):
                     continue
                 os.remove(path)
                 m = read_marker(img)
-                if not m or m[1] is None or m[0] > args.stops or m[1] >= VARIANTS:
+                if not m or m[1] is None or m[0] > args.stops or m[1] >= VARIANTS or (args.only and m[0] not in args.only):
                     continue
                 # (the last settled frame of a variant is the one kept: written over until the variant changes)
                 Image.fromarray(img).save(os.path.join(args.out, f"s{m[0]:02d}_v{m[1]:02d}.png"))
@@ -337,6 +337,7 @@ def main():
     ap.add_argument("--ares", default=os.environ.get("ARES", "ares"))
     ap.add_argument("--display", default=":90")
     ap.add_argument("--timeout", type=int, default=7200)
+    ap.add_argument("--only", type=lambda t: [int(x) for x in t.split(",")], help="only these stops (pop_ab_cal)")
     ap.add_argument("--ppd", type=float, default=PPD, help="pixels per degree of view (default 20: a TV across a room)")
     args = ap.parse_args()
     globals()["PPD"] = args.ppd
