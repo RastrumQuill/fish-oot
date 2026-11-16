@@ -200,3 +200,30 @@ was (updates back to back outrun the cart).
 
 What the first try got wrong, kept for the next: the game's commands reach the driver on the *second* update after a
 frame, so batches that started on the first pushed every sound two updates later (the check's 22nd buffer).
+
+## The audio check's tour, and what it caught (16 November)
+
+One map isn't the game. `fishmod/scripts/audlog_world.inc.c` is the audio check on a tour: Hyrule Field, then 16
+entrances covering the audio session settings the scenes use (the market, Kakariko, Link's house, Zora's Fountain,
+the Shadow Temple, Jabu-Jabu, the Fire Temple, the Forest Temple, the Temple of Time, the Desert Colossus, the
+Haunted Wasteland, the Lost Woods, a Great Fairy's fountain, the Deku Tree, the lake), 10 seconds each, Link running,
+rolling and swinging. **A change to the driver is checked on both: the lake's route and the tour.**
+
+Building updates ahead matched on the lake's route and differed on the tour, three ways (releases/notes-audio-sched-
+ab.md): each was real, and none could have been found at the lake.
+
+Still to cover: the ocarina (the game's custom update function), headset output (the Haas delays), and whatever the
+title screen and the cutscenes play that the tour doesn't reach.
+
+Found on the way and not the audio's: adult Link put down in Kokiri Forest stops on his first frame with a
+floating-point exception in the forest's fairies (`ObjectKankyo_Fairies`), in the build without `--expak` and not in
+the one with. Not yet looked into.
+
+## Where things sit in the caches is worth milliseconds
+
+The `--expak` build's first run (releases/notes-audio-sched-ab.md): 100 KB of new buffers in the middle of the
+engine's data moved the kernel's thread records, and the thread switch alone cost 4.3 ms a frame more under the PC
+sampler; frames over 52 ms went from 23% to 75% in ares with nothing switched on. The audio driver is pinned now, as
+the mod's own code was (fishmod_pin.c), so its size moves nothing after it. By the rule above (build time is free)
+the placement of the engine's hot code and data is something a build step could search for, not leave to where the
+link order happens to put it: `cpuprof.py` already gives the fills by function and by line.
