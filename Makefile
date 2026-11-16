@@ -1134,7 +1134,8 @@ $(LDSCRIPT): $(BUILD_DIR)/spec
 
 # Generates a makefile containing rules for building .plf files
 # from overlay .o files for every overlay defined in the spec.
-$(SEGMENTS_DIR)/Makefile: $(BUILD_DIR)/spec
+# (and the audio driver's function order, which mkspecrules reads: fishmod/data/audio_text_order.txt)
+$(SEGMENTS_DIR)/Makefile: $(BUILD_DIR)/spec fishmod/data/audio_text_order.txt
 	$(MKSPECRULES) $< $(SEGMENTS_DIR) $@
 
 # Generates relocations for each overlay after partial linking so that the final

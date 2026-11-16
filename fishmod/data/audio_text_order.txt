@@ -1,53 +1,120 @@
-# The audio driver's hot functions, in the order an audio update runs them (tools/mkspecrules.c places them first
-# in the driver's code, each in its own section). From the exact profile of the Lake Hylia bench in ares
-# (fishmod/tools/cpuprof.py: every function run at least 20 instructions an update). A name ending in * also takes
-# the compiler's own pieces of the function (.part.0, .isra.0 ...).
-#
-# the update's start: loads, the game's commands
-AudioThread_UpdateImpl*
-AudioLoad_DecreaseSampleDmaTtls*
-AudioLoad_ProcessLoads*
-Fishmod_SampleStoreStep*
-AudioLoad_ProcessSlowLoads*
-AudioLoad_ProcessSamplePreloads*
-AudioLoad_ProcessAsyncLoads*
-AudioLoad_ProcessScriptLoads*
-AudioThread_ProcessCmds*
-AudioThread_ProcessCmd
-AudioThread_ProcessChannelCmd*
-AudioThread_ProcessSeqPlayerCmd*
-AudioSynth_Update*
-# the sequences and the notes, three ticks an update
-AudioSeq_ProcessSequences*
-AudioLoad_IsSeqLoadComplete*
-AudioLoad_IsFontLoadComplete*
-AudioLoad_SetSeqLoadStatus*
-AudioLoad_SetFontLoadStatus*
-AudioSeq_SequencePlayerProcessSequence*
-AudioSeq_SequenceChannelProcessScript*
-AudioSeq_HandleScriptFlowControl*
-AudioHeap_LoadFilter*
-AudioSeq_SeqLayerProcessScript
-Audio_SequencePlayerProcessSound*
-Audio_SequenceChannelProcessSound*
+# The audio driver's functions in the order they are linked (tools/mkspecrules.c): the parts of an update
+# one after another, each part's functions together and the most-run first, so that functions that call
+# each other don't share lines of the 16 KB instruction cache. Written by fishmod/tools/audio_text_order.py
+# from the audio sweep's profiles (6 of them) and the code's own calls: don't edit by hand.
+# A name ending in * also takes the compiler's own pieces of the function (.part.0, .isra.0 ...).
+# the mixing (the command list written)
+AudioSynth_ProcessNote*
+AudioSynth_DoOneAudioUpdate*
+AudioSynth_ProcessEnvelope*
+AudioLoad_FindSampleDmaChecked*
+AudioLoad_DmaSampleData*
+Fishmod_SampleStoreUse*
+AudioSynth_ApplyHaasEffect*
+AudioSynth_SaveReverbSamples*
+AudioSynth_FilterReverb*
+AudioSynth_LoadRingBuffer1*
+AudioSynth_LoadReverbSamples*
+func_800DB4E4*
+AudioLoad_Dma*
+# the notes' upkeep
+Audio_InitSampleState*
 Audio_ProcessNotes*
 Audio_AdsrUpdate*
-Audio_NoteVibratoUpdate*
 Audio_GetVibratoFreqScale*
-Audio_InitSampleState*
-func_800DB03C*
-# the command lists, three ticks an update
-AudioSynth_InitNextRingBuf*
-AudioSynth_DoOneAudioUpdate*
-AudioSynth_LoadReverbSamples*
-AudioSynth_LoadRingBuffer1*
-AudioSynth_ProcessNote*
-AudioSynth_ProcessEnvelope*
-AudioSynth_FilterReverb*
-AudioSynth_SaveReverbSamples*
-# now and then: a note starting or ending
-AudioSeq_SeqLayerProcessScriptStep*
+Audio_NoteVibratoUpdate*
 Audio_SeqLayerDecayRelease*
+AudioSeq_SequenceChannelDisable*
 Audio_NoteInitForLayer*
-Audio_AllocNote*
 Audio_NoteInit*
+Audio_NotePoolClear*
+Audio_NoteVibratoInit*
+AudioSeq_AudioListPushBack*
+Audio_NotePortamentoInit*
+# the sequences
+AudioSeq_SequenceChannelProcessScript*
+AudioSeq_HandleScriptFlowControl*
+Audio_SequenceChannelProcessSound*
+Audio_SequencePlayerProcessSound*
+AudioSeq_SequencePlayerProcessSequence*
+AudioSeq_SeqLayerProcessScript*
+AudioSeq_ProcessSequences*
+AudioHeap_LoadFilter*
+AudioLoad_IsFontLoadComplete*
+AudioLoad_IsSeqLoadComplete*
+AudioLoad_SetSeqLoadStatus*
+AudioLoad_SetFontLoadStatus*
+AudioSeq_SeqLayerProcessScriptStep4*
+AudioSeq_SeqLayerProcessScriptStep3*
+AudioSeq_InitSequenceChannel*
+Audio_AllocNote*
+AudioSeq_SeqLayerProcessScriptStep5*
+AudioSeq_SeqLayerProcessScriptStep2*
+AudioSeq_SeqLayerProcessScriptStep1*
+AudioSeq_AudioListPopBack*
+Audio_GetInstrumentInner*
+AudioSeq_SeqLayerFree*
+Audio_GetSoundEffect*
+AudioSeq_SeqChannelSetLayer*
+Audio_InvalDCache*
+# the rest of what runs
+func_800DB03C*
+AudioSynth_InitNextRingBuf*
+AudioLoad_DecreaseSampleDmaTtls*
+AudioSynth_Update*
+Audio_ChooseActiveSfx*
+AudioLoad_DecreaseSampleDmaTtlsIn*
+Audio_PlayActiveSfx*
+AudioThread_Body*
+AudioHeap_Init*
+AudioThread_UpdateImpl*
+Audio_SetSfxProperties*
+AudioLoad_ProcessAsyncLoads*
+AudioThread_FishmodSteady*
+AudioThread_ProcessCmd*
+Audio_UpdateActiveSequences*
+Audio_ComputeSfxPanSigned*
+AudioHeap_AllocZeroed*
+Audio_ComputeSfxReverb*
+Audio_ProcessSfxRequest*
+AudioHeap_ResetStep*
+AudioThread_ProcessChannelCmd*
+Audio_ComputeSfxFreqScale*
+AudioThread_ProcessCmds*
+Audio_ComputeSfxVolume*
+AudioLoad_ProcessSlowLoads*
+AudioThread_LockstepWaitDmas*
+func_800F8F88*
+AudioThread_QueueCmdS8*
+Fishmod_SampleStoreStep*
+Audio_StepUnusedBankLerp*
+AudioLoad_Init*
+AudioOcarina_Update*
+AudioLoad_ProcessLoads*
+Audio_SetSequenceMode*
+osAiSetNextBuffer*
+AudioLoad_ProcessSamplePreloads*
+Audio_PlaySfxGeneral*
+AudioLoad_ProcessScriptLoads*
+Audio_Update*
+AudioThread_QueueCmdF32*
+AudioThread_ScheduleProcessCmds*
+Audio_ProcessSfxRequests*
+Audio_GetActiveSeqId*
+Audio_UpdateRiverSoundVolumes*
+Audio_ProcessSeqCmds*
+Audio_ProcessSeqCmd*
+AudioOcarina_UpdatePlaybackStaff*
+Audio_RemoveSfxFromBankByPos*
+Audio_UpdateSceneSequenceResumePoint*
+AudioOcarina_CheckSongsWithMusicStaff*
+func_800FAD34*
+Audio_StopSfxById*
+Audio_SetExtraFilter*
+AudioLoad_PreloadSamplesForFont*
+AudioThread_ProcessSeqPlayerCmd*
+Audio_PlaySfxRiver*
+Audio_RemoveSfxBankEntry*
+Audio_IsSfxPlaying*
+Audio_SetBaseFilter*
+AudioOcarina_PlayControllerInput*
