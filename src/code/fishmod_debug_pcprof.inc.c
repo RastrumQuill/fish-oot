@@ -859,7 +859,13 @@ static void PcProf_Update(void) {
             }
             osSetIntMask(mask);
             sprintf(line, "FISHMOD-AUDIO lap %d level %d frames %u updates %u us %u seq %u notes %u lists %u n %u\n",
-                    gFishmodAudioAbReport, (gFishmodAudioAbReport - 1) % 3, sPlayFrames - sAbFrames, (u32)t[0],
+                    gFishmodAudioAbReport,
+#ifdef FISHMOD_AUDIO_AB
+                    (gFishmodAudioAbReport - 1) % 3,
+#else
+                    0,
+#endif
+                    sPlayFrames - sAbFrames, (u32)t[0],
                     (u32)OS_CYCLES_TO_USEC(t[1]), (u32)OS_CYCLES_TO_USEC(t[2]), (u32)OS_CYCLES_TO_USEC(t[3]),
                     (u32)OS_CYCLES_TO_USEC(t[4]), (u32)t[5]);
             Sc64_UsbText(line);

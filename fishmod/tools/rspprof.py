@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Where the audio microcode's RSP time goes, by command: reads the profile ares writes with ARES_RSPPROF=<file>
-(fishmod/tools/ares-rspprof.patch: every RSP instruction and its clocks counted by PC, on the interpreter, so the
+(fishmod/tools/ares-prof.patch: every RSP instruction and its clocks counted by PC, on the interpreter, so the
 counts are exact and the same from run to run) and adds it up by the command handler each PC belongs to (the
 microcode's own dispatch table).
 

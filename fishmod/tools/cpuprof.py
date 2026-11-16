@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Where the CPU's time goes, by function, exactly: reads the profile ares writes with ARES_CPUPROF=<file>
-(fishmod/tools/ares-cpuprof.patch: the CPU on the interpreter, every instruction counted by PC with its clocks and
+(fishmod/tools/ares-prof.patch: the CPU on the interpreter, every instruction counted by PC with its clocks and
 the data cache lines it filled and wrote back, and the instruction cache lines filled) and adds it up by the ELF's functions. The counts are the emulator's
 model (a data cache fill or write-back is 40 cycles, an instruction cache fill 48), the same from run to run for the same ROM and inputs.
 

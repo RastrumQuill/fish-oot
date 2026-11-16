@@ -137,3 +137,42 @@ state and I/O ports beside its head, about 1%; the note's per-tick state reused 
 (a second microcode that expands it), about 4% of the CPU's and 3% of the RSP's audio time. All of it together is
 near a tenth of the driver's 12 ms a frame. The rest is the work itself: about 15 notes and 14 channels walked 180
 times a second, through an 8 KB data cache that the walk doesn't fit in, with the code cold at every refresh.
+
+## The memory bus (16 November, ares: `fishmod/tools/busprof.py`)
+
+`ARES_BUSPROF` counts every byte moved to or from RDRAM by who asked. The play bench at the lake, per game frame
+(50 ms). (The RDP's drawing isn't in it: ares draws on the GPU. The video interface's read-out isn't either.)
+
+| KB a game frame | read | written |
+|---|---|---|
+| CPU: the audio driver's code filled | 56.5 | |
+| CPU: the audio driver's data filled / written back | 67.7 | 37.2 |
+| RSP: the audio tasks' DMAs | 79.2 | 31.2 |
+| **the audio's, together: 272 KB** | | |
+| CPU: the rest's code | 459 | |
+| CPU: the rest's data | 259 | 157 |
+| RSP: the graphics tasks' DMAs | 438 | 401 |
+| RDP: its commands fetched | 248 | |
+
+The audio is about an eighth of what's counted. The game's own code is the largest single reader (459 KB a frame of
+instruction cache fills: the 16 KB cache, 20 times a second), then the graphics microcode's loads and its output to
+the RDP.
+
+**The audio's RSP DMAs, by what they carry** (1,543 a game frame, 112 KB):
+
+| | DMAs | KB |
+|---|---|---|
+| the reverbs' ring buffers, in and out | 72 | 24.4 |
+| the command list, 64 bytes (8 commands) at a time | 240 | 14.9 |
+| the microcode itself, text and data, each task | 6 | 14.1 |
+| the notes' sample data | ~190 | ~14 |
+| the notes' states (32 bytes each, in and out) | 438 | 13.7 |
+| the ADPCM codebooks | 111 | 8.8 |
+| the finished sound out | 9 | 6.3 |
+| the decoder's last frame in, and other small states | ~480 | ~16 |
+
+What can come off it and keep every sample: the command list (a compact record a note: about 10 of its 15 KB, and
+its 240 DMAs to about 20 with larger pieces); the microcode's own load and the driver's cold code, by waking the
+driver less often (every second refresh: -11% of the audio's traffic, measured; releases/notes-audio-laps.md); the
+codebooks, if DMEM had room to keep them (it doesn't, as laid out). The reverbs, the samples, the states and the
+sound itself are the work.

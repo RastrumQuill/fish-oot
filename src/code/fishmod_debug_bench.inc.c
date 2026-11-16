@@ -593,6 +593,11 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
             R_AUDIOMGR_ACTIVITY_LEVEL = 0;
         }
 #endif
+#ifdef FISHMOD_AUDIO_LAPS
+        if (!gFishmodBenchDone) {
+            gFishmodAudioAbReport = sBench.laps; // (the last lap's)
+        }
+#endif
         Bench_SetMode(BENCH_BASE);
         sPbActive = false;
         gFishmodBenchDone = true; // (the profiler stops here: fishmod_debug_pcprof.inc.c)
@@ -609,6 +614,21 @@ static void Fishmod_PlayBenchUpdate(PlayState* play) {
     sPbCond = 0;
     R_AUDIOMGR_ACTIVITY_LEVEL = (sBench.laps & 1) ? 1 /* AUDIOMGR_ACTIVITY_LEVEL_NO_RSP */
                                                   : 0 /* AUDIOMGR_ACTIVITY_LEVEL_ALL */;
+#endif
+#ifdef FISHMOD_AUDIO_LAPS
+    // (the audio laps, audio_laps script: every lap the same time and weather, nothing switched; each lap's end sends
+    // the audio thread's own time by part, as the audio A/B does)
+    sPbCond = 0;
+    {
+        static s32 sLapsLap = -1;
+
+        if (sLapsLap != sBench.laps) {
+            if (sLapsLap >= 0) {
+                gFishmodAudioAbReport = sLapsLap + 1;
+            }
+            sLapsLap = sBench.laps;
+        }
+    }
 #endif
 #ifdef FISHMOD_AUDIO_AB
     // (the audio A/B, audio_ab script: every lap the same time and weather; the audio whole, then without its RSP

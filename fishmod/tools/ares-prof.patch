@@ -1,0 +1,351 @@
+diff --git a/ares/n64/cpu/cpu.cpp b/ares/n64/cpu/cpu.cpp
+index ec4a52d..80c0514 100644
+--- a/ares/n64/cpu/cpu.cpp
++++ b/ares/n64/cpu/cpu.cpp
+@@ -121,7 +121,112 @@ auto CPU::interruptPoll() -> void {
+   }
+ }
+ 
++// fish-oot: ARES_CPUPROF=<file>: the CPU on the interpreter, every instruction counted by PC (KSEG0 code) with its
++// clocks and the data cache lines it filled and wrote back; the file rewritten every 2^25 instructions as records of
++// (u32 pc, u32 instructions, u64 clocks, u32 fills, u32 writebacks, u32 instruction cache fills), host byte order; and <file>.lines, the fills by
++// the line filled, those from code in ARES_CPUPROF_LO..ARES_CPUPROF_HI (hex) apart
++static const char* cpuProfPath = getenv("ARES_CPUPROF");
++struct CpuProfEntry { u32 instructions; u32 fills; u32 writebacks; u32 ifills; u64 clocks; };
++static CpuProfEntry* cpuProf = nullptr;
++u32 cpuProfFills = 0, cpuProfWritebacks = 0;
++u32* cpuProfLines = nullptr;
++u32* cpuProfBytes = nullptr;
++u32 cpuProfLo = 0, cpuProfHi = 0;
++static u64 cpuProfTotal = 0;
++static auto cpuProfWrite() -> void {
++  string tmp{cpuProfPath, ".tmp"};
++  if(auto fp = fopen(tmp, "wb")) {
++    for(u32 n : range(0x200000)) {
++      auto& e = cpuProf[n];
++      if(!e.instructions) continue;
++      u32 head[2] = {0x80000000u + (n << 2), e.instructions};
++      u32 tail[3] = {e.fills, e.writebacks, e.ifills};
++      fwrite(head, 4, 2, fp); fwrite(&e.clocks, 8, 1, fp); fwrite(tail, 4, 3, fp);
++    }
++    fclose(fp);
++    rename(tmp, cpuProfPath);
++  }
++  //<file>.lines: the fills by line: records of (u32 address, u32 fills from the code range, u32 all fills)
++  string ltmp{cpuProfPath, ".lines.tmp"};
++  if(auto fp = fopen(ltmp, "wb")) {
++    for(u32 n : range(0x80000)) {
++      if(!cpuProfLines[n * 2 + 1]) continue;
++      u32 rec[3] = {0x80000000u + (n << 4), cpuProfLines[n * 2], cpuProfLines[n * 2 + 1]};
++      fwrite(rec, 4, 3, fp);
++    }
++    fclose(fp);
++    rename(ltmp, string{cpuProfPath, ".lines"});
++  }
++  //<file>.bytes: every byte the code range read or wrote through the cache: records of (u32 address, u32 reads, u32 writes)
++  string btmp{cpuProfPath, ".bytes.tmp"};
++  if(cpuProfBytes) if(auto fp = fopen(btmp, "wb")) {
++    for(u32 n : range(0x800000)) {
++      if(!cpuProfBytes[n * 2] && !cpuProfBytes[n * 2 + 1]) continue;
++      u32 rec[3] = {0x80000000u + n, cpuProfBytes[n * 2], cpuProfBytes[n * 2 + 1]};
++      fwrite(rec, 4, 3, fp);
++    }
++    fclose(fp);
++    rename(btmp, string{cpuProfPath, ".bytes"});
++  }
++}
++
++static const char* busProfPath = getenv("ARES_BUSPROF");
++static u32 busProfLo = 0, busProfHi = 0;
++static u64 busProfTicks = 0;
++static auto busProfWrite() -> void {
++  static const char* names[14] = {"unknown", "cpu_code", "cpu_data", "cpu_uncached", "sp_other", "pi", "si", "vi", "ai",
++                                  "dp_lists", "dp_draw", "cpu_code_audio", "cpu_data_audio", "sp_audio"};
++  string tmp{busProfPath, ".tmp"};
++  if(auto fp = fopen(tmp, "w")) {
++    fprintf(fp, "# class read_bytes read_count write_bytes write_count\n");
++    for(u32 n : range(14)) fprintf(fp, "%s %llu %llu %llu %llu\n", names[n], (unsigned long long)busProf.bytes[n][0],
++      (unsigned long long)busProf.count[n][0], (unsigned long long)busProf.bytes[n][1], (unsigned long long)busProf.count[n][1]);
++    fprintf(fp, "sp_other_dmas %llu 0 %llu 0\nsp_audio_dmas %llu 0 %llu 0\n", (unsigned long long)busProf.dmas[0][0],
++      (unsigned long long)busProf.dmas[0][1], (unsigned long long)busProf.dmas[1][0], (unsigned long long)busProf.dmas[1][1]);
++    for(u32 out : range(2)) for(u32 im : range(2)) for(u32 a : range(512)) {
++      auto& e = busProf.audioDma[out][im][a];
++      if(e[0]) fprintf(fp, "audio_dma %s %s 0x%03x %u %u\n", out ? "out" : "in", im ? "imem" : "dmem", a << 3, e[0], e[1]);
++    }
++    fclose(fp);
++    rename(tmp, busProfPath);
++  }
++}
++
+ auto CPU::instruction() -> bool {
++  if(busProfPath) {
++    if(!busProf.on) {
++      busProf.on = true;
++      if(auto lo = getenv("ARES_BUSPROF_LO")) busProfLo = strtoul(lo, nullptr, 16);
++      if(auto hi = getenv("ARES_BUSPROF_HI")) busProfHi = strtoul(hi, nullptr, 16);
++    }
++    u32 pc = (u32)ipu.pc;
++    busProf.cpuAudio = pc >= busProfLo && pc < busProfHi;
++    if((++busProfTicks & 0xfffff) == 0) busProfWrite();
++  }
++  if(cpuProfPath) {
++    if(!cpuProf) {
++      cpuProf = (CpuProfEntry*)calloc(0x200000, sizeof(CpuProfEntry));
++      cpuProfLines = (u32*)calloc(0x80000 * 2, sizeof(u32));
++      if(getenv("ARES_CPUPROF_LO")) cpuProfBytes = (u32*)calloc(0x800000 * 2, sizeof(u32));
++      if(auto lo = getenv("ARES_CPUPROF_LO")) cpuProfLo = strtoul(lo, nullptr, 16);
++      if(auto hi = getenv("ARES_CPUPROF_HI")) cpuProfHi = strtoul(hi, nullptr, 16);
++    }
++    u64 pc = ipu.pc; s64 clock = Thread::clock; u32 fills = cpuProfFills, writebacks = cpuProfWritebacks;
++    auto imisses = profile.icacheMisses;
++    bool result = instructionInner();
++    if((pc >> 23) == (0xffffffff80000000ull >> 23)) {
++      auto& e = cpuProf[(pc & 0x7fffff) >> 2];
++      e.instructions++; e.clocks += Thread::clock - clock;
++      e.fills += cpuProfFills - fills; e.writebacks += cpuProfWritebacks - writebacks;
++      e.ifills += profile.icacheMisses - imisses;
++    }
++    if((++cpuProfTotal & 0x1ffffff) == 0) cpuProfWrite();
++    return result;
++  }
++  return instructionInner();
++}
++
++auto CPU::instructionInner() -> bool {
+   if(auto interrupts = scc.cause.interruptPending & scc.status.interruptMask) {
+     if(scc.status.interruptEnable && !scc.status.exceptionLevel && !scc.status.errorLevel) {
+       debugger.interrupt(scc.cause.interruptPending);
+@@ -145,7 +250,7 @@ auto CPU::instruction() -> bool {
+   auto access = devirtualize<Read, Word>(ipu.pc);
+   if(!access) return true;
+ 
+-  if(Accuracy::CPU::Recompiler && recompiler.enabled && access.cache) {
++  if(Accuracy::CPU::Recompiler && recompiler.enabled && access.cache && !cpuProfPath && !busProfPath) {
+     if(vaddrAlignedError<Word>(access.vaddr, false)) return true;
+     auto block = recompiler.block(ipu.pc, access.paddr);
+     if(block) {
+diff --git a/ares/n64/cpu/cpu.hpp b/ares/n64/cpu/cpu.hpp
+index ada6b68..87b201d 100644
+--- a/ares/n64/cpu/cpu.hpp
++++ b/ares/n64/cpu/cpu.hpp
+@@ -43,6 +43,8 @@ struct CPU : Thread {
+   auto queueInsert(u32 event, u32 clocks) -> void;
+ 
+   auto instruction() -> bool;
++
++  auto instructionInner() -> bool;
+   auto instructionPrologue(u64 address, u32 instruction) -> void;
+   template<bool Recompiled> auto instructionEpilogue() -> void;
+   auto raiseCoprocessor1Exception() -> void;
+diff --git a/ares/n64/cpu/dcache.cpp b/ares/n64/cpu/dcache.cpp
+index 5496d75..0a17c86 100644
+--- a/ares/n64/cpu/dcache.cpp
++++ b/ares/n64/cpu/dcache.cpp
+@@ -1,9 +1,21 @@
++extern u32 cpuProfFills, cpuProfWritebacks;
++extern u32* cpuProfLines;
++extern u32* cpuProfBytes;
++extern u32 cpuProfLo, cpuProfHi;
++
+ auto CPU::DataCache::Line::hit(u32 paddr) const -> bool {
+   const u32 t = paddr & ~0x0000'0fffu;
+   return valid() && (tagKey & ~1u) == t;
+ }
+ 
+ auto CPU::DataCache::Line::fill(u32 paddr) -> void {
++  cpuProfFills++;
++  if(cpuProfLines) {
++    //by the line filled (8 MB of RDRAM, 16-byte lines): [0] fills from code in ARES_CPUPROF_LO..HI, [1] all fills
++    u32 pc = (u32)cpu.ipu.pc, n = (paddr & 0x7fffff) >> 4;
++    if(pc >= cpuProfLo && pc < cpuProfHi) cpuProfLines[n * 2 + 0]++;
++    cpuProfLines[n * 2 + 1]++;
++  }
+   cpu.step(40 * 2);
+   const u32 tag = paddr & ~0x0000'0fffu;
+   dirty  = 0;
+@@ -13,6 +25,7 @@ auto CPU::DataCache::Line::fill(u32 paddr) -> void {
+ }
+ 
+ auto CPU::DataCache::Line::writeBack() -> void {
++  cpuProfWritebacks++;
+   cpu.step(40 * 2);
+   const u32 tag = tagKey & ~0x0000'0fffu;
+   dirty = 0;
+@@ -51,6 +64,10 @@ auto CPU::DataCache::Line::write(u32 paddr, u64 data) -> void {
+ template<u32 Size>
+ auto CPU::DataCache::read(u64 vaddr, u32 paddr) -> u64 {
+   auto& line = this->line(vaddr);
++  if(cpuProfBytes) {
++    u32 pc = (u32)cpu.ipu.pc;
++    if(pc >= cpuProfLo && pc < cpuProfHi) for(u32 n : range(Size)) cpuProfBytes[((paddr + n) & 0x7fffff) * 2 + 0]++;
++  }
+   if(!line.hit(paddr)) {
+     if(line.valid() && line.dirty) {
+       line.writeBack();
+@@ -80,6 +97,10 @@ auto CPU::DataCache::readDebug(u64 vaddr, u32 paddr) -> u64 {
+ template<u32 Size>
+ auto CPU::DataCache::write(u64 vaddr, u32 paddr, u64 data) -> void {
+   auto& line = this->line(vaddr);
++  if(cpuProfBytes) {
++    u32 pc = (u32)cpu.ipu.pc;
++    if(pc >= cpuProfLo && pc < cpuProfHi) for(u32 n : range(Size)) cpuProfBytes[((paddr + n) & 0x7fffff) * 2 + 1]++;
++  }
+   if(!line.hit(paddr)) {
+     if(line.valid() && line.dirty) {
+       line.writeBack();
+diff --git a/ares/n64/n64.hpp b/ares/n64/n64.hpp
+index 5ed3774..06a07e8 100644
+--- a/ares/n64/n64.hpp
++++ b/ares/n64/n64.hpp
+@@ -99,6 +99,26 @@ namespace ares::Nintendo64 {
+     static auto decode(u8 value) -> u8 { return (value >> 4) * 10 + (value & 15); }
+   };
+ 
++  //fish-oot: ARES_BUSPROF=<file>: every byte moved to or from RDRAM, by who asked (rdram.hpp counts; cpu.cpp writes
++  //the file). classes: the RBusDevice's number, and three more for the audio's own share: 11 the CPU's code fills
++  //from the audio driver's code (ARES_BUSPROF_LO..HI, hex), 12 its data fills and write-backs, 13 the RSP's DMAs while
++  //the audio microcode is loaded (ARES_RSPPROF_KEY)
++  struct BusProf {
++    bool on = false;
++    u32 cpuAudio = 0, spAudio = 0;
++    u64 bytes[16][2] = {}, count[16][2] = {};
++    u64 dmas[2][2] = {};  //the RSP's DMAs: [the audio microcode's?][out?]
++    u32 audioDma[2][2][512][2] = {};  //the audio's, by [out?][IMEM?][DMEM or IMEM address / 8]: [0] DMAs, [1] bytes
++    auto add(u32 device, u32 write, u32 size) -> void {
++      if(device == 1 && cpuAudio) device = 11;
++      if(device == 2 && cpuAudio) device = 12;
++      if(device == 4 && spAudio) device = 13;
++      if(device > 13) return;
++      bytes[device][write] += size; count[device][write]++;
++    }
++  };
++  extern BusProf busProf;
++
+   //Devices that can request RI to access RDRAM
+   enum class RBusDevice {
+     UNKNOWN,
+diff --git a/ares/n64/rdram/rdram.cpp b/ares/n64/rdram/rdram.cpp
+index f099508..335f576 100644
+--- a/ares/n64/rdram/rdram.cpp
++++ b/ares/n64/rdram/rdram.cpp
+@@ -3,6 +3,7 @@
+ namespace ares::Nintendo64 {
+ 
+ RDRAM rdram;
++BusProf busProf;
+ #include "io.cpp"
+ #include "debugger.cpp"
+ #include "serialization.cpp"
+diff --git a/ares/n64/rdram/rdram.hpp b/ares/n64/rdram/rdram.hpp
+index 9b4adbb..d3b68fe 100644
+--- a/ares/n64/rdram/rdram.hpp
++++ b/ares/n64/rdram/rdram.hpp
+@@ -11,6 +11,7 @@ struct RDRAM : Memory::RCP<RDRAM> {
+     template<u32 Size>
+     auto read(u32 address, RBusDevice device) -> u64 {
+       if (address >= size) return 0;
++      if (unlikely(busProf.on)) busProf.add((u32)device, 0, Size);
+       if (unlikely(system.homebrewMode)) {
+         self.debugger.readWord(address, Size, device);
+         self.profile.metrics[(u32)device].reads += Size;
+@@ -79,6 +80,7 @@ struct RDRAM : Memory::RCP<RDRAM> {
+     template<u32 Size>
+     auto write(u32 address, u64 value, RBusDevice device) -> void {
+       if (address >= size) return;
++      if (unlikely(busProf.on)) busProf.add((u32)device, 1, Size);
+       if (unlikely(system.homebrewMode)) {
+         self.debugger.writeWord(address, Size, value, device);
+       }
+@@ -99,6 +101,7 @@ struct RDRAM : Memory::RCP<RDRAM> {
+     template<u32 Size>
+     auto writeBurst(u32 address, u32 *value, RBusDevice device) -> void {
+       if (address >= size) return;
++      if (unlikely(busProf.on)) busProf.add((u32)device, 1, Size);
+       if (unlikely(system.homebrewMode)) {
+         self.profile.metrics[(u32)device].writes += Size;
+       }
+@@ -122,6 +125,7 @@ struct RDRAM : Memory::RCP<RDRAM> {
+           value[4] = value[5] = value[6] = value[7] = 0;
+         return;
+       }
++      if (unlikely(busProf.on)) busProf.add((u32)device, 0, Size);
+       if (unlikely(system.homebrewMode)) {
+         self.profile.metrics[(u32)device].reads += Size;
+       }
+diff --git a/ares/n64/rsp/dma.cpp b/ares/n64/rsp/dma.cpp
+index d49cbd6..4d59b23 100644
+--- a/ares/n64/rsp/dma.cpp
++++ b/ares/n64/rsp/dma.cpp
+@@ -22,6 +22,18 @@ auto RSP::dmaTransferStart(Thread& thread) -> void {
+ }
+ 
+ auto RSP::dmaTransferStep() -> void {
++  if(busProf.on && dma.busy.read && dma.current.pbusRegion && dma.current.pbusAddress == 0 && dma.current.length >= 0x87) {
++    //fish-oot: a microcode's text being loaded (by the CPU, the RSP stopped): counted as that microcode's
++    static u32 busKey = getenv("ARES_RSPPROF_KEY") ? strtoul(getenv("ARES_RSPPROF_KEY"), nullptr, 16) : 0;
++    busProf.spAudio = rdram.ram.read<Word>(dma.current.dramAddress + 0x80, RBusDevice::ARES_DEBUGGER) == busKey;
++  }
++  if(busProf.on) {
++    busProf.dmas[busProf.spAudio ? 1 : 0][dma.busy.write ? 1 : 0]++;
++    if(busProf.spAudio) {
++      auto& e = busProf.audioDma[dma.busy.write ? 1 : 0][dma.current.pbusRegion][dma.current.pbusAddress >> 3];
++      e[0]++; e[1] += (dma.current.length | 7) + 1;
++    }
++  }
+   if(dma.busy.read) {
+     if constexpr(Accuracy::RSP::Recompiler) {
+       if(dma.current.pbusRegion) {
+diff --git a/ares/n64/rsp/rsp.cpp b/ares/n64/rsp/rsp.cpp
+index d110fe2..6e6b1f9 100644
+--- a/ares/n64/rsp/rsp.cpp
++++ b/ares/n64/rsp/rsp.cpp
+@@ -44,8 +44,33 @@ auto RSP::main() -> void {
+   }
+ }
+ 
++// fish-oot: ARES_RSPPROF=<file>: the RSP on the interpreter, every instruction's clocks counted by task type
++// (kind 1: the microcode named by ARES_RSPPROF_KEY, 0: any other) and PC; the file rewritten every 2^22 instructions
++// as records of (u32 kind, u32 pc, u64 instructions, u64 clocks), host byte order
++static const char* rspProfPath = getenv("ARES_RSPPROF");
++static u64 rspProfCount[4][1024][2];
++static u64 rspProfTotal = 0;
++static auto rspProfWrite() -> void {
++  string tmp{rspProfPath, ".tmp"};
++  if(auto fp = fopen(tmp, "wb")) {
++    for(u32 t : range(4)) for(u32 pc : range(1024)) {
++      if(!rspProfCount[t][pc][0]) continue;
++      u32 head[2] = {t, pc << 2};
++      fwrite(head, 4, 2, fp);
++      fwrite(rspProfCount[t][pc], 8, 2, fp);
++    }
++    fclose(fp);
++    rename(tmp, rspProfPath);
++  }
++}
++
+ auto RSP::instruction() -> void {
+-  if(Accuracy::RSP::Recompiler && recompiler.enabled) {
++  u32 profPc = ipu.pc & 0xffc;
++  if(busProf.on) {
++    static u32 busKey = getenv("ARES_RSPPROF_KEY") ? strtoul(getenv("ARES_RSPPROF_KEY"), nullptr, 16) : 0;
++    busProf.spAudio = imem.read<Word>(0x80) == busKey;
++  }
++  if(Accuracy::RSP::Recompiler && recompiler.enabled && !rspProfPath) {
+     auto block = recompiler.block(ipu.pc);
+     block->execute(*this);
+   } else {
+@@ -80,6 +105,14 @@ auto RSP::instruction() -> void {
+   //with the recompiler, it only steps for taken branch stalls
+   step(pipeline.clocks);
+   pipeline.clocksTotal += pipeline.clocks;
++  if(rspProfPath) {
++    //kind 1: the microcode whose first instruction (IMEM 0x80, after the boot code) is ARES_RSPPROF_KEY (hex); 0: any other
++    static u32 wanted = getenv("ARES_RSPPROF_KEY") ? strtoul(getenv("ARES_RSPPROF_KEY"), nullptr, 16) : 0;
++    u32 type = imem.read<Word>(0x80) == wanted;
++    rspProfCount[type][profPc >> 2][0] += 1 + pipeline.dblIssueCount;
++    rspProfCount[type][profPc >> 2][1] += pipeline.clocks;
++    if((++rspProfTotal & 0x3fffff) == 0) rspProfWrite();
++  }
+ }
+ 
+ auto RSP::instructionPrologue(u32 instruction) -> void {
