@@ -290,7 +290,7 @@ static void Fishmod_ViewUpdate(PlayState* play) {
 #define POP_AB_STEP_SET 24.0f
 #define POP_AB_FRAMES 24
 #define POP_AB_SETTLE 12
-#define POP_AB_VARIANTS (3 + 32)
+#define POP_AB_VARIANTS (3 + 32 + 1) // (the last: the view as it is again, for the test's own noise)
 static s32 sPopAbVariant = -1; // the variant on screen and settled, -1: none
 #endif
 #ifdef FISHMOD_EDGE_AB
@@ -461,8 +461,10 @@ static void Fishmod_TourUpdate(PlayState* play) {
         sPopAbVariant = -1;
         if (since >= 0) {
             s32 variant = since / POP_AB_FRAMES;
-            f32 step = (variant == 0) ? 0.0f : (variant == 1) ? POP_AB_STEP_SET : POP_AB_STEP;
-            s32 kind = (variant < 3) ? -1 : (variant - 3);
+            f32 step = ((variant == 0) || (variant == POP_AB_VARIANTS - 1)) ? 0.0f
+                       : (variant == 1)                                     ? POP_AB_STEP_SET
+                                                                            : POP_AB_STEP;
+            s32 kind = ((variant < 3) || (variant == POP_AB_VARIANTS - 1)) ? -1 : (variant - 3);
 
             if (since == 0) {
                 sFrozenFrames = play->gameplayFrames;

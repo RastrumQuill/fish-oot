@@ -36,7 +36,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SETTINGS = ["Audio/Driver=None", "Input/Defocus=Allow", "Video/Output=IntegerFixed", "Video/FixedScale=1",
             "Video/Shader=None", "Video/InterframeBlending=false", "Video/ColorEmulation=false",
             "Video/ColorBleed=false", "Video/Quality=SD", "Video/Supersampling=false"]
-VARIANTS = 35  # as fishmod_debug.c: 0 as it is, 1 all 24 nearer, 2 all 150 nearer, 3.. each kind 150 nearer
+VARIANTS = 36  # as fishmod_debug.c: 0 as it is, 1 all 24 nearer, 2 all 150 nearer, 3..34 each kind 150 nearer,
+               # 35 as it is again (the control: what differs between two drawings of the same thing)
 DE_SEEN = 2.0
 PATCH_MIN = 3  # pixels: smaller patches are the dither's and the coverage's noise
 DE_PEAK_MIN = 3.0  # and so are patches that nowhere reach this (measured: kinds not in view scored 7 to 30 without it)
@@ -123,11 +124,26 @@ def patches(mask):
     return out
 
 
-def score(a, b):
-    """The pops between two frames of one view: (strength, [patch: size, mean dE, peak dE, box], the dE map)."""
+def de_map(a, b):
     A, B = to_screen(a), to_screen(b)
     de = 100.0 * np.sqrt(((blur(oklab(A)) - blur(oklab(B))) ** 2).sum(-1))
     de[:24, :24] = 0  # (the marker)
+    return de
+
+
+def spread(n, r=2):
+    """Each pixel's largest value within r pixels (the noise's reach: an edge's shimmer moves a pixel or two)."""
+    p = np.pad(n, r, mode="edge")
+    return np.max([p[y:y + n.shape[0], x:x + n.shape[1]] for y in range(2 * r + 1) for x in range(2 * r + 1)], 0)
+
+
+def score(a, b, noise=None):
+    """The pops between two frames of one view: (strength, [patch: size, mean dE, peak dE, box], the dE map). With
+    the control's map (the same view drawn twice), a pixel counts only by what it differs beyond twice the noise
+    around it: the cut-outs' edges shimmer between two drawings (the coverage, the dither), a pop doesn't."""
+    de = de_map(a, b)
+    if noise is not None:
+        de = np.where(de > 2.0 * noise, de, 0.0)
     found = []
     for p in patches(de > DE_SEEN):
         if len(p) < PATCH_MIN:
@@ -196,12 +212,17 @@ def report(out, stops):
         if not os.path.exists(base):
             continue
         a = np.asarray(Image.open(base).convert("RGB"))
-        for v in range(1, VARIANTS):
+        ctl = os.path.join(out, f"s{stop:02d}_v{VARIANTS - 1:02d}.png")
+        noise = spread(de_map(a, np.asarray(Image.open(ctl).convert("RGB")))) if os.path.exists(ctl) else None
+        if noise is not None:
+            rows.append({"stop": stop, "variant": VARIANTS - 1, "what": "control",
+                         "strength": score(a, np.asarray(Image.open(ctl).convert("RGB")))[0], "patches": []})
+        for v in range(1, VARIANTS - 1):
             p = os.path.join(out, f"s{stop:02d}_v{v:02d}.png")
             if not os.path.exists(p):
                 continue
             b = np.asarray(Image.open(p).convert("RGB"))
-            s, found, de = score(a, b)
+            s, found, de = score(a, b, noise)
             rows.append({"stop": stop, "variant": v, "what": label(v), "strength": s, "patches": found[:8]})
             if s >= SCALE[0][0]:
                 # the view before and after and the patches lit, at 3x
@@ -216,8 +237,8 @@ def report(out, stops):
     with open(os.path.join(out, "report.md"), "w") as f:
         f.write("# Pop-in at the tour's stops\n\nStrength: the sum of dE over the patches that differ (dE x pixels at "
                 "320x240); under 40 not seen, 40 to 250 a flicker, over 250 a pop.\n\n")
-        f.write("## Every kind together\n\n| stop | 24 units nearer (one set) | | 150 units nearer | | biggest patch at 150 |\n"
-                "|---|---|---|---|---|---|\n")
+        f.write("## Every kind together\n\n| stop | 24 units nearer (one set) | | 150 units nearer | | biggest patch at 150 | "
+                "the control's own (left out of the others) |\n|---|---|---|---|---|---|---|\n")
         for stop in range(1, stops + 1):
             r1 = next((r for r in rows if r["stop"] == stop and r["variant"] == 1), None)
             r2 = next((r for r in rows if r["stop"] == stop and r["variant"] == 2), None)
@@ -227,12 +248,13 @@ def report(out, stops):
             f.write(f"| {stop} | {r1['strength']:.0f} | {verdict(r1['strength'])} | {r2['strength']:.0f} | "
                     f"{verdict(r2['strength'])} | "
                     + (f"{big['px']} px at dE {big['mean']} (peak {big['peak']}), at {big['box'][:2]}" if big else "-")
+                    + " | " + next((f"{r['strength']:.0f}" for r in rows if r["stop"] == stop and r["what"] == "control"), "-")
                     + " |\n")
         f.write("\n## Each kind alone, 150 units nearer\n\n| kind | worst stop | its strength | | patches there | "
                 "stops where it's a flicker or more | total over the stops |\n|---|---|---|---|---|---|---|\n")
         kinds = {}
         for r in rows:
-            if r["variant"] >= 3:
+            if 3 <= r["variant"] < VARIANTS - 1:
                 kinds.setdefault(r["what"], []).append(r)
         for what, rs in sorted(kinds.items(), key=lambda kv: -max(r["strength"] for r in kv[1])):
             worst = max(rs, key=lambda r: r["strength"])
