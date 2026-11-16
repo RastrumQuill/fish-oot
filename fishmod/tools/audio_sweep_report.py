@@ -67,6 +67,23 @@ def entrance_names(root):
     return names
 
 
+def leg_name(leg, names):
+    """The leg a mark stands for (fishmod_debug.c and fishmod_debug_sweep.inc.c set gFishmodSweepLeg)."""
+    if leg == 0:
+        return "start"
+    if leg < 0x1000:
+        return names[leg - 1] if leg <= len(names) else "entrance 0x%x" % (leg - 1)
+    if leg < 0x1800:
+        return "sequence 0x%02x" % (leg - 0x1000)
+    if leg < 0x2000:
+        return "nature ambience %d" % (leg - 0x1800)
+    if leg < 0x3000:
+        return "effects %d-%d" % ((leg - 0x2000) * 64, (leg - 0x2000) * 64 + 63)
+    oca = {0x3001: "ocarina: free notes", 0x3030: "ocarina: wrong song, no staff", 0x3040: "ocarina: instruments",
+           0x3050: "ocarina: scarecrow record", 0x3060: "ocarina: memory game"}
+    return oca.get(leg, "ocarina: song %d" % (leg - 0x3010) if 0x3010 <= leg < 0x3030 else "leg 0x%x" % leg)
+
+
 def threads(ram, sym):
     def r32(a):
         return struct.unpack_from(">I", ram, a - 0x80000000)[0]
@@ -122,7 +139,7 @@ def report(a):
                 cover[where[0]].add(where[1])
         n = lambda pc: (cur.get(pc, (0,))[0] - prev.get(pc, (0,))[0]) if pc else 0
         if leg < 0xFFFF:
-            legs.append({"leg": leg, "name": (names[leg - 1] if 0 < leg <= len(names) else "start"),
+            legs.append({"leg": leg, "name": leg_name(leg, names),
                          "frames": n(frame), "updates": n(upd),
                          "audio": {"cycles": tot["audio"][1] // 2, "fills": tot["audio"][2], "wbacks": tot["audio"][3],
                                    "ifills": tot["audio"][4], "instr": tot["audio"][0]},

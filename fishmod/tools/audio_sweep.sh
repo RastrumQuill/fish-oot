@@ -37,7 +37,7 @@ printf '%s\n' "${JOBS[@]}" | xargs -P 4 -I{} bash -c '
     d={}; slot=$(( $(echo "$d" | cksum | cut -d" " -f1) % 4 ))
     # (a free GDB port: four runs at once, one each)
     for s in 0 1 2 3; do if mkdir "$OUT/.slot$s" 2>/dev/null; then slot=$s; break; fi; done
-    "$HERE/audio_sweep_run.sh" $slot "$d/rom.z64" "$OUT/rom.elf" "$d" ${MAXSECS:-2400} > "$d/run.log" 2>&1
+    "$HERE/audio_sweep_run.sh" $slot "$d/rom.z64" "$OUT/rom.elf" "$d" ${MAXSECS:-4800} > "$d/run.log" 2>&1
     rmdir "$OUT/.slot$slot" 2>/dev/null
     python3 "$HERE/audio_sweep_report.py" "$d" --elf "$OUT/rom.elf" > "$d/report.txt" 2>&1
     rm -f "$d"/cpu.bin.seg* "$d"/cpu.bin.lines "$d/rom.z64"

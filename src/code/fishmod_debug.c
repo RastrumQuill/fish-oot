@@ -1166,6 +1166,7 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         static u8 sSweepPart;
         static u8 sSweepKind;
         static s32 sSweepOver;
+        static s32 sSweepCsWait;
 
         if (!sSweepSound) {
             // The run's options, from the ROM's header (the word at 0x38, which nothing uses: fishmod/tools/
@@ -1190,8 +1191,24 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             if (sSweepOver || Sweep_Leg(sSweepKind, sSweepParts, sSweepPart)) {
                 gFishmodSweepLeg = (++sSweepOver > 20) ? 0xFFFE : 0xFFFF; // (as the scenes' end below)
             }
-        } else
+        } else {
+        // (A cutscene the scene opened with plays to its end first: leaving in the middle of one, which a player
+        // can't, left the game's cutscene state armed for the next scene, which then loaded as another scene's
+        // cutscene and looped on a script that wasn't one; the reference build did the same. One that hasn't ended
+        // after two minutes is stopped as the game stops them.)
+        if ((sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES - 1) &&
+            ((play->csCtx.state != CS_STATE_IDLE) || (gSaveContext.cutsceneTrigger != 0) ||
+             (gSaveContext.save.cutsceneIndex != 0))) {
+            if (++sSweepCsWait < 2400) {
+                sAudWorldTimer = FISHMOD_AUDWORLD_FRAMES - 2;
+            } else {
+                gSaveContext.cutsceneTrigger = 0;
+                gSaveContext.save.cutsceneIndex = 0;
+                play->csCtx.state = CS_STATE_IDLE;
+            }
+        }
         if (++sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES) {
+            sSweepCsWait = 0;
             while (sSweepEntrance < ENTR_MAX) {
                 s32 entrance = sSweepEntrance++;
                 s32 scene = gEntranceTable[entrance].sceneId;
@@ -1222,6 +1239,7 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             } else if ((sSweepEntrance >= ENTR_MAX) && (sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES)) {
                 gFishmodSweepLeg = 0xFFFF; // (the last scene's time is up: the sweep's end)
             }
+        }
         }
     }
 #else
