@@ -29,7 +29,8 @@ needed beyond what frames25 uses.
 
 ## In ares (the emulator's timing, not the console's)
 
-Two laps of each, run side by side:
+The every-second-refresh ROM run to its end: three laps reported, then FISHMOD-DONE (the third lap 9.2 ms a game
+frame). Two laps of each, run side by side:
 
 | | audio thread, ms a game frame, lap 1 | lap 2 |
 |---|---|---|
