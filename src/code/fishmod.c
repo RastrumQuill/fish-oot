@@ -2165,3 +2165,26 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
     gSPSegment(gfx++, FISHMOD_RELIT_SEG, sRelitBuf[sRelitFront]);
     return gfx;
 }
+
+/*
+ * A build that needs the Expansion Pak (fishmod/build.sh --expak), started without one: says so and stops there,
+ * before anything is set up that counts on the 8 MB (called from SysCfb_Init, code/sys_cfb.c, on the flag below).
+ * Drawn with the crash screen's own text, into a frame buffer at the top of the 4 MB that are there.
+ */
+#include "fault.h"
+const u8 gFishmodExpakRequired = FISHMOD_EXPAK;
+
+void Fishmod_NeedsExpansionPak(void) {
+    u16* fb = (u16*)(0x80400000 - (SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16)));
+
+    Fault_SetFrameBuffer(fb, SCREEN_WIDTH, SCREEN_HEIGHT);
+    Fault_DrawRecBlack(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    Fault_DrawText(56, 96, "THIS VERSION NEEDS THE");
+    Fault_DrawText(56, 108, "EXPANSION PAK.");
+    Fault_DrawText(56, 132, "TURN THE CONSOLE OFF AND");
+    Fault_DrawText(56, 144, "PUT ONE IN.");
+    osWritebackDCacheAll();
+    osViSwapBuffer(fb);
+    osViBlack(false);
+    for (;;) {}
+}

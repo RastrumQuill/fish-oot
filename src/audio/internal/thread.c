@@ -64,10 +64,11 @@ static AudioTask* sWaitingAudioTask = NULL;
  * original name: CreateAudioTask (note: function is heavily modified in Animal Crossing)
  */
 extern u8 gFishmodDmaTtlAhead; // (load.c)
+// (in every build, so the files that set them are the same code with and without --expak)
+u8 gFishmodAudioAhead = false; // updates built ahead when the driver is steady (--expak): off until the console says
+                               // it pays (the audio_sched_ab bench switches it by lap; the audio check has it on)
 static s32 sFishmodCallSlot; // the output buffer ring's slot of the refresh being handled
 #if FISHMOD_EXPAK
-u8 gFishmodAudioAhead = false; // updates built ahead when the driver is steady: off until the console says it
-                                // pays (the audio_ahead_ab bench switches it by lap; the audio check's build has it on)
 u8 gFishmodTaskRing = 2;      // the command lists and tasks in use: 6, or the heap's 2 for a spec too big (heap.c)
 u8 gFishmodBuiltCount;        // the updates built by the last call (0: its update was built ahead; 1-3), for the audio
 AudioTask* gFishmodBuilt[3];  // manager (code/audio_thread_manager.c): their tasks, in order,
@@ -1189,3 +1190,129 @@ u32 AudioThread_NextRandom(void) {
 void AudioThread_InitMesgQueues(void) {
     AudioThread_InitMesgQueuesImpl();
 }
+
+/*
+ * fish-oot: the audio manager's retrace handler for a build with the Expansion Pak's memory (--expak). Here, in the
+ * audio driver's own files, and reached through a pointer: code/audio_thread_manager.c is then the same code in every
+ * build.
+ */
+#include "audiomgr.h"
+#include "regs.h"
+#include "sched.h"
+#include "speed_meter.h"
+
+#if FISHMOD_EXPAK
+/*
+ * fish-oot: the audio's RSP tasks sent with time to spare. The game sends an update's task at the next refresh, and
+ * the scheduler takes the RSP from the graphics task for it there and then. But the task is ready as soon as its
+ * update is built (a refresh earlier; up to three for updates built ahead: audio/internal/thread.c), and its output
+ * isn't wanted until the refresh after the one it's sent on. So, with gFishmodAudioLazy, each task is handed over as
+ * soon as it's built, marked OS_SC_FISHMOD_LAZY: the scheduler runs it when the RSP is next free (sched.c), and only
+ * if it still hasn't run by the refresh the game would have sent it on is it made urgent, as it always was. The
+ * tasks are the same and run in the same order; only when they run changes. Without the switch each task goes at the
+ * game's time, urgent. (A task whose update started sample loads from the cart waits for its refresh as before: the
+ * loads must land first.)
+ *
+ * Each task has its own scheduler entry here (the game's one would be overwritten while still queued) and they report
+ * done on a queue with room for all of them.
+ */
+u8 gFishmodAudioLazy = false; // off until the console says it pays (the audio_sched_ab bench switches it by lap)
+extern OSScTask* volatile gFishmodSchedUrgent;
+static OSScTask sFmScTask[FISHMOD_TASK_RING];
+static u8 sFmState[FISHMOD_TASK_RING]; // 0: not sent; 1: sent; 2: done
+static OSMesgQueue sFmDoneQueue;
+static OSMesg sFmDoneMsg[2 * FISHMOD_TASK_RING];
+static AudioTask* sFmPrevDue; // the task that was due a refresh ago: its output is queued by this refresh's update
+
+static void AudioMgr_FmSend(AudioMgr* audioMgr, AudioTask* rspTask, s32 lazy) {
+    s32 i = rspTask - gAudioCtx.rspTask;
+    OSScTask* task = &sFmScTask[i];
+
+    task->next = NULL;
+    task->flags = OS_SC_NEEDS_RSP | (lazy ? OS_SC_FISHMOD_LAZY : 0);
+    task->framebuffer = NULL;
+    task->list = rspTask->task;
+    task->msgQueue = &sFmDoneQueue;
+    task->msg = (OSMesg)(i + 1);
+    sFmState[i] = 1;
+    osSendMesg(&audioMgr->sched->cmdQueue, (OSMesg)task, OS_MESG_BLOCK);
+    Sched_Notify(audioMgr->sched);
+}
+
+static void AudioMgr_FmDone(s32 block, s32 until) {
+    OSMesg msg;
+
+    while (((until >= 0) && (sFmState[until] == 1)) || !block) {
+        if (osRecvMesg(&sFmDoneQueue, &msg, block ? OS_MESG_BLOCK : OS_MESG_NOBLOCK) == -1) {
+            break;
+        }
+        sFmState[(u32)msg - 1] = 2;
+    }
+}
+
+static void AudioMgr_FishmodHandleRetrace(AudioMgr* audioMgr) {
+    static s32 sInit;
+    AudioTask* rspTask;
+    AudioTask* due;
+    s32 i;
+
+    if (!sInit) {
+        osCreateMesgQueue(&sFmDoneQueue, sFmDoneMsg, ARRAY_COUNT(sFmDoneMsg));
+        sInit = true;
+    }
+    AudioMgr_FmDone(false, -1);
+    if (sFmPrevDue != NULL) {
+        // (its output buffer is the one this refresh's update queues: by now it has always run)
+        AudioMgr_FmDone(true, sFmPrevDue - gAudioCtx.rspTask);
+    }
+
+    if (R_AUDIOMGR_ACTIVITY_LEVEL > AUDIOMGR_ACTIVITY_LEVEL_ALL) {
+        // Inhibit audio rsp task processing
+        audioMgr->rspTask = NULL;
+    }
+    due = audioMgr->rspTask;
+    if (due != NULL) {
+        // the game's time for this task: sent now, or, sent earlier with time to spare and still waiting, made urgent
+        i = due - gAudioCtx.rspTask;
+        if (sFmState[i] == 0) {
+            AudioMgr_FmSend(audioMgr, due, false);
+        } else if (sFmState[i] == 1) {
+            gFishmodSchedUrgent = &sFmScTask[i];
+            Sched_Notify(audioMgr->sched);
+        }
+    }
+    sFmPrevDue = due;
+
+    // Update the audio driver
+    gAudioThreadUpdateTimeStart = osGetTime();
+    if (R_AUDIOMGR_ACTIVITY_LEVEL >= AUDIOMGR_ACTIVITY_LEVEL_NO_UPDATE) {
+        rspTask = NULL;
+        gFishmodBuiltCount = 0;
+    } else {
+        rspTask = AudioThread_Update();
+    }
+    gAudioThreadUpdateTimeAcc += osGetTime() - gAudioThreadUpdateTimeStart;
+    gAudioThreadUpdateTimeStart = 0;
+
+    // the tasks just built: not sent yet; and, with time to spare, sent now for the RSP's next gap
+    for (i = 0; i < gFishmodBuiltCount; i++) {
+        if (gFishmodBuilt[i] != NULL) {
+            sFmState[gFishmodBuilt[i] - gAudioCtx.rspTask] = 0;
+        }
+    }
+    if (gFishmodAudioLazy && (R_AUDIOMGR_ACTIVITY_LEVEL == AUDIOMGR_ACTIVITY_LEVEL_ALL) && (gFishmodBuiltDmas == 0)) {
+        for (i = 0; (i < gFishmodBuiltCount) && (gFishmodBuilt[i] != NULL); i++) {
+            AudioMgr_FmSend(audioMgr, gFishmodBuilt[i], true);
+        }
+    }
+
+    // Update rsp task to be scheduled on next retrace
+    audioMgr->rspTask = rspTask;
+}
+#endif
+
+#if FISHMOD_EXPAK
+void (*gFishmodAudioMgrRetrace)(AudioMgr*) = AudioMgr_FishmodHandleRetrace;
+#else
+void (*gFishmodAudioMgrRetrace)(AudioMgr*) = NULL;
+#endif

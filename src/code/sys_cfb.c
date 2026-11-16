@@ -6,10 +6,6 @@
 #include "line_numbers.h"
 #include "printf.h"
 #include "translation.h"
-#if FISHMOD_EXPAK
-#include "fault.h"
-#include "ultra64.h"
-#endif
 
 #pragma increment_block_number "gc-eu:128 gc-eu-mq:128 gc-jp:128 gc-jp-ce:128 gc-jp-mq:128 gc-us:128 gc-us-mq:128" \
                                "pal-1.1:128"
@@ -21,37 +17,23 @@ uintptr_t sSysCfbEnd;
 u32 gFishmodSampleStoreStart; // fish-oot: RAM no one else uses, for the audio driver's sample store (0: none)
 u32 gFishmodSampleStoreEnd;
 
-#if FISHMOD_EXPAK
 /*
- * fish-oot: a build that needs the Expansion Pak (fishmod/build.sh --expak), started without one: says so and stops
- * there, before anything is set up that counts on the 8 MB. Drawn with the crash screen's own text, into a frame
- * buffer at the top of the 4 MB that are there.
+ * fish-oot: a build that needs the Expansion Pak (fishmod/build.sh --expak) says so and stops when there's none
+ * (Fishmod_NeedsExpansionPak, in the mod's own code: code/fishmod.c). The test is the same code in every build,
+ * on a flag that file sets, so this file, and all the engine's code after it, sits where it does whichever way
+ * the build goes.
  */
-static void SysCfb_NeedsExpansionPak(void) {
-    u16* fb = (u16*)(0x80400000 - (SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16)));
+extern const u8 gFishmodExpakRequired;
+void Fishmod_NeedsExpansionPak(void);
 
-    Fault_SetFrameBuffer(fb, SCREEN_WIDTH, SCREEN_HEIGHT);
-    Fault_DrawRecBlack(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    Fault_DrawText(56, 96, "THIS VERSION NEEDS THE");
-    Fault_DrawText(56, 108, "EXPANSION PAK.");
-    Fault_DrawText(56, 132, "TURN THE CONSOLE OFF AND");
-    Fault_DrawText(56, 144, "PUT ONE IN.");
-    osWritebackDCacheAll();
-    osViSwapBuffer(fb);
-    osViBlack(false);
-    for (;;) {}
-}
-#endif
 
 void SysCfb_Init(s32 n64dd) {
     u32 screenSize;
     UNUSED_NDEBUG uintptr_t tmpFbEnd;
 
-#if FISHMOD_EXPAK
-    if (osMemSize < 0x800000) {
-        SysCfb_NeedsExpansionPak();
+    if (gFishmodExpakRequired && (osMemSize < 0x800000)) {
+        Fishmod_NeedsExpansionPak();
     }
-#endif
 
     if (osMemSize >= 0x800000) {
         PRINTF(T("８Ｍバイト以上のメモリが搭載されています\n", "8MB or more memory is installed\n"));
