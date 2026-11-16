@@ -1164,6 +1164,7 @@ skip:
     PLAY_LOG(3816);
     FISHMOD_SECT(FISHMOD_SECT_ENV, Environment_Update(this, &this->envCtx, &this->lightCtx, &this->pauseCtx,
                                                       &this->msgCtx, &this->gameOverCtx, this->state.gfxCtx));
+    Fishmod_HazeTint(this); // fishmod: under the lake's water, its fog colour as seen from above
 }
 
 void Play_DrawOverlayElements(PlayState* this) {

@@ -799,11 +799,11 @@ typedef struct ManagerDrawItem {
     u8 whiskers;
     s16 fog; // -1: lit; else flat, this fogged (EnFishmod_FogAmount)
     u16 dist;  // from the camera
-    u8 hero;   // one of the HERO_MAX nearest that would have the full rig: it keeps it, and gets the sheen
+    u8 hero;   // one of the HERO_MAX nearest that would have the full rig: it keeps it
     u8 wantFull;
 } ManagerDrawItem;
-// Heroes and the crowd (fish-oot). The full rig (every spine bone, the fins' own bones) and the sheen are for the few
-// fish nearest the camera, where they show; every other fish in range has the reduced rig, however many swim close.
+// Heroes and the crowd (fish-oot). The full rig (every spine bone, the fins' own bones) is for the few fish nearest
+// the camera, where it shows; every other fish in range has the reduced rig, however many swim close.
 // (Was: every fish within LOD_FULL_DIST had the full rig, a school at the camera all of them at once.)
 #define HERO_MAX 4
 
@@ -819,6 +819,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
     s32 lastSpecies = -1;
     s32 lastVariant = -1;
     s32 lastFlat = -1;
+    s32 waterFog = false; // (the water's fog set for the last lit fish: the scene's put back after)
 #if FISHMOD_DEBUG
     OSTime profStart;
 #endif
@@ -889,7 +890,7 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
                     }
                 }
             }
-            item->fog = (close || (dist < LIT_DIST)) ? -1 : EnFishmod_FogAmount(play, &actor->world.pos);
+            item->fog = (close || (dist < LIT_DIST)) ? -1 : EnFishmod_FogAmount(play, &actor->world.pos, fish->fogRgb);
             item->whiskers = DRAW_WHISKERS && (fish->species->lookFlags & FISHMOD_LOOK_WHISKERS) &&
                              (item->variant == FISH_RIG_FULL) && (close || (dist < LOD_FULL_DIST));
         }
@@ -971,13 +972,34 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
             EnFishmod_RigSetSpecies(fish, play, full[i].variant);
             lastVariant = full[i].variant;
         }
-        gFishmodRigSheen = full[i].hero;
+        if (full[i].fog < 0) {
+            // lit (the blender's fog): under the lake's surface seen from above it, the water's fog for this fish, as
+            // the bed's (fishmod.c Fishmod_WaterFogFactor); the scene's again for the next fish that isn't
+            s16 fm;
+            s16 fo;
+
+            OPEN_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+            if (Fishmod_WaterFogFactor(FISHMOD_LAKE_SURFACE - fish->actor.world.pos.y, &fm, &fo)) {
+                gDPPipeSync(POLY_OPA_DISP++);
+                gDPSetFogColor(POLY_OPA_DISP++, gFishmodWaterFog.water[0], gFishmodWaterFog.water[1],
+                               gFishmodWaterFog.water[2], 0);
+                gSPFogFactor(POLY_OPA_DISP++, fm, fo);
+                waterFog = true;
+            } else if (waterFog) {
+                POLY_OPA_DISP = Fishmod_WaterFogOff(play, POLY_OPA_DISP);
+                waterFog = false;
+            }
+            CLOSE_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+        }
         EnFishmod_RigDraw(fish, play, full[i].variant,
                           full[i].whiskers || FISHMOD_PHOTO_ON || (fish->fishState == FISH_STATE_CAUGHT), full[i].fog);
     }
-    gFishmodRigSheen = false;
+    if (waterFog) {
+        OPEN_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+        POLY_OPA_DISP = Fishmod_WaterFogOff(play, POLY_OPA_DISP);
+        CLOSE_DISPS(play->state.gfxCtx, "../fishmod_manager.c", __LINE__);
+    }
     if (fullCount != 0) {
-        EnFishmod_RigSheenFlush(play); // (the heroes' sheen, over the fish as drawn)
         EnFishmod_RigRestoreSegments(play);
     }
 

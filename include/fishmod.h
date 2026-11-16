@@ -757,14 +757,24 @@ void Fishmod_TerrainRA(struct PlayState* play);
 #define FISHMOD_DEPTH_TO 500.0f
 #define FISHMOD_DEPTH_MIN 0.12f
 s32 Fishmod_DepthShade(f32 depth);
-// the lake's water surface: tools/meshpack.py's (a 64x64 intensity texture of waves, the colours and alphas the
-// frame's: z_bg_spot06_objects.c) in a meshpack build; FISHMOD_WATER_CLEAR: clear between the waves
+// the lake's water surface: tools/meshpack.py's (a 64x64 intensity texture of waves, the colours the frame's:
+// z_bg_spot06_objects.c) in a meshpack build; its alpha vanilla's (160 on the lake, 102 on the outflow)
 #ifndef FISHMOD_MESHPACK
 #define FISHMOD_MESHPACK 0
 #endif
 #define FISHMOD_WATER_SURFACE FISHMOD_MESHPACK
-#ifndef FISHMOD_WATER_CLEAR
-#define FISHMOD_WATER_CLEAR 0
+#define FISHMOD_WATER_ALPHA 160
+#define FISHMOD_WATER_ALPHA_OUT 102
+// the water's numbers as the game reads them: in debug builds a table in memory (gFishmodWaterTune: the alphas, the
+// fog's tint) that the render tools poke between pictures, so variants need no build; in others the numbers here
+#define FISHMOD_WT_ALPHA 0
+#define FISHMOD_WT_ALPHA_OUT 1
+#define FISHMOD_WT_TINT 2
+#if FISHMOD_DEBUG
+extern s16 gFishmodWaterTune[3];
+#define FISHMOD_WATER_TUNE(i, v) (gFishmodWaterTune[i])
+#else
+#define FISHMOD_WATER_TUNE(i, v) (v)
 #endif
 // water fog seen from above (fishmod.c Fishmod_WaterFogSetup): the camera-under-water fog by the share of the view's
 // ray inside the water, as the RSP's own fog's two numbers scaled for each draw (the lake bed's bands: tools/meshpack.py)
@@ -778,6 +788,13 @@ typedef struct FishmodWaterFog {
 } FishmodWaterFog;
 extern FishmodWaterFog gFishmodWaterFog;
 void Fishmod_WaterFogSetup(struct PlayState* play);
+// the water's fog colour (the underwater light setting's, seen from above or from under the surface) taken this far
+// toward vanilla's water's own colour (its texture's average), of 256: FISHMOD_WATER_SURFACE builds only
+#ifndef FISHMOD_WATER_TINT
+#define FISHMOD_WATER_TINT 192
+#endif
+void Fishmod_WaterTint(u8* rgb, s32 amount);
+void Fishmod_HazeTint(struct PlayState* play);
 s32 Fishmod_WaterFogFactor(f32 depth, s16* fm, s16* fo);
 Gfx* Fishmod_WaterFogOff(struct PlayState* play, Gfx* gfx);
 void Fishmod_WaterFogBands(struct PlayState* play, Gfx* out);

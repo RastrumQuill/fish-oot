@@ -463,8 +463,7 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
     // fish-oot: the surface made by tools/meshpack.py (a 64x64 intensity texture of waves, its two layers a fine
     // ripple and a swell four times coarser): each layer scrolled its own way, and the colours and alphas, in the lists
     // of segments 8 (the lake) and 9 (its outflow): the waves move the colour from the water's (the environment's) to
-    // a highlight (the primitive's), in the scene's light; the alpha is a base (the environment's) plus the waves'
-    // (the primitive's). FISHMOD_WATER_CLEAR: no base, the surface clear between the waves.
+    // a highlight (the primitive's), in the scene's light; the alpha is vanilla's.
     {
         // (vanilla's texture's own darkest and brightest colours: tools/meshpack.py)
         static const u8 sBase[3] = FISHMOD_WATER_BASE;
@@ -481,10 +480,10 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
             light[c] = CLAMP_MAX(l, 255);
         }
         for (part = 0; part < 2; part++) {
-            // (the outflow's part as vanilla had it: 102 of the lake's 160)
-            // (vanilla: 160 all over, 102 on the outflow; here about that between the waves and more on them)
-            s32 baseA = FISHMOD_WATER_CLEAR ? 0 : (part ? 90 : 140);
-            s32 waveA = FISHMOD_WATER_CLEAR ? (part ? 128 : 200) : (part ? 40 : 60);
+            // the alpha: vanilla's, one value all over (160 on the lake, 102 on the outflow)
+            s32 baseA = part ? FISHMOD_WATER_TUNE(FISHMOD_WT_ALPHA_OUT, FISHMOD_WATER_ALPHA_OUT)
+                             : FISHMOD_WATER_TUNE(FISHMOD_WT_ALPHA, FISHMOD_WATER_ALPHA);
+            s32 waveA = 0;
             Gfx* g = GRAPH_ALLOC(play->state.gfxCtx, 7 * sizeof(Gfx));
             u32 f = gameplayFrames * (part ? 3 : 1);
             // the ripple drifts one way, the swell slowly another (in quarter texels a frame)

@@ -785,8 +785,7 @@ def unsize(dirpath, room, dl):
 # every 77 units, the second layer every 154, mirrored) with twice the texels, each scrolled its own way
 # (z_bg_spot06_objects.c). The colour is the frame's: the waves move it from vanilla's darkest colour (the
 # environment's) to its brightest (the primitive's), in the scene's light (fishmod_water_colours.h, written here); the
-# alpha is a base (the environment's) plus the waves' times the primitive's, so the surface can be made wholly clear
-# between the waves (the bed's colour then the water fog's). MESHPACK_NO_WATER_SURFACE=1: vanilla's.
+# alpha is vanilla's, one value over the whole surface (the environment's). MESHPACK_NO_WATER_SURFACE=1: vanilla's.
 WATER_SURFACE = not os.environ.get("MESHPACK_NO_WATER_SURFACE")
 WATER_DIR = "assets/objects/object_spot06_objects"
 WATER_TEX = "gLakeHyliaWaterTex"
@@ -812,7 +811,8 @@ def water_texture(src_png, path):
     flat = im.reshape(-1, 3)[order]
     low = flat[: max(1, len(flat) // 10)].mean(0)
     high = flat[int(len(flat) * 0.95):].mean(0)
-    return [int(round(c)) for c in low], [int(round(c)) for c in high]
+    mean = im.reshape(-1, 3).mean(0)
+    return ([int(round(c)) for c in low], [int(round(c)) for c in high], [int(round(c)) for c in mean])
 
 
 WATER_MATERIAL_OLD = re.compile(r"gsDPLoadTextureBlock\(gLakeHyliaWaterTex,.*?gsSPSetGeometryMode\(G_FOG \| G_LIGHTING\),",
@@ -825,7 +825,7 @@ WATER_MATERIAL = (
     "G_TX_MIRROR | G_TX_WRAP, 6, 14),\n"
     "    gsDPSetTileSize(1, 0, 0, 0x00FC, 0x00FC),\n"
     "    gsDPSetCombineLERP(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, PRIMITIVE, "
-    "ENVIRONMENT, COMBINED, ENVIRONMENT, COMBINED, 0, PRIMITIVE, ENVIRONMENT),\n"
+    "ENVIRONMENT, COMBINED, ENVIRONMENT, 0, 0, 0, ENVIRONMENT),\n"
     "    gsDPSetRenderMode(G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2),\n"
     "    gsSPClearGeometryMode(G_CULL_BACK | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR | G_LIGHTING),\n"
     "    gsSPSetGeometryMode(G_FOG),")
@@ -848,16 +848,16 @@ def water_surface(out):
     template = os.path.join(d, WATER_TEX + ".rgba16.png")
     out_png = os.path.join(d, WATER_TEX + ".i4.png")
     tmp = out_png + ".tmp.png"
-    low, high = water_texture(template, tmp)
+    low, high, mean = water_texture(template, tmp)
     for f in os.listdir(d):
         if f.startswith(WATER_TEX + ".") and not f.endswith(".tmp.png"):
             os.remove(os.path.join(d, f))
     os.rename(tmp, out_png)
     # (the base and highlight colours for the game: vanilla's own, by its darkest and brightest texels)
     hp = os.path.join(d, "fishmod_water_colours.h")
-    open(hp, "w").write("// tools/meshpack.py: vanilla's water texture's darkest and brightest colours\n"
+    open(hp, "w").write("// tools/meshpack.py: vanilla's water texture's darkest, brightest and average colours\n"
                         "#define FISHMOD_WATER_BASE { %d, %d, %d }\n#define FISHMOD_WATER_HIGH { %d, %d, %d }\n"
-                        % tuple(low + high))
+                        "#define FISHMOD_WATER_MEAN { %d, %d, %d }\n" % tuple(low + high + mean))
     for f, a, b in (("object_spot06_objects.c", WATER_TEX + ".rgba16.inc.c", WATER_TEX + ".i4.inc.c"),
                     ("object_spot06_objects.c", "gLakeHyliaWaterTex_HEIGHT, 16)]", "gLakeHyliaWaterTex_HEIGHT, 4)]"),
                     ("object_spot06_objects.h", "gLakeHyliaWaterTex_WIDTH 32", "gLakeHyliaWaterTex_WIDTH 64"),

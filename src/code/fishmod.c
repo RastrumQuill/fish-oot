@@ -6,6 +6,9 @@
 
 #include "fishmod.h"
 #include "fishmod_bedcard.h"
+#if FISHMOD_WATER_SURFACE
+#include "assets/objects/object_spot06_objects/fishmod_water_colours.h"
+#endif
 #include "src/fishmod_data/fishmod_profile.h"
 #include "assert.h"
 #include "fishmod_species_data.h"
@@ -1899,10 +1902,36 @@ void Fishmod_WaterFogSetup(PlayState* play) {
     for (c = 0; c < 3; c++) {
         gFishmodWaterFog.water[c] = sWater[c];
     }
+    Fishmod_WaterTint(gFishmodWaterFog.water, 256);
     gFishmodWaterFog.zA = (f + n) / (f - n);
     gFishmodWaterFog.fm = 128000.0f / (FISHMOD_HAZE_FOG_FAR - sWaterNear);
     gFishmodWaterFog.fo = (500 - sWaterNear) * 256.0f / (FISHMOD_HAZE_FOG_FAR - sWaterNear);
     gFishmodWaterFog.h = eye.y - FISHMOD_LAKE_SURFACE;
+}
+
+#if FISHMOD_DEBUG
+s16 gFishmodWaterTune[3] = { FISHMOD_WATER_ALPHA, FISHMOD_WATER_ALPHA_OUT, FISHMOD_WATER_TINT };
+#endif
+
+/** A fog colour taken toward vanilla's water's colour: FISHMOD_WATER_TINT of 256, times amount of 256. */
+void Fishmod_WaterTint(u8* rgb, s32 amount) {
+#if FISHMOD_WATER_SURFACE
+    static const u8 sMean[3] = FISHMOD_WATER_MEAN;
+    s32 k = (FISHMOD_WATER_TUNE(FISHMOD_WT_TINT, FISHMOD_WATER_TINT) * amount) >> 8;
+    s32 c;
+
+    for (c = 0; c < 3; c++) {
+        rgb[c] += ((sMean[c] - rgb[c]) * k) >> 8;
+    }
+#endif
+}
+
+/** Under water, the scene's fog colour (the fog, the frame's clear) tinted as the water's seen from above, by how far
+ * the haze has come in: after Environment_Update, which makes it afresh each frame. */
+void Fishmod_HazeTint(PlayState* play) {
+    if ((gFishmodHaze > 0.0f) && (play->sceneId == SCENE_LAKE_HYLIA)) {
+        Fishmod_WaterTint(play->lightCtx.fogColor, (s32)(gFishmodHaze * 256.0f));
+    }
 }
 
 /** The RSP's fog numbers for something this deep under the surface, seen from above (false: next to none: the

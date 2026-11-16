@@ -22,9 +22,6 @@
  */
 
 #include "z_en_fishmod.h"
-#include "gfx_setupdl.h"
-#include "light.h"
-#include "environment.h"
 #include "array_count.h"
 #include "attributes.h"
 #include "assets/objects/object_fish/object_fish.h"
@@ -45,10 +42,6 @@
 #define RIG_MAX_LOADS 48
 #define RIG_MAX_FINS 3
 #define RIG_MAX_JOINT 0x1300 // the sharpest bend between two body bones (about 27 degrees)
-// A hero fish's sheen pass (EnFishmod_RigSheenFlush): off, it doesn't draw yet (see there)
-#ifndef FISHMOD_HERO_SHEEN
-#define FISHMOD_HERO_SHEEN 0
-#endif
 #define RIG_SEG_MTX 0x0D
 #define RIG_SEG_VTX 0x0E
 #define RIG_SEG_TINT 0x0F
@@ -95,7 +88,6 @@ typedef struct FishRigBase {
     u8* vtxBone; // per baked vertex
     Gfx* dl;
     Gfx* dlFlat; // the same, flat: 1 cycle, unlit, fogged in the combiner (Rig_Flatten)
-    Gfx* dlSheen; // its body's triangles alone, no material: a hero's second pass (Rig_SheenList), or NULL
 } FishRigBase;
 
 /** A species' copy of a model's rig: its baked vertices and tints, and the bones' rest places (shapes differ). */
@@ -674,43 +666,6 @@ static Gfx* Rig_Flatten(Gfx* in, Gfx* end, Gfx* out) {
     return out;
 }
 
-/*
- * A hero fish's sheen (EnFishmod_RigSheenFlush): the lit list's matrices, vertices and triangles with no material at
- * all, for a second pass over the body that adds a wet highlight. Only the opaque parts: the fins are cut out of their
- * textures, and without the texture a fin would be its whole quad.
- */
-static Gfx* Rig_SheenList(Gfx* in, Gfx* end, Gfx* out) {
-    s32 opaque = true;
-
-    for (; in < end; in++) {
-        u32 w0 = in->words.w0;
-        u32 w1 = in->words.w1;
-
-        switch (w0 >> 24) {
-            case G_SETOTHERMODE_L:
-                // (a limb's render mode: the fins' is the cut-out one, coverage from the texture's alpha)
-                if ((w0 & 0xFFFF) == (((32 - G_MDSFT_RENDERMODE - 29) << 8) | 28)) {
-                    opaque = !(w1 & (CVG_X_ALPHA | ALPHA_CVG_SEL));
-                }
-                break;
-            case G_MTX:
-                *out++ = *in; // (a bone's matrix: the vertices after it are loaded through it)
-                break;
-            case G_VTX:
-            case G_TRI1:
-            case G_TRI2:
-            case G_QUAD:
-                if (opaque) {
-                    *out++ = *in;
-                }
-                break;
-            default:
-                break;
-        }
-    }
-    return out;
-}
-
 static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
     FishRigBase* base = &sRigBases[model][variant];
     FlexSkeletonHeader* skel = SEGMENTED_TO_VIRTUAL(Rig_Skeleton(model));
@@ -951,15 +906,6 @@ static s32 Rig_BuildBase(s32 model, s32 variant, u8* partMap) {
 #endif
         }
     }
-    }
-    // a hero's sheen list (the full rig only: the nearest few fish), before the lit one is tidied in place
-    if (FISHMOD_HERO_SHEEN && (variant == FISH_RIG_FULL)) {
-        base->dlSheen = ZeldaArena_Malloc(((out - base->dl) + 1) * sizeof(Gfx));
-        if (base->dlSheen != NULL) {
-            Gfx* sheenEnd = Rig_SheenList(base->dl, out, base->dlSheen);
-
-            gSPEndDisplayList(sheenEnd++);
-        }
     }
     // the flat list (before the lit one is tidied in place)
     base->dlFlat = ZeldaArena_Malloc(((out - base->dl) + 1) * sizeof(Gfx));
@@ -1204,91 +1150,6 @@ void EnFishmod_RigSetSpecies(EnFishmod* this, PlayState* play, s32 variant) {
 }
 
 /** Gives segments 0x0E/0x0F back (the z-buffer and the framebuffer) after the fish are drawn. */
-/*
- * The hero fish's sheen (fish-oot, F3DEX3 only). The few fish nearest the camera get a second pass over their bodies:
- * the microcode's specular lighting (the highlight of the sun off each vertex toward the camera) put in the vertex
- * alpha, and the light's colour blended in by it over the fish as drawn (a decal: the same triangles at the same
- * depth). A wet glint that moves over the body as the fish turns and bends. The pass is the body's triangles with no
- * texture: about as many RSP commands again for that fish, and a few hundred pixels blended.
- */
-// NOT WORKING YET, so off: with FISHMOD_HERO_SHEEN 1 the pass runs (the heroes are noted, the list is called: checked
-// with counters in ares) but nothing shows on the fish, not even with the combiner set to a solid colour, in the
-// animation studio's view. Not found yet: whether the decal mode's depth test rejects it, the list's triangles are
-// still left out (the fins' cut-out mode was first told apart by the combiner, which never matched; now by the render
-// mode), or the segments aren't what the list expects by then. It needs a still close-up to work on.
-#define SHEEN_MAX 4
-#define SHEEN_SIZE 3     // the highlight's size (F3DEX3's light size: 1 broad to 4 tight)
-#define SHEEN_ALPHA 150  // its strength at its brightest (of 255)
-s32 gFishmodRigSheen;    // set by the manager before EnFishmod_RigDraw: this fish is a hero
-static struct {
-    Mtx* mtx;
-    Vtx* vtx;
-    Gfx* dl;
-} sSheen[SHEEN_MAX];
-static s32 sSheenCount;
-
-void EnFishmod_RigSheenFlush(PlayState* play) {
-#if ENABLE_F3DEX3
-    GraphicsContext* gfxCtx = play->state.gfxCtx;
-    EnvironmentContext* env = &play->envCtx;
-    Lights* lights;
-    PlainVtx* cam;
-    u8 light[3];
-    s32 i;
-
-    if (sSheenCount == 0) {
-        return;
-    }
-    lights = Graph_Alloc(gfxCtx, sizeof(Lights));
-    cam = Graph_Alloc(gfxCtx, sizeof(PlainVtx));
-    bzero(lights, sizeof(Lights));
-    // one light, the sun's (or the moon's) direction, white: the highlight's colour comes from the primitive colour
-    lights->numLights = 1;
-    lights->l.l[0].l.col[0] = lights->l.l[0].l.col[1] = lights->l.l[0].l.col[2] = 255;
-    lights->l.l[0].l.colc[0] = lights->l.l[0].l.colc[1] = lights->l.l[0].l.colc[2] = 255;
-    lights->l.l[0].l.dir[0] = env->dirLight1.params.dir.x;
-    lights->l.l[0].l.dir[1] = env->dirLight1.params.dir.y;
-    lights->l.l[0].l.dir[2] = env->dirLight1.params.dir.z;
-    lights->l.l[0].l.size = SHEEN_SIZE;
-    cam->c.pos[0] = play->view.eye.x;
-    cam->c.pos[1] = play->view.eye.y;
-    cam->c.pos[2] = play->view.eye.z;
-    EnFishmod_FlatLight(play, light);
-
-    OPEN_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
-    gDPPipeSync(POLY_OPA_DISP++);
-    gSPTexture(POLY_OPA_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-    gDPSetCycleType(POLY_OPA_DISP++, G_CYC_1CYCLE);
-    // colour: the light's; alpha: the highlight (the lighting's result, in the vertex alpha) times its strength
-    gDPSetCombineLERP(POLY_OPA_DISP++, 0, 0, 0, PRIMITIVE, SHADE, 0, PRIMITIVE, 0, 0, 0, 0, PRIMITIVE, SHADE, 0,
-                      PRIMITIVE, 0);
-    gDPSetRenderMode(POLY_OPA_DISP++, G_RM_ZB_XLU_DECAL, G_RM_ZB_XLU_DECAL2);
-    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, light[0], light[1], light[2], SHEEN_ALPHA);
-    gSPCameraWorld(POLY_OPA_DISP++, cam);
-    gSPSetLights(POLY_OPA_DISP++, 1, lights->l);
-    gSPClearGeometryMode(POLY_OPA_DISP++, G_FOG | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR | G_PACKED_NORMALS);
-    gSPSetGeometryMode(POLY_OPA_DISP++, G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH | G_CULL_BACK | G_LIGHTING |
-                                            G_LIGHTING_SPECULAR | G_LIGHTTOALPHA);
-    for (i = 0; i < sSheenCount; i++) {
-        gSPSegment(POLY_OPA_DISP++, RIG_SEG_MTX, sSheen[i].mtx);
-        gSPSegment(POLY_OPA_DISP++, RIG_SEG_VTX, sSheen[i].vtx);
-        gSPDisplayList(POLY_OPA_DISP++, sSheen[i].dl);
-    }
-    gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING_SPECULAR | G_LIGHTTOALPHA);
-    gDPPipeSync(POLY_OPA_DISP++);
-    CLOSE_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
-    // what's drawn next as it expects: the usual setup and the scene's lights
-    Gfx_SetupDL_25Opa(gfxCtx);
-    {
-        Lights* scene = LightContext_NewLights(&play->lightCtx, gfxCtx);
-
-        Lights_BindAll(scene, play->lightCtx.listHead, NULL);
-        Lights_Draw(scene, gfxCtx);
-    }
-#endif
-    sSheenCount = 0;
-}
-
 void EnFishmod_RigRestoreSegments(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_rig.c", __LINE__);
     gSPSegment(POLY_OPA_DISP++, 0x0E, gZBuffer);
@@ -1464,20 +1325,12 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
         gFishmodProfCount[FISHMOD_PROF_D_RIG_LOOK]++;
     }
 #endif
-    if (FISHMOD_HERO_SHEEN && gFishmodRigSheen && (fog < 0) && (base->dlSheen != NULL) && (sSheenCount < SHEEN_MAX)) {
-        // (a hero, drawn lit: its sheen after the fish are all drawn)
-        sSheen[sSheenCount].mtx = mtx;
-        sSheen[sSheenCount].vtx = rig->vtx;
-        sSheen[sSheenCount].dl = base->dlSheen;
-        sSheenCount++;
-    }
     OPEN_DISPS(gfxCtx, "../fishmod_rig.c", __LINE__);
     gSPSegment(POLY_OPA_DISP++, RIG_SEG_MTX, mtx);
     if ((fog >= 0) && (base->dlFlat != NULL)) {
         // flat (Rig_Flatten): its tints by the scene's light and (1 - fog), the fog colour x fog added in the
         // environment colour. The tints in the fish's own memory, made again only when its looks, the light or its fog
         // (in 64 steps, 1.6% each) change: once a frame they cost about 40 us a fish (ares)
-        LightContext* lights = &play->lightCtx;
         u8 light[3];
         u32 key;
 
@@ -1506,8 +1359,8 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
             }
         }
         gSPSegment(POLY_OPA_DISP++, RIG_SEG_TINT, this->flatGfx);
-        gDPSetEnvColor(POLY_OPA_DISP++, (lights->fogColor[0] * fog) >> 8, (lights->fogColor[1] * fog) >> 8,
-                       (lights->fogColor[2] * fog) >> 8, 255);
+        gDPSetEnvColor(POLY_OPA_DISP++, (this->fogRgb[0] * fog) >> 8, (this->fogRgb[1] * fog) >> 8,
+                       (this->fogRgb[2] * fog) >> 8, 255);
         if ((model == FISH_RIG_BASS) && (this->jawRot > 0)) {
             gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
             gSPDisplayList(POLY_OPA_DISP++, base->dlFlat);
