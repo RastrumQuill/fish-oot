@@ -75,7 +75,7 @@ u8 gFishmodBuiltDmas;         // and the sample loads the last of them started (
 static u8 sFishmodAhead;      // updates built and not yet due (0-2)
 static u8 sFishmodWillBatch;  // this call's update is to be followed by the next two (decided before it's built)
 #define FISHMOD_FILTER_SNAPS 160 // filters copied for one task: three ticks of 24 notes and two reverbs' pairs, and room
-static ALIGNED(16) s16 sFishmodFilterSnaps[FISHMOD_TASK_RING][FISHMOD_FILTER_SNAPS * 8];
+static s16 sFishmodFilterSnaps[FISHMOD_TASK_RING][FISHMOD_FILTER_SNAPS * 8] __attribute__((aligned(16)));
 extern s16* gFishmodFilterSnap; // (synthesis.c)
 extern s16* gFishmodFilterSnapEnd;
 static AudioTask* sFishmodAheadTask[2];
@@ -100,8 +100,8 @@ static s32 AudioThread_FishmodSteady(void) {
     }
     // nor while anything is being loaded: a load can take the room of a font or a sample that a task built and not
     // yet run still reads its codebooks and samples from
-    if ((gAudioCtx.preloadSampleStackTop > 0) || (gAudioCtx.slowLoads[0].state != SLOW_LOAD_STATE_WAITING) ||
-        (gAudioCtx.slowLoads[1].state != SLOW_LOAD_STATE_WAITING)) {
+    if ((gAudioCtx.preloadSampleStackTop > 0) || (gAudioCtx.slowLoads[0].state != 0 /* SLOW_LOAD_STATE_WAITING (load.c) */) ||
+        (gAudioCtx.slowLoads[1].state != 0)) {
         return false;
     }
     for (i = 0; i < ARRAY_COUNT(gAudioCtx.asyncLoads); i++) {
