@@ -711,9 +711,8 @@ def accents(instances):
                 out.append(p)
             continue
         if k == "vine_curtain":
-            # capped: a spatterdock's pads float on top (its roots, from below), so from above it's leaves, not a
-            # cross of card tops
-            out.append(p)
+            # a spatterdock in its place: its pads alone on the surface (the hanging roots under them taken out:
+            # they read as a vine curtain, not as roots)
             out.append(dict(p, kind="spatterdock", scale=1.0, tilt=(0.0, 0.0)))
             continue
         if k == "ribbon_weed":
