@@ -424,6 +424,41 @@ typedef struct ScatterFrame {
 // mostly), so most frames only send the commands again. Two sets: a new one is made while the RSP may still be
 // reading the last.
 #define BEDCARD_SET_MAX 64 // bed cards drawn in a frame at most
+/*
+ * Cache lines claimed before they're written whole (as Fishmod_ClaimDisplayLists, fishmod.c): a store to a line that
+ * isn't in the data cache first reads it from RDRAM, for nothing when all of it is about to be written; the VR4300's
+ * Create Dirty Exclusive makes the line without the read. Only ever a line every byte of which is then written.
+ */
+#if defined(__GNUC__) && !defined(FISHMOD_NO_CLAIM)
+#define SCATTER_CLAIM_LINE(p) __asm__ volatile("cache 0x0D, 0(%0)" : : "r"(p) : "memory")
+#else
+#define SCATTER_CLAIM_LINE(p) (void)0
+#endif
+#define SCATTER_CLAIM_AHEAD 256
+
+/**
+ * The lines of a command buffer ahead of where it's being written (none of their bytes written yet this frame, all of
+ * them before `end`: what's there is two frames old, and unused or about to be written), claimed up to
+ * SCATTER_CLAIM_AHEAD on; `claimed` is how far that has gone.
+ */
+static inline void Scatter_ClaimAhead(Gfx* at, Gfx* end, u32* claimed) {
+    u32 head = ((u32)at + 15) & ~15;
+    u32 last = (u32)end & ~15;
+    u32 to = head + SCATTER_CLAIM_AHEAD;
+    u32 p = *claimed;
+
+    if (p < head) {
+        p = head;
+    }
+    if (to > last) {
+        to = last;
+    }
+    for (; p < to; p += 16) {
+        SCATTER_CLAIM_LINE(p);
+    }
+    *claimed = p;
+}
+
 // A drawn prop's commands, all but written: everything the frame's loop needs of it, in one cache line (made with the
 // set, so a frame reads these in a row instead of the prop, its kind and the set's lists)
 typedef struct ScatterEntry {
@@ -1285,6 +1320,57 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
     return gfx;
 }
 
+/*
+ * The materials as display lists of their own, each made the first time it's wanted: a change of material in a frame's
+ * commands is then one command instead of a dozen (a frame changes material about forty times, and those were over
+ * half of what it wrote). Not the ones that hold a frame's own addresses (the lit materials' scene lights, the shallow
+ * rocks' scroll). A list depends on the kind, the tier (the edge mode goes by it) and the modes below: when one of
+ * those changes (the benches only), the lists are made afresh in the other pool, as the RSP may still be reading these.
+ */
+#define MAT_LIST_MAX 20    // commands in one, at most
+#define MAT_POOL_SIZE 1200 // commands in all (a scene uses about sixty materials of about thirteen commands)
+static Gfx sMatPool[FISHMOD_DEBUG ? 2 : 1][MAT_POOL_SIZE];
+static u16 sMatListAt[FISHMOD_PROP_KIND_MAX * TIER_MAX]; // where each is in the pool, plus 1 (0: not made)
+static s32 sMatPoolUsed;
+static u32 sMatListMode = 0xFFFFFFFF;
+static s32 sMatListPool;
+
+/** The opaque material of a kind and tier as a list of its own, or NULL: one made in place each time. */
+static Gfx* Scatter_MaterialList(FishmodPropKindInfo* info, s32 kind, s32 tier) {
+    s32 key = kind + tier * FISHMOD_PROP_KIND_MAX;
+    u32 mode = SCATTER_ONE_CYCLE();
+    Gfx* list;
+
+#if FISHMOD_DEBUG
+    mode |= (gFishmodBench & FISHMOD_BENCH_ALTEDGE) ? 2 : 0;
+#endif
+    if (info->xlu || (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK_LIT)) {
+        return NULL;
+    }
+    if (mode != sMatListMode) {
+        sMatListMode = mode;
+        sMatListPool = (sMatListPool + 1) % ARRAY_COUNT(sMatPool);
+        sMatPoolUsed = 0;
+        bzero(sMatListAt, sizeof(sMatListAt));
+    }
+    if (sMatListAt[key] == 0) {
+        s32 edgeNear = sEdgeNear;
+        Gfx* end;
+
+        if (sMatPoolUsed + MAT_LIST_MAX > MAT_POOL_SIZE) {
+            return NULL; // (no room: made in place)
+        }
+        list = &sMatPool[sMatListPool][sMatPoolUsed];
+        sEdgeNear = (tier == TIER_NEAR);
+        end = Scatter_Material(list, info, kind, tier);
+        sEdgeNear = edgeNear;
+        gSPEndDisplayList(end++);
+        sMatListAt[key] = sMatPoolUsed + 1;
+        sMatPoolUsed += end - list;
+    }
+    return &sMatPool[sMatListPool][sMatListAt[key] - 1];
+}
+
 /**
  * The shallow rocks' caustics for this frame: scrolled as the bed's (Scene_DrawConfigLakeHylia: a quarter texel a
  * frame), and the fade's steps from the scene's own colour (255 when the lake is drained: no caustics).
@@ -2100,6 +2186,12 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             // a single card, standing: turned to the camera as every other (the turn's cosine and sine made once)
             Mtx* mtx = &set->mtx[sMtxUsed++];
 
+            if (((u32)mtx & 15) == 0) { // (all four of its lines are written)
+                SCATTER_CLAIM_LINE(mtx);
+                SCATTER_CLAIM_LINE((u8*)mtx + 16);
+                SCATTER_CLAIM_LINE((u8*)mtx + 32);
+                SCATTER_CLAIM_LINE((u8*)mtx + 48);
+            }
             Scatter_MatrixTurned(mtx, prop, k == FISHMOD_PROP_LILY_PAD, cosBill, sinBill);
             set->mtxp[set->count] = mtx;
         } else {
@@ -2158,6 +2250,9 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             FishmodPropKindInfo* info = &sKinds[k];
             Gfx* near = info->model;
 
+            if (((u32)e & 15) == 0) { // (an entry is a line, all of it written here)
+                SCATTER_CLAIM_LINE(e);
+            }
             e->mtx = set->mtxp[set->count];
             e->prop = id;
             e->kind = k;
@@ -2419,11 +2514,14 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         s32 lastAlpha = -1;
         s32 touched = (sTouchSlot != NULL) && (sTouchCount > 0);
         s32 oneCycle = SCATTER_ONE_CYCLE();
+        u32 claimed = 0;
 
         for (n = cacheStart; n < set->entryCount; n++) {
             ScatterEntry* e = &set->entry[n];
             s32 tier = e->flags & SE_TIER;
             Gfx* g;
+
+            Scatter_ClaimAhead(opa, &frame->opa[ARRAY_COUNT(frame->opa)], &claimed);
 
             kind = e->kind;
             if (e->flags & SE_XLU) {
@@ -2448,7 +2546,15 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                         gSPTexture(opa++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
                     }
                     lastOpa = key;
-                    opa = Scatter_Material(opa, &sKinds[kind], kind, tier);
+                    {
+                        Gfx* list = Scatter_MaterialList(&sKinds[kind], kind, tier);
+
+                        if (list != NULL) {
+                            gSPDisplayList(opa++, list);
+                        } else {
+                            opa = Scatter_Material(opa, &sKinds[kind], kind, tier);
+                        }
+                    }
                     lastColor = lastAlpha = -1;
                 }
                 g = opa;
