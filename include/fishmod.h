@@ -754,6 +754,13 @@ s32 Fishmod_DepthShade(f32 depth);
 #ifndef FISHMOD_WATER_CLEAR
 #define FISHMOD_WATER_CLEAR 0
 #endif
+// the surface's own alpha (of 255): a base, and the waves' on top (the outflow's two thirds of each)
+#ifndef FISHMOD_WATER_BASE_A
+#define FISHMOD_WATER_BASE_A 40
+#endif
+#ifndef FISHMOD_WATER_WAVE_A
+#define FISHMOD_WATER_WAVE_A 80
+#endif
 // water fog seen from above (fishmod.c Fishmod_WaterFogSetup): the camera-under-water fog by the share of the view's
 // ray inside the water, as the RSP's own fog's two numbers scaled for each draw (the lake bed's bands: tools/meshpack.py)
 #define FISHMOD_WATER_BANDS 8

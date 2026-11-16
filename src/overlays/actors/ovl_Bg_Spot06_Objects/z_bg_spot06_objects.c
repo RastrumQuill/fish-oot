@@ -482,9 +482,11 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
         }
         for (part = 0; part < 2; part++) {
             // (the outflow's part as vanilla had it: 102 of the lake's 160)
-            // (vanilla: 160 all over, 102 on the outflow; here about that between the waves and more on them)
-            s32 baseA = FISHMOD_WATER_CLEAR ? 0 : (part ? 90 : 140);
-            s32 waveA = FISHMOD_WATER_CLEAR ? (part ? 128 : 200) : (part ? 40 : 60);
+            // (vanilla: 160 all over, 102 on the outflow. Here the surface is mostly clear: what's under it takes the
+            // water's colour and murk from the water fog by how much water the view crosses (fishmod.c), so the
+            // shallows show their bed and the deep water is opaque; the surface keeps its waves)
+            s32 baseA = FISHMOD_WATER_CLEAR ? 0 : (part ? FISHMOD_WATER_BASE_A * 2 / 3 : FISHMOD_WATER_BASE_A);
+            s32 waveA = FISHMOD_WATER_CLEAR ? (part ? 128 : 200) : (part ? FISHMOD_WATER_WAVE_A * 2 / 3 : FISHMOD_WATER_WAVE_A);
             Gfx* g = GRAPH_ALLOC(play->state.gfxCtx, 7 * sizeof(Gfx));
             u32 f = gameplayFrames * (part ? 3 : 1);
             // the ripple drifts one way, the swell slowly another (in quarter texels a frame)

@@ -2696,7 +2696,7 @@ void EnFishmod_FlatLight(PlayState* play, u8* out) {
     out[2] = sLight[2];
 }
 
-s32 EnFishmod_FogAmount(PlayState* play, Vec3f* pos) {
+s32 EnFishmod_FogAmount(PlayState* play, Vec3f* pos, u8* rgb) {
     MtxF* m = &play->viewProjectionMtxF;
     s32 near = play->lightCtx.fogNear;
     s32 far = 1000 - (s32)((1000 - FISHMOD_HAZE_FOG_FAR) * gFishmodHaze);
@@ -2705,7 +2705,23 @@ s32 EnFishmod_FogAmount(PlayState* play, Vec3f* pos) {
     f32 fm;
     f32 fo;
     f32 fog;
+    s16 wfm;
+    s16 wfo;
 
+    // under the lake's surface, seen from above it: the water's fog (fishmod.c Fishmod_WaterFogFactor), as the bed's
+    if (Fishmod_WaterFogFactor(FISHMOD_LAKE_SURFACE - pos->y, &wfm, &wfo)) {
+        rgb[0] = gFishmodWaterFog.water[0];
+        rgb[1] = gFishmodWaterFog.water[1];
+        rgb[2] = gFishmodWaterFog.water[2];
+        if (w < 1.0f) {
+            return 0;
+        }
+        fog = (z / w) * wfm + wfo;
+        return (fog <= 0.0f) ? 0 : (fog >= 255.0f) ? 255 : (s32)fog;
+    }
+    rgb[0] = play->lightCtx.fogColor[0];
+    rgb[1] = play->lightCtx.fogColor[1];
+    rgb[2] = play->lightCtx.fogColor[2];
     if (far == near) {
         far++;
     }
@@ -2817,7 +2833,7 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     const u8* tint = this->species->tint;
     s32 i;
     // (all lit, a comparison: the blender fogs it, as before)
-    s32 fog = (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT) ? 0 : EnFishmod_FogAmount(play, &this->actor.world.pos);
+    s32 fog = (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT) ? 0 : EnFishmod_FogAmount(play, &this->actor.world.pos, this->fogRgb);
     s32 keep = 255 - fog;
     u8 light[3] = { 255, 255, 255 }; // (all lit, a comparison: unlit, as before)
     s32 scale[3];
@@ -2917,8 +2933,8 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     }
 
     OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
-    gDPSetEnvColor(POLY_OPA_DISP++, (play->lightCtx.fogColor[0] * fog) >> 8, (play->lightCtx.fogColor[1] * fog) >> 8,
-                   (play->lightCtx.fogColor[2] * fog) >> 8, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, (this->fogRgb[0] * fog) >> 8, (this->fogRgb[1] * fog) >> 8,
+                   (this->fogRgb[2] * fog) >> 8, 255);
     gSPVertex(POLY_OPA_DISP++, vtx, 6, 0);
     gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
     gSP2Triangles(POLY_OPA_DISP++, 0, 3, 4, 0, 0, 4, 5, 0);
