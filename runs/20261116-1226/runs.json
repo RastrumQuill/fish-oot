@@ -1,0 +1,58 @@
+[
+ {
+  "run": 1,
+  "label": "rc1-1",
+  "patch": "releases\\fish-oot-rc1-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-16 12:26:35",
+  "patch_sha1": "cfa3ad427766a4375c403fcc10a9005685a5e7d2",
+  "upload_check": "ok",
+  "packets": 437,
+  "bytes": 3308712,
+  "packs": 1,
+  "seconds": 228
+ },
+ {
+  "run": 2,
+  "label": "props-1",
+  "patch": "releases\\fish-oot-rc1-props-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-16 12:30:25",
+  "patch_sha1": "1c59b1f3668082a52950f206ad77cc9bdcc4605c",
+  "upload_check": "ok",
+  "packets": 414,
+  "bytes": 3142736,
+  "packs": 1,
+  "seconds": 225
+ },
+ {
+  "run": 3,
+  "label": "rc1-2",
+  "patch": "releases\\fish-oot-rc1-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-16 12:34:13",
+  "patch_sha1": "cfa3ad427766a4375c403fcc10a9005685a5e7d2",
+  "upload_check": "ok",
+  "packets": 439,
+  "bytes": 3321464,
+  "packs": 1,
+  "seconds": 228
+ },
+ {
+  "run": 4,
+  "label": "props-2",
+  "patch": "releases\\fish-oot-rc1-props-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-16 12:38:04",
+  "patch_sha1": "1c59b1f3668082a52950f206ad77cc9bdcc4605c",
+  "upload_check": "ok",
+  "packets": 419,
+  "bytes": 3175816,
+  "packs": 1,
+  "seconds": 220
+ }
+]
