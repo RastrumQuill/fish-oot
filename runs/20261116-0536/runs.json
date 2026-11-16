@@ -1,0 +1,30 @@
+[
+ {
+  "run": 1,
+  "label": "audio-laps",
+  "patch": "releases\\fish-oot-audio-laps.bps",
+  "minutes_max": 16.0,
+  "status": "done",
+  "started": "2026-11-16 05:36:46",
+  "patch_sha1": "0a402c2aa860e2e87980a321a563440b5ce8c264",
+  "upload_check": "ok",
+  "packets": 1298,
+  "bytes": 9833456,
+  "packs": 1,
+  "seconds": 620
+ },
+ {
+  "run": 2,
+  "label": "audio-laps-every2",
+  "patch": "releases\\fish-oot-audio-laps-every2.bps",
+  "minutes_max": 16.0,
+  "status": "done",
+  "started": "2026-11-16 05:47:15",
+  "patch_sha1": "638e351a945b47749fe7ca6d670d21f9062955a3",
+  "upload_check": "ok",
+  "packets": 1282,
+  "bytes": 9713744,
+  "packs": 1,
+  "seconds": 628
+ }
+]

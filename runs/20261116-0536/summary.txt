@@ -1,0 +1,4 @@
+Morning runs 20261116-0536
+
+ 1. audio-laps                   done       1298 packets    9.8 MB   620 s  
+ 2. audio-laps-every2            done       1282 packets    9.7 MB   628 s  
