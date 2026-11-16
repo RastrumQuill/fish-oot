@@ -1,0 +1,53 @@
+# The audio driver's hot functions, in the order an audio update runs them (tools/mkspecrules.c places them first
+# in the driver's code, each in its own section). From the exact profile of the Lake Hylia bench in ares
+# (fishmod/tools/cpuprof.py: every function run at least 20 instructions an update). A name ending in * also takes
+# the compiler's own pieces of the function (.part.0, .isra.0 ...).
+#
+# the update's start: loads, the game's commands
+AudioThread_UpdateImpl*
+AudioLoad_DecreaseSampleDmaTtls*
+AudioLoad_ProcessLoads*
+Fishmod_SampleStoreStep*
+AudioLoad_ProcessSlowLoads*
+AudioLoad_ProcessSamplePreloads*
+AudioLoad_ProcessAsyncLoads*
+AudioLoad_ProcessScriptLoads*
+AudioThread_ProcessCmds*
+AudioThread_ProcessCmd
+AudioThread_ProcessChannelCmd*
+AudioThread_ProcessSeqPlayerCmd*
+AudioSynth_Update*
+# the sequences and the notes, three ticks an update
+AudioSeq_ProcessSequences*
+AudioLoad_IsSeqLoadComplete*
+AudioLoad_IsFontLoadComplete*
+AudioLoad_SetSeqLoadStatus*
+AudioLoad_SetFontLoadStatus*
+AudioSeq_SequencePlayerProcessSequence*
+AudioSeq_SequenceChannelProcessScript*
+AudioSeq_HandleScriptFlowControl*
+AudioHeap_LoadFilter*
+AudioSeq_SeqLayerProcessScript
+Audio_SequencePlayerProcessSound*
+Audio_SequenceChannelProcessSound*
+Audio_ProcessNotes*
+Audio_AdsrUpdate*
+Audio_NoteVibratoUpdate*
+Audio_GetVibratoFreqScale*
+Audio_InitSampleState*
+func_800DB03C*
+# the command lists, three ticks an update
+AudioSynth_InitNextRingBuf*
+AudioSynth_DoOneAudioUpdate*
+AudioSynth_LoadReverbSamples*
+AudioSynth_LoadRingBuffer1*
+AudioSynth_ProcessNote*
+AudioSynth_ProcessEnvelope*
+AudioSynth_FilterReverb*
+AudioSynth_SaveReverbSamples*
+# now and then: a note starting or ending
+AudioSeq_SeqLayerProcessScriptStep*
+Audio_SeqLayerDecayRelease*
+Audio_NoteInitForLayer*
+Audio_AllocNote*
+Audio_NoteInit*

@@ -22,6 +22,7 @@ git -C "$DIR" checkout -q -f "$REV"
 git -C "$DIR" apply "$PATCH"
 git -C "$DIR" apply "$(dirname "$PATCH")/ares-sc64.patch" # ARES_SC64_DIR=<dir>: a minimal SummerCart64, its USB packets saved there
 git -C "$DIR" apply "$(dirname "$PATCH")/ares-rspprof.patch" # ARES_RSPPROF=<file>: RSP instructions and clocks by PC (rspprof.py)
+git -C "$DIR" apply "$(dirname "$PATCH")/ares-cpuprof.patch" # ARES_CPUPROF=<file>: CPU instructions, cycles and cache fills by PC (cpuprof.py)
 cmake -S "$DIR" -B "$DIR/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DARES_CORES=n64 -DARES_ENABLE_LIBRASHADER=OFF \
     -DARES_ENABLE_SDL=OFF
 ninja -C "$DIR/build"

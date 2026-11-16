@@ -245,7 +245,7 @@ static void AudioSynth_ClaimCmdLines(Acmd* cmd) {
         p = sCmdClaimed;
     }
     for (; p < lim; p += 16) {
-        __asm__ volatile("cache 0x0D, 0(%0)" : : "r"(p) : "memory");
+        __asm__ volatile(".set push\n\t.set mips3\n\tcache 0x0D, 0(%0)\n\t.set pop" : : "r"(p) : "memory");
     }
     if (p > sCmdClaimed) {
         sCmdClaimed = p;
