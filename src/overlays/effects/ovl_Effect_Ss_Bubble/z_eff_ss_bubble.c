@@ -55,9 +55,35 @@ void EffectSsBubble_Draw(PlayState* play, u32 index, EffectSs* this) {
 
     OPEN_DISPS(gfxCtx, "../z_eff_ss_bubble.c", 154);
 
-    Matrix_Translate(this->pos.x, this->pos.y, this->pos.z, MTXMODE_NEW);
-    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx, "../z_eff_ss_bubble.c", 167);
+    {
+        // fish-oot: its matrix (a scale and a place: Matrix_Translate, Matrix_Scale and the conversion gave these
+        // same words) written as it is, a word at a time. The lake's plants make a few dozen bubbles a frame, and the
+        // three calls were most of what one cost.
+        Mtx* mtx = GRAPH_ALLOC(gfxCtx, sizeof(Mtx));
+        u32* w = (u32*)mtx;
+        s32 s = scale * 0x10000;
+        s32 tx = this->pos.x * 0x10000;
+        s32 ty = this->pos.y * 0x10000;
+        s32 tz = this->pos.z * 0x10000;
+
+        w[0] = (u32)s & 0xFFFF0000;
+        w[1] = 0;
+        w[2] = (u32)s >> 16;
+        w[3] = 0;
+        w[4] = 0;
+        w[5] = (u32)s & 0xFFFF0000;
+        w[6] = ((u32)tx & 0xFFFF0000) | ((u32)ty >> 16);
+        w[7] = ((u32)tz & 0xFFFF0000) | 1;
+        w[8] = (u32)s << 16;
+        w[9] = 0;
+        w[10] = (u32)s & 0xFFFF;
+        w[11] = 0;
+        w[12] = 0;
+        w[13] = (u32)s << 16;
+        w[14] = ((u32)tx << 16) | ((u32)ty & 0xFFFF);
+        w[15] = (u32)tz << 16;
+        gSPMatrix(POLY_OPA_DISP++, mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    }
     Gfx_SetupDL_25Opa(gfxCtx);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
     gDPSetEnvColor(POLY_OPA_DISP++, 150, 150, 150, 0);

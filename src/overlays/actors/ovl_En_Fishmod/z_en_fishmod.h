@@ -90,6 +90,8 @@ typedef struct EnFishmod {
     /* 0x401 */ u8 drawnFull;                      // frames the full model was drawn lately (the swim wave runs while > 0)
     /* 0x3CD */ u8 blocked;                        // the last SwimToward hit the shore (debug display)
     /* 0x40E */ u8 look;                           // its own looks: EnFishmod_LookTable (saved with it in a bottle)
+    /*       */ u8 followSkip;                     // a far school member keeping its place: the frames it sits out
+                                                   // between two (a mask on its timer: 0, 1 or 3; EnFishmod_Update)
     /* 0x352 */ s16 timer;
     /* 0x37A */ s16 stateTimer;
     /* 0x37C */ s16 cooldown;   // frames before it will look at the bobber again
