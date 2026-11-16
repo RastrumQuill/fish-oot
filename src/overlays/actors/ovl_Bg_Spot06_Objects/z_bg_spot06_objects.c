@@ -8,6 +8,9 @@
 
 #include "array_count.h"
 #include "fishmod.h"
+#if FISHMOD_WATER_SURFACE
+#include "assets/objects/object_spot06_objects/fishmod_water_colours.h"
+#endif
 #include "gfx.h"
 #include "gfx_setupdl.h"
 #include "ichain.h"
@@ -463,8 +466,9 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
     // a highlight (the primitive's), in the scene's light; the alpha is a base (the environment's) plus the waves'
     // (the primitive's). FISHMOD_WATER_CLEAR: no base, the surface clear between the waves.
     {
-        static const u8 sBase[3] = { 52, 104, 104 };
-        static const u8 sHigh[3] = { 205, 232, 228 };
+        // (vanilla's texture's own darkest and brightest colours: tools/meshpack.py)
+        static const u8 sBase[3] = FISHMOD_WATER_BASE;
+        static const u8 sHigh[3] = FISHMOD_WATER_HIGH;
         EnvironmentContext* env = &play->envCtx;
         u32 light[3];
         s32 part;
@@ -478,8 +482,9 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
         }
         for (part = 0; part < 2; part++) {
             // (the outflow's part as vanilla had it: 102 of the lake's 160)
-            s32 baseA = FISHMOD_WATER_CLEAR ? 0 : (part ? 60 : 96);
-            s32 waveA = FISHMOD_WATER_CLEAR ? (part ? 128 : 200) : (part ? 70 : 110);
+            // (vanilla: 160 all over, 102 on the outflow; here about that between the waves and more on them)
+            s32 baseA = FISHMOD_WATER_CLEAR ? 0 : (part ? 90 : 140);
+            s32 waveA = FISHMOD_WATER_CLEAR ? (part ? 128 : 200) : (part ? 40 : 60);
             Gfx* g = GRAPH_ALLOC(play->state.gfxCtx, 7 * sizeof(Gfx));
             u32 f = gameplayFrames * (part ? 3 : 1);
             // the ripple drifts one way, the swell slowly another (in quarter texels a frame)

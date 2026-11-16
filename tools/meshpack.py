@@ -780,45 +780,49 @@ def unsize(dirpath, room, dl):
 
 
 # The lake's water surface (object_spot06_objects: gLakeHyliaHighWaterDL, gLakeHyliaLowWaterDL), its texture and
-# material made again: vanilla's 32x32 colour texture (2 KB, the same texture in both layers, magnified up to 4 times:
-# the ripples repeat every 77 units) becomes a 64x64 intensity texture of waves made here (I4: the same 2 KB, 4 times the
-# texels), its two layers far apart in scale (fine ripples at vanilla's texel size, repeating every 154 units; a swell 4
-# times coarser, mirrored, every 615), each scrolled its own way (z_bg_spot06_objects.c). The colour isn't the texture's:
-# the waves move it from the water's colour (the environment's) to a highlight (the primitive's), both set each frame
-# from the water's light setting and the scene's light; the alpha is a base (the environment's) plus the waves' times
-# the primitive's, so the surface can be made wholly clear between the waves (the bed's colour then the water fog's).
-# MESHPACK_NO_WATER_SURFACE=1: vanilla's.
+# material made again from vanilla's: its 32x32 colour texture (2 KB) as the template, its brightness upscaled to a 64x64
+# intensity texture (I4: the same 2 KB, 4 times the texels), its two layers at vanilla's sizes on the water (a ripple
+# every 77 units, the second layer every 154, mirrored) with twice the texels, each scrolled its own way
+# (z_bg_spot06_objects.c). The colour is the frame's: the waves move it from vanilla's darkest colour (the
+# environment's) to its brightest (the primitive's), in the scene's light (fishmod_water_colours.h, written here); the
+# alpha is a base (the environment's) plus the waves' times the primitive's, so the surface can be made wholly clear
+# between the waves (the bed's colour then the water fog's). MESHPACK_NO_WATER_SURFACE=1: vanilla's.
 WATER_SURFACE = not os.environ.get("MESHPACK_NO_WATER_SURFACE")
 WATER_DIR = "assets/objects/object_spot06_objects"
 WATER_TEX = "gLakeHyliaWaterTex"
 WATER_W = 64
 
 
-def water_texture(path):
-    """the waves: a sum of sines on whole wave numbers (so it tiles), ridged (bright crests, broad troughs), 4-bit grey"""
+def water_texture(src_png, path):
+    """the waves: vanilla's own texture as the template, its brightness (its colour is the frame's now: z_bg_spot06_
+    objects.c) upscaled to 64x64 (tiled 3 x 3 first, so the edges join as they did), 4-bit grey; and vanilla's darkest
+    and brightest colours (the 10th and 95th percentiles of brightness), the base and highlight it's drawn between"""
     import numpy as np
     from PIL import Image
-    rnd = random.Random(1313)
-    y, x = np.mgrid[0:WATER_W, 0:WATER_W] / float(WATER_W)
-    h = np.zeros((WATER_W, WATER_W))
-    for _ in range(9):
-        kx, ky = rnd.randint(-5, 5), rnd.randint(1, 6)
-        a = 1.0 / (kx * kx + ky * ky) ** 0.35
-        h += a * np.sin(2 * np.pi * (kx * x + ky * y) + rnd.uniform(0, 2 * np.pi))
-    h = (h - h.min()) / (h.max() - h.min())
-    crest = np.clip((h - 0.45) / 0.55, 0, 1) ** 1.6     # (most of it dark, the crests bright)
-    v = np.round(crest * 15).astype(np.uint8) * 17
+    im = np.asarray(Image.open(src_png).convert("RGB"), float)
+    lum = im @ np.array([0.299, 0.587, 0.114])
+    n = im.shape[0]
+    big = Image.fromarray(np.tile(lum, (3, 3)).astype(np.float32), "F").resize((WATER_W * 3, WATER_W * 3),
+                                                                                 Image.BICUBIC)
+    h = np.asarray(big)[WATER_W:2 * WATER_W, WATER_W:2 * WATER_W]
+    h = np.clip((h - h.min()) / max(h.max() - h.min(), 1e-6), 0, 1)
+    v = np.round(h * 15).astype(np.uint8) * 17
     Image.fromarray(v, "L").save(path)
+    order = np.argsort(lum.ravel())
+    flat = im.reshape(-1, 3)[order]
+    low = flat[: max(1, len(flat) // 10)].mean(0)
+    high = flat[int(len(flat) * 0.95):].mean(0)
+    return [int(round(c)) for c in low], [int(round(c)) for c in high]
 
 
 WATER_MATERIAL_OLD = re.compile(r"gsDPLoadTextureBlock\(gLakeHyliaWaterTex,.*?gsSPSetGeometryMode\(G_FOG \| G_LIGHTING\),",
                                 re.S)
 WATER_MATERIAL = (
     "gsDPLoadTextureBlock_4b(gLakeHyliaWaterTex, G_IM_FMT_I, 64, 64, 0, G_TX_NOMIRROR | G_TX_WRAP, "
-    "G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 14, 14),\n"
+    "G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 13, 13),\n"
     "    gsDPTileSync(),\n"
-    "    gsDPSetTile(G_IM_FMT_I, G_IM_SIZ_4b, 4, 0x0000, 1, 0, G_TX_MIRROR | G_TX_WRAP, 6, 0, "
-    "G_TX_MIRROR | G_TX_WRAP, 6, 0),\n"
+    "    gsDPSetTile(G_IM_FMT_I, G_IM_SIZ_4b, 4, 0x0000, 1, 0, G_TX_MIRROR | G_TX_WRAP, 6, 14, "
+    "G_TX_MIRROR | G_TX_WRAP, 6, 14),\n"
     "    gsDPSetTileSize(1, 0, 0, 0x00FC, 0x00FC),\n"
     "    gsDPSetCombineLERP(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, PRIMITIVE, "
     "ENVIRONMENT, COMBINED, ENVIRONMENT, COMBINED, 0, PRIMITIVE, ENVIRONMENT),\n"
@@ -841,10 +845,19 @@ def water_surface(out):
         os.remove(p)
         open(p, "w").write(t2)
         n += 1
+    template = os.path.join(d, WATER_TEX + ".rgba16.png")
+    out_png = os.path.join(d, WATER_TEX + ".i4.png")
+    tmp = out_png + ".tmp.png"
+    low, high = water_texture(template, tmp)
     for f in os.listdir(d):
-        if f.startswith(WATER_TEX + "."):
+        if f.startswith(WATER_TEX + ".") and not f.endswith(".tmp.png"):
             os.remove(os.path.join(d, f))
-    water_texture(os.path.join(d, WATER_TEX + ".i4.png"))
+    os.rename(tmp, out_png)
+    # (the base and highlight colours for the game: vanilla's own, by its darkest and brightest texels)
+    hp = os.path.join(d, "fishmod_water_colours.h")
+    open(hp, "w").write("// tools/meshpack.py: vanilla's water texture's darkest and brightest colours\n"
+                        "#define FISHMOD_WATER_BASE { %d, %d, %d }\n#define FISHMOD_WATER_HIGH { %d, %d, %d }\n"
+                        % tuple(low + high))
     for f, a, b in (("object_spot06_objects.c", WATER_TEX + ".rgba16.inc.c", WATER_TEX + ".i4.inc.c"),
                     ("object_spot06_objects.c", "gLakeHyliaWaterTex_HEIGHT, 16)]", "gLakeHyliaWaterTex_HEIGHT, 4)]"),
                     ("object_spot06_objects.h", "gLakeHyliaWaterTex_WIDTH 32", "gLakeHyliaWaterTex_WIDTH 64"),
