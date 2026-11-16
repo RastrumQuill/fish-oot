@@ -1170,8 +1170,10 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     // Wait for the scene transition to finish, then place Link at the test spot and start the script.
     if (!sPlacedPlayer && (player != NULL) && (sPlayFrames > 20) && (play->transitionTrigger == TRANS_TRIGGER_OFF) &&
         (play->transitionMode == TRANS_MODE_OFF)) {
+#ifndef FISHMOD_AUDWORLD // (the audio check's tour starts where each entrance puts him)
         player->actor.world.pos = player->actor.prevPos = player->actor.home.pos = sScript.startPos;
         player->actor.shape.rot.y = player->actor.world.rot.y = player->yaw = sScript.startYaw;
+#endif
         sPlacedPlayer = true;
 #ifdef FISHMOD_STRESS
         Stress_Place(play, player);
