@@ -22,6 +22,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-frames19.bps` | frames18 with bush, tall and ribbon weed drawn with whole cards up close (the prop sweep: the cut cost more for these) | [notes](notes-frames19.md) |
 | `fish-oot-frames20.bps` | frames19 with the caustics faded with depth and colourless, the rocks made for where they lie, plants making way for Link | [notes](notes-frames20.md) |
 | `fish-oot-frames20-colbase.bps`, `-colnew.bps` | frames20's collision and the collision work's (claude/collision-opt), the same tree and toolchain, to compare on the console with the Expansion Pak in | [notes](notes-frames20-col.md) |
+| `fish-oot-frames20-headroom.bps` | colnew with the props' draw, the bubbles and the far school followers made cheaper (claude/fish-prop-headroom), to compare with colnew on the console | [notes](notes-frames20-headroom.md) |
 | `fish-oot-anatomy-sweep.bps` | about 3.3 hours: every other lap shipped, between them the terrain, Link, the other actors, the effects, or everything left out; and the RDP's idle time | [notes](notes-anatomy-sweep.md) |
 | `fish-oot-frames14.bps` | frames13 with the fish rig's lists cleaned, the lake terrain cut into areas the RSP culls and lit by the CPU | [notes](notes-frames14.md) |
 | `fish-oot-rsp-ab.bps` | The RSP test: frames13's bench for 4 laps (about 16 minutes), the audio's RSP work on, off, on, off | (rsp_ab script) |
