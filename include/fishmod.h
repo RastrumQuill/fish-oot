@@ -745,39 +745,21 @@ void Fishmod_TerrainRA(struct PlayState* play);
 #define FISHMOD_DEPTH_TO 500.0f
 #define FISHMOD_DEPTH_MIN 0.12f
 s32 Fishmod_DepthShade(f32 depth);
-// the lake's water surface: tools/meshpack.py's (a 64x64 intensity texture of waves, the colours and alphas the
-// frame's: z_bg_spot06_objects.c) in a meshpack build; FISHMOD_WATER_CLEAR: clear between the waves
+// the lake's water surface: tools/meshpack.py's (a 64x64 intensity texture of waves, the colours the frame's:
+// z_bg_spot06_objects.c) in a meshpack build; its alpha vanilla's (160 on the lake, 102 on the outflow)
 #ifndef FISHMOD_MESHPACK
 #define FISHMOD_MESHPACK 0
 #endif
 #define FISHMOD_WATER_SURFACE FISHMOD_MESHPACK
-#ifndef FISHMOD_WATER_CLEAR
-#define FISHMOD_WATER_CLEAR 0
-#endif
-// the surface's alpha (z_bg_spot06_objects.c): the waves' contrast raised by CONTRAST/256 about PIVOT (of 255); the
-// crests stay as vanilla's (160 on the lake), the troughs go clear. The outflow's (vanilla 102) a higher pivot.
-#ifndef FISHMOD_WATER_PIVOT
-#define FISHMOD_WATER_PIVOT 160
-#endif
-#ifndef FISHMOD_WATER_CONTRAST
-#define FISHMOD_WATER_CONTRAST 128
-#endif
-#ifndef FISHMOD_WATER_PIVOT_OUT
-#define FISHMOD_WATER_PIVOT_OUT 217
-#endif
-#ifndef FISHMOD_WATER_CONTRAST_OUT
-#define FISHMOD_WATER_CONTRAST_OUT 148
-#endif
-// the water's numbers as the game reads them: in debug builds a table in memory (gFishmodWaterTune: pivot, contrast,
-// the outflow's pivot and contrast, the fog's tint) that the render tools poke between pictures, so variants need no
-// build; in others the numbers above
-#define FISHMOD_WT_PIVOT 0
-#define FISHMOD_WT_CONTRAST 1
-#define FISHMOD_WT_PIVOT_OUT 2
-#define FISHMOD_WT_CONTRAST_OUT 3
-#define FISHMOD_WT_TINT 4
+#define FISHMOD_WATER_ALPHA 160
+#define FISHMOD_WATER_ALPHA_OUT 102
+// the water's numbers as the game reads them: in debug builds a table in memory (gFishmodWaterTune: the alphas, the
+// fog's tint) that the render tools poke between pictures, so variants need no build; in others the numbers here
+#define FISHMOD_WT_ALPHA 0
+#define FISHMOD_WT_ALPHA_OUT 1
+#define FISHMOD_WT_TINT 2
 #if FISHMOD_DEBUG
-extern s16 gFishmodWaterTune[5];
+extern s16 gFishmodWaterTune[3];
 #define FISHMOD_WATER_TUNE(i, v) (gFishmodWaterTune[i])
 #else
 #define FISHMOD_WATER_TUNE(i, v) (v)

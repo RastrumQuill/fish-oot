@@ -785,9 +785,7 @@ def unsize(dirpath, room, dl):
 # every 77 units, the second layer every 154, mirrored) with twice the texels, each scrolled its own way
 # (z_bg_spot06_objects.c). The colour is the frame's: the waves move it from vanilla's darkest colour (the
 # environment's) to its brightest (the primitive's), in the scene's light (fishmod_water_colours.h, written here); the
-# alpha is the waves' with their contrast raised about a pivot (the environment's alpha: waves at it keep it, those
-# under it go clearer and those over it more opaque, by the primitive's alpha), so the troughs are clear (the bed's
-# colour then the water fog's) and the crests as opaque as vanilla's. MESHPACK_NO_WATER_SURFACE=1: vanilla's.
+# alpha is vanilla's, one value over the whole surface (the environment's). MESHPACK_NO_WATER_SURFACE=1: vanilla's.
 WATER_SURFACE = not os.environ.get("MESHPACK_NO_WATER_SURFACE")
 WATER_DIR = "assets/objects/object_spot06_objects"
 WATER_TEX = "gLakeHyliaWaterTex"
@@ -827,7 +825,7 @@ WATER_MATERIAL = (
     "G_TX_MIRROR | G_TX_WRAP, 6, 14),\n"
     "    gsDPSetTileSize(1, 0, 0, 0x00FC, 0x00FC),\n"
     "    gsDPSetCombineLERP(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, PRIMITIVE, "
-    "ENVIRONMENT, COMBINED, ENVIRONMENT, COMBINED, ENVIRONMENT, PRIMITIVE, COMBINED),\n"
+    "ENVIRONMENT, COMBINED, ENVIRONMENT, 0, 0, 0, ENVIRONMENT),\n"
     "    gsDPSetRenderMode(G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2),\n"
     "    gsSPClearGeometryMode(G_CULL_BACK | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR | G_LIGHTING),\n"
     "    gsSPSetGeometryMode(G_FOG),")
