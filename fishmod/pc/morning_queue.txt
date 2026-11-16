@@ -1,8 +1,9 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# The collision lead's rc1-headroom (claude/rc1-headroom, releases/notes-rc1-headroom.md): rc1 with the far cards'
-# fix, the props' and fish's CPU work and the recalibrated tiers, against rc1 rebuilt on the same machine
-# (like for like), A B A B. Expansion Pak in.
-releases/fish-oot-rc1-bench-rebuilt.bps 12 rc1r-1
-releases/fish-oot-rc1-headroom-bench.bps 12 headroom-1
-releases/fish-oot-rc1-bench-rebuilt.bps 12 rc1r-2
-releases/fish-oot-rc1-headroom-bench.bps 12 headroom-2
+# claude/rc1-merge-ready (releases/notes-merge-ready.md): main (9d1d2b6) with the far cards' fix, the tiers
+# recalibrated to the pop-in test, the surface's crossing blended and heroes and the crowd, against main itself built
+# on the same machine with the same command (like for like), A B A B. Expansion Pak in.
+# (In place of the rc1-headroom pair: that branch is superseded, main has its CPU work already.)
+releases/fish-oot-main-bench-rebuilt.bps 12 main-1
+releases/fish-oot-merge-ready-bench.bps 12 ready-1
+releases/fish-oot-main-bench-rebuilt.bps 12 main-2
+releases/fish-oot-merge-ready-bench.bps 12 ready-2
