@@ -1,0 +1,58 @@
+[
+ {
+  "run": 1,
+  "label": "frames28-1",
+  "patch": "releases\\fish-oot-frames28.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-15 17:16:38",
+  "patch_sha1": "837366f2641f085f56cc707c09688bdcb16a948d",
+  "upload_check": "ok",
+  "packets": 446,
+  "bytes": 3375648,
+  "packs": 1,
+  "seconds": 245
+ },
+ {
+  "run": 2,
+  "label": "nobands-1",
+  "patch": "releases\\fish-oot-frames28-nobands.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-15 17:20:45",
+  "patch_sha1": "2dfb447ee242c4403ffa3da00a0c242926e32cf4",
+  "upload_check": "ok",
+  "packets": 439,
+  "bytes": 3320720,
+  "packs": 1,
+  "seconds": 229
+ },
+ {
+  "run": 3,
+  "label": "frames28-2",
+  "patch": "releases\\fish-oot-frames28.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-15 17:24:38",
+  "patch_sha1": "837366f2641f085f56cc707c09688bdcb16a948d",
+  "upload_check": "ok",
+  "packets": 447,
+  "bytes": 3381184,
+  "packs": 1,
+  "seconds": 238
+ },
+ {
+  "run": 4,
+  "label": "nobands-2",
+  "patch": "releases\\fish-oot-frames28-nobands.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-15 17:28:38",
+  "patch_sha1": "2dfb447ee242c4403ffa3da00a0c242926e32cf4",
+  "upload_check": "ok",
+  "packets": 439,
+  "bytes": 3320416,
+  "packs": 1,
+  "seconds": 235
+ }
+]

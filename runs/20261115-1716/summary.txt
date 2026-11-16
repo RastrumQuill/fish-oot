@@ -1,0 +1,6 @@
+Morning runs 20261115-1716
+
+ 1. frames28-1                   done        446 packets    3.4 MB   245 s  
+ 2. nobands-1                    done        439 packets    3.3 MB   229 s  
+ 3. frames28-2                   done        447 packets    3.4 MB   238 s  
+ 4. nobands-2                    done        439 packets    3.3 MB   235 s  
