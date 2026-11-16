@@ -124,7 +124,10 @@ def impostor(kind, mesh, texture, out_dir):
     import card_outline
     t = card_outline.triangle(png)
     if t is not None:
-        poly = [tuple(p) for p in t[0]]
+        # (card_outline.triangle gives its corners as fractions of the texture: to texels. Taken as texels they made
+        # a card a W-th of its size, a few units across at the picture's top left corner: every kind whose picture
+        # could be cut to a triangle vanished wherever it was drawn as its single card.)
+        poly = [(u * W, v * H) for u, v in t[0]]
     else:
         poly = [(0, 0), (W, 0), (W, H), (0, H)]
     # texel (u right, v down) -> model (x right, y up, z 0): the card faces +z
