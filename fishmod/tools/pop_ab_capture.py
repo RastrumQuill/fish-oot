@@ -5,21 +5,31 @@ it, the same view with every prop kind's distances taken 24 units nearer (one se
 and each kind alone 150 units nearer. The camera doesn't move between them, so whatever differs from the first is what
 pops in, changes tier or finishes dissolving over that much travel: no parallax, no water, no sway in the difference.
 
-Each difference is scored as the eye would take it, not counted in pixels:
-- both frames to Oklab (a perceptually even colour space), blurred a little (sigma 1 pixel at 320x240: the VI's filter
-  and the screen), and the distance between them per pixel, x100 (dE: about 1 is the least difference one can see side
-  by side; 2 is taken here as visible in a moving picture);
-- the pixels over dE 2 gathered into patches (touching pixels), each a pop: its size, its mean dE, where it is;
-- a variant's strength is the sum of dE over its patches (dE x pixels): a 30-pixel plant appearing at dE 10 is 300.
-  As a first scale: under 40 nobody sees it, 40 to 250 is a flicker one can find when looking for it, over 250 is a pop
-  one notices. (These are starting points: look at the pairs the report saves and move them.)
+Each difference gets two scores:
+- LPIPS (needs torch and lpips): the distance between the two frames in a trained network's features, fitted to what
+  people judge more different. The whole frame's, x1000, less the control's (the same view drawn twice). This is the
+  number to calibrate distances to.
+- FLIP (flip_metric.py), as a check on it and to say where on the screen: an error per pixel from a model of contrast
+  sensitivity, colour and edges. Details below.
+
+FLIP's part: scored with a model of what the eye sees when one picture replaces another, FLIP (flip_metric.py):
+- each frame filtered by the eye's contrast sensitivity for its detail size (at --ppd pixels a degree of view: 20 is
+  a TV across a room), colour difference taken where it's perceived, and a change that makes or breaks an edge or a
+  dot weighted up: an error per pixel, 0 (nothing to see) to 1;
+- the control (the same view drawn twice) gives the test's own noise: a pixel counts only beyond twice the control's
+  error around it (the cut-outs' edges and the dither shimmer between two drawings; a pop doesn't);
+- the pixels over 0.1 gathered into patches (touching pixels), each a pop: its size, its mean and peak error, where;
+- a variant's strength is the error summed over its patches: a 30-pixel plant appearing at 0.3 is 9. As a first
+  scale: under 3 not seen, 3 to 25 a flicker one can find, over 25 a pop one notices. (Starting points: look at the
+  pairs the report saves and move them. Not modelled: where the viewer is looking, masking by the camera's motion.)
 
 Writes <out>/report.md (per stop, per kind: the worst and the total), the worst pops as pictures (the view before, after,
 and the patches lit), and <out>/pops.json for a calibration to read.
 
 Usage: fishmod/tools/pop_ab_capture.py <rom> <outdir> [--stops N] [--ares PATH] [--display :90] [--timeout S]
        fishmod/tools/pop_ab_capture.py --score <outdir>      (again, from the frames a run kept)
-Needs ares built with the ARES_AUTOSHOT patch (fishmod/docs/offline.md), numpy and Pillow.
+Needs ares built with the ARES_AUTOSHOT patch (fishmod/docs/offline.md), numpy and Pillow; for LPIPS, torch and lpips
+(pip install torch lpips: without them its columns are left empty).
 """
 import argparse
 import json
@@ -38,10 +48,10 @@ SETTINGS = ["Audio/Driver=None", "Input/Defocus=Allow", "Video/Output=IntegerFix
             "Video/ColorBleed=false", "Video/Quality=SD", "Video/Supersampling=false"]
 VARIANTS = 36  # as fishmod_debug.c: 0 as it is, 1 all 24 nearer, 2 all 150 nearer, 3..34 each kind 150 nearer,
                # 35 as it is again (the control: what differs between two drawings of the same thing)
-DE_SEEN = 2.0
+DE_SEEN = 0.10  # FLIP's error from which a pixel is part of a pop
 PATCH_MIN = 3  # pixels: smaller patches are the dither's and the coverage's noise
-DE_PEAK_MIN = 3.0  # and so are patches that nowhere reach this (measured: kinds not in view scored 7 to 30 without it)
-SCALE = [(40, "not seen"), (250, "a flicker"), (1e9, "a pop")]
+DE_PEAK_MIN = 0.15  # and so are patches that nowhere reach this
+SCALE = [(3, "not seen"), (25, "a flicker"), (1e9, "a pop")]
 
 
 def kind_names():
@@ -124,11 +134,48 @@ def patches(mask):
     return out
 
 
+PPD = 20.0  # pixels per degree of view: 320 pixels across a 27" 4:3 set from 2 m (--ppd; flip_metric.py)
+
+
 def de_map(a, b):
-    A, B = to_screen(a), to_screen(b)
-    de = 100.0 * np.sqrt(((blur(oklab(A)) - blur(oklab(B))) ** 2).sum(-1))
+    """How visible the difference is at each pixel to someone watching one frame replace the other: FLIP's error
+    (flip_metric.py: contrast sensitivity by detail size, perceived colour difference, edges and points), 0 to 1."""
+    import flip_metric
+
+    de = flip_metric.flip(to_screen(a), to_screen(b), PPD)
     de[:24, :24] = 0  # (the marker)
     return de
+
+
+_LPIPS = None
+
+
+def lpips_dist(a, b):
+    """LPIPS (Zhang et al. 2018: the distance between two images in a trained network's features, fitted to people's
+    judgements of which of two distortions looks more different), AlexNet, x1000; None without torch and lpips
+    (pip install torch lpips). The whole frame's, as the measure is defined: a small pop is a small number."""
+    global _LPIPS
+    if _LPIPS is None:
+        try:
+            import lpips
+            import torch
+            import warnings
+
+            warnings.filterwarnings("ignore")
+            _LPIPS = (lpips.LPIPS(net="alex", verbose=False), torch)
+        except Exception:
+            _LPIPS = False
+    if not _LPIPS:
+        return None
+    model, torch = _LPIPS
+
+    def t(img):
+        x = to_screen(img).astype(np.float32).copy()
+        x[:24, :24] = 0  # (the marker)
+        return torch.from_numpy(x / 127.5 - 1.0).permute(2, 0, 1)[None]
+
+    with torch.no_grad():
+        return 1000.0 * float(model(t(a), t(b)))
 
 
 def spread(n, r=2):
@@ -152,11 +199,11 @@ def score(a, b, noise=None):
         v = de[ys, xs]
         if v.max() < DE_PEAK_MIN:
             continue  # (the dissolve's dither and the coverage's last bit: a few pixels just over the line)
-        found.append({"px": len(p), "mean": round(float(v.mean()), 1), "peak": round(float(v.max()), 1),
-                      "sum": round(float(v.sum()), 1),
+        found.append({"px": len(p), "mean": round(float(v.mean()), 3), "peak": round(float(v.max()), 3),
+                      "sum": round(float(v.sum()), 2),
                       "box": [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]})
     found.sort(key=lambda f: -f["sum"])
-    return round(sum(f["sum"] for f in found), 1), found, de
+    return round(sum(f["sum"] for f in found), 2), found, de
 
 
 def verdict(s):
@@ -214,57 +261,70 @@ def report(out, stops):
         a = np.asarray(Image.open(base).convert("RGB"))
         ctl = os.path.join(out, f"s{stop:02d}_v{VARIANTS - 1:02d}.png")
         noise = spread(de_map(a, np.asarray(Image.open(ctl).convert("RGB")))) if os.path.exists(ctl) else None
+        lp0 = lpips_dist(a, np.asarray(Image.open(ctl).convert("RGB"))) if os.path.exists(ctl) else 0.0
         if noise is not None:
             rows.append({"stop": stop, "variant": VARIANTS - 1, "what": "control",
-                         "strength": score(a, np.asarray(Image.open(ctl).convert("RGB")))[0], "patches": []})
+                         "strength": score(a, np.asarray(Image.open(ctl).convert("RGB")))[0], "patches": [],
+                         "lpips": lp0, "lpips_net": 0.0})
         for v in range(1, VARIANTS - 1):
             p = os.path.join(out, f"s{stop:02d}_v{v:02d}.png")
             if not os.path.exists(p):
                 continue
             b = np.asarray(Image.open(p).convert("RGB"))
             s, found, de = score(a, b, noise)
-            rows.append({"stop": stop, "variant": v, "what": label(v), "strength": s, "patches": found[:8]})
+            lp = lpips_dist(a, b)
+            rows.append({"stop": stop, "variant": v, "what": label(v), "strength": s, "patches": found[:8],
+                         "lpips": lp, "lpips_net": None if lp is None else round(max(lp - (lp0 or 0.0), 0.0), 2)})
             if s >= SCALE[0][0]:
                 # the view before and after and the patches lit, at 3x
                 A, B = to_screen(a).astype(np.uint8), to_screen(b).astype(np.uint8)
                 heat = (A * 0.3).astype(np.uint8)
-                lit = np.clip(de / 12.0, 0, 1)[..., None]
+                lit = np.clip(de / 0.5, 0, 1)[..., None]
                 heat = (heat * (1 - lit) + np.array([255, 60, 40]) * lit).astype(np.uint8)
                 trio = np.concatenate([A, B, heat], 1)
                 Image.fromarray(trio).resize((trio.shape[1] * 3, trio.shape[0] * 3), Image.NEAREST).save(
                     os.path.join(out, f"pop_s{stop:02d}_v{v:02d}.png"))
     json.dump(rows, open(os.path.join(out, "pops.json"), "w"), indent=1)
     with open(os.path.join(out, "report.md"), "w") as f:
-        f.write("# Pop-in at the tour's stops\n\nStrength: the sum of dE over the patches that differ (dE x pixels at "
-                "320x240); under 40 not seen, 40 to 250 a flicker, over 250 a pop.\n\n")
-        f.write("## Every kind together\n\n| stop | 24 units nearer (one set) | | 150 units nearer | | biggest patch at 150 | "
-                "the control's own (left out of the others) |\n|---|---|---|---|---|---|---|\n")
+        f.write("# Pop-in at the tour's stops\n\nStrength: FLIP's error (0 to 1 a pixel: how visible the change is to "
+                f"someone watching, at {PPD:g} pixels a degree) summed over the patches that change, at 320x240: a "
+                "30-pixel plant appearing at 0.3 is 9. Under 3 not seen, 3 to 25 a flicker, over 25 a pop (a first "
+                "scale: look at the pairs and move it).\n\n")
+        L = lambda r: "-" if r.get("lpips_net") is None else f"{r['lpips_net']:.1f}"
+        f.write("LPIPS: the whole frame's distance x1000, less the control's (the same view drawn twice): the number to "
+                "calibrate to. FLIP: the sanity check, and where on the screen.\n\n")
+        f.write("## Every kind together\n\n| stop | 24 nearer (one set): LPIPS | FLIP | | 150 nearer: LPIPS | FLIP | | "
+                "biggest patch at 150 | the control: LPIPS, FLIP |\n|---|---|---|---|---|---|---|---|---|\n")
         for stop in range(1, stops + 1):
             r1 = next((r for r in rows if r["stop"] == stop and r["variant"] == 1), None)
             r2 = next((r for r in rows if r["stop"] == stop and r["variant"] == 2), None)
+            rc = next((r for r in rows if r["stop"] == stop and r["what"] == "control"), None)
             if not r1 or not r2:
                 continue
             big = r2["patches"][0] if r2["patches"] else None
-            f.write(f"| {stop} | {r1['strength']:.0f} | {verdict(r1['strength'])} | {r2['strength']:.0f} | "
-                    f"{verdict(r2['strength'])} | "
-                    + (f"{big['px']} px at dE {big['mean']} (peak {big['peak']}), at {big['box'][:2]}" if big else "-")
-                    + " | " + next((f"{r['strength']:.0f}" for r in rows if r["stop"] == stop and r["what"] == "control"), "-")
-                    + " |\n")
-        f.write("\n## Each kind alone, 150 units nearer\n\n| kind | worst stop | its strength | | patches there | "
-                "stops where it's a flicker or more | total over the stops |\n|---|---|---|---|---|---|---|\n")
+            f.write(f"| {stop} | {L(r1)} | {r1['strength']:.1f} | {verdict(r1['strength'])} | {L(r2)} | "
+                    f"{r2['strength']:.1f} | {verdict(r2['strength'])} | "
+                    + (f"{big['px']} px at FLIP {big['mean']} (peak {big['peak']}), at {big['box'][:2]}" if big else "-")
+                    + " | " + (f"{rc['lpips']:.1f}, {rc['strength']:.1f}" if rc and rc.get("lpips") is not None
+                               else f"-, {rc['strength']:.1f}" if rc else "-") + " |\n")
+        f.write("\n## Each kind alone, 150 units nearer\n\n| kind | worst stop (by LPIPS) | LPIPS there | FLIP there | | "
+                "LPIPS summed over the stops | FLIP summed | stops where FLIP says a flicker or more |\n"
+                "|---|---|---|---|---|---|---|---|\n")
         kinds = {}
         for r in rows:
             if 3 <= r["variant"] < VARIANTS - 1:
                 kinds.setdefault(r["what"], []).append(r)
-        for what, rs in sorted(kinds.items(), key=lambda kv: -max(r["strength"] for r in kv[1])):
-            worst = max(rs, key=lambda r: r["strength"])
-            if worst["strength"] <= 0:
+        key = lambda r: (r["lpips_net"] if r.get("lpips_net") is not None else r["strength"])
+        for what, rs in sorted(kinds.items(), key=lambda kv: -sum(key(r) for r in kv[1])):
+            worst = max(rs, key=key)
+            if worst["strength"] <= 0 and key(worst) < 0.5:
                 continue
-            f.write(f"| {what} | {worst['stop']} | {worst['strength']:.0f} | {verdict(worst['strength'])} | "
-                    f"{len(worst['patches'])} | {sum(1 for r in rs if r['strength'] >= SCALE[0][0])} | "
-                    f"{sum(r['strength'] for r in rs):.0f} |\n")
+            f.write(f"| {what} | {worst['stop']} | {L(worst)} | {worst['strength']:.1f} | {verdict(worst['strength'])} | "
+                    + ("-" if worst.get("lpips_net") is None else f"{sum(r['lpips_net'] for r in rs):.1f}")
+                    + f" | {sum(r['strength'] for r in rs):.1f} | "
+                    f"{sum(1 for r in rs if r['strength'] >= SCALE[0][0])} |\n")
         f.write("\nThe pairs: `pop_sSS_vVV.png` (the view, the view with the distances nearer, the patches lit), for "
-                "every variant of strength 40 or more. `pops.json` has every patch.\n")
+                "every variant FLIP calls a flicker or more. `pops.json` has every patch.\n")
     print(open(os.path.join(out, "report.md")).read())
 
 
@@ -277,7 +337,9 @@ def main():
     ap.add_argument("--ares", default=os.environ.get("ARES", "ares"))
     ap.add_argument("--display", default=":90")
     ap.add_argument("--timeout", type=int, default=7200)
+    ap.add_argument("--ppd", type=float, default=PPD, help="pixels per degree of view (default 20: a TV across a room)")
     args = ap.parse_args()
+    globals()["PPD"] = args.ppd
     if args.score:
         return report(args.score, args.stops)
     if not args.rom or not args.out:

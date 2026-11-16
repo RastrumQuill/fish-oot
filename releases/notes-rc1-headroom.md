@@ -41,10 +41,14 @@ This test looks at the picture, at the moment of the pop:
   travel: no parallax, no water, no sway.
 - The turns: every kind 24 units nearer (one set's worth: what a single new set changes on screen), every kind 150
   nearer, then each kind alone 150 nearer (which kind it is).
-- The score is how the eye takes it: both frames in Oklab, blurred by a pixel, the distance per pixel (dE x 100);
-  pixels over dE 2 gathered into touching patches (a pop each: its size, mean and peak dE, where); a variant's strength
-  is dE summed over its patches. As a first scale: under 40 not seen, 40 to 250 a flicker, over 250 a pop. Patches
-  that nowhere reach dE 3 are left out (the dissolve's dither: kinds not in view scored 7 to 30 with them in).
+- Two scores for each difference. **LPIPS** (the distance between the two frames in a trained network's features,
+  fitted to what people judge more different; AlexNet, the whole frame, x1000, less the control's): the number to
+  calibrate to. **FLIP** (fishmod/tools/flip_metric.py: contrast sensitivity by detail size at a viewing distance,
+  perceived colour difference, edges and points; an error per pixel, summed over the patches that change): the check
+  on it, and what says where on the screen the pop is. FLIP here is written from the paper, not NVIDIA's code: its
+  ranking is what to trust, its absolute numbers should be checked against `flip-evaluator` once.
+- The control (the same view drawn twice) is taken off both: LPIPS by subtraction, FLIP pixel by pixel (a pixel
+  counts beyond twice the control's error around it). LPIPS under about 1 for a kind is within that noise.
 - It writes `report.md` (per stop; per kind its worst stop and total), the pairs as pictures with the patches lit,
   and `pops.json`.
 
@@ -58,12 +62,11 @@ About 95 seconds a stop in ares (35 pictures each).
 
 ### What it finds on this branch (releases/pop-ab-rc1-headroom.md, the tour's 22 stops)
 
-- One set's worth of travel (24 units) is not seen at 13 of the 22 stops and a pop at 6 (stops 3, 4, 10, 11, 19, 21:
-  the beds seen from above and the shallows).
-- By kind, 150 units of travel: grass_tuft is by far the worst (its worst stop 10,152, a flicker or more at 12 stops),
-  then bush_weed (4,559), cattails (3,966), reed_clump (3,199), tall_weed (2,558); vine_strand, broadleaf and
-  ribbon_weed around 500 to 1,100; the rest under 450 or not seen. Those five are where a recalibration should start.
+- One set's worth of travel (24 units): LPIPS 0.0 to 0.9 at 17 stops, 1.6 to 4.7 at five (4, 10, 11, 14, 21: beds
+  seen from above and the shallows), where FLIP also finds patches.
+- By kind, 150 units of travel, LPIPS summed over the stops (FLIP's sum beside it): grass_tuft 59.9 (785), bush_weed
+  23.6 (396), tall_weed 13.4 (271), cattails 10.1 (420), vine_strand 9.6 (352), reed_clump 8.8 (383), fan_weed 7.2
+  (91), ribbon_weed 7.0 (303); the rest 5.5 and under. The two scores put the same kinds on top: a recalibration
+  should start with grass_tuft and bush_weed.
 - The pictures show what kind of change each is: for bush_weed under water it is the single card against the model
-  (the card's shape is not the model's: pop_s01_v07.png), not the plant appearing.
-- The control (the same view drawn twice) is 0 at 14 stops and up to 571 at the others (the cut-outs' edges shimmer
-  between two drawings); a pixel counts only beyond twice the control's difference around it.
+  (the card's shape is not the model's), not the plant appearing.
