@@ -25,5 +25,7 @@ on screen, 54.7 and 54.6 ms a frame, 30% and 29% visible hitches; slow frames: C
 Checked in ares: the bench build boots and draws (frame 600, the same picture as the set's all, no prop missing).
 The playable builds weren't run in ares (they have no harness to stop them at a frame).
 
-Not in it yet: the audio driver every second refresh (the audio lead's every2: the audio thread 14% less on the
-console; its frame log still to come).
+A snapshot, not the end of anything: the audio, collision and props work goes on in their branches and comes in on
+top as each change proves itself on the console. Left out: the audio driver every second refresh (worse on screen:
+releases/notes-audio-laps.md); the props and fish CPU work (claude/fish-prop-headroom, on the frames20 tree: its
+console test first, then brought onto this one, whose fishmod_scatter.c has changed a lot since frames20).

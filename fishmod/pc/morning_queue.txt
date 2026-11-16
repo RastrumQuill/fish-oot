@@ -1,4 +1,10 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# rc1's bench, the baseline later builds are measured against (releases/notes-rc1.md), twice. Expansion Pak in.
+# The props' and fish's CPU work (claude/fish-prop-headroom, releases/notes-frames20-headroom.md): the collision
+# work's build and theirs on the same frames20 tree, A B A B. Then rc1's bench, the baseline later builds are measured
+# against (releases/notes-rc1.md), twice. Expansion Pak in.
+releases/fish-oot-frames20-colnew.bps 12 colnew-1
+releases/fish-oot-frames20-headroom.bps 12 headroom-1
+releases/fish-oot-frames20-colnew.bps 12 colnew-2
+releases/fish-oot-frames20-headroom.bps 12 headroom-2
 releases/fish-oot-rc1-bench.bps 12 rc1-1
 releases/fish-oot-rc1-bench.bps 12 rc1-2
