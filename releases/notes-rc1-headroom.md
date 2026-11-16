@@ -114,5 +114,10 @@ there, 0.2 after). `--script pop_ab_cal` runs the eleven stops in about 20 minut
 
 - `fish-oot-rc1-headroom-test.bps`: this branch as rc1's test build (`--hw --texpack --colpack --meshpack --gcc-all
   --testmode`).
-- `fish-oot-rc1-headroom-bench.bps`: as rc1's bench (`--script pcprof_frames`, the same flags), to set against
-  `fish-oot-rc1-bench.bps`.
+- `fish-oot-rc1-headroom-bench.bps`: as rc1's bench (`--script pcprof_frames --hw --texpack --colpack --meshpack
+  --gcc-all`).
+- `fish-oot-rc1-bench-rebuilt.bps`: **the one to set it against**: rc1 itself (d692527, the tree this branch starts
+  from) built on the same machine with the same command. The released `fish-oot-rc1-bench.bps` is the same source
+  but not the same bytes as a build of it here (another machine's toolchain), so against that one a difference could
+  be the compiler's. Between `-rebuilt` and `-headroom-bench` the only differences are this branch's commits: the
+  far cards' fix, the CPU work, the recalibration, the pop-in test's hooks (debug builds only, idle in the bench).
