@@ -462,12 +462,12 @@ Acmd* func_800DB828(Acmd* cmd, s32 aiBufLen, SynthesisReverb* reverb, s16 update
  */
 Acmd* AudioSynth_FilterReverb(Acmd* cmd, s32 size, SynthesisReverb* reverb) {
     if (reverb->filterLeft != NULL) {
-        aFilter(cmd++, 2, size, reverb->filterLeft);
+        AudioSynth_LoadFilterSize(cmd++, size, reverb->filterLeft); // (fish-oot: its own copy if the task wants)
         aFilter(cmd++, reverb->resampleFlags, DMEM_WET_LEFT_CH, reverb->filterLeftState);
     }
 
     if (reverb->filterRight != NULL) {
-        aFilter(cmd++, 2, size, reverb->filterRight);
+        AudioSynth_LoadFilterSize(cmd++, size, reverb->filterRight);
         aFilter(cmd++, reverb->resampleFlags, DMEM_WET_RIGHT_CH, reverb->filterRightState);
     }
     return cmd;
@@ -619,11 +619,40 @@ void AudioSynth_Stub_800DBE64(void) {
 void AudioSynth_Stub_800DBE6C(void) {
 }
 
+#if FISHMOD_EXPAK
+/*
+ * fish-oot: a filter's coefficients are read by the RSP when its task runs, from where the driver keeps them, and
+ * the driver rewrites them tick by tick (a channel's, a note's own). A task run a refresh or two after it was
+ * built (the updates built ahead: thread.c) would filter with the later ones. So such a task is given its own
+ * copy: gFishmodFilterSnap points at room for the next one (NULL: none wanted, or the room's all used: the
+ * driver's own, as always).
+ */
+s16* gFishmodFilterSnap;
+s16* gFishmodFilterSnapEnd;
+
+static void* AudioSynth_FishmodFilter(void* addr) {
+    s16* snap = gFishmodFilterSnap;
+    s32 i;
+
+    if ((snap == NULL) || (snap + 8 > gFishmodFilterSnapEnd)) {
+        return addr;
+    }
+    for (i = 0; i < 8; i++) {
+        snap[i] = ((s16*)addr)[i];
+    }
+    gFishmodFilterSnap = snap + 8;
+    return snap;
+}
+#else
+#define AudioSynth_FishmodFilter(addr) (addr)
+#endif
+
 void AudioSynth_LoadFilterBuffer(Acmd* cmd, s32 flags, s32 buf, void* addr) {
     aFilter(cmd, flags, buf, addr);
 }
 
 void AudioSynth_LoadFilterSize(Acmd* cmd, s32 size, void* addr) {
+    addr = AudioSynth_FishmodFilter(addr);
     aFilter(cmd, 2, size, addr);
 }
 

@@ -73,6 +73,11 @@ u8 gFishmodBuiltCount;        // the updates built by the last call (0: its upda
 AudioTask* gFishmodBuilt[3];  // manager (code/audio_thread_manager.c): their tasks, in order,
 u8 gFishmodBuiltDmas;         // and the sample loads the last of them started (its task can't run until they're done)
 static u8 sFishmodAhead;      // updates built and not yet due (0-2)
+static u8 sFishmodWillBatch;  // this call's update is to be followed by the next two (decided before it's built)
+#define FISHMOD_FILTER_SNAPS 160 // filters copied for one task: three ticks of 24 notes and two reverbs' pairs, and room
+static ALIGNED(16) s16 sFishmodFilterSnaps[FISHMOD_TASK_RING][FISHMOD_FILTER_SNAPS * 8];
+extern s16* gFishmodFilterSnap; // (synthesis.c)
+extern s16* gFishmodFilterSnapEnd;
 static AudioTask* sFishmodAheadTask[2];
 #define FISHMOD_TASK_RING_NOW gFishmodTaskRing
 
@@ -90,6 +95,17 @@ static s32 AudioThread_FishmodSteady(void) {
     }
     for (i = 0; i < gAudioCtx.numSynthesisReverbs; i++) {
         if (gAudioCtx.synthesisReverbs[i].downsampleRate >= 2) {
+            return false;
+        }
+    }
+    // nor while anything is being loaded: a load can take the room of a font or a sample that a task built and not
+    // yet run still reads its codebooks and samples from
+    if ((gAudioCtx.preloadSampleStackTop > 0) || (gAudioCtx.slowLoads[0].state != SLOW_LOAD_STATE_WAITING) ||
+        (gAudioCtx.slowLoads[1].state != SLOW_LOAD_STATE_WAITING)) {
+        return false;
+    }
+    for (i = 0; i < ARRAY_COUNT(gAudioCtx.asyncLoads); i++) {
+        if (gAudioCtx.asyncLoads[i].status != 0) {
             return false;
         }
     }
@@ -124,7 +140,24 @@ static AudioTask* AudioThread_Body(u32 samplesRemainingInAi, u32 taskCount, s32 
 
     gFishmodDmaTtlAhead = ahead;
     gAudioCtx.rspTaskIndex = (gAudioCtx.rspTaskIndex + 1) % FISHMOD_TASK_RING_NOW;
+#if FISHMOD_EXPAK
+    // (a task that will run after later updates are built filters with its own copies of the coefficients)
+    gFishmodFilterSnap = sFishmodWillBatch ? sFishmodFilterSnaps[gAudioCtx.rspTaskIndex] : NULL;
+    gFishmodFilterSnapEnd = sFishmodFilterSnaps[gAudioCtx.rspTaskIndex] + FISHMOD_FILTER_SNAPS * 8;
+#endif
     gAudioCtx.curAiBufIndex = (gAudioCtx.curAiBufIndex + 1) % FISHMOD_AI_RING;
+#if FISHMOD_AI_RING != 3
+    if ((gAudioCtx.resetStatus != 0) || (gAudioCtx.resetTimer > 16)) {
+        // fish-oot: an update that builds nothing (the audio heap being reset) leaves its output buffer as it was, and
+        // that buffer is still queued in its turn: with the game's three buffers it holds the update's of three
+        // refreshes ago. With six it would hold another, older one: given the same samples and length here, so
+        // what's heard while the heap resets is what always was.
+        s32 from = (gAudioCtx.curAiBufIndex + FISHMOD_AI_RING - 3) % FISHMOD_AI_RING;
+
+        gAudioCtx.aiBufLengths[gAudioCtx.curAiBufIndex] = gAudioCtx.aiBufLengths[from];
+        bcopy(gAudioCtx.aiBuffers[from], gAudioCtx.aiBuffers[gAudioCtx.curAiBufIndex], AIBUF_SIZE);
+    }
+#endif
 
     sp5C = gAudioCtx.curAudioFrameDmaCount;
     for (i = 0; i < gAudioCtx.curAudioFrameDmaCount; i++) {
@@ -355,6 +388,11 @@ AudioTask* AudioThread_UpdateImpl(void) {
             return rspTask;
         }
 #endif
+#if FISHMOD_EXPAK
+        // (decided before the update is built, for its filters' copies: the game's commands are waiting, so the
+        // next two refreshes' updates will follow it if the driver is still steady after)
+        sFishmodWillBatch = AudioThread_FishmodSteady() && (MQ_GET_COUNT(gAudioCtx.threadCmdProcQueueP) != 0);
+#endif
         rspTask = AudioThread_Body(samplesRemainingInAi, gAudioCtx.totalTaskCount, 0, &aiLen, &cmdsTaken);
 #if FISHMOD_EXPAK
         // the next two refreshes' updates too, while this one's code and data are in the caches: the same updates
@@ -362,7 +400,7 @@ AudioTask* AudioThread_UpdateImpl(void) {
         // them once a frame, three refreshes, so the two refreshes after are the ones it will have nothing new for,
         // and what it does send is heard as soon as it ever was. Each is given what the audio interface will hold by
         // its refresh: what it holds now, plus what was just made, less a refresh's playing.
-        while ((cmdsTaken != 0) && (sFishmodAhead < 2) && AudioThread_FishmodSteady()) {
+        while (sFishmodWillBatch && (cmdsTaken != 0) && (sFishmodAhead < 2) && AudioThread_FishmodSteady()) {
             s32 cmdsAhead;
 
             samplesRemainingInAi += aiLen;
@@ -384,6 +422,7 @@ AudioTask* AudioThread_UpdateImpl(void) {
             gAudioCtx.totalTaskCount -= sFishmodAhead + 1;
             sFishmodAhead++;
         }
+        sFishmodWillBatch = false;
         gFishmodBuilt[0] = rspTask;
         gFishmodBuilt[1] = sFishmodAheadTask[0];
         gFishmodBuilt[2] = sFishmodAheadTask[1];
