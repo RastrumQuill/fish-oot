@@ -435,7 +435,12 @@ AudioTask* AudioThread_UpdateImpl(void) {
         // them once a frame, three refreshes, so the two refreshes after are the ones it will have nothing new for,
         // and what it does send is heard as soon as it ever was. Each is given what the audio interface will hold by
         // its refresh: what it holds now, plus what was just made, less a refresh's playing.
-        while (sFishmodWillBatch && (cmdsTaken != 0) && (sFishmodAhead < sFishmodAheadMax) && AudioThread_FishmodSteady()) {
+        // And never an update that has commands of the game's waiting (ones the game wrote after its hand-over,
+        // which the update before fetched for it): a command can load a font or a sequence over the memory of one
+        // that tasks built in this wake and not yet run still play from (the sweep's scenes: a sample's decoding
+        // table read from a font just replaced, at the start of five scenes). It is built on its own refresh.
+        while (sFishmodWillBatch && (cmdsTaken != 0) && (sFishmodAhead < sFishmodAheadMax) &&
+               (MQ_GET_COUNT(gAudioCtx.threadCmdProcQueueP) == 0) && AudioThread_FishmodSteady()) {
             s32 cmdsAhead;
 #if FISHMOD_DEBUG
             {

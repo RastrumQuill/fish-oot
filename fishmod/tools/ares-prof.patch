@@ -288,13 +288,39 @@ index 9b4adbb..d3b68fe 100644
          self.profile.metrics[(u32)device].reads += Size;
        }
 diff --git a/ares/n64/rsp/dma.cpp b/ares/n64/rsp/dma.cpp
-index d49cbd6..4d59b23 100644
+index d49cbd6..4e0183b 100644
 --- a/ares/n64/rsp/dma.cpp
 +++ b/ares/n64/rsp/dma.cpp
-@@ -22,6 +22,18 @@ auto RSP::dmaTransferStart(Thread& thread) -> void {
+@@ -22,6 +22,44 @@ auto RSP::dmaTransferStart(Thread& thread) -> void {
  }
  
  auto RSP::dmaTransferStep() -> void {
++  {
++    //fish-oot: ARES_SPDMALOG=<file>: every DMA of the audio microcode's tasks numbered ARES_SPDMALOG_FROM..TO
++    //(counted from 1 as their text is loaded): r/w, the DMEM address, the RDRAM address, the length and a hash
++    //of the bytes moved. Two builds' logs compared line by line name the first input that differs.
++    static const char* logPath = getenv("ARES_SPDMALOG");
++    if(logPath) {
++      static FILE* fp = fopen(logPath, "w");
++      static u32 from = getenv("ARES_SPDMALOG_FROM") ? strtoul(getenv("ARES_SPDMALOG_FROM"), nullptr, 10) : 0;
++      static u32 to = getenv("ARES_SPDMALOG_TO") ? strtoul(getenv("ARES_SPDMALOG_TO"), nullptr, 10) : 0xffffffff;
++      static u32 task = 0; static bool audio = false;
++      if(dma.busy.read && dma.current.pbusRegion && dma.current.pbusAddress == 0 && dma.current.length >= 0x87) {
++        audio = rdram.ram.read<Word>(dma.current.dramAddress + 0x80, RBusDevice::ARES_DEBUGGER) == 0x00400008;
++        if(audio) { task++; if(fp && task >= from && task <= to) fprintf(fp, "task %u\n", task); }
++      } else if(fp && audio && task >= from && task <= to && !dma.current.pbusRegion) {
++        u32 h = 2166136261u;
++        for(u32 i = 0; i <= dma.current.length; i += 4) {
++          u32 w = dma.busy.read ? rdram.ram.read<Word>(dma.current.dramAddress + i, RBusDevice::ARES_DEBUGGER)
++                                : dmem.read<Word>(dma.current.pbusAddress + i);
++          h = (h ^ w) * 16777619u;
++        }
++        fprintf(fp, "%c %03x %08x %03x %08x\n", dma.busy.read ? 'r' : 'w', (u32)dma.current.pbusAddress & 0xfff,
++                (u32)dma.current.dramAddress, (u32)dma.current.length + 1, h);
++        if(task == to) fflush(fp);
++      }
++    }
++  }
 +  if(busProf.on && dma.busy.read && dma.current.pbusRegion && dma.current.pbusAddress == 0 && dma.current.length >= 0x87) {
 +    //fish-oot: a microcode's text being loaded (by the CPU, the RSP stopped): counted as that microcode's
 +    static u32 busKey = getenv("ARES_RSPPROF_KEY") ? strtoul(getenv("ARES_RSPPROF_KEY"), nullptr, 16) : 0;
