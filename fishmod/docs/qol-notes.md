@@ -1,12 +1,23 @@
 # Quality of life: done, open, ideas
 
-Gathered from the roadmap (fishmod/docs/roadmap.md, its quality-of-life lists) and from play feedback. Each open item
+Gathered from the roadmap (fishmod/docs/roadmap.md, its quality-of-life lists), the requests in the sessions' chat
+(dates given), and play feedback. Each open item
 says what it would take; none of them needs the RDP or RSP, so none should cost frame time.
 
 ## Done
 
-- **The D-pad as four more C buttons** (bottles, boots, tunics, swords, any item): fishmod_items.c. The Lens of Truth
-  on the D-pad now stays on (the magic meter turned it off unless a C button held it: frames27).
+- **The D-pad as four more C buttons** (bottles, boots, tunics, swords, any item): fishmod_items.c. In the pause
+  menu, press a D-pad direction on an item to put it there, again to take it off; the same C button again takes an
+  item off a C button too. The Lens of Truth on the D-pad now stays on (the magic meter turned it off unless a C
+  button held it: frames27). (Asked 8 and 12 Nov.)
+- **The D-pad on the HUD**: a cross under the C buttons shaded as they are (arrows pressed in, not embossed), its
+  items with their ammo counts as the C buttons show them; shown only once something is on it, an item dimmed while
+  it can't be used. (Asked 8 Nov.)
+- **Equipment swaps at any time** (swords, shields, tunics, boots), from a C or D-pad button too; pressing what's
+  already worn goes back to the default (Kokiri tunic and boots; Kokiri Sword and Deku Shield as a child, Master Sword
+  and Hylian Shield as an adult). (Asked 12 Nov.)
+- **The time of day**: a small arc under the overworld minimap, the sun or moon riding it, fading with the minimap,
+  hidden where time is frozen (fishmod_items.c).
 - **"New record!"** when a catch beats the best for its species (the catch's text box).
 - **Strength scales Link's strength**: the cast and the line's length +35% an upgrade (about twice as far with the
   Golden Gauntlets: fishmod_rod.c STRENGTH_CAST_SCALE), blocks pushed and pulled 1.35, 1.7, 2 times as fast
@@ -26,8 +37,6 @@ says what it would take; none of them needs the RDP or RSP, so none should cost 
 - **Depth handled for you**: the float and sinker settle at a sane depth for where the bait lands (the water's depth
   there and what lives at that spot), and fish look further up and down for food. Now: the float depth is set on
   every cast (fishmod_rod.c); check it follows the water and the spot's fish, not a fixed default.
-- **The time of day without a big clock** (none chosen): a small sun/moon mark only while the rod is out; or on the
-  pause screen only; or in the log's notes ("bites best at dusk").
 - **The buyer says what he's getting** when Link sells a bottled fish (its species and size, not "fish").
 - **A bigger, verified save**: the mod's data in a larger save (flashcarts and emulators take it), each part with a
   version and a checksum, a failed part taken from the backup copy if that one is good, and otherwise loaded with a
