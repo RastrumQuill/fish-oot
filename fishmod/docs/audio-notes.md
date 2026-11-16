@@ -111,3 +111,29 @@ and code each tick walks, 180 ticks a second. What's left that can keep every sa
   Needs a second audio microcode (the game's fills all but 80 bytes of the RSP's instruction memory).
 - **Less data a tick**: the script state and the I/O ports of a channel in one line, the notes' unused bytes out,
   the per-tick note states smaller. A few percent each.
+
+## The measure for a change to the driver, and where it stands (16 November)
+
+The bench builds don't run the same audio twice (the game's frames fall differently against the refreshes: 4% more or
+fewer instructions from one run to the next), so a change of a percent can't be read from them. The audio check's
+build does (lockstep: three updates a game frame, the same notes every run): **`cpuprof.py` on the audlog build, the
+audio thread's cycles an update**, is exact to a few tenths of a percent, and the same build proves the sound.
+
+    fishmod/build.sh --script audlog --hw --texpack --colpack --meshpack --gcc-all
+    ARES_CPUPROF=cpu.bin fishmod/tools/ares_run.sh 0 ROM 150
+    fishmod/tools/cpuprof.py cpu.bin --elf ELF --per-calls AudioThread_UpdateImpl \
+        --match '^(Audio|func_800D|func_800E|Fishmod_Sample)' --top 0
+
+| the driver | instructions | cycles an update | data fills | write-backs | code fills |
+|---|---|---|---|---|---|
+| before any of this (frames25's) | 68,515 | 217,288 | 1,496 | 828 | 636 |
+| the hot functions together; the note's fields in a tick's order | 68,695 | 215,147 (-1.0%) | 1,452 | 826 | 623 |
+
+(The function sections cost the command-line claim its inlining, 900 instructions an update: forced back.)
+
+**What the exact changes left are worth, from the bytes each tick reads** (`cpuprof`'s `.bytes`): the channel's script
+state and I/O ports beside its head, about 1%; the note's per-tick state reused when its inputs haven't changed, about
+2%; the driver's scattered globals and its stack, 1 to 2%; one compact record a note to the RSP instead of 13 commands
+(a second microcode that expands it), about 4% of the CPU's and 3% of the RSP's audio time. All of it together is
+near a tenth of the driver's 12 ms a frame. The rest is the work itself: about 15 notes and 14 channels walked 180
+times a second, through an 8 KB data cache that the walk doesn't fit in, with the code cold at every refresh.
