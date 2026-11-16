@@ -1215,9 +1215,10 @@ __attribute__((always_inline)) static inline f32 EnFishmod_SchoolSlot(EnFishmod*
  * its place in the school without steering or looking at the water itself (the leader did that for the school: its
  * water is borrowed). Far away a follower's own steering only showed as a fish a little out of place; this costs a
  * small part of it. False (the full AI) when it's on its own, the leader isn't cruising, or it has fallen well
- * behind (it may have a bank to get round).
+ * behind (it may have a bank to get round). `frames`: how many frames this one stands for (the furthest only keep
+ * their places every 2nd or 4th frame: EnFishmod_Update): that many frames' way toward its place at once.
  */
-__attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlayState* play) {
+__attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlayState* play, s32 frames) {
     EnFishmod* lead;
     Vec3f slot;
     f32 unit;
@@ -1243,7 +1244,7 @@ __attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlaySt
         return false;
     }
     // the leader's pace, more while out of place (as up close), straight at the slot
-    step = lead->speed + 1.5f;
+    step = (lead->speed + 1.5f) * frames;
     if (distSq > SQ(step)) {
         f32 scale = step / sqrtf(distSq);
 
@@ -1267,9 +1268,7 @@ __attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlaySt
     this->stateTimer = 1;
     this->stuckTimer = 0;
     this->stuckPos = this->actor.world.pos;
-    if (this->cooldown > 0) {
-        this->cooldown--;
-    }
+    this->cooldown = (this->cooldown > frames) ? (this->cooldown - frames) : 0;
     this->blocked = false;
     return true;
 }
@@ -2322,7 +2321,19 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     // less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200 every 8th (gliding on in
     // between), and past 1600 it goes dormant: it holds still (and is out of drawing range) until attention comes.
     f32 attnDist = 0.0f; // (once a frame: it was worked out twice)
+    s32 followFrames;
 
+    // A school member that only kept its place behind its leader last time, too far off to be drawn as more than its
+    // far shape: it does that every 2nd frame past 800 units from attention, every 4th past 1200 (a few units' move,
+    // under a pixel or two at that distance), and nothing in between. Each has its own frames (by its number), and
+    // anything else happening to it (a fright, a startle, its full model drawn) has it back on every frame at once.
+    if ((this->followSkip != 0) && (((this->timer + this->actor.params) & this->followSkip) != 0) &&
+        (this->fishState == FISH_STATE_WANDER) && (this->drawnFull == 0) && (this->startle == 0) &&
+        !FISHMOD_PHOTO_ON) {
+        return;
+    }
+    followFrames = this->followSkip + 1; // (the frames since it last kept its place)
+    this->followSkip = 0;                // (and every frame from here, unless it only keeps its place again)
     if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON) {
         FISHMOD_PROF(FISHMOD_PROF_U_ATTN, attnDist = EnFishmod_AttentionDist(this, play));
         if (attnDist > 1600.0f) {
@@ -2336,8 +2347,9 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON && (attnDist > FISHMOD_FOLLOW_FAR_DIST)) {
         s32 followed;
 
-        FISHMOD_PROF(FISHMOD_PROF_U_FOLLOW, followed = EnFishmod_FollowFar(this, play));
+        FISHMOD_PROF(FISHMOD_PROF_U_FOLLOW, followed = EnFishmod_FollowFar(this, play, followFrames));
         if (followed) {
+            this->followSkip = (attnDist > 1200.0f) ? 3 : (attnDist > 800.0f) ? 1 : 0;
             if (this->drawnFull == 0) {
                 // (EnFishmod_UpdateSwim's first case, here: most of these fish aren't drawn in full, and the swim
                 // function's code is a cache line or two more each)
