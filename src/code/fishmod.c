@@ -191,7 +191,34 @@ f32 Fishmod_RandCenteredFloat(FishmodRng* rng, f32 f) {
     return (Fishmod_RandZeroOne(rng) - 0.5f) * f;
 }
 
+/*
+ * The game's View_Init sets the X of the view's look-at point and leaves its Y and Z as the memory was. The camera
+ * fills them in at the end of the first frame, but Kokiri Forest's fairies (ObjectKankyo_Fairies) read them on it.
+ * In the game as shipped that memory holds zero or the last scene's look-at point. A build that starts straight in
+ * the forest (the test and debug builds) finds whatever used the memory before: seen, two words of code, which as
+ * floats are denormal, and the CPU stops on arithmetic with those (a floating-point exception on the first frame, in
+ * one build and not the next: it goes by where things fall in memory). A value that isn't a usable number (denormal,
+ * infinite or not a number) is made zero here, after View_Init and before anything reads it; a usable one is left as
+ * the game would have had it.
+ */
+static void Fishmod_ViewSane(f32* f) {
+    u32 bits = *(u32*)f;
+    u32 exponent = bits & 0x7F800000;
+
+    if ((exponent == 0x7F800000) || ((exponent == 0) && ((bits & 0x007FFFFF) != 0))) {
+        *f = 0.0f;
+    }
+}
+
 void Fishmod_OnSceneLoad(PlayState* play) {
+#ifdef FISHMOD_TEST_VIEW_GARBAGE // (the fix's own test: the two words the crash was seen with)
+    *(u32*)&play->view.at.y = 0x04410002;
+    *(u32*)&play->view.at.z = 0x00400821;
+#endif
+#ifndef FISHMOD_TEST_VIEW_NOFIX
+    Fishmod_ViewSane(&play->view.at.y);
+    Fishmod_ViewSane(&play->view.at.z);
+#endif
     gFishmodRod = NULL;
     Fishmod_ResetRodInfo();
     Fishmod_RandSeed(&gFishmodRng, FISHMOD_TIME_SEED() + play->sceneId);
