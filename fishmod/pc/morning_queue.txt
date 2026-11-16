@@ -1,13 +1,7 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# The Expansion Pak in for all of these (the collision runs need it).
-# frames28 (frames27: the water fog in the RSP's own fog, rope bending; and no pop-in between the camera and Link:
-# compare with frames25), 12 minutes.
-releases/fish-oot-frames28.bps 12 frames28
-# The audio lead's A/B (claude/sleepy-faraday-ve9g2u, releases/notes-audio-ab.md): about 21 minutes.
-releases/fish-oot-audio-ab.bps 26 audio-ab
-# The collision lead's test (claude/collision-opt, releases/notes-frames20-col.md): frames20's collision and theirs,
-# the same tree and toolchain otherwise, each twice (A B A B) so the run-to-run spread shows.
-releases/fish-oot-frames20-colbase.bps 12 colbase-1
-releases/fish-oot-frames20-colnew.bps 12 colnew-1
-releases/fish-oot-frames20-colbase.bps 12 colbase-2
-releases/fish-oot-frames20-colnew.bps 12 colnew-2
+# What frames27's water fog costs (it ran 53% hitches against frames25's 26%): frames28 (frames27 and no pop-in
+# between the camera and Link) and frames28-nobands (the same without the lake bed's fog bands), twice each.
+releases/fish-oot-frames28.bps 12 frames28-1
+releases/fish-oot-frames28-nobands.bps 12 nobands-1
+releases/fish-oot-frames28.bps 12 frames28-2
+releases/fish-oot-frames28-nobands.bps 12 nobands-2

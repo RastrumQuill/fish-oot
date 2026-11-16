@@ -30,6 +30,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-frames26.bps` | frames25 with the water fog from above being the underwater fog, by the ray's length in the water (bed and props, vertex by vertex), nothing poking out of the water, reeds bending | [notes](notes-frames26.md) |
 | `fish-oot-frames27.bps` | frames26 with the water fog from above in the RSP's own fog (the bed in depth bands, each prop by its depth; no CPU fog), plants bending as ropes, the lens working on the D-pad | [notes](notes-frames27.md) |
 | `fish-oot-frames28.bps` | frames27 with plants no longer left out between the camera and Link | [notes](notes-frames28.md) |
+| `fish-oot-frames28-nobands.bps` | frames28 without the lake bed's water-fog bands (the props' fog still on): what the bands cost | [notes](notes-frames28-nobands.md) |
 | `fish-oot-audio-ab.bps` | the audio lead's A/B (claude/sleepy-faraday-ve9g2u, their patch): 6 laps, the audio whole / without its RSP tasks / without the driver, twice | [notes](notes-audio-ab.md) |
 | `fish-oot-frames20-colbase.bps`, `-colnew.bps` | frames20's collision and the collision work's (claude/collision-opt), the same tree and toolchain, to compare on the console with the Expansion Pak in | [notes](notes-frames20-col.md) |
 | `fish-oot-anatomy-sweep.bps` | about 3.3 hours: every other lap shipped, between them the terrain, Link, the other actors, the effects, or everything left out; and the RDP's idle time | [notes](notes-anatomy-sweep.md) |
