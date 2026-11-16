@@ -96,10 +96,71 @@ static u32 sSampleDmaLive[0x100 / 32];
 
 /*
  * fish-oot: how many refreshes ahead of its own the update being built is (thread.c: updates built ahead; 0
- * otherwise). A sample buffer it uses must outlive its task, which runs that many refreshes later than an update's
- * usually does: its countdown starts that much higher, and the countdowns still drop once a refresh.
+ * otherwise), and the refresh it is being built on.
+ *
+ * The buffers' bookkeeping is the game's in every update, built ahead or not: the same countdowns, dropped once an
+ * update, the same buffer chosen, the same answer when none is free (a note then gets no samples that update: so
+ * the bookkeeping must not differ, and holding buffers longer for updates built ahead made it differ whenever many
+ * samples were streamed at once: the sweep's scenes heard it at the start of five scenes). What an update built
+ * ahead can't do is read new samples into a buffer's memory, as the game does when it takes a free buffer: the
+ * buffer came free by the update's own count, but a task built in the same wake and not yet run may still read the
+ * old samples there. So such a buffer is given other memory for the new samples (one of 64 spare blocks), and its
+ * old memory joins the spares once the refresh that update belongs to has come, by when every task that read it has
+ * run. Only the short-lived buffers need it: a long-lived one comes free 32 updates after its last use.
  */
 u8 gFishmodDmaTtlAhead;
+u32 gFishmodDmaRefresh;
+
+#if FISHMOD_EXPAK
+#define SAMPLE_DMA_SPARES 64
+#define SAMPLE_DMA_SPARE_SIZE 0x300 // (the short-lived buffers' size in every audio setting: session_config.c)
+static u8 sSampleDmaSpareMem[SAMPLE_DMA_SPARES][SAMPLE_DMA_SPARE_SIZE] __attribute__((aligned(16)));
+static u8* sSampleDmaSpareFree[SAMPLE_DMA_SPARES];
+static s32 sSampleDmaSpareFreeCount;
+static u8* sSampleDmaSpareHeld[SAMPLE_DMA_SPARES];
+static u32 sSampleDmaSpareHeldUntil[SAMPLE_DMA_SPARES];
+static s32 sSampleDmaSpareHeldCount;
+u32 gFishmodDmaSpareMisses; // (never: 64 is more than two updates of 24 notes can ask for)
+
+static void Fishmod_SampleDmaSparesInit(void) {
+    s32 i;
+
+    for (i = 0; i < SAMPLE_DMA_SPARES; i++) {
+        sSampleDmaSpareFree[i] = sSampleDmaSpareMem[i];
+    }
+    sSampleDmaSpareFreeCount = SAMPLE_DMA_SPARES;
+    sSampleDmaSpareHeldCount = 0;
+}
+
+static void Fishmod_SampleDmaFreshMemory(SampleDma* dma) {
+    s32 i;
+    s32 kept = 0;
+
+    if ((gFishmodDmaTtlAhead == 0) || ((u32)(dma - gAudioCtx.sampleDmas) >= (u32)gAudioCtx.sampleDmaListSize1) ||
+        (dma->size > SAMPLE_DMA_SPARE_SIZE)) {
+        return;
+    }
+    // (blocks whose refresh has come are spare again)
+    for (i = 0; i < sSampleDmaSpareHeldCount; i++) {
+        if ((s32)(gFishmodDmaRefresh - sSampleDmaSpareHeldUntil[i]) >= 0) {
+            sSampleDmaSpareFree[sSampleDmaSpareFreeCount++] = sSampleDmaSpareHeld[i];
+        } else {
+            sSampleDmaSpareHeld[kept] = sSampleDmaSpareHeld[i];
+            sSampleDmaSpareHeldUntil[kept] = sSampleDmaSpareHeldUntil[i];
+            kept++;
+        }
+    }
+    sSampleDmaSpareHeldCount = kept;
+    if ((sSampleDmaSpareFreeCount == 0) || (sSampleDmaSpareHeldCount >= SAMPLE_DMA_SPARES)) {
+        gFishmodDmaSpareMisses++;
+        return;
+    }
+    sSampleDmaSpareHeld[sSampleDmaSpareHeldCount] = dma->ramAddr;
+    sSampleDmaSpareHeldUntil[sSampleDmaSpareHeldCount] = gFishmodDmaRefresh + gFishmodDmaTtlAhead;
+    sSampleDmaSpareHeldCount++;
+    dma->ramAddr = sSampleDmaSpareFree[--sSampleDmaSpareFreeCount];
+}
+#endif
 
 #define SAMPLE_DMA_LIVE(i) (sSampleDmaLive[(u32)(i) >> 5] |= 1u << ((u32)(i) & 31))
 
@@ -263,7 +324,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
                     }
                     gAudioCtx.sampleDmaReuseQueue2RdPos++;
                 }
-                dma->ttl = 32 + gFishmodDmaTtlAhead;
+                dma->ttl = 32;
                 SAMPLE_DMA_LIVE(i);
                 *dmaIndexRef = (u8)i;
                 return &dma->ramAddr[devAddr - dma->devAddr];
@@ -306,7 +367,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
                 }
                 gAudioCtx.sampleDmaReuseQueue1RdPos++;
             }
-            dma->ttl = 2 + gFishmodDmaTtlAhead;
+            dma->ttl = 2;
             SAMPLE_DMA_LIVE(dma - gAudioCtx.sampleDmas);
             return dma->ramAddr + (devAddr - dma->devAddr);
         }
@@ -324,7 +385,10 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
 
     transfer = dma->size;
     dmaDevAddr = devAddr & ~0xF;
-    dma->ttl = 3 + gFishmodDmaTtlAhead;
+    dma->ttl = 3;
+#if FISHMOD_EXPAK
+    Fishmod_SampleDmaFreshMemory(dma);
+#endif
     SAMPLE_DMA_LIVE(dma - gAudioCtx.sampleDmas);
     dma->devAddr = dmaDevAddr;
     sSampleDmaDevAddr[dma - gAudioCtx.sampleDmas] = dmaDevAddr; // (fish-oot: the search's copy)
@@ -345,6 +409,9 @@ void AudioLoad_InitSampleDmaBuffers(UNUSED s32 numNotes) {
     s32 j;
 
     bzero(sSampleDmaLive, sizeof(sSampleDmaLive)); // (fish-oot: no buffer counting down yet)
+#if FISHMOD_EXPAK
+    Fishmod_SampleDmaSparesInit(); // (the buffers' memory is the heap's again: the spare blocks all spare)
+#endif
     gAudioCtx.sampleDmaBufSize = gAudioCtx.sampleDmaBufSize1;
     gAudioCtx.sampleDmas = AudioHeap_Alloc(&gAudioCtx.miscPool, 4 * gAudioCtx.numNotes * sizeof(SampleDma) *
                                                                     gAudioCtx.audioBufferParameters.specUnk4);
@@ -2655,6 +2722,11 @@ void Fishmod_SampleStoreUse(Sample* sample, s32 queue) {
         slot->state = SAMPLE_STORE_QUEUED;
         sSampleStoreQueue[sSampleStoreTail++ & (SAMPLE_STORE_QUEUE - 1)] = slot - sSampleStore;
     }
+}
+
+/** Is the store still copying samples in? */
+s32 Fishmod_SampleStoreBusy(void) {
+    return (sSampleStoreInFlight != 0) || (sSampleStoreHead != sSampleStoreTail);
 }
 
 /** Once an audio update: the DMA in flight finished? Then the next piece of the queue's first sample. */

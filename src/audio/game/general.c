@@ -2344,6 +2344,8 @@ void Audio_UpdateFanfare(void);
 /**
  * This is Audio_Update for the graph thread
  */
+u32 gFishmodAudioFrameFlushes;
+
 void Audio_Update(void) {
     if (func_800FAD34() == 0) {
 #if DEBUG_FEATURES
@@ -2370,6 +2372,9 @@ void Audio_Update(void) {
         AudioDebug_ProcessInput();
 #endif
 
+        // fish-oot: the game's once-a-frame hand-over of its commands to the driver, counted: the driver builds
+        // updates ahead only straight after one (audio/internal/thread.c)
+        gFishmodAudioFrameFlushes++;
         AudioThread_ScheduleProcessCmds();
 
 #if DEBUG_FEATURES

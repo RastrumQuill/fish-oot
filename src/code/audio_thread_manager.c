@@ -47,6 +47,7 @@ u32 gFishmodAudCmdLog[12000 * 2]; // [task][2]: hash of its command list, its le
 u32 gFishmodAudCmdLogCount;
 u32 gFishmodAudCmdDump[0x1000];
 u32 gFishmodAudCmdDumpSize;
+u8 gFishmodAheadDbg;
 s16 gFishmodAudFilterDump[8][24][8];
 u32 gFishmodAudFilterAddr[8][24];
 u32 gFishmodAudDataHash[8][512];
@@ -62,6 +63,13 @@ static void Fishmod_AudLog_Task(AudioTask* task) {
     if (sDumpAt == 0xFFFFFFFF) {
         sDumpAt = 0;
         osEPiReadIo(gCartHandle, 0x34, &sDumpAt);
+        gFishmodAheadDbg = sDumpAt >> 24; // (the top byte: switches for tracing the updates built ahead, thread.c)
+        sDumpAt &= 0xFFFFFF;
+        if (gFishmodAheadDbg & 0x10) {
+            extern u8 gFishmodAudioAhead;
+
+            gFishmodAudioAhead = false; // (the pak build without its updates built ahead)
+        }
     }
     gFishmodAudCmdLogCount++;
     if (gFishmodAudCmdLogCount <= 12000) {
@@ -259,6 +267,9 @@ static void AudioMgr_HandleRetraceLockstep(AudioMgr* audioMgr) {
     AudioThread_LockstepWaitDmas();
     if (audioMgr->rspTask != NULL) {
         Fishmod_AudLog_Task(audioMgr->rspTask);
+        if (gFishmodAheadDbg & 0x40) {
+            osWritebackDCacheAll(); // (tracing: the RSP reads everything as the CPU last wrote it)
+        }
         audioMgr->audioTask.next = NULL;
         audioMgr->audioTask.flags = OS_SC_NEEDS_RSP;
         audioMgr->audioTask.framebuffer = NULL;

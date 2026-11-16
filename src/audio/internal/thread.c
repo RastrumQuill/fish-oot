@@ -64,6 +64,7 @@ static AudioTask* sWaitingAudioTask = NULL;
  * original name: CreateAudioTask (note: function is heavily modified in Animal Crossing)
  */
 extern u8 gFishmodDmaTtlAhead; // (load.c)
+extern u32 gFishmodDmaRefresh;
 // (in every build, so the files that set them are the same code with and without --expak)
 u8 gFishmodAudioAhead = false; // updates built ahead when the driver is steady (--expak): off until the console says
                                // it pays (the audio_sched_ab bench switches it by lap; the audio check has it on)
@@ -74,6 +75,10 @@ u8 gFishmodBuiltCount;        // the updates built by the last call (0: its upda
 AudioTask* gFishmodBuilt[3];  // manager (code/audio_thread_manager.c): their tasks, in order,
 u8 gFishmodBuiltDmas;         // and the sample loads the last of them started (its task can't run until they're done)
 static u8 sFishmodAhead;      // updates built and not yet due (0-2)
+extern u32 gFishmodAudioFrameFlushes; // (audio/game/general.c, Audio_Update)
+static u32 sFishmodFlushesSeen;
+static u8 sFishmodRefreshes = 255;
+static u8 sFishmodAheadMax;
 static u8 sFishmodWillBatch;  // this call's update is to be followed by the next two (decided before it's built)
 #define FISHMOD_FILTER_SNAPS 160 // filters copied for one task: three ticks of 24 notes and two reverbs' pairs, and room
 static s16 sFishmodFilterSnaps[FISHMOD_TASK_RING][FISHMOD_FILTER_SNAPS * 8] __attribute__((aligned(16)));
@@ -144,6 +149,15 @@ static AudioTask* AudioThread_Body(u32 samplesRemainingInAi, u32 taskCount, s32 
 #if FISHMOD_EXPAK
     // (a task that will run after later updates are built filters with its own copies of the coefficients)
     gFishmodFilterSnap = sFishmodWillBatch ? sFishmodFilterSnaps[gAudioCtx.rspTaskIndex] : NULL;
+#if FISHMOD_DEBUG
+    {
+        extern u8 gFishmodAheadDbg;
+
+        if (gFishmodAheadDbg & 8) {
+            gFishmodFilterSnap = NULL; // (tracing: the filters read where the driver keeps them)
+        }
+    }
+#endif
     gFishmodFilterSnapEnd = sFishmodFilterSnaps[gAudioCtx.rspTaskIndex] + FISHMOD_FILTER_SNAPS * 8;
 #endif
     gAudioCtx.curAiBufIndex = (gAudioCtx.curAiBufIndex + 1) % FISHMOD_AI_RING;
@@ -181,10 +195,7 @@ static AudioTask* AudioThread_Body(u32 samplesRemainingInAi, u32 taskCount, s32 
     }
 
     gAudioCtx.curAudioFrameDmaCount = 0;
-    if (ahead == 0) {
-        // (the countdowns drop once a refresh: an update built ahead leaves them, and its own refresh drops them)
-        AudioLoad_DecreaseSampleDmaTtls();
-    }
+    AudioLoad_DecreaseSampleDmaTtls(); // (once an update, built ahead or not: load.c, gFishmodDmaTtlAhead)
     AudioLoad_ProcessLoads(gAudioCtx.resetStatus);
     AudioLoad_ProcessScriptLoads();
 
@@ -385,10 +396,13 @@ AudioTask* AudioThread_UpdateImpl(void) {
         s32 aiLen = 0;
         s32 cmdsTaken = 0;
 #if FISHMOD_EXPAK
+        gFishmodDmaRefresh++;
+        if (sFishmodRefreshes < 255) {
+            sFishmodRefreshes++; // (refreshes since the game's last hand-over was seen)
+        }
         if (sFishmodAhead != 0) {
-            // this refresh's update was built with an earlier one's: only its sample buffers' countdowns are due
+            // this refresh's update was built with an earlier one's: nothing is due
             // (the game's custom update function ran before it was built: below)
-            AudioLoad_DecreaseSampleDmaTtls();
             rspTask = sFishmodAheadTask[0];
             sFishmodAheadTask[0] = sFishmodAheadTask[1];
             sFishmodAhead--;
@@ -399,7 +413,20 @@ AudioTask* AudioThread_UpdateImpl(void) {
 #if FISHMOD_EXPAK
         // (decided before the update is built, for its filters' copies: the game's commands are waiting, so the
         // next two refreshes' updates will follow it if the driver is still steady after)
-        sFishmodWillBatch = AudioThread_FishmodSteady() && (MQ_GET_COUNT(gAudioCtx.threadCmdProcQueueP) != 0);
+        // And only on the update straight after the game's once-a-frame hand-over (Audio_Update), for as many
+        // refreshes as the last frame took: those are the ones the game will send nothing for. An update that
+        // takes commands at another time (ones the game wrote after its hand-over, which the driver fetches an
+        // update later; the first update after a load) starts no batch: it would run past the next hand-over,
+        // whose commands would then be heard an update or two late (the sweep's scenes found exactly that, at
+        // the start of five scenes).
+        sFishmodAheadMax = 0;
+        if (gFishmodAudioFrameFlushes != sFishmodFlushesSeen) {
+            sFishmodFlushesSeen = gFishmodAudioFrameFlushes;
+            sFishmodAheadMax = (sFishmodRefreshes >= 3) ? 2 : (sFishmodRefreshes == 2) ? 1 : 0;
+            sFishmodRefreshes = 0;
+        }
+        sFishmodWillBatch = (sFishmodAheadMax != 0) && AudioThread_FishmodSteady() &&
+                            (MQ_GET_COUNT(gAudioCtx.threadCmdProcQueueP) != 0);
 #endif
         rspTask = AudioThread_Body(samplesRemainingInAi, gAudioCtx.totalTaskCount, 0, &aiLen, &cmdsTaken);
 #if FISHMOD_EXPAK
@@ -408,8 +435,20 @@ AudioTask* AudioThread_UpdateImpl(void) {
         // them once a frame, three refreshes, so the two refreshes after are the ones it will have nothing new for,
         // and what it does send is heard as soon as it ever was. Each is given what the audio interface will hold by
         // its refresh: what it holds now, plus what was just made, less a refresh's playing.
-        while (sFishmodWillBatch && (cmdsTaken != 0) && (sFishmodAhead < 2) && AudioThread_FishmodSteady()) {
+        while (sFishmodWillBatch && (cmdsTaken != 0) && (sFishmodAhead < sFishmodAheadMax) && AudioThread_FishmodSteady()) {
             s32 cmdsAhead;
+#if FISHMOD_DEBUG
+            {
+                extern u8 gFishmodAheadDbg;
+                s32 Fishmod_SampleStoreBusy(void);
+
+                if (((gFishmodAheadDbg & 1) && Fishmod_SampleStoreBusy()) ||
+                    ((gFishmodAheadDbg & 2) && (gAudioCtx.curAudioFrameDmaCount != 0)) ||
+                    ((gFishmodAheadDbg & 4) && (sFishmodAhead >= 1))) {
+                    break;
+                }
+            }
+#endif
 
             samplesRemainingInAi += aiLen;
             j = (gAudioCtx.audioBufferParameters.aiSamplingFrequency * 1001 + 30000) / 60000;
