@@ -281,6 +281,18 @@ static void Fishmod_ViewUpdate(PlayState* play) {
  * The controller is kept from Link while the tour runs. FISHMOD_TOUR_AUTO: move on by itself (for screenshots).
  */
 #define TOUR_GLIDE 110
+#ifdef FISHMOD_POP_AB
+// The pop-in test's turns at each stop: the view as it is, then with every kind's distances POP_AB_STEP_SET nearer
+// (what one set's worth of travel changes), POP_AB_STEP nearer, then each kind alone POP_AB_STEP nearer
+#ifndef POP_AB_STEP
+#define POP_AB_STEP 150.0f
+#endif
+#define POP_AB_STEP_SET 24.0f
+#define POP_AB_FRAMES 24
+#define POP_AB_SETTLE 12
+#define POP_AB_VARIANTS (3 + 32)
+static s32 sPopAbVariant = -1; // the variant on screen and settled, -1: none
+#endif
 #ifdef FISHMOD_EDGE_AB
 #ifndef FISHMOD_EDGE_AB_FLAGS
 #define FISHMOD_EDGE_AB_FLAGS FISHMOD_BENCH_ALTEDGE // what the A/B switches (bench flags)
@@ -438,6 +450,52 @@ static void Fishmod_TourUpdate(PlayState* play) {
         }
     }
 #endif
+#ifdef FISHMOD_POP_AB
+    {
+        static s32 sFrozenFrames;
+        static s32 sFrozenTime;
+        static s16 sFrozenSky;
+        static s32 sFrozenState;
+        s32 since = sTourFrame - (TOUR_GLIDE + 40);
+
+        sPopAbVariant = -1;
+        if (since >= 0) {
+            s32 variant = since / POP_AB_FRAMES;
+            f32 step = (variant == 0) ? 0.0f : (variant == 1) ? POP_AB_STEP_SET : POP_AB_STEP;
+            s32 kind = (variant < 3) ? -1 : (variant - 3);
+
+            if (since == 0) {
+                sFrozenFrames = play->gameplayFrames;
+                sFrozenTime = gSaveContext.save.dayTime;
+                sFrozenSky = play->skyboxCtx.rot.y;
+                sFrozenState = play->state.frames;
+            }
+            play->gameplayFrames = sFrozenFrames;
+            gSaveContext.save.dayTime = sFrozenTime;
+            play->skyboxCtx.rot.y = sFrozenSky;
+            play->state.frames = sFrozenState;
+            play->haltAllActors = true;
+            if (variant >= POP_AB_VARIANTS) {
+                gFishmodPop.step = 0.0f;
+                gFishmodPop.kind = -1;
+                gFishmodPop.serial++;
+                play->haltAllActors = false;
+                Fishmod_TourGo(sTourStop + 1);
+            } else {
+                if ((gFishmodPop.step != step) || (gFishmodPop.kind != kind)) {
+                    gFishmodPop.step = step;
+                    gFishmodPop.kind = kind;
+                    gFishmodPop.serial++;
+                }
+                if ((since % POP_AB_FRAMES) >= POP_AB_SETTLE) {
+                    sPopAbVariant = variant;
+                }
+            }
+        } else {
+            play->haltAllActors = false;
+        }
+    }
+#endif
 #ifdef FISHMOD_VIEW_BENCH
     {
         static s32 sFrozenFrames;
@@ -564,6 +622,18 @@ static void Fishmod_TourDraw(Gfx** gfxP) {
 
 #if defined(FISHMOD_LOD_CALIBRATE) || defined(FISHMOD_HWBENCH)
     return; // nothing over the frames being compared or timed
+#endif
+
+#ifdef FISHMOD_POP_AB
+    // for fishmod/tools/pop_ab_capture.py: red = 8 * stop number; green = 8 * (the variant, mod 32); blue 248 while a
+    // variant up to 31 is on screen and settled, 128 for one from 32 up, 0 otherwise; nothing else over the picture
+    gfx = Gfx_SetupDL_57(gfx);
+    gDPSetPrimColor(gfx++, 0, 0, (sTourStop + 1) * 8, (sPopAbVariant >= 0) ? (sPopAbVariant & 31) * 8 : 0,
+                    (sPopAbVariant < 0) ? 0 : (sPopAbVariant >= 32) ? 128 : 248, 255);
+    gDPFillRectangle(gfx++, 0, 0, 16, 16);
+    gDPPipeSync(gfx++);
+    *gfxP = gfx;
+    return;
 #endif
 
 #ifdef FISHMOD_EDGE_AB
@@ -824,6 +894,7 @@ u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 u32 gFishmodPcTag; // the PC profile's tag for its samples now (FISHMOD_PCTAG_*)
 u32 gFishmodScatterDropped[4];
 void* gFishmodScatterDbg[8];
+FishmodPopTest gFishmodPop = { 0.0f, -1, 0 };
 FishmodPropTest gFishmodPropTest; // props in view left out by the props' caps: budget, see-through, materials; and the most in view
 #ifndef FISHMOD_FLAT_TEST_INIT
 #define FISHMOD_FLAT_TEST_INIT 0

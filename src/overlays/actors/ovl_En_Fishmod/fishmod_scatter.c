@@ -463,6 +463,8 @@ typedef struct ScatterSet {
     u16 prop[PROP_BUDGET]; // in drawing order: nearest band first, kind by kind within a band
     u8 tier[PROP_BUDGET];  // ScatterTier, as its matrix was made
     u8 hidden[PROP_BUDGET]; // wholly beyond the screen's edges: in the set (as the cone chose it), not drawn
+    u8 alpha[PROP_BUDGET];  // a single card past its kind's distance: how far it has dissolved (255: not at all)
+    u8 swayUsed[SWAY_MAX];  // the sway matrices its props use
     s32 count;
     s16 cards[BEDCARD_SET_MAX]; // the bed cards drawn in place of their chunks' card-drawn plants
     s32 cardCount;
@@ -483,9 +485,16 @@ static u32 sSetPropTest; // the prop sweep's test the set was made for
 #endif
 static s32 sSetAge = 1000;
 // Remake the set when the camera has moved this far or turned this much, or after this many frames anyway
-#define REUSE_MOVE 6.0f
-#define REUSE_TURN_COS 0.9996f
-#define REUSE_FRAMES 10
+// (The turn: the view cone and the screen's edges are tested with VIEW_MARGIN, 5 degrees, to spare, so a set holds
+// for any turn under that: nothing at the picture's edge is missing. The move: a prop's place in the picture shifts by
+// less than its own room in the tests (PROP_RADIUS and more) for any prop not right at the camera, and those are
+// always kept; the distances, tiers and dissolve are a few frames late by at most this far. A run is about 6 units a
+// frame: one set serves several frames of it. Was 6 units, 1.6 degrees, 10 frames: a walking camera made a new set
+// nearly every frame.)
+#define REUSE_MOVE 24.0f
+#define REUSE_TURN_COS 0.99756f // 4 degrees
+#define REUSE_FRAMES 20
+static s32 sSetUnder; // the set was made with the camera under water
 
 /**
  * The props' commands kept (fish-oot). While the set, the light on the props and the mode stay the same, the commands
@@ -1175,7 +1184,11 @@ static void Scatter_PropFogSetup(void) {
     sPropFog.key = !gFishmodWaterFog.on ? 0
                                         : (0x80000000 | ((u32)gFishmodWaterFog.water[0] << 16) |
                                            ((u32)gFishmodWaterFog.water[1] << 8) | gFishmodWaterFog.water[2]) ^
-                                              ((u32)(s32)(gFishmodWaterFog.h * 4.0f) << 4);
+                                              ((u32)(s32)((gFishmodWaterFog.h < 40.0f) ? gFishmodWaterFog.h * 4.0f
+                                                                                     : 120.0f + gFishmodWaterFog.h)
+                                               << 4);
+    // (the camera's height over the water in quarter units near it, whole units from 40 up, where a unit is under
+    // 2.5% of the fog's slope: every quarter unit, a camera that bobs made every frame's commands anew)
 }
 
 /** The prop's water fog (0: the scene's; else its depth step + 1). */
@@ -1375,6 +1388,84 @@ static Gfx* Scatter_Material(Gfx* gfx, FishmodPropKindInfo* info, s32 kind, s32 
         gSPDisplayList(gfx++, info->material);
     }
     return gfx;
+}
+
+/*
+ * The materials as display lists of their own, each made the first time it's wanted: a change of material in a frame's
+ * commands is then one command instead of a dozen (a frame changes material about forty times, and those were over
+ * half of what it wrote). Not the ones that hold a frame's own addresses (the lit materials' scene lights, the shallow
+ * rocks' scroll). A list depends on the kind, the tier (the edge mode goes by it) and the modes below: when one of
+ * those changes (the benches only), the lists are made afresh in the other pool, as the RSP may still be reading these.
+ */
+#define MAT_LIST_MAX 20    // commands in one, at most
+#define MAT_POOL_SIZE 1200 // commands in all (a scene uses about sixty materials of about thirteen commands)
+static Gfx sMatPool[FISHMOD_DEBUG ? 2 : 1][MAT_POOL_SIZE];
+static u16 sMatListAt[FISHMOD_PROP_KIND_MAX * TIER_MAX]; // where each is in the pool, plus 1 (0: not made)
+static s32 sMatPoolUsed;
+static u32 sMatListMode = 0xFFFFFFFF;
+static s32 sMatListPool;
+
+/** The opaque material of a kind and tier as a list of its own, or NULL: one made in place each time. */
+static Gfx* Scatter_MaterialList(FishmodPropKindInfo* info, s32 kind, s32 tier) {
+    s32 key = kind + tier * FISHMOD_PROP_KIND_MAX;
+    u32 mode = SCATTER_ONE_CYCLE();
+    Gfx* list;
+
+#if FISHMOD_DEBUG
+    mode |= (gFishmodBench & FISHMOD_BENCH_ALTEDGE) ? 2 : 0;
+#endif
+    if (info->xlu || (kind == FISHMOD_PROP_LILY_PAD) || (kind == FISHMOD_PROP_ROCK_LIT)) {
+        return NULL;
+    }
+    if (mode != sMatListMode) {
+        sMatListMode = mode;
+        sMatListPool = (sMatListPool + 1) % ARRAY_COUNT(sMatPool);
+        sMatPoolUsed = 0;
+        bzero(sMatListAt, sizeof(sMatListAt));
+    }
+    if (sMatListAt[key] == 0) {
+        s32 edgeNear = sEdgeNear;
+        Gfx* end;
+
+        if (sMatPoolUsed + MAT_LIST_MAX > MAT_POOL_SIZE) {
+            return NULL; // (no room: made in place)
+        }
+        list = &sMatPool[sMatListPool][sMatPoolUsed];
+        sEdgeNear = (tier == TIER_NEAR);
+        end = Scatter_Material(list, info, kind, tier);
+        sEdgeNear = edgeNear;
+        gSPEndDisplayList(end++);
+        sMatListAt[key] = sMatPoolUsed + 1;
+        sMatPoolUsed += end - list;
+    }
+    return &sMatPool[sMatListPool][sMatListAt[key] - 1];
+}
+
+/*
+ * Cache lines claimed before they're written whole (as Fishmod_ClaimDisplayLists, fishmod.c): the lines of the props'
+ * command buffer ahead of where it's being written (none of their bytes written yet this frame, all of them before
+ * `end`: what's there is two frames old, and unused or about to be written).
+ */
+#define SCATTER_CLAIM_AHEAD 256
+static u32 sClaimedOpa; // (how far this frame's claims have gone)
+static inline void Scatter_ClaimAhead(Gfx* at, Gfx* end, u32* claimed) {
+#if defined(__GNUC__) && !defined(FISHMOD_NO_CLAIM)
+    u32 head = ((u32)at + 15) & ~15;
+    u32 last = (u32)end & ~15;
+    u32 to = head + SCATTER_CLAIM_AHEAD;
+    u32 p = *claimed;
+
+    if (p < head) {
+        p = head;
+    }
+    if (to > last) {
+        to = last;
+    }
+    for (; p < to; p += 16) {
+        __asm__ volatile("cache 0x0D, 0(%0)" : : "r"(p) : "memory");
+    }
+    *claimed = p;
+#endif
 }
 
 /**
@@ -1932,7 +2023,7 @@ static ScatterBend* Scatter_BendBuild(Gfx* modelIn, u8* seg6, s32 nbands) {
 }
 
 /** The sway shears for this frame: per swaying kind, a few phases. */
-static void Scatter_Sway(PlayState* play, ScatterFrame* frame) {
+static void Scatter_Sway(PlayState* play, ScatterFrame* frame, ScatterSet* set) {
     s32 kind;
     s32 ph;
     s32 t = play->gameplayFrames;
@@ -1947,10 +2038,18 @@ static void Scatter_Sway(PlayState* play, ScatterFrame* frame) {
         }
         for (ph = 0; ph < SWAY_PHASES; ph++) {
             Mtx* mtx = &frame->sway[kind * SWAY_PHASES + ph];
-            s16 ang = (s16)(t * info->swayRate * 16 + ph * (0x10000 / SWAY_PHASES) + kind * 0x2345);
-            f32 amp = info->sway * (65536.0f / 1000.0f);
-            s32 a = (s32)(Math_SinS(ang) * amp);
-            s32 b = (s32)(Math_CosS((s16)(ang * 7 / 10 + 0x1000)) * amp * 0.4f);
+            s16 ang;
+            f32 amp;
+            s32 a;
+            s32 b;
+
+            if (!init && !set->swayUsed[kind * SWAY_PHASES + ph]) {
+                continue; // (no prop drawn this frame leans by it)
+            }
+            ang = (s16)(t * info->swayRate * 16 + ph * (0x10000 / SWAY_PHASES) + kind * 0x2345);
+            amp = info->sway * (65536.0f / 1000.0f);
+            a = (s32)(Math_SinS(ang) * amp);
+            b = (s32)(Math_CosS((s16)(ang * 7 / 10 + 0x1000)) * amp * 0.4f);
 
             // identity, but the y axis leans: x += a * y, z += b * y (the identity's entries written once: the
             // buffer keeps them, and only these two change)
@@ -2060,6 +2159,24 @@ static s16 sCards[BEDCARD_SET_MAX]; // (the build's bed cards, until it has its 
 static s32 sCardCount;
 static u8* sUseCard; // per visible chunk: drawn as its card
 
+#if FISHMOD_DEBUG
+static u32 sSetPop; // the pop-in test the set was made for
+/** A prop's (squared, flat) distance as its cut, tier and dissolve take it: nearer by the pop-in test's step. */
+static f32 Scatter_PopSq(f32 dSq, s32 kind) {
+    if ((gFishmodPop.step > 0.0f) && ((gFishmodPop.kind < 0) || (gFishmodPop.kind == kind))) {
+        f32 d = sqrtf(dSq) - gFishmodPop.step;
+
+        return (d > 0.0f) ? SQ(d) : 0.0f;
+    }
+    return dSq;
+}
+#define POP_SQ(dSq, kind) Scatter_PopSq(dSq, kind)
+#define POP_REACH gFishmodPop.step
+#else
+#define POP_SQ(dSq, kind) (dSq)
+#define POP_REACH 0.0f
+#endif
+
 static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f32 lookZ) {
     static u16 sVisible[256];                       // chunks near the camera
     static f32 sChunkDistSq[ARRAY_COUNT(sVisible)]; // their centres' distance from the eye, squared
@@ -2077,7 +2194,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 visibleCount = 0;
     s32 chunk = sScatter->chunk;
     s32 under = (gFishmodHaze > 0.5f);
-    f32 distFar = sDistFar[under];
+    f32 distFar = sDistFar[under] + POP_REACH;
     s32 mats = 0;
     s32 matsXlu = 0;
     s32 lastOpa = -1;
@@ -2248,7 +2365,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             {
                 f32 dx = sBedCards[card].x - eye.x;
                 f32 dz = sBedCards[card].z - eye.z;
-                f32 dSq = SQ(dx) + SQ(dz);
+                f32 dSq = POP_SQ(SQ(dx) + SQ(dz), -1);
 
                 if ((dSq > SQ(BEDCARD_DIST)) && (dSq < SQ(distFar * (1.0f + FADE_BAND))) &&
                     (BedCard_Views(card) != NULL)) {
@@ -2283,7 +2400,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             maxDist *= 1.0f + FADE_BAND; // the dissolve, past the kind's distance
         }
         maxSq = SQ(maxDist);
-        reachSq = SQ(maxDist + chunk * 0.71f);
+        reachSq = SQ(maxDist + chunk * 0.71f + POP_REACH);
 
         for (v = 0; v < visibleCount; v++) {
             s32 c = sVisible[v];
@@ -2309,7 +2426,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 f32 front;
                 s32 hidden;
 
-                if (dSq > maxSq) {
+                if (POP_SQ(dSq, kind) > maxSq) {
                     continue;
                 }
 #if FISHMOD_DEBUG
@@ -2321,7 +2438,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                     // the camera inside it
                     f32 k = prop->scale * (1.0f / 64.0f);
                     f32 h = info->height * k;
-                    f32 r = NEAR_SKIP_R * k + 10.0f;
+                    f32 r = NEAR_SKIP_R * k + 10.0f + (REUSE_MOVE - 6.0f); // (and the camera's way before the next set)
 
                     if ((dSq < SQ(r)) && (eye.y > prop->y - 10.0f) && (eye.y < prop->y + h + 10.0f)) {
                         continue;
@@ -2405,6 +2522,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     sMtxUsed = 0;
     set = &sBufs->set[sSet];
     set->count = 0;
+    bzero(set->swayUsed, sizeof(set->swayUsed));
     set->cardCount = sCardCount;
     bcopy(sCards, set->cards, sCardCount * sizeof(s16));
     // the single cards face the camera: they turn about their own up, by the look's direction across the ground
@@ -2417,7 +2535,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     for (n = 0; (n < candCount) && (budget > 0); n++) {
         FishmodProp* prop = &sProps[sOrdered[n]];
         s32 k = prop->kind;
-        s32 tier = Scatter_Tier(prop, &sKinds[k], k, SQ(prop->x - eye.x) + SQ(prop->z - eye.z), eye.y);
+        s32 tier = Scatter_Tier(prop, &sKinds[k], k, POP_SQ(SQ(prop->x - eye.x) + SQ(prop->z - eye.z), k), eye.y);
         s32 key = k + tier * FISHMOD_PROP_KIND_MAX; // (a material per kind and tier)
 
         if (sKinds[k].xlu) {
@@ -2508,6 +2626,27 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             } else {
                 set->mtxp[set->count] = Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD, yaw);
             }
+        }
+        set->alpha[set->count] = 255;
+        if (!sKinds[k].xlu && (tier == TIER_IMP) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)
+#if FISHMOD_DEBUG
+            && !gFishmodLodTest.active
+#endif
+        ) {
+            // past its distance: dissolving away (a dithered alpha test, no blending). Worked out with the set, not
+            // every frame: a camera that moves has a new set every few frames, and a frame's commands can then all
+            // be kept while the set is (they were kept only up to the first single card, which comes early)
+            f32 from = sKindMax[k];
+            f32 dSq = POP_SQ(SQ(prop->x - eye.x) + SQ(prop->z - eye.z), k);
+
+            if (dSq > SQ(from)) {
+                s32 a = (s32)((from * (1.0f + FADE_BAND) - sqrtf(dSq)) * (255.0f / (from * FADE_BAND)));
+
+                set->alpha[set->count] = CLAMP(a, 0, 255);
+            }
+        }
+        if (!sOrderedHidden[n] && (sKinds[k].sway != 0)) {
+            set->swayUsed[k * SWAY_PHASES + (((prop->x + prop->z) >> 7) & (SWAY_PHASES - 1))] = true;
         }
         set->tier[set->count] = tier;
         set->prop[set->count++] = sOrdered[n];
@@ -2636,11 +2775,12 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     // remake what's drawn only when the camera has moved or turned (or now and then anyway)
     sSetAge++;
 
-    if ((sSetAge >= REUSE_FRAMES) ||
+    if ((sSetAge >= REUSE_FRAMES) || ((gFishmodHaze > 0.5f) != sSetUnder) ||
 #if FISHMOD_DEBUG
         gFishmodLodTest.active || // calibrating: what's drawn changes with the test, not the camera
         ((u32)gFishmodBench != sSetBench) || // the bench switched a mode: the tiers are chosen here
         (gFishmodPropTest.serial != sSetPropTest) || // the prop sweep switched its test
+        (gFishmodPop.serial != sSetPop) ||
 #endif
         ((SQ(eye.x - sSetEye.x) + SQ(eye.y - sSetEye.y) + SQ(eye.z - sSetEye.z)) > SQ(REUSE_MOVE)) ||
         ((lookX * sSetLook.x + lookY * sSetLook.y + lookZ * sSetLook.z) < REUSE_TURN_COS)) {
@@ -2649,8 +2789,10 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 #if FISHMOD_DEBUG
         sSetBench = gFishmodBench;
         sSetPropTest = gFishmodPropTest.serial;
+        sSetPop = gFishmodPop.serial;
 #endif
         sSetAge = 0;
+        sSetUnder = (gFishmodHaze > 0.5f);
         sSetEye = eye;
         sSetLook.x = lookX;
         sSetLook.y = lookY;
@@ -2678,7 +2820,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         frame->lights = *sSceneLights;
         sSceneLights = &frame->lights;
     }
-    Scatter_Sway(play, frame);
+    Scatter_Sway(play, frame, set);
     Scatter_Touch(play);
     Scatter_TouchMatrices(frame);
     Scatter_RockCaustics(play, frame);
@@ -2690,13 +2832,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         ScatterKeep* keep = &sKeep[sFrame];
         s32 k;
 
-        cacheUntil = set->count;
-        for (k = 0; k < set->count; k++) {
-            if (set->tier[k] == TIER_IMP) {
-                cacheUntil = k;
-                break;
-            }
-        }
+        cacheUntil = set->count; // (all of them: nothing in a prop's commands changes while its set is the same)
         cacheOpa0 = opa;
         cacheXlu0 = xlu;
         keepNow.opaFrom = opa - frame->opa;
@@ -2758,6 +2894,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 #endif
         }
     }
+    sClaimedOpa = 0;
     for (n = cacheStart; n < set->count; n++) {
         FishmodProp* prop = &sProps[set->prop[n]];
         FishmodPropKindInfo* info;
@@ -2769,6 +2906,7 @@ void EnFishmod_ScatterDraw(PlayState* play) {
         if (set->hidden[n]) {
             continue; // (beyond the screen's edges)
         }
+        Scatter_ClaimAhead(opa, &frame->opa[ARRAY_COUNT(frame->opa)], &sClaimedOpa);
 
         if (n == cacheUntil) {
             Scatter_KeepAt(&sKeep[sFrame], cacheValid, cacheOpa0, opa, cacheXlu0, xlu, &keepNow, lastOpa, lastXlu,
@@ -2799,26 +2937,22 @@ void EnFishmod_ScatterDraw(PlayState* play) {
                 }
                 lastOpa = key;
             }
-            *disp = Scatter_Material(*disp, info, kind, tier);
+            {
+                Gfx* list = info->xlu ? NULL : Scatter_MaterialList(info, kind, tier);
+
+                if (list != NULL) {
+                    gSPDisplayList((*disp)++, list);
+                } else {
+                    *disp = Scatter_Material(*disp, info, kind, tier);
+                }
+            }
         }
         if (!info->xlu) {
             u32 t = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
             s32 a = 255;
             u32 col[3];
 
-            if ((tier == TIER_IMP) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)
-#if FISHMOD_DEBUG
-                && !gFishmodLodTest.active
-#endif
-            ) {
-                // past its distance: dissolving away (a dithered alpha test, no blending)
-                f32 from = sKindMax[kind];
-
-                if (dSq > SQ(from)) {
-                    a = (s32)((from * (1.0f + FADE_BAND) - sqrtf(dSq)) * (255.0f / (from * FADE_BAND)));
-                    a = CLAMP(a, 0, 255);
-                }
-            }
+            a = set->alpha[n]; // (a single card's dissolve, as the set was made)
             if (SCATTER_IS_ROCK(kind)) {
                 // each rock a slightly different stone: neutral, warmer or cooler grey (by where it stands)
                 static const u8 sStone[4][3] = { { 255, 255, 255 }, { 255, 240, 222 }, { 228, 240, 255 }, { 240, 248, 232 } };
