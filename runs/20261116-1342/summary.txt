@@ -1,0 +1,6 @@
+Morning runs 20261116-1342
+
+ 1. rc1r-1                       done        427 packets    3.2 MB   282 s  
+ 2. headroom-1                   done        410 packets    3.1 MB   225 s  
+ 3. rc1r-2                       done        427 packets    3.2 MB   223 s  
+ 4. headroom-2                   done        409 packets    3.1 MB   219 s  
