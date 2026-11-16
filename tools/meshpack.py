@@ -23,6 +23,7 @@ Usage: tools/meshpack.py SRC_TREE OUT_TREE [--report]
 """
 import collections
 import os
+import random
 import re
 import shutil
 import sys
@@ -778,6 +779,86 @@ def unsize(dirpath, room, dl):
             open(p, "w").write(new)
 
 
+# The lake's water surface (object_spot06_objects: gLakeHyliaHighWaterDL, gLakeHyliaLowWaterDL), its texture and
+# material made again: vanilla's 32x32 colour texture (2 KB, the same texture in both layers, magnified up to 4 times:
+# the ripples repeat every 77 units) becomes a 64x64 intensity texture of waves made here (I4: the same 2 KB, 4 times the
+# texels), its two layers far apart in scale (fine ripples at vanilla's texel size, repeating every 154 units; a swell 4
+# times coarser, mirrored, every 615), each scrolled its own way (z_bg_spot06_objects.c). The colour isn't the texture's:
+# the waves move it from the water's colour (the environment's) to a highlight (the primitive's), both set each frame
+# from the water's light setting and the scene's light; the alpha is a base (the environment's) plus the waves' times
+# the primitive's, so the surface can be made wholly clear between the waves (the bed's colour then the water fog's).
+# MESHPACK_NO_WATER_SURFACE=1: vanilla's.
+WATER_SURFACE = not os.environ.get("MESHPACK_NO_WATER_SURFACE")
+WATER_DIR = "assets/objects/object_spot06_objects"
+WATER_TEX = "gLakeHyliaWaterTex"
+WATER_W = 64
+
+
+def water_texture(path):
+    """the waves: a sum of sines on whole wave numbers (so it tiles), ridged (bright crests, broad troughs), 4-bit grey"""
+    import numpy as np
+    from PIL import Image
+    rnd = random.Random(1313)
+    y, x = np.mgrid[0:WATER_W, 0:WATER_W] / float(WATER_W)
+    h = np.zeros((WATER_W, WATER_W))
+    for _ in range(9):
+        kx, ky = rnd.randint(-5, 5), rnd.randint(1, 6)
+        a = 1.0 / (kx * kx + ky * ky) ** 0.35
+        h += a * np.sin(2 * np.pi * (kx * x + ky * y) + rnd.uniform(0, 2 * np.pi))
+    h = (h - h.min()) / (h.max() - h.min())
+    crest = np.clip((h - 0.45) / 0.55, 0, 1) ** 1.6     # (most of it dark, the crests bright)
+    v = np.round(crest * 15).astype(np.uint8) * 17
+    Image.fromarray(v, "L").save(path)
+
+
+WATER_MATERIAL_OLD = re.compile(r"gsDPLoadTextureBlock\(gLakeHyliaWaterTex,.*?gsSPSetGeometryMode\(G_FOG \| G_LIGHTING\),",
+                                re.S)
+WATER_MATERIAL = (
+    "gsDPLoadTextureBlock_4b(gLakeHyliaWaterTex, G_IM_FMT_I, 64, 64, 0, G_TX_NOMIRROR | G_TX_WRAP, "
+    "G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 14, 14),\n"
+    "    gsDPTileSync(),\n"
+    "    gsDPSetTile(G_IM_FMT_I, G_IM_SIZ_4b, 4, 0x0000, 1, 0, G_TX_MIRROR | G_TX_WRAP, 6, 0, "
+    "G_TX_MIRROR | G_TX_WRAP, 6, 0),\n"
+    "    gsDPSetTileSize(1, 0, 0, 0x00FC, 0x00FC),\n"
+    "    gsDPSetCombineLERP(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, PRIMITIVE, "
+    "ENVIRONMENT, COMBINED, ENVIRONMENT, COMBINED, 0, PRIMITIVE, ENVIRONMENT),\n"
+    "    gsDPSetRenderMode(G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2),\n"
+    "    gsSPClearGeometryMode(G_CULL_BACK | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR | G_LIGHTING),\n"
+    "    gsSPSetGeometryMode(G_FOG),")
+
+
+def water_surface(out):
+    d = os.path.join(out, WATER_DIR)
+    n = 0
+    for dl in ("gLakeHyliaHighWaterDL", "gLakeHyliaLowWaterDL"):
+        p = os.path.join(d, dl + ".inc.c")
+        t = open(p).read()
+        t2, k = WATER_MATERIAL_OLD.subn(WATER_MATERIAL, t)
+        if k != 1:
+            sys.exit("meshpack: %s's material not as expected" % dl)
+        # (the colours and alphas are the frame's, in the scroll lists of segments 8 and 9: the list's own go)
+        t2 = re.sub(r"\s*gsDPSetPrimColor\(0, 0, 255, 255, 255, \d+\),", "", t2)
+        os.remove(p)
+        open(p, "w").write(t2)
+        n += 1
+    for f in os.listdir(d):
+        if f.startswith(WATER_TEX + "."):
+            os.remove(os.path.join(d, f))
+    water_texture(os.path.join(d, WATER_TEX + ".i4.png"))
+    for f, a, b in (("object_spot06_objects.c", WATER_TEX + ".rgba16.inc.c", WATER_TEX + ".i4.inc.c"),
+                    ("object_spot06_objects.c", "gLakeHyliaWaterTex_HEIGHT, 16)]", "gLakeHyliaWaterTex_HEIGHT, 4)]"),
+                    ("object_spot06_objects.h", "gLakeHyliaWaterTex_WIDTH 32", "gLakeHyliaWaterTex_WIDTH 64"),
+                    ("object_spot06_objects.h", "gLakeHyliaWaterTex_HEIGHT 32", "gLakeHyliaWaterTex_HEIGHT 64"),
+                    ("object_spot06_objects.h", "gLakeHyliaWaterTex_HEIGHT, 16)]", "gLakeHyliaWaterTex_HEIGHT, 4)]")):
+        p = os.path.join(d, f)
+        t = open(p).read()
+        if a not in t:
+            sys.exit("meshpack: %s: %r not found" % (f, a))
+        os.remove(p)
+        open(p, "w").write(t.replace(a, b))
+    return n
+
+
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
@@ -787,6 +868,10 @@ def main():
         shutil.rmtree(out)
     # a copy of the tree of hard links (the files changed below are written fresh, breaking their link)
     shutil.copytree(src, out, copy_function=os.link)
+    if WATER_SURFACE:
+        n = water_surface(out)
+        if report:
+            print("meshpack: the lake's water surface: %d lists, a 64x64 intensity texture of waves" % n)
     for scene_dir, scene, texs in GREY_CAUSTICS:
         dls = [dl for sd, _, ds in CAUSTICS if sd == scene_dir for dl in ds]
         n = grey_caustics(os.path.join(out, scene_dir), scene, texs, dls)

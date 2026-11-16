@@ -456,6 +456,51 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
 
     gameplayFrames = play->state.frames;
 
+#if FISHMOD_WATER_SURFACE
+    // fish-oot: the surface made by tools/meshpack.py (a 64x64 intensity texture of waves, its two layers a fine
+    // ripple and a swell four times coarser): each layer scrolled its own way, and the colours and alphas, in the lists
+    // of segments 8 (the lake) and 9 (its outflow): the waves move the colour from the water's (the environment's) to
+    // a highlight (the primitive's), in the scene's light; the alpha is a base (the environment's) plus the waves'
+    // (the primitive's). FISHMOD_WATER_CLEAR: no base, the surface clear between the waves.
+    {
+        static const u8 sBase[3] = { 52, 104, 104 };
+        static const u8 sHigh[3] = { 205, 232, 228 };
+        EnvironmentContext* env = &play->envCtx;
+        u32 light[3];
+        s32 part;
+        s32 c;
+
+        for (c = 0; c < 3; c++) {
+            s32 l = play->lightCtx.ambientColor[c] + (env->dirLight1.params.dir.color[c] >> 1) +
+                    (env->dirLight2.params.dir.color[c] >> 1);
+
+            light[c] = CLAMP_MAX(l, 255);
+        }
+        for (part = 0; part < 2; part++) {
+            // (the outflow's part as vanilla had it: 102 of the lake's 160)
+            s32 baseA = FISHMOD_WATER_CLEAR ? 0 : (part ? 60 : 96);
+            s32 waveA = FISHMOD_WATER_CLEAR ? (part ? 128 : 200) : (part ? 70 : 110);
+            Gfx* g = GRAPH_ALLOC(play->state.gfxCtx, 7 * sizeof(Gfx));
+            u32 f = gameplayFrames * (part ? 3 : 1);
+            // the ripple drifts one way, the swell slowly another (in quarter texels a frame)
+            u32 x0 = (u32)(-(s32)f * 3) & 0xFFF;
+            u32 y0 = (f * 2) & 0xFFF;
+            u32 x1 = f & 0xFFF;
+            u32 y1 = (u32)(-(s32)f) & 0xFFF;
+
+            gDPTileSync(&g[0]);
+            gDPSetTileSize(&g[1], G_TX_RENDERTILE, x0, y0, x0 + (63 << 2), y0 + (63 << 2));
+            gDPTileSync(&g[2]);
+            gDPSetTileSize(&g[3], 1, x1, y1, x1 + (63 << 2), y1 + (63 << 2));
+            gDPSetPrimColor(&g[4], 0, 128, (sHigh[0] * light[0]) >> 8, (sHigh[1] * light[1]) >> 8,
+                            (sHigh[2] * light[2]) >> 8, waveA);
+            gDPSetEnvColor(&g[5], (sBase[0] * light[0]) >> 8, (sBase[1] * light[1]) >> 8,
+                           (sBase[2] * light[2]) >> 8, baseA);
+            gSPEndDisplayList(&g[6]);
+            gSPSegment(POLY_XLU_DISP++, part ? 0x09 : 0x08, g);
+        }
+    }
+#else
     gSPSegment(POLY_XLU_DISP++, 0x08,
                Gfx_TwoTexScroll(play->state.gfxCtx, G_TX_RENDERTILE, -gameplayFrames, gameplayFrames, 32, 32, 1,
                                 gameplayFrames, gameplayFrames, 32, 32));
@@ -464,6 +509,7 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
                                 gameplayFrames, gameplayFrames * 6, 32, 32));
 
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 128);
+#endif
 
     if ((this->lakeHyliaWaterLevel < -680.0f) && !IS_CUTSCENE_LAYER) {
         gSPDisplayList(POLY_XLU_DISP++, gLakeHyliaLowWaterDL);

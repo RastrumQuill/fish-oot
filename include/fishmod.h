@@ -745,6 +745,15 @@ void Fishmod_TerrainRA(struct PlayState* play);
 #define FISHMOD_DEPTH_TO 500.0f
 #define FISHMOD_DEPTH_MIN 0.12f
 s32 Fishmod_DepthShade(f32 depth);
+// the lake's water surface: tools/meshpack.py's (a 64x64 intensity texture of waves, the colours and alphas the
+// frame's: z_bg_spot06_objects.c) in a meshpack build; FISHMOD_WATER_CLEAR: clear between the waves
+#ifndef FISHMOD_MESHPACK
+#define FISHMOD_MESHPACK 0
+#endif
+#define FISHMOD_WATER_SURFACE FISHMOD_MESHPACK
+#ifndef FISHMOD_WATER_CLEAR
+#define FISHMOD_WATER_CLEAR 0
+#endif
 // water fog seen from above (fishmod.c Fishmod_WaterFogSetup): the camera-under-water fog by the share of the view's
 // ray inside the water, as the RSP's own fog's two numbers scaled for each draw (the lake bed's bands: tools/meshpack.py)
 #define FISHMOD_WATER_BANDS 8
