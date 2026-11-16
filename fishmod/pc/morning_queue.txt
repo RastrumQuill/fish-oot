@@ -1,9 +1,12 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
+# current-build: our branch as it is now (9d1d2b6), built on the collision lead's machine.
+# plus-popin-fixes: the same plus the collision lead's pop-in work (far cards fixed, plant distances recalibrated,
+# the surface crossing blended, the full fish model for the four nearest fish only).
 # claude/rc1-merge-ready (releases/notes-merge-ready.md): main (9d1d2b6) with the far cards' fix, the tiers
 # recalibrated to the pop-in test, the surface's crossing blended and heroes and the crowd, against main itself built
 # on the same machine with the same command (like for like), A B A B. Expansion Pak in.
 # (In place of the rc1-headroom pair: that branch is superseded, main has its CPU work already.)
-releases/fish-oot-main-bench-rebuilt.bps 12 main-1
-releases/fish-oot-merge-ready-bench.bps 12 ready-1
-releases/fish-oot-main-bench-rebuilt.bps 12 main-2
-releases/fish-oot-merge-ready-bench.bps 12 ready-2
+releases/fish-oot-main-bench-rebuilt.bps 12 current-build-1
+releases/fish-oot-merge-ready-bench.bps 12 plus-popin-fixes-1
+releases/fish-oot-main-bench-rebuilt.bps 12 current-build-2
+releases/fish-oot-merge-ready-bench.bps 12 plus-popin-fixes-2
