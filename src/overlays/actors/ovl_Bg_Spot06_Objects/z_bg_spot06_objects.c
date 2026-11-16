@@ -21,6 +21,7 @@
 #include "stack_pad.h"
 #include "sys_matrix.h"
 #include "z_lib.h"
+#include "libc64/math64.h"
 #include "effect.h"
 #include "play_state.h"
 #include "save.h"
@@ -473,9 +474,22 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
         s32 part;
         s32 c;
 
+        // the light on the surface as the RSP gives vanilla's (its normals point straight up): the ambient, and each
+        // directional light by how straight down it shines (none from below), as the scene's lights are this frame
+        LightDirectional* dirs[2];
+        f32 down[2];
+        s32 k;
+
+        dirs[0] = &env->dirLight1.params.dir;
+        dirs[1] = &env->dirLight2.params.dir;
+        for (k = 0; k < 2; k++) {
+            f32 len = sqrtf(SQ((f32)dirs[k]->x) + SQ((f32)dirs[k]->y) + SQ((f32)dirs[k]->z));
+
+            down[k] = ((len > 0.0f) && (dirs[k]->y > 0)) ? (dirs[k]->y / len) : 0.0f;
+        }
         for (c = 0; c < 3; c++) {
-            s32 l = play->lightCtx.ambientColor[c] + (env->dirLight1.params.dir.color[c] >> 1) +
-                    (env->dirLight2.params.dir.color[c] >> 1);
+            s32 l = play->lightCtx.ambientColor[c] + (s32)(dirs[0]->color[c] * down[0]) +
+                    (s32)(dirs[1]->color[c] * down[1]);
 
             light[c] = CLAMP_MAX(l, 255);
         }

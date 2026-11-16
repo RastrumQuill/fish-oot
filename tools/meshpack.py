@@ -794,8 +794,8 @@ WATER_W = 64
 
 def water_texture(src_png, path):
     """the waves: vanilla's own texture as the template, its brightness (its colour is the frame's now: z_bg_spot06_
-    objects.c) upscaled to 64x64 (tiled 3 x 3 first, so the edges join as they did), 4-bit grey; and vanilla's darkest
-    and brightest colours (the 10th and 95th percentiles of brightness), the base and highlight it's drawn between"""
+    objects.c) upscaled to 64x64 (tiled 3 x 3 first, so the edges join as they did), 4-bit grey; and the base and
+    highlight colours it's drawn between, fitted to vanilla's (below)"""
     import numpy as np
     from PIL import Image
     im = np.asarray(Image.open(src_png).convert("RGB"), float)
@@ -807,10 +807,21 @@ def water_texture(src_png, path):
     h = np.clip((h - h.min()) / max(h.max() - h.min(), 1e-6), 0, 1)
     v = np.round(h * 15).astype(np.uint8) * 17
     Image.fromarray(v, "L").save(path)
-    order = np.argsort(lum.ravel())
-    flat = im.reshape(-1, 3)[order]
-    low = flat[: max(1, len(flat) // 10)].mean(0)
-    high = flat[int(len(flat) * 0.95):].mean(0)
+    # the base and highlight: vanilla's colour against its brightness, a line fitted per channel through its texels as
+    # the game shows them (its two layers averaged, at many offsets), taken at the darkest and brightest brightness
+    # (the texture's 0 and 1): the waves' colours then go as vanilla's do (within about 4 of 255)
+    rng = np.random.default_rng(1)
+    cols = []
+    lums = []
+    for _ in range(64):
+        dy, dx = rng.integers(0, n, 2)
+        cols.append(((im + np.roll(im, (dy, dx), (0, 1))) / 2).reshape(-1, 3))
+        lums.append(((lum + np.roll(lum, (dy, dx), (0, 1))) / 2).ravel())
+    cols = np.concatenate(cols)
+    lums = np.concatenate(lums)
+    coef = np.linalg.lstsq(np.stack([np.ones_like(lums), lums], 1), cols, rcond=None)[0]
+    low = np.clip(coef[0] + coef[1] * lum.min(), 0, 255)
+    high = np.clip(coef[0] + coef[1] * lum.max(), 0, 255)
     mean = im.reshape(-1, 3).mean(0)
     return ([int(round(c)) for c in low], [int(round(c)) for c in high], [int(round(c)) for c in mean])
 
