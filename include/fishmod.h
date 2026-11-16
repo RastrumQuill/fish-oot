@@ -766,6 +766,13 @@ typedef struct FishmodWaterFog {
 } FishmodWaterFog;
 extern FishmodWaterFog gFishmodWaterFog;
 void Fishmod_WaterFogSetup(struct PlayState* play);
+// the water's fog colour (the underwater light setting's, seen from above or from under the surface) taken this far
+// toward vanilla's water's own colour (its texture's average), of 256: FISHMOD_WATER_SURFACE builds only
+#ifndef FISHMOD_WATER_TINT
+#define FISHMOD_WATER_TINT 192
+#endif
+void Fishmod_WaterTint(u8* rgb, s32 amount);
+void Fishmod_HazeTint(struct PlayState* play);
 s32 Fishmod_WaterFogFactor(f32 depth, s16* fm, s16* fo);
 Gfx* Fishmod_WaterFogOff(struct PlayState* play, Gfx* gfx);
 void Fishmod_WaterFogBands(struct PlayState* play, Gfx* out);
