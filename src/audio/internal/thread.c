@@ -376,9 +376,12 @@ AudioTask* AudioThread_UpdateImpl(void) {
             if (gAudioCustomUpdateFunction != NULL) {
                 gAudioCustomUpdateFunction(); // (once an update, before it: as on its own refresh)
             }
-            sFishmodAheadTask[sFishmodAhead] = AudioThread_Body(
-                samplesRemainingInAi, gAudioCtx.totalTaskCount + sFishmodAhead + 1, sFishmodAhead + 1, &aiLen,
-                &cmdsAhead);
+            // (the update's own number, for whatever in it reads the count: the sequences' random numbers do,
+            // AudioThread_NextRandom. The game's thread can't see it meanwhile: this one outranks it.)
+            gAudioCtx.totalTaskCount += sFishmodAhead + 1;
+            sFishmodAheadTask[sFishmodAhead] =
+                AudioThread_Body(samplesRemainingInAi, gAudioCtx.totalTaskCount, sFishmodAhead + 1, &aiLen, &cmdsAhead);
+            gAudioCtx.totalTaskCount -= sFishmodAhead + 1;
             sFishmodAhead++;
         }
         gFishmodBuilt[0] = rspTask;
