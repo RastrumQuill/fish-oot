@@ -1,0 +1,8 @@
+Morning runs 20261116-0650
+
+ 1. colnew-1                     done        414 packets    3.1 MB   228 s  
+ 2. headroom-1                   done        396 packets    3.0 MB   229 s  
+ 3. colnew-2                     done        413 packets    3.1 MB   226 s  
+ 4. headroom-2                   done        395 packets    3.0 MB   234 s  
+ 5. rc1-1                        done        438 packets    3.3 MB   229 s  
+ 6. rc1-2                        done        439 packets    3.3 MB   228 s  
