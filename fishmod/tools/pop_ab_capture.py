@@ -46,8 +46,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SETTINGS = ["Audio/Driver=None", "Input/Defocus=Allow", "Video/Output=IntegerFixed", "Video/FixedScale=1",
             "Video/Shader=None", "Video/InterframeBlending=false", "Video/ColorEmulation=false",
             "Video/ColorBleed=false", "Video/Quality=SD", "Video/Supersampling=false"]
-VARIANTS = 36  # as fishmod_debug.c: 0 as it is, 1 all 24 nearer, 2 all 150 nearer, 3..34 each kind 150 nearer,
+VARIANTS = 38  # as fishmod_debug.c: 36, 37 the surface's crossing (the haze at its middle; the props a frame before, a frame after); 0 as it is, 1 all 24 nearer, 2 all 150 nearer, 3..34 each kind 150 nearer,
                # 35 as it is again (the control: what differs between two drawings of the same thing)
+CONTROL = 35  # the variant that is the view as it is again
 DE_SEEN = 0.10  # FLIP's error from which a pixel is part of a pop
 PATCH_MIN = 3  # pixels: smaller patches are the dither's and the coverage's noise
 DE_PEAK_MIN = 0.15  # and so are patches that nowhere reach this
@@ -259,14 +260,29 @@ def report(out, stops):
         if not os.path.exists(base):
             continue
         a = np.asarray(Image.open(base).convert("RGB"))
-        ctl = os.path.join(out, f"s{stop:02d}_v{VARIANTS - 1:02d}.png")
+        ctl = os.path.join(out, f"s{stop:02d}_v{CONTROL:02d}.png")
         noise = spread(de_map(a, np.asarray(Image.open(ctl).convert("RGB")))) if os.path.exists(ctl) else None
         lp0 = lpips_dist(a, np.asarray(Image.open(ctl).convert("RGB"))) if os.path.exists(ctl) else 0.0
         if noise is not None:
-            rows.append({"stop": stop, "variant": VARIANTS - 1, "what": "control",
+            rows.append({"stop": stop, "variant": CONTROL, "what": "control",
                          "strength": score(a, np.asarray(Image.open(ctl).convert("RGB")))[0], "patches": [],
                          "lpips": lp0, "lpips_net": 0.0})
-        for v in range(1, VARIANTS - 1):
+        xa, xb = (os.path.join(out, f"s{stop:02d}_v{v:02d}.png") for v in (CONTROL + 1, CONTROL + 2))
+        if os.path.exists(xa) and os.path.exists(xb):
+            # the surface's crossing: the same half-hazed view with each side's distances
+            ia, ib = (np.asarray(Image.open(q).convert("RGB")) for q in (xa, xb))
+            s, found, de = score(ia, ib, noise)
+            lp = lpips_dist(ia, ib)
+            rows.append({"stop": stop, "variant": CONTROL + 1, "what": "crossing", "strength": s, "patches": found[:8],
+                         "lpips": lp, "lpips_net": None if lp is None else round(max(lp - (lp0 or 0.0), 0.0), 2)})
+            A, B = to_screen(ia).astype(np.uint8), to_screen(ib).astype(np.uint8)
+            heat = (A * 0.3).astype(np.uint8)
+            lit = np.clip(de / 0.5, 0, 1)[..., None]
+            heat = (heat * (1 - lit) + np.array([255, 60, 40]) * lit).astype(np.uint8)
+            trio = np.concatenate([A, B, heat], 1)
+            Image.fromarray(trio).resize((trio.shape[1] * 3, trio.shape[0] * 3), Image.NEAREST).save(
+                os.path.join(out, f"cross_s{stop:02d}.png"))
+        for v in range(1, CONTROL):
             p = os.path.join(out, f"s{stop:02d}_v{v:02d}.png")
             if not os.path.exists(p):
                 continue
@@ -312,7 +328,7 @@ def report(out, stops):
                 "|---|---|---|---|---|---|---|---|\n")
         kinds = {}
         for r in rows:
-            if 3 <= r["variant"] < VARIANTS - 1:
+            if 3 <= r["variant"] < CONTROL:
                 kinds.setdefault(r["what"], []).append(r)
         key = lambda r: (r["lpips_net"] if r.get("lpips_net") is not None else r["strength"])
         for what, rs in sorted(kinds.items(), key=lambda kv: -sum(key(r) for r in kv[1])):
@@ -323,6 +339,13 @@ def report(out, stops):
                     + ("-" if worst.get("lpips_net") is None else f"{sum(r['lpips_net'] for r in rs):.1f}")
                     + f" | {sum(r['strength'] for r in rs):.1f} | "
                     f"{sum(1 for r in rs if r['strength'] >= SCALE[0][0])} |\n")
+        cr = [r for r in rows if r["what"] == "crossing"]
+        if cr:
+            f.write("\n## Crossing the surface\n\nThe view with the haze half in (the moment the props' distances "
+                    "change sides), drawn with the over-water distances and with the under-water ones: what jumps "
+                    "in that one frame. `cross_sSS.png`.\n\n| stop | LPIPS | FLIP | |\n|---|---|---|---|\n")
+            for r in cr:
+                f.write(f"| {r['stop']} | {L(r)} | {r['strength']:.1f} | {verdict(r['strength'])} |\n")
         f.write("\nThe pairs: `pop_sSS_vVV.png` (the view, the view with the distances nearer, the patches lit), for "
                 "every variant FLIP calls a flicker or more. `pops.json` has every patch.\n")
     print(open(os.path.join(out, "report.md")).read())

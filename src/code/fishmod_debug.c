@@ -290,7 +290,9 @@ static void Fishmod_ViewUpdate(PlayState* play) {
 #define POP_AB_STEP_SET 24.0f
 #define POP_AB_FRAMES 24
 #define POP_AB_SETTLE 12
-#define POP_AB_VARIANTS (3 + 32 + 1) // (the last: the view as it is again, for the test's own noise)
+#define POP_AB_CONTROL (3 + 32)    // the view as it is again, for the test's own noise
+#define POP_AB_VARIANTS (3 + 32 + 3) // (then the surface's crossing: the haze at its middle, the props' distances
+                                    // as a frame before it and a frame after)
 static s32 sPopAbVariant = -1; // the variant on screen and settled, -1: none
 #endif
 #ifdef FISHMOD_EDGE_AB
@@ -468,10 +470,14 @@ static void Fishmod_TourUpdate(PlayState* play) {
 #endif
         if (since >= 0) {
             s32 variant = since / POP_AB_FRAMES;
-            f32 step = ((variant == 0) || (variant == POP_AB_VARIANTS - 1)) ? 0.0f
-                       : (variant == 1)                                     ? POP_AB_STEP_SET
-                                                                            : POP_AB_STEP;
-            s32 kind = ((variant < 3) || (variant == POP_AB_VARIANTS - 1)) ? -1 : (variant - 3);
+            f32 step = ((variant == 0) || (variant >= POP_AB_CONTROL)) ? 0.0f
+                       : (variant == 1)                                ? POP_AB_STEP_SET
+                                                                       : POP_AB_STEP;
+            s32 kind = ((variant < 3) || (variant >= POP_AB_CONTROL)) ? -1 : (variant - 3);
+            // (the crossing: the haze held at its middle, where the camera goes through the surface, and the props'
+            // distances as a frame before and a frame after: the fog itself the same in both)
+            f32 haze = (variant > POP_AB_CONTROL) ? 0.5f : -1.0f;
+            f32 under = (variant == POP_AB_CONTROL + 1) ? 0.45f : (variant == POP_AB_CONTROL + 2) ? 0.55f : -1.0f;
 
             if (since == 0) {
                 sFrozenFrames = play->gameplayFrames;
@@ -487,13 +493,17 @@ static void Fishmod_TourUpdate(PlayState* play) {
             if (variant >= POP_AB_VARIANTS) {
                 gFishmodPop.step = 0.0f;
                 gFishmodPop.kind = -1;
+                gFishmodPop.under = -1.0f;
+                gFishmodPop.haze = -1.0f;
                 gFishmodPop.serial++;
                 play->haltAllActors = false;
                 Fishmod_TourGo(sTourStop + 1);
             } else {
-                if ((gFishmodPop.step != step) || (gFishmodPop.kind != kind)) {
+                if ((gFishmodPop.step != step) || (gFishmodPop.kind != kind) || (gFishmodPop.under != under)) {
                     gFishmodPop.step = step;
                     gFishmodPop.kind = kind;
+                    gFishmodPop.under = under;
+                    gFishmodPop.haze = haze;
                     gFishmodPop.serial++;
                 }
                 if ((since % POP_AB_FRAMES) >= POP_AB_SETTLE) {
@@ -903,7 +913,7 @@ u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 u32 gFishmodPcTag; // the PC profile's tag for its samples now (FISHMOD_PCTAG_*)
 u32 gFishmodScatterDropped[4];
 void* gFishmodScatterDbg[8];
-FishmodPopTest gFishmodPop = { 0.0f, -1, 0 };
+FishmodPopTest gFishmodPop = { 0.0f, -1, 0, -1.0f, -1.0f };
 FishmodPropTest gFishmodPropTest; // props in view left out by the props' caps: budget, see-through, materials; and the most in view
 #ifndef FISHMOD_FLAT_TEST_INIT
 #define FISHMOD_FLAT_TEST_INIT 0

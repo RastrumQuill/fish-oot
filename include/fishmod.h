@@ -566,6 +566,8 @@ typedef struct FishmodPopTest {
     f32 step;
     s32 kind;
     u32 serial; // (a change: the set is made again)
+    f32 haze;   // the underwater haze held at this (the moment the camera crosses the surface is 0.5); < 0: as it is
+    f32 under;  // the props' distances as this far into the haze (0 over the water, 1 under it); < 0: as it is
 } FishmodPopTest;
 extern FishmodPopTest gFishmodPop;
 // The flat fish compared (fishmod_manager.c, LIT_DIST): set by a script (FISHMOD_FLAT_TEST_INIT), else normal

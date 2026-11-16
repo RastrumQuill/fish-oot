@@ -70,3 +70,49 @@ About 95 seconds a stop in ares (35 pictures each).
   should start with grass_tuft and bush_weed.
 - The pictures show what kind of change each is: for bush_weed under water it is the single card against the model
   (the card's shape is not the model's), not the plant appearing.
+
+## The recalibration (include/fishmod_lod_pop.h)
+
+**The line: LPIPS 2.0 for a kind at a stop over 150 units of travel.** From the pairs: at 6 and over a clump visibly
+changes shape or colour when the two frames are flipped; at 2.5 to 3 one clump changes a little; about 1 is the
+control's own noise.
+
+| | before | after |
+|---|---|---|
+| kinds over the line at the calibration stops | 11 | 0 |
+| the worst kind | grass_tuft 22.4 | tall_weed 1.7 |
+| every kind together, 150 units, the worst stops | 29.5, 27.2, 26.0, 17.8 | 4.7 (stop 10), 3.0, 2.2 |
+| crossing the surface, the worst frame | 27.4 (stop 10), 11.5, 10.3 | 0.9 |
+
+What changed:
+
+- **The tiers under water at their over-water distances** (they were at half). Halved, a plant became its single
+  card at twice the size on screen; that didn't show while the cards drew nothing. This alone took grass_tuft from
+  22.4 to 1.4, tall_weed 11.4 to 0.1, bush_weed 8.8 to 0.6, vine_strand 6.1 to 0.6, fan_weed 6.3 to 0. (0.75 was
+  tried: grass_tuft 12.5, vine_strand 2.4.)
+- **reed_clump, cattails, kelp_frond near for longer** (to 1200, 1200 and 900 units; was 500). They're thin stalks,
+  mostly edge, and the edge mode changes where the near drawing ends: a reed clump 60 pixels tall changed colour
+  there. Their card's distance and their half-size texture were tried first and weren't it; the props' positions at
+  the stop (580 to 650 units) were what said which boundary it was.
+- **The surface's crossing.** Under water each kind is drawn 500 to 900 units, over it 800 to 1600, and the switch
+  was in one frame at the haze's middle: lily pads, floating leaves and far clumps past 500 to 700 units vanished or
+  came back at once. Now each kind's distance goes from one to the other with the haze over its ten frames (a new
+  set each of those frames), and the dissolve covers the edge.
+
+What it costs, not measured here (ares doesn't time the RDP): under water more plants are drawn as their models
+between 250 and 500 units instead of as cards, and the reeds, cattails and kelp keep their cut cards further out.
+The bench patch below is for that.
+
+Left over the line, and not a distance: every kind together at stop 10 (4.7) with no single kind over 1: the bed
+cards' own swap at 1300 units, which the per-kind turns don't isolate.
+
+Reports: `pop-ab-rc1-calibrated.md` (the eleven calibration stops, the final settings, with the crossing) and
+`pop-ab-rc1-calibrated-22stops.md` (all 22 stops, before the kelp and crossing changes: kelp_frond 2.6 at stop 12
+there, 0.2 after). `--script pop_ab_cal` runs the eleven stops in about 20 minutes.
+
+## Patches
+
+- `fish-oot-rc1-headroom-test.bps`: this branch as rc1's test build (`--hw --texpack --colpack --meshpack --gcc-all
+  --testmode`).
+- `fish-oot-rc1-headroom-bench.bps`: as rc1's bench (`--script pcprof_frames`, the same flags), to set against
+  `fish-oot-rc1-bench.bps`.

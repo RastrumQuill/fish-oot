@@ -17,12 +17,15 @@
  *   coverage alone and the VI smooths it; far, blended with the picture behind): a clump 60 pixels tall changed colour
  *   there. Near until 1200 now, just short of where their single cards start (1234 and 1429). The half-size texture
  *   and the card's distance were tried first and weren't it.
+ * - kelp_frond: the same at the tour's stop 12 (2.6, thin fronds 550 to 650 units off, once the tiers under water
+ *   were at their full distances): near until 900, which is as far as it's drawn under water.
  * (0.75 under water was tried: grass_tuft and vine_strand stayed over the line.)
  */
 #define FISHMOD_UNDER_LOD_SCALE 1.0f
 
 #define FISHMOD_LOD_POP(X) \
     X(REED_CLUMP, 1.0f, 1.0f, 2.4f) \
-    X(CATTAILS, 1.0f, 1.0f, 2.4f)
+    X(CATTAILS, 1.0f, 1.0f, 2.4f) \
+    X(KELP_FROND, 1.0f, 1.0f, 1.8f)
 
 #endif
