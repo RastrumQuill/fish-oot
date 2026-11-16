@@ -104,7 +104,7 @@ def report(a):
     funcs = functions(a.elf)
     addrs = [f[0] for f in funcs]
     sym = symbols(a.elf)
-    names = entrance_names(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+    names = entrance_names(os.environ.get("FISHMOD_ROOT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
     def klass(pc):
         k = bisect.bisect_right(addrs, pc) - 1
