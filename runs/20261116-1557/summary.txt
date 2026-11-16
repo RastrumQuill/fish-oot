@@ -1,0 +1,6 @@
+Morning runs 20261116-1557
+
+ 1. main-1                       done        405 packets    3.1 MB   217 s  
+ 2. ready-1                      done        406 packets    3.1 MB   218 s  
+ 3. main-2                       done        406 packets    3.1 MB   217 s  
+ 4. ready-2                      done        406 packets    3.1 MB   222 s  

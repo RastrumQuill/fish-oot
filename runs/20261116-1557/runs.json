@@ -1,0 +1,58 @@
+[
+ {
+  "run": 1,
+  "label": "main-1",
+  "patch": "releases\\fish-oot-main-bench-rebuilt.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-16 15:57:24",
+  "patch_sha1": "1a274ea43e99566e2d2ac4c67523c86c71676ad4",
+  "upload_check": "ok",
+  "packets": 405,
+  "bytes": 3076728,
+  "packs": 1,
+  "seconds": 217
+ },
+ {
+  "run": 2,
+  "label": "ready-1",
+  "patch": "releases\\fish-oot-merge-ready-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-16 16:01:04",
+  "patch_sha1": "a211666fa99f8734676d39059278c0e0cefe90be",
+  "upload_check": "ok",
+  "packets": 406,
+  "bytes": 3079240,
+  "packs": 1,
+  "seconds": 218
+ },
+ {
+  "run": 3,
+  "label": "main-2",
+  "patch": "releases\\fish-oot-main-bench-rebuilt.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-16 16:04:44",
+  "patch_sha1": "1a274ea43e99566e2d2ac4c67523c86c71676ad4",
+  "upload_check": "ok",
+  "packets": 406,
+  "bytes": 3078808,
+  "packs": 1,
+  "seconds": 217
+ },
+ {
+  "run": 4,
+  "label": "ready-2",
+  "patch": "releases\\fish-oot-merge-ready-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-16 16:08:24",
+  "patch_sha1": "a211666fa99f8734676d39059278c0e0cefe90be",
+  "upload_check": "ok",
+  "packets": 406,
+  "bytes": 3085200,
+  "packs": 1,
+  "seconds": 222
+ }
+]
