@@ -1,6 +1,6 @@
 # claude/rc1-merge-ready: what's left to merge, on main as it is now
 
-main (d951a26) already has the props' and fish's CPU work: f5285cd merged claude/fish-prop-headroom onto rc1 with
+main (9d1d2b6 when this was last brought up to it) already has the props' and fish's CPU work: f5285cd merged claude/fish-prop-headroom onto rc1 with
 its own port (the entries, the one-pass set, the water fog per entry, the bending in bands). So
 `claude/rc1-headroom`'s port of the same work is superseded: don't merge that branch. This branch starts from main and
 has only what main doesn't:
@@ -12,7 +12,7 @@ has only what main doesn't:
 | a62b17b | each kind's draw distance crosses the surface with the haze, over its ten frames | fishmod_scatter.c |
 | a62b17b | the water fog's key in whole units of camera height from 40 up | fishmod_scatter.c |
 | a62b17b | the pop-in test: `--script pop_ab`, `pop_ab_cal`, `fishmod/tools/pop_ab_capture.py`, `flip_metric.py`; `popin_pier` | fishmod_debug.c, fishmod.c, fishmod.h (debug builds only), tools, scripts |
-| 9018b6a | heroes and the crowd: the full rig for the four fish nearest the camera only | fishmod_manager.c, fishmod_rig.c |
+| 9018b6a, 9a9ce46 | heroes and the crowd: the full rig for the four fish nearest the camera only | fishmod_manager.c |
 
 ## Checked here, on this branch
 
@@ -30,9 +30,8 @@ has only what main doesn't:
 
 ## Not done, and said plainly
 
-- **The heroes' sheen** (a specular highlight on the nearest fish, F3DEX3's specular lighting): written, and off
-  (`FISHMOD_HERO_SHEEN 0`). With it on, the pass runs and nothing shows on the fish. It needs a still close-up to
-  find out why. The hero/crowd selection itself is on and doesn't depend on it.
+- **The heroes' sheen** (a specular highlight on the nearest fish) was tried and taken out: it didn't draw, and the
+  fish are too small on screen for it to matter. Heroes and the crowd is the rig's cap alone.
 - **The RDP's side** of the recalibration (more models drawn under water between 250 and 500 units; reeds, cattails
   and kelp on their cut cards further) and of the far cards now drawing: ares doesn't time it. The bench pair below
   is for that.
@@ -42,11 +41,12 @@ has only what main doesn't:
 ## Patches
 
 - `fish-oot-merge-ready-bench.bps`: this branch, `--script pcprof_frames --hw --texpack --colpack --meshpack --gcc-all`.
-- `fish-oot-main-bench-rebuilt.bps`: main at d951a26, the same command on the same machine: the baseline for it.
+- `fish-oot-main-bench-rebuilt.bps`: main at 9d1d2b6, the same command on the same machine: the baseline for it.
+- The queue (`fishmod/pc/morning_queue.txt`): main, ready, main, ready, 12 minutes each.
 - `fish-oot-merge-ready-test.bps`: this branch as the test build (`--testmode`).
 
 ## To merge
 
-One merge of this branch into main: it is main plus two commits (and this note's). The only file both have been
+One merge of this branch into main: it is main plus its own commits and one merge of main into it (9a9ce46). The only file both have been
 changing is fishmod_scatter.c; this branch's changes to it are the recalibration's hooks in Scatter_Build and the
-fog key, on top of main's version of it as of d951a26.
+fog key, on top of main's version of it as of 9d1d2b6. fishmod_rig.c and z_en_fishmod.h are main's, unchanged.
