@@ -1276,12 +1276,23 @@ void AudioOcarina_SetCustomButtonMapping(u8 useCustom) {
 
 #endif
 
+#if FISHMOD_DEBUG
+void (*gFishmodOcarinaPad)(Input* input) = NULL;
+#endif
+
 void AudioOcarina_ReadControllerInput(void) {
     Input inputs[MAXCONTROLLERS];
     Input* input = &inputs[0];
     u32 ocarinaInputButtonPrev = sOcarinaInputButtonCur;
 
     PadMgr_RequestPadData(&gPadMgr, inputs, false);
+#if FISHMOD_DEBUG
+    // fish-oot: a test script playing the ocarina (the audio sweep's ocarina leg, code/fishmod_debug_sweep.inc.c):
+    // the ocarina reads the controller itself, so the script's buttons and stick are handed to it here
+    if (gFishmodOcarinaPad != NULL) {
+        gFishmodOcarinaPad(input);
+    }
+#endif
     sOcarinaInputButtonCur = input->cur.button;
     sOcarinaInputButtonPrev = ocarinaInputButtonPrev;
     sOcarinaInputStickAdj.x = input->rel.stick_x;

@@ -7,7 +7,7 @@ set -u
 REF=$1 NEW=$2
 HERE="$(cd "$(dirname "$0")" && pwd)"
 fail=0
-for d in "$NEW"/[sc]?.*/; do
+for d in "$NEW"/[a-z][0-3].*/; do
     r=$(basename "$d")
     [ -f "$REF/$r/report.json" ] && [ -f "$d/report.json" ] || { echo "$r: MISSING"; fail=1; continue; }
     snd=$(python3 "$HERE/audlog_compare.py" "$REF/$r/aud.bin" "$d/aud.bin" 2>&1 | tail -1)
@@ -17,5 +17,5 @@ for d in "$NEW"/[sc]?.*/; do
     case "$snd" in *SAME*) ;; *) fail=1 ;; esac
     echo "$cmp" | grep -qE "DIFFER|NOT REACHED|STOPPED" && fail=1
 done
-python3 "$HERE/audio_sweep_report.py" --cover "$NEW/rom.elf" "$NEW"/[sc]?.*/ | head -${COVER_LINES:-60}
+python3 "$HERE/audio_sweep_report.py" --cover "$NEW/rom.elf" "$NEW"/[a-z][0-3].*/ | head -${COVER_LINES:-60}
 [ $fail = 0 ] && echo "SWEEP: sound the same and running to the end in every run" || echo "SWEEP: FAILED (see above)"

@@ -146,9 +146,9 @@ typedef struct FishmodScript {
 #define FISHMOD_SCRIPT_BENCH 0
 #endif
 #ifdef FISHMOD_SWEEP_SCENES
-void Audio_SetSoundOutputMode(s8 soundSetting);
 #include "carthandle.h"
 u32 gFishmodSweepLeg; // the sweep leg being played (the profiler cuts its totals when this changes)
+#include "fishmod_debug_sweep.inc.c"
 #endif
 #ifdef FISHMOD_SCRIPT_ADULT
 #define SF_ADULT FISHMOD_SCRIPT_F_ADULT
@@ -1164,6 +1164,8 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
         static u8 sSweepChildNight;
         static u8 sSweepParts;
         static u8 sSweepPart;
+        static u8 sSweepKind;
+        static s32 sSweepOver;
 
         if (!sSweepSound) {
             // The run's options, from the ROM's header (the word at 0x38, which nothing uses: fishmod/tools/
@@ -1177,12 +1179,18 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             sSweepChildNight = (opt >> 4) & 1;
             sSweepParts = (opt >> 8) & 0xFF;
             sSweepPart = (opt >> 16) & 0xFF;
+            sSweepKind = (opt >> 24) & 0xF; // (0 the scenes; else fishmod_debug_sweep.inc.c's legs)
             if (sSweepParts == 0) {
                 sSweepParts = 1;
             }
             gSaveContext.soundSetting = opt & 3;
             Audio_SetSoundOutputMode(gSaveContext.soundSetting);
         }
+        if (sSweepKind != 0) {
+            if (sSweepOver || Sweep_Leg(sSweepKind, sSweepParts, sSweepPart)) {
+                gFishmodSweepLeg = (++sSweepOver > 20) ? 0xFFFE : 0xFFFF; // (as the scenes' end below)
+            }
+        } else
         if (++sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES) {
             while (sSweepEntrance < ENTR_MAX) {
                 s32 entrance = sSweepEntrance++;
