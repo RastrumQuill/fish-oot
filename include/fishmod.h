@@ -754,12 +754,33 @@ s32 Fishmod_DepthShade(f32 depth);
 #ifndef FISHMOD_WATER_CLEAR
 #define FISHMOD_WATER_CLEAR 0
 #endif
-// the surface's own alpha (of 255): a base, and the waves' on top (the outflow's two thirds of each)
-#ifndef FISHMOD_WATER_BASE_A
-#define FISHMOD_WATER_BASE_A 40
+// the surface's alpha (z_bg_spot06_objects.c): the waves' contrast raised by CONTRAST/256 about PIVOT (of 255); the
+// crests stay as vanilla's (160 on the lake), the troughs go clear. The outflow's (vanilla 102) a higher pivot.
+#ifndef FISHMOD_WATER_PIVOT
+#define FISHMOD_WATER_PIVOT 160
 #endif
-#ifndef FISHMOD_WATER_WAVE_A
-#define FISHMOD_WATER_WAVE_A 80
+#ifndef FISHMOD_WATER_CONTRAST
+#define FISHMOD_WATER_CONTRAST 128
+#endif
+#ifndef FISHMOD_WATER_PIVOT_OUT
+#define FISHMOD_WATER_PIVOT_OUT 217
+#endif
+#ifndef FISHMOD_WATER_CONTRAST_OUT
+#define FISHMOD_WATER_CONTRAST_OUT 148
+#endif
+// the water's numbers as the game reads them: in debug builds a table in memory (gFishmodWaterTune: pivot, contrast,
+// the outflow's pivot and contrast, the fog's tint) that the render tools poke between pictures, so variants need no
+// build; in others the numbers above
+#define FISHMOD_WT_PIVOT 0
+#define FISHMOD_WT_CONTRAST 1
+#define FISHMOD_WT_PIVOT_OUT 2
+#define FISHMOD_WT_CONTRAST_OUT 3
+#define FISHMOD_WT_TINT 4
+#if FISHMOD_DEBUG
+extern s16 gFishmodWaterTune[5];
+#define FISHMOD_WATER_TUNE(i, v) (gFishmodWaterTune[i])
+#else
+#define FISHMOD_WATER_TUNE(i, v) (v)
 #endif
 // water fog seen from above (fishmod.c Fishmod_WaterFogSetup): the camera-under-water fog by the share of the view's
 // ray inside the water, as the RSP's own fog's two numbers scaled for each draw (the lake bed's bands: tools/meshpack.py)

@@ -1901,11 +1901,16 @@ void Fishmod_WaterFogSetup(PlayState* play) {
     gFishmodWaterFog.h = eye.y - FISHMOD_LAKE_SURFACE;
 }
 
+#if FISHMOD_DEBUG
+s16 gFishmodWaterTune[5] = { FISHMOD_WATER_PIVOT, FISHMOD_WATER_CONTRAST, FISHMOD_WATER_PIVOT_OUT,
+                             FISHMOD_WATER_CONTRAST_OUT, FISHMOD_WATER_TINT };
+#endif
+
 /** A fog colour taken toward vanilla's water's colour: FISHMOD_WATER_TINT of 256, times amount of 256. */
 void Fishmod_WaterTint(u8* rgb, s32 amount) {
 #if FISHMOD_WATER_SURFACE
     static const u8 sMean[3] = FISHMOD_WATER_MEAN;
-    s32 k = (FISHMOD_WATER_TINT * amount) >> 8;
+    s32 k = (FISHMOD_WATER_TUNE(FISHMOD_WT_TINT, FISHMOD_WATER_TINT) * amount) >> 8;
     s32 c;
 
     for (c = 0; c < 3; c++) {

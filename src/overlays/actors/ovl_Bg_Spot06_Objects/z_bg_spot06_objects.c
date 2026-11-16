@@ -463,8 +463,8 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
     // fish-oot: the surface made by tools/meshpack.py (a 64x64 intensity texture of waves, its two layers a fine
     // ripple and a swell four times coarser): each layer scrolled its own way, and the colours and alphas, in the lists
     // of segments 8 (the lake) and 9 (its outflow): the waves move the colour from the water's (the environment's) to
-    // a highlight (the primitive's), in the scene's light; the alpha is a base (the environment's) plus the waves'
-    // (the primitive's). FISHMOD_WATER_CLEAR: no base, the surface clear between the waves.
+    // a highlight (the primitive's), in the scene's light; the alpha is the waves' with their contrast raised (below).
+    // FISHMOD_WATER_CLEAR: only the crests.
     {
         // (vanilla's texture's own darkest and brightest colours: tools/meshpack.py)
         static const u8 sBase[3] = FISHMOD_WATER_BASE;
@@ -481,12 +481,16 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
             light[c] = CLAMP_MAX(l, 255);
         }
         for (part = 0; part < 2; part++) {
-            // (the outflow's part as vanilla had it: 102 of the lake's 160)
-            // (vanilla: 160 all over, 102 on the outflow. Here the surface is mostly clear: what's under it takes the
-            // water's colour and murk from the water fog by how much water the view crosses (fishmod.c), so the
-            // shallows show their bed and the deep water is opaque; the surface keeps its waves)
-            s32 baseA = FISHMOD_WATER_CLEAR ? 0 : (part ? FISHMOD_WATER_BASE_A * 2 / 3 : FISHMOD_WATER_BASE_A);
-            s32 waveA = FISHMOD_WATER_CLEAR ? (part ? 128 : 200) : (part ? FISHMOD_WATER_WAVE_A * 2 / 3 : FISHMOD_WATER_WAVE_A);
+            // the alpha: the waves (the two layers' average, t) with their contrast raised about a pivot (the
+            // environment's alpha e) by the primitive's (p): t + (t - e) p. Vanilla's is 160 all over (102 on the
+            // outflow); here the crests (t about 0.63, the brightest 3%) keep about that, the troughs go clear and the
+            // water fog shows through them (fishmod.c). (e p kept under 0.5: below -128 the combiner wraps to 255)
+            s32 baseA = FISHMOD_WATER_CLEAR ? 240
+                        : part ? FISHMOD_WATER_TUNE(FISHMOD_WT_PIVOT_OUT, FISHMOD_WATER_PIVOT_OUT)
+                               : FISHMOD_WATER_TUNE(FISHMOD_WT_PIVOT, FISHMOD_WATER_PIVOT);
+            s32 waveA = FISHMOD_WATER_CLEAR ? 128
+                        : part ? FISHMOD_WATER_TUNE(FISHMOD_WT_CONTRAST_OUT, FISHMOD_WATER_CONTRAST_OUT)
+                               : FISHMOD_WATER_TUNE(FISHMOD_WT_CONTRAST, FISHMOD_WATER_CONTRAST);
             Gfx* g = GRAPH_ALLOC(play->state.gfxCtx, 7 * sizeof(Gfx));
             u32 f = gameplayFrames * (part ? 3 : 1);
             // the ripple drifts one way, the swell slowly another (in quarter texels a frame)
