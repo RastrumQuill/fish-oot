@@ -65,14 +65,29 @@ if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
 # drained, or the bench's NOWATERFOG).
 WATER_FOG = not os.environ.get("MESHPACK_NO_WATER_FOG")
 WATER_BANDS = [0, 12, 30, 60, 100, 160, 250, 400]   # each band's top, by depth under the surface
+# (the game's band lists: these 8, by their middles' depths, fishmod.c sWaterBandMid)
+GAME_BAND_MID = [6, 21, 45, 80, 130, 205, 325, 520]
+# tests: MESHPACK_FOG_BANDS="0,30,100,250" cuts at fewer depths (each band's fog the game's list nearest its middle);
+# MESHPACK_FOG_NOCUT=1 cuts nothing: each whole triangle in the band of its middle's depth
+if os.environ.get("MESHPACK_FOG_BANDS"):
+    WATER_BANDS = [int(x) for x in os.environ["MESHPACK_FOG_BANDS"].split(",")]
+FOG_NOCUT = bool(os.environ.get("MESHPACK_FOG_NOCUT"))
+
+
+def game_band(k):
+    """the game's band list for this band (by the depth of its middle)"""
+    top = WATER_BANDS[k]
+    bottom = WATER_BANDS[k + 1] if k + 1 < len(WATER_BANDS) else top + 250
+    mid = (top + bottom) / 2.0
+    return min(range(len(GAME_BAND_MID)), key=lambda i: abs(GAME_BAND_MID[i] - mid))
 FOG_SEG_BASE = 0x0A000000 + 3 * 16                    # (after the three caustic steps, two commands each)
 
 
 def fog_band_call(k):
-    return "gsSPDisplayList(0x%08X)" % (FOG_SEG_BASE + k * 32)
+    return "gsSPDisplayList(0x%08X)" % (FOG_SEG_BASE + game_band(k) * 32)
 
 
-FOG_OFF_CALL = "gsSPDisplayList(0x%08X)" % (FOG_SEG_BASE + len(WATER_BANDS) * 32)
+FOG_OFF_CALL = "gsSPDisplayList(0x%08X)" % (FOG_SEG_BASE + len(GAME_BAND_MID) * 32)
 FOG_CALLS = {fog_band_call(k) for k in range(len(WATER_BANDS))} | {FOG_OFF_CALL}
 
 
@@ -121,6 +136,13 @@ def clip_poly(poly, y0, lit):
 
 def band_split(tri, lit):
     """the triangle's parts by band: [(band (-1: over the surface), triangle)]"""
+    if FOG_NOCUT:
+        d = WATER_Y - sum(int(v[1], 0) for v in tri) / 3.0
+        b = -1
+        for k, top in enumerate(WATER_BANDS):
+            if d > top:
+                b = k
+        return [(b, tuple(tri))]
     out = []
     poly = list(tri)
     for k, d in enumerate(WATER_BANDS):
