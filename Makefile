@@ -247,6 +247,17 @@ COMPARE := 0
 
 # (the build profile, hardware or emulator, is src/fishmod_data/fishmod_profile.h: fishmod/build.sh --profile)
 
+# FISHMOD_EXPAK=1: the ROM needs the Expansion Pak (fishmod/build.sh --expak): code under #if FISHMOD_EXPAK can count
+# on the 8 MB (the heap's extra 4 MB, the third frame buffer, the audio's sample store: code/sys_cfb.c); without the
+# pak the game says so at power-on instead of starting. 0 (the default): it runs either way, using the pak if it's there
+FISHMOD_EXPAK ?= 0
+ifeq ($(FISHMOD_EXPAK),1)
+  CPP_DEFINES += -DFISHMOD_EXPAK=1
+  COMPARE := 0
+else
+  CPP_DEFINES += -DFISHMOD_EXPAK=0
+endif
+
 # FISHMOD_TESTMODE=1: new files skip the intro and start with testing items (bottles, slingshot, bracelet...)
 FISHMOD_TESTMODE ?= 0
 ifeq ($(FISHMOD_TESTMODE),1)
