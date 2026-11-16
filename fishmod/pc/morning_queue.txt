@@ -1,7 +1,8 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# rc1 against rc1 with the props and fish CPU work brought onto it (releases/notes-rc1-props.md), A B A B. Expansion
-# Pak in.
-releases/fish-oot-rc1-bench.bps 12 rc1-1
-releases/fish-oot-rc1-props-bench.bps 12 props-1
-releases/fish-oot-rc1-bench.bps 12 rc1-2
-releases/fish-oot-rc1-props-bench.bps 12 props-2
+# The collision lead's rc1-headroom (claude/rc1-headroom, releases/notes-rc1-headroom.md): rc1 with the far cards'
+# fix, the props' and fish's CPU work and the recalibrated tiers, against rc1 rebuilt on the same machine
+# (like for like), A B A B. Expansion Pak in.
+releases/fish-oot-rc1-bench-rebuilt.bps 12 rc1r-1
+releases/fish-oot-rc1-headroom-bench.bps 12 headroom-1
+releases/fish-oot-rc1-bench-rebuilt.bps 12 rc1r-2
+releases/fish-oot-rc1-headroom-bench.bps 12 headroom-2
