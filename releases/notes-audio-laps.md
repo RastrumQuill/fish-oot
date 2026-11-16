@@ -45,3 +45,26 @@ RDRAM traffic a game frame (`fishmod/tools/busprof.py`, the play bench, 160 s of
 | CPU: its data filled / written back | 67.7 / 37.2 | 61.7 / 40.2 |
 | RSP: the audio tasks' DMAs, in / out | 79.2 / 31.2 | 72.3 / 31.2 |
 | **the audio's, together** | **271.8** | **243.1 (-11%)** |
+
+## On the console (16 November, 05:37; a run each, one after the other)
+
+| | lap | frames over 52 ms | frame | CPU update + draw | RSP graphics | RSP audio | RDP | audio thread, ms a game frame |
+|---|---|---|---|---|---|---|---|---|
+| every refresh | 1 | 44.6% | 53.52 | 48.16 | 23.01 | 10.67 | 42.51 | 11.93 |
+| | 2 | 41.0% | 53.35 | 47.32 | 22.94 | 10.06 | 42.28 | 11.35 |
+| | 3 | 39.9% | 53.34 | 47.55 | 24.41 | 9.73 | 43.36 | 11.19 |
+| every second refresh | 1 | 58.9% | 54.36 | 45.95 | 24.95 | 10.53 | 43.23 | 10.26 |
+| | 2 | 55.9% | 53.54 | 45.41 | 24.90 | 9.93 | 42.76 | 9.82 |
+| | 3 | 56.6% | 53.63 | 45.64 | 26.12 | 9.54 | 43.69 | 9.68 |
+
+- **Every second refresh is worse on screen**: 57% of frames over 52 ms against 42%, though the audio thread's time is
+  14% lower (1.6 ms a frame) and the CPU's update and draw 2.0 ms shorter. Visible hitches 23% against 21%. Not to
+  be used.
+- Why, most likely: a game frame is three refreshes, so with an update every two a frame gets one update or two,
+  turn about, each twice the size: 6.3 ms of CPU and a 6.6 ms RSP task in one piece, or twice that. The frames with
+  two go over; the frames with one can't go under the 50 ms cap, so nothing is won back. The graphics task's time on
+  the clock is 1.9 ms longer (it waits out a longer audio task). Every refresh gives each frame the same three.
+- **The branch as it is** (the baseline): the audio thread 11.2 to 11.9 ms a game frame; the audio A/B's whole laps
+  on frames25's driver were 12.1 to 12.8 (another power-on, a day apart: about 7% lower, more than the 1% ares
+  counted without the PC sampler, near the 4.5% it counted with it, which these builds carry). 42% of frames over
+  52 ms against 45%: inside a lap's noise.
