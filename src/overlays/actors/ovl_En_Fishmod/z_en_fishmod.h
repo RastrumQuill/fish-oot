@@ -302,6 +302,8 @@ s32 EnFishmod_RigPrepare(struct EnFishmod* this);
 void EnFishmod_RigFreeAll(void);
 void EnFishmod_RigSetSpecies(struct EnFishmod* this, struct PlayState* play, s32 variant);
 void EnFishmod_RigRestoreSegments(struct PlayState* play);
+void EnFishmod_RigSheenFlush(struct PlayState* play);
+extern s32 gFishmodRigSheen;
 // fog: -1 lit (the model's own material), else flat with this much fog (0-255, EnFishmod_FogAmount)
 void EnFishmod_RigDraw(struct EnFishmod* this, struct PlayState* play, s32 variant, s32 wantBounds, s32 fog);
 // How fogged a point is (0-255), as the RSP would fog a vertex there with the scene's fog now (Play_SetFog)
