@@ -63,14 +63,49 @@ static AudioTask* sWaitingAudioTask = NULL;
  *
  * original name: CreateAudioTask (note: function is heavily modified in Animal Crossing)
  */
-AudioTask* AudioThread_UpdateImpl(void) {
-#if OOT_VERSION < PAL_1_0 || !PLATFORM_N64
-    static s32 sMaxAbiCmdCnt = 0x80;
-    static AudioTask* sWaitingAudioTask = NULL;
+extern u8 gFishmodDmaTtlAhead; // (load.c)
+static s32 sFishmodCallSlot; // the output buffer ring's slot of the refresh being handled
+#if FISHMOD_EXPAK
+u8 gFishmodAudioAhead = false; // updates built ahead when the driver is steady: off until the console says it
+                                // pays (the audio_ahead_ab bench switches it by lap; the audio check's build has it on)
+u8 gFishmodTaskRing = 2;      // the command lists and tasks in use: 6, or the heap's 2 for a spec too big (heap.c)
+static u8 sFishmodAhead;      // updates built and not yet due (0-2)
+static AudioTask* sFishmodAheadTask[2];
+#define FISHMOD_TASK_RING_NOW gFishmodTaskRing
+
+/**
+ * Whether the next refresh's update can be built now: it must not need anything that only happens between
+ * refreshes. That is the RSP's output (a reverb that downsamples reads back what the task before last wrote), a
+ * reset in progress or just started (its steps are timed in refreshes), or the driver's own two-refresh mode.
+ */
+static s32 AudioThread_FishmodSteady(void) {
+    s32 i;
+
+    if (!gFishmodAudioAhead || (gFishmodTaskRing != FISHMOD_TASK_RING) || (gAudioCtx.resetStatus != 0) ||
+        (gAudioCtx.resetTimer != 0) || (gAudioCtx.audioBufferParameters.specUnk4 != 1)) {
+        return false;
+    }
+    for (i = 0; i < gAudioCtx.numSynthesisReverbs; i++) {
+        if (gAudioCtx.synthesisReverbs[i].downsampleRate >= 2) {
+            return false;
+        }
+    }
+    return true;
+}
+#else
+#define FISHMOD_TASK_RING_NOW FISHMOD_TASK_RING
 #endif
-    u32 samplesRemainingInAi;
+
+/*
+ * fish-oot: the rest of the audio update, as the game's: the sample loads waited for, the loads and the reset stepped,
+ * the game's commands taken, the command list built for the next slot of the rings, the task filled in. Returns the
+ * task (NULL where the game's update returned none). Its own function so that an update can be followed by the next
+ * refreshes' in the same wake (AudioThread_UpdateImpl, FISHMOD_EXPAK): ahead is how many refreshes early this one is
+ * built (0: on its own refresh, exactly the game's update), taskCount the update's number (the game's totalTaskCount
+ * when it would have run), samplesRemainingInAi what the audio interface holds, or will by then.
+ */
+static AudioTask* AudioThread_Body(u32 samplesRemainingInAi, u32 taskCount, s32 ahead, s32* lenOut, s32* cmdsOut) {
     s32 abiCmdCnt;
-    STACK_PAD(s32);
     s32 j;
     s32 sp5C;
     s16* curAiBuffer;
@@ -79,55 +114,14 @@ AudioTask* AudioThread_UpdateImpl(void) {
     u32 sp4C;
     s32 sp48;
     s32 i;
-
 #if FISHMOD_DEBUG
     extern u64 gFishmodAudTime[];
     u32 fmStart = osGetCount();
 #endif
 
-    gAudioCtx.totalTaskCount++;
-    if ((gAudioCtx.totalTaskCount % gAudioCtx.audioBufferParameters.specUnk4) != 0) {
-        if (gAudioCustomUpdateFunction != NULL) {
-            gAudioCustomUpdateFunction();
-        }
-
-        if (((gAudioCtx.totalTaskCount % gAudioCtx.audioBufferParameters.specUnk4) + 1) ==
-            gAudioCtx.audioBufferParameters.specUnk4) {
-            return sWaitingAudioTask;
-        } else {
-            return NULL;
-        }
-    }
-
-    osSendMesg(gAudioCtx.taskStartQueueP, (OSMesg)gAudioCtx.totalTaskCount, OS_MESG_NOBLOCK);
-    gAudioCtx.rspTaskIndex ^= 1;
-    gAudioCtx.curAiBufIndex++;
-    gAudioCtx.curAiBufIndex %= 3;
-    index = (gAudioCtx.curAiBufIndex - 2 + 3) % 3;
-    samplesRemainingInAi = osAiGetLength() / 4;
-#if FISHMOD_DEBUG
-    if (gFishmodAudioLockstep) {
-        /* fish-oot: the audio check: as many samples every update, not what the hardware still holds */
-        samplesRemainingInAi = EXTRA_BUFFERED_AI_SAMPLES_TARGET;
-    }
-#endif
-
-    if (gAudioCtx.resetTimer < 16) {
-        if (gAudioCtx.aiBufLengths[index] != 0) {
-#if FISHMOD_DEBUG
-            if (gFishmodAudioLockstep) {
-                Fishmod_AudLog_Buffer(gAudioCtx.aiBuffers[index], gAudioCtx.aiBufLengths[index]);
-            }
-#endif
-            osAiSetNextBuffer(gAudioCtx.aiBuffers[index], gAudioCtx.aiBufLengths[index] * 4);
-            if (gAudioCtx.aiBuffers[index]) {}
-            if (gAudioCtx.aiBufLengths[index]) {}
-        }
-    }
-
-    if (gAudioCustomUpdateFunction != NULL) {
-        gAudioCustomUpdateFunction();
-    }
+    gFishmodDmaTtlAhead = ahead;
+    gAudioCtx.rspTaskIndex = (gAudioCtx.rspTaskIndex + 1) % FISHMOD_TASK_RING_NOW;
+    gAudioCtx.curAiBufIndex = (gAudioCtx.curAiBufIndex + 1) % FISHMOD_AI_RING;
 
     sp5C = gAudioCtx.curAudioFrameDmaCount;
     for (i = 0; i < gAudioCtx.curAudioFrameDmaCount; i++) {
@@ -150,7 +144,10 @@ AudioTask* AudioThread_UpdateImpl(void) {
     }
 
     gAudioCtx.curAudioFrameDmaCount = 0;
-    AudioLoad_DecreaseSampleDmaTtls();
+    if (ahead == 0) {
+        // (the countdowns drop once a refresh: an update built ahead leaves them, and its own refresh drops them)
+        AudioLoad_DecreaseSampleDmaTtls();
+    }
     AudioLoad_ProcessLoads(gAudioCtx.resetStatus);
     AudioLoad_ProcessScriptLoads();
 
@@ -191,6 +188,8 @@ AudioTask* AudioThread_UpdateImpl(void) {
         gAudioCtx.aiBufLengths[index] = gAudioCtx.audioBufferParameters.maxAiBufferLength;
     }
 
+    *lenOut = gAudioCtx.aiBufLengths[index];
+
     j = 0;
     if (gAudioCtx.resetStatus == 0) {
         // msg = 0000RREE R = read pos, E = End Pos
@@ -199,6 +198,7 @@ AudioTask* AudioThread_UpdateImpl(void) {
             AudioThread_ProcessCmds(sp4C);
             j++;
         }
+        *cmdsOut = j;
         if ((j == 0) && (gAudioCtx.threadCmdQueueFinished)) {
             AudioThread_ScheduleProcessCmds();
         }
@@ -211,15 +211,16 @@ AudioTask* AudioThread_UpdateImpl(void) {
 #if FISHMOD_DEBUG
     if (gFishmodAudioLockstep) {
         /* fish-oot: the audio check: the cycle count and the code's bytes vary between builds; fixed stand-ins */
+        // (not the output buffer's old samples either, as the game adds: which old buffer that is depends on how many
+        // there are in the ring, 3 or 6 (FISHMOD_AI_RING), and the check compares builds of both)
         gAudioCtx.audioRandom =
-            (gAudioCtx.audioRandom + gAudioCtx.totalTaskCount) * (gAudioCtx.totalTaskCount * 0x9E3779B1 + 1);
-        gAudioCtx.audioRandom = gAudioCtx.audioRandom + gAudioCtx.aiBuffers[index][gAudioCtx.totalTaskCount & 0xFF];
+            (gAudioCtx.audioRandom + taskCount) * (taskCount * 0x9E3779B1 + 1);
         gWaveSamples[8] = (s16*)(gFishmodAudNoise + (gAudioCtx.audioRandom & 0xFFF0));
     } else
 #endif
     {
-        gAudioCtx.audioRandom = (gAudioCtx.audioRandom + gAudioCtx.totalTaskCount) * osGetCount();
-        gAudioCtx.audioRandom = gAudioCtx.audioRandom + gAudioCtx.aiBuffers[index][gAudioCtx.totalTaskCount & 0xFF];
+        gAudioCtx.audioRandom = (gAudioCtx.audioRandom + taskCount) * osGetCount();
+        gAudioCtx.audioRandom = gAudioCtx.audioRandom + gAudioCtx.aiBuffers[index][taskCount & 0xFF];
 
         // gWaveSamples[8] interprets compiled assembly code as s16 samples as a way to generate sound with noise.
         // Start with the address of AudioThread_Update, and offset it by a random number between 0 - 0xFFF0
@@ -263,6 +264,122 @@ AudioTask* AudioThread_UpdateImpl(void) {
     } else {
         sWaitingAudioTask = gAudioCtx.curTask;
         return NULL;
+    }
+}
+
+AudioTask* AudioThread_UpdateImpl(void) {
+#if OOT_VERSION < PAL_1_0 || !PLATFORM_N64
+    static s32 sMaxAbiCmdCnt = 0x80;
+    static AudioTask* sWaitingAudioTask = NULL;
+#endif
+    u32 samplesRemainingInAi;
+    s32 abiCmdCnt;
+    STACK_PAD(s32);
+    s32 j;
+    s32 sp5C;
+    s16* curAiBuffer;
+    OSTask_t* task;
+    s32 index;
+    u32 sp4C;
+    s32 sp48;
+    s32 i;
+
+#if FISHMOD_DEBUG
+    extern u64 gFishmodAudTime[];
+    u32 fmStart = osGetCount();
+#endif
+
+    gAudioCtx.totalTaskCount++;
+    if ((gAudioCtx.totalTaskCount % gAudioCtx.audioBufferParameters.specUnk4) != 0) {
+        if (gAudioCustomUpdateFunction != NULL) {
+            gAudioCustomUpdateFunction();
+        }
+
+        if (((gAudioCtx.totalTaskCount % gAudioCtx.audioBufferParameters.specUnk4) + 1) ==
+            gAudioCtx.audioBufferParameters.specUnk4) {
+            return sWaitingAudioTask;
+        } else {
+            return NULL;
+        }
+    }
+
+    osSendMesg(gAudioCtx.taskStartQueueP, (OSMesg)gAudioCtx.totalTaskCount, OS_MESG_NOBLOCK);
+    // fish-oot: this refresh's place in the ring of output buffers, kept apart from the last one built
+    // (gAudioCtx.curAiBufIndex, which AudioThread_Body advances): they're the same unless updates were built ahead
+    sFishmodCallSlot = (sFishmodCallSlot + 1) % FISHMOD_AI_RING;
+    index = (sFishmodCallSlot - 2 + FISHMOD_AI_RING) % FISHMOD_AI_RING;
+    samplesRemainingInAi = osAiGetLength() / 4;
+#if FISHMOD_DEBUG
+    if (gFishmodAudioLockstep) {
+        /* fish-oot: the audio check: as many samples every update, not what the hardware still holds */
+        samplesRemainingInAi = EXTRA_BUFFERED_AI_SAMPLES_TARGET;
+    }
+#endif
+
+    if (gAudioCtx.resetTimer < 16) {
+        if (gAudioCtx.aiBufLengths[index] != 0) {
+#if FISHMOD_DEBUG
+            if (gFishmodAudioLockstep) {
+                Fishmod_AudLog_Buffer(gAudioCtx.aiBuffers[index], gAudioCtx.aiBufLengths[index]);
+            }
+#endif
+            osAiSetNextBuffer(gAudioCtx.aiBuffers[index], gAudioCtx.aiBufLengths[index] * 4);
+            if (gAudioCtx.aiBuffers[index]) {}
+            if (gAudioCtx.aiBufLengths[index]) {}
+        }
+    }
+
+#if FISHMOD_EXPAK
+    if (sFishmodAhead == 0) // (an update built ahead had its call before it was built)
+#endif
+    if (gAudioCustomUpdateFunction != NULL) {
+        gAudioCustomUpdateFunction();
+    }
+
+    {
+        AudioTask* rspTask;
+        s32 aiLen = 0;
+        s32 cmdsTaken = 0;
+#if FISHMOD_EXPAK
+        if (sFishmodAhead != 0) {
+            // this refresh's update was built with an earlier one's: only its sample buffers' countdowns are due
+            // (the game's custom update function ran before it was built: below)
+            AudioLoad_DecreaseSampleDmaTtls();
+            rspTask = sFishmodAheadTask[0];
+            sFishmodAheadTask[0] = sFishmodAheadTask[1];
+            sFishmodAhead--;
+            return rspTask;
+        }
+#endif
+        rspTask = AudioThread_Body(samplesRemainingInAi, gAudioCtx.totalTaskCount, 0, &aiLen, &cmdsTaken);
+#if FISHMOD_EXPAK
+        // the next two refreshes' updates too, while this one's code and data are in the caches: the same updates
+        // (AudioThread_Body), only made early. Only after an update that took commands from the game: the game sends
+        // them once a frame, three refreshes, so the two refreshes after are the ones it will have nothing new for,
+        // and what it does send is heard as soon as it ever was. Each is given what the audio interface will hold by
+        // its refresh: what it holds now, plus what was just made, less a refresh's playing.
+        while ((cmdsTaken != 0) && (sFishmodAhead < 2) && AudioThread_FishmodSteady()) {
+            s32 cmdsAhead;
+
+            samplesRemainingInAi += aiLen;
+            j = (gAudioCtx.audioBufferParameters.aiSamplingFrequency * 1001 + 30000) / 60000;
+            samplesRemainingInAi = (samplesRemainingInAi > (u32)j) ? samplesRemainingInAi - j : 0;
+#if FISHMOD_DEBUG
+            if (gFishmodAudioLockstep) {
+                samplesRemainingInAi = EXTRA_BUFFERED_AI_SAMPLES_TARGET;
+            }
+#endif
+            if (gAudioCustomUpdateFunction != NULL) {
+                gAudioCustomUpdateFunction(); // (once an update, before it: as on its own refresh)
+            }
+            sFishmodAheadTask[sFishmodAhead] = AudioThread_Body(
+                samplesRemainingInAi, gAudioCtx.totalTaskCount + sFishmodAhead + 1, sFishmodAhead + 1, &aiLen,
+                &cmdsAhead);
+            sFishmodAhead++;
+        }
+#endif
+        gFishmodDmaTtlAhead = 0;
+        return rspTask;
     }
 }
 

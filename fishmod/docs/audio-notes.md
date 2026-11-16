@@ -176,3 +176,27 @@ its 240 DMAs to about 20 with larger pieces); the microcode's own load and the d
 driver less often (every second refresh: -11% of the audio's traffic, measured; releases/notes-audio-laps.md); the
 codebooks, if DMEM had room to keep them (it doesn't, as laid out). The reverbs, the samples, the states and the
 sound itself are the work.
+
+## The rule for this work (16 November)
+
+**Build time is free.** No amount of work before the game runs is too much: anything that can be worked out at build
+time is, however long the tools take. The compiler's output isn't sacred either: where it leaves something on the
+table (a quirk, a needless instruction, a bad layout), the assembly can be fixed after it's compiled, by a build step
+or by hand, as long as the result is checked (the same answers, the same sound, the same picture) like any other
+change. The cost that counts is the console's, at run time.
+
+## Updates built ahead (`--expak`, off by default: `gFishmodAudioAhead`)
+
+`audio/internal/thread.c`: the audio update split into the refresh's own part (the output buffer queued) and its
+body (the game's update, unchanged: `AudioThread_Body`); with the Expansion Pak's memory (six output buffers and six
+command lists and tasks instead of three and two) the body that takes the game's commands is followed by the next
+two refreshes' bodies in the same wake. The RSP's tasks and the output are as they were. Same sound: the audio check,
+1,894 buffers, against the build without.
+
+For the check to compare the two, three of its stand-ins changed (so its logs from before 16 November don't compare
+with later ones): the random number no longer adds the output buffer's old samples (which old buffer depends on the
+ring's size), and a sample preload or a sample store copy in flight is waited for, as an async load's chunk already
+was (updates back to back outrun the cart).
+
+What the first try got wrong, kept for the next: the game's commands reach the driver on the *second* update after a
+frame, so batches that started on the first pushed every sound two updates later (the check's 22nd buffer).

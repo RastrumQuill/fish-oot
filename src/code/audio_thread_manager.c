@@ -64,6 +64,14 @@ void AudioMgr_LockstepTick(u32 gameFrame) {
     if (gFishmodAudLog == NULL) {
         // (the scripts skip the title screen, which is what turns the RSP's audio on: CIC6105_EnableAudio)
         R_AUDIOMGR_ACTIVITY_LEVEL = AUDIOMGR_ACTIVITY_LEVEL_ALL;
+#if FISHMOD_EXPAK
+        {
+            // (the updates built ahead, where the build can: the check is then of them too, against a build without)
+            extern u8 gFishmodAudioAhead;
+
+            gFishmodAudioAhead = true;
+        }
+#endif
         gFishmodAudLogMax = 24000; // (about a lap of the play route at three updates a frame)
         gFishmodAudLog = SYSTEM_ARENA_MALLOC(gFishmodAudLogMax * 4 * sizeof(u32), "../audio_thread_manager.c", __LINE__);
         gFishmodAudNoise = SYSTEM_ARENA_MALLOC(0x10000 + 0x100, "../audio_thread_manager.c", __LINE__);

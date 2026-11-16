@@ -94,6 +94,13 @@ s32 gAudioContextInitialized = false;
  */
 static u32 sSampleDmaLive[0x100 / 32];
 
+/*
+ * fish-oot: how many refreshes ahead of its own the update being built is (thread.c: updates built ahead; 0
+ * otherwise). A sample buffer it uses must outlive its task, which runs that many refreshes later than an update's
+ * usually does: its countdown starts that much higher, and the countdowns still drop once a refresh.
+ */
+u8 gFishmodDmaTtlAhead;
+
 #define SAMPLE_DMA_LIVE(i) (sSampleDmaLive[(u32)(i) >> 5] |= 1u << ((u32)(i) & 31))
 
 static void AudioLoad_DecreaseSampleDmaTtlsIn(u32 from, u32 to, u8* queue, u8* wrPos) {
@@ -256,7 +263,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
                     }
                     gAudioCtx.sampleDmaReuseQueue2RdPos++;
                 }
-                dma->ttl = 32;
+                dma->ttl = 32 + gFishmodDmaTtlAhead;
                 SAMPLE_DMA_LIVE(i);
                 *dmaIndexRef = (u8)i;
                 return &dma->ramAddr[devAddr - dma->devAddr];
@@ -299,7 +306,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
                 }
                 gAudioCtx.sampleDmaReuseQueue1RdPos++;
             }
-            dma->ttl = 2;
+            dma->ttl = 2 + gFishmodDmaTtlAhead;
             SAMPLE_DMA_LIVE(dma - gAudioCtx.sampleDmas);
             return dma->ramAddr + (devAddr - dma->devAddr);
         }
@@ -317,7 +324,7 @@ void* AudioLoad_DmaSampleData(u32 devAddr, u32 size, s32 arg2, u8* dmaIndexRef, 
 
     transfer = dma->size;
     dmaDevAddr = devAddr & ~0xF;
-    dma->ttl = 3;
+    dma->ttl = 3 + gFishmodDmaTtlAhead;
     SAMPLE_DMA_LIVE(dma - gAudioCtx.sampleDmas);
     dma->devAddr = dmaDevAddr;
     sSampleDmaDevAddr[dma - gAudioCtx.sampleDmas] = dmaDevAddr; // (fish-oot: the search's copy)
@@ -1446,7 +1453,7 @@ void AudioLoad_Init(void* heap, u32 heapSize) {
 
     AudioThread_InitMesgQueues();
 
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < FISHMOD_AI_RING; i++) {
         gAudioCtx.aiBufLengths[i] = 0xA0;
     }
 
@@ -1455,8 +1462,9 @@ void AudioLoad_Init(void* heap, u32 heapSize) {
     gAudioCtx.curAiBufIndex = 0;
     gAudioCtx.soundOutputMode = SOUND_OUTPUT_STEREO;
     gAudioCtx.curTask = NULL;
-    gAudioCtx.rspTask[0].task.t.data_size = 0;
-    gAudioCtx.rspTask[1].task.t.data_size = 0;
+    for (i = 0; i < FISHMOD_TASK_RING; i++) {
+        gAudioCtx.rspTask[i].task.t.data_size = 0;
+    }
     osCreateMesgQueue(&gAudioCtx.syncDmaQueue, &gAudioCtx.syncDmaMesg, 1);
     osCreateMesgQueue(&gAudioCtx.curAudioFrameDmaQueue, gAudioCtx.curAudioFrameDmaMsgBuf,
                       ARRAY_COUNT(gAudioCtx.curAudioFrameDmaMsgBuf));
@@ -1485,6 +1493,16 @@ void AudioLoad_Init(void* heap, u32 heapSize) {
 
     // Initialize the audio interface buffers
     for (i = 0; i < ARRAY_COUNT(gAudioCtx.aiBuffers); i++) {
+#if FISHMOD_EXPAK
+        if (i >= 3) {
+            // fish-oot: the three more output buffers of the updates built ahead (thread.c): static (the init pool
+            // holds three)
+            static ALIGNED(16) s16 sFishmodAheadAiBuffers[FISHMOD_AI_RING - 3][AIBUF_LEN];
+
+            gAudioCtx.aiBuffers[i] = sFishmodAheadAiBuffers[i - 3];
+            continue;
+        }
+#endif
         gAudioCtx.aiBuffers[i] = AudioHeap_AllocZeroed(&gAudioCtx.initPool, AIBUF_SIZE);
 #ifdef FISHMOD_AUDIO_EVERY2
         {
@@ -2183,7 +2201,13 @@ s32 AudioLoad_ProcessSamplePreloads(s32 resetStatus) {
             gAudioCtx.preloadSampleStackTop = 0;
             return false;
         }
-        if (osRecvMesg(&gAudioCtx.preloadSampleQueue, (OSMesg*)&preloadIndex, OS_MESG_NOBLOCK) == -1) {
+        if (osRecvMesg(&gAudioCtx.preloadSampleQueue, (OSMesg*)&preloadIndex,
+#if FISHMOD_DEBUG
+                       /* fish-oot: the audio check waits for the preload, as for an async load's chunk: it's done on
+                          the same update however the updates fall against the clock (back to back, or built ahead) */
+                       gFishmodAudioLockstep ? OS_MESG_BLOCK :
+#endif
+                                             OS_MESG_NOBLOCK) == -1) {
             // Previous preload is not done yet.
             return false;
         }
@@ -2642,7 +2666,11 @@ void Fishmod_SampleStoreStep(void) {
         return;
     }
     if (sSampleStoreInFlight != 0) {
-        if (osRecvMesg(&sSampleStoreDmaQueue, NULL, OS_MESG_NOBLOCK) == -1) {
+        if (osRecvMesg(&sSampleStoreDmaQueue, NULL,
+#if FISHMOD_DEBUG
+                       gFishmodAudioLockstep ? OS_MESG_BLOCK : // (the audio check: as the preloads above)
+#endif
+                                             OS_MESG_NOBLOCK) == -1) {
             return;
         }
         slot = &sSampleStore[sSampleStoreQueue[sSampleStoreHead & (SAMPLE_STORE_QUEUE - 1)]];

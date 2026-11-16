@@ -54,6 +54,22 @@ typedef void (*AudioCustomUpdateFunction)(void);
 #define DMEM_2CH_SIZE (2 * DMEM_1CH_SIZE)
 
 #define AIBUF_LEN (88 * SAMPLES_PER_FRAME) // number of samples
+
+/*
+ * fish-oot: the audio updates built ahead (audio/internal/thread.c, AudioThread_UpdateImpl): with the Expansion Pak's
+ * memory to count on (FISHMOD_EXPAK), an update that finds the driver steady also builds the next two refreshes'
+ * command lists and tasks in the same wake, while its code and data are in the caches. That needs more of what the
+ * game keeps two or three of: six output buffers (three being played or waiting, three being made) and six command
+ * lists and tasks (the one the RSP is running, the three new ones).
+ */
+#if FISHMOD_EXPAK
+#define FISHMOD_AI_RING 6
+#define FISHMOD_TASK_RING 6
+#define FISHMOD_CMD_BUF_MAX 0x800 // commands in each of the four extra lists (16 KB); a bigger spec isn't built ahead
+#else
+#define FISHMOD_AI_RING 3
+#define FISHMOD_TASK_RING 2
+#endif
 #define AIBUF_SIZE (AIBUF_LEN * SAMPLE_SIZE) // number of bytes
 
 // Filter sizes
@@ -970,15 +986,15 @@ typedef struct AudioContext {
     /* 0x28A0 */ s32 curAudioFrameDmaCount;
     /* 0x28A4 */ s32 rspTaskIndex;
     /* 0x28A8 */ s32 curAiBufIndex;
-    /* 0x28AC */ Acmd* abiCmdBufs[2]; // Pointer to audio heap where the audio binary interface command lists (for the rsp) are stored. Two lists that alternate every frame
+    /* 0x28AC */ Acmd* abiCmdBufs[FISHMOD_TASK_RING]; // Pointer to audio heap where the audio binary interface command lists (for the rsp) are stored. Two lists that alternate every frame
     /* 0x28B4 */ Acmd* curAbiCmdBuf; // Pointer to the currently active abiCmdBufs
     /* 0x28B8 */ AudioTask* curTask;
     /* 0x28BC */ char unk_28BC[0x4];
-    /* 0x28C0 */ AudioTask rspTask[2];
+    /* 0x28C0 */ AudioTask rspTask[FISHMOD_TASK_RING];
     /* 0x2960 */ f32 maxTempoTvTypeFactors; // tvType factors that impact maxTempo, in units of milliseconds/frame
     /* 0x2964 */ s32 refreshRate;
-    /* 0x2968 */ s16* aiBuffers[3];
-    /* 0x2974 */ s16 aiBufLengths[3];
+    /* 0x2968 */ s16* aiBuffers[FISHMOD_AI_RING];
+    /* 0x2974 */ s16 aiBufLengths[FISHMOD_AI_RING];
     /* 0x297C */ u32 audioRandom;
     /* 0x2980 */ s32 audioErrorFlags;
     /* 0x2984 */ volatile u32 resetTimer;
