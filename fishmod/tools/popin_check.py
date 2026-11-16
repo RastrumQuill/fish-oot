@@ -47,15 +47,15 @@ def main():
         height, extent = struct.unpack_from(">HH", d, a + 0x3C)
         info.append(dict(imp=modelImp != 0, floating=floating, plant=plant, card=card, height=height, extent=extent))
     base = sset & 0xFFFFFF
-    off_prop = base + PROP_BUDGET * 64 + PROP_BUDGET * 4
-    off_hidden = off_prop + PROP_BUDGET * 2 + PROP_BUDGET
-    off_count = (off_hidden + PROP_BUDGET + 3) & ~3
+    # ScatterSet (fishmod_scatter.c): Mtx mtx[PROP_BUDGET]; ScatterEntry entry[PROP_BUDGET] (16 bytes: the prop's
+    # number at +0x0A, the drawn ones only); u8 fogStep[PROP_BUDGET]; s32 entryCount; ...
+    off_entry = base + PROP_BUDGET * 64
+    off_count = (off_entry + PROP_BUDGET * 16 + PROP_BUDGET + 3) & ~3
     n = struct.unpack_from(">i", d, off_count)[0]
     drawn = set()
     hidden = set()
     for i in range(n):
-        p = struct.unpack_from(">H", d, off_prop + 2 * i)[0]
-        (hidden if d[off_hidden + i] else drawn).add(p)
+        drawn.add(struct.unpack_from(">H", d, off_entry + 16 * i + 0x0A)[0])
     # the camera's axes
     rx = look[1] * up[2] - look[2] * up[1]
     ry = look[2] * up[0] - look[0] * up[2]
@@ -99,8 +99,8 @@ def main():
         should += 1
         if i not in drawn:
             missing.append((dist, sx, sy, kind, i, i in hidden))
-    print("eye (%.0f, %.0f, %.0f) %s; set: %d props (%d hidden); should be on screen: %d; missing: %d%s" % (
-        eye[0], eye[1], eye[2], "under water" if under else "above water", n, len(hidden), should, len(missing),
+    print("eye (%.0f, %.0f, %.0f) %s; set: %d props drawn; should be on screen: %d; missing: %d%s" % (
+        eye[0], eye[1], eye[2], "under water" if under else "above water", n, should, len(missing),
         " (the budget full)" if n >= PROP_BUDGET else ""))
     for dist, sx, sy, kind, i, hid in sorted(missing)[:40]:
         print("  prop %5d kind %2d  %5.0f away  screen (%+.2f, %+.2f)%s" % (i, kind, dist, sx, sy,
