@@ -1,8 +1,8 @@
 diff --git a/ares/n64/cpu/cpu.cpp b/ares/n64/cpu/cpu.cpp
-index ec4a52d..80c0514 100644
+index ec4a52d..00c343f 100644
 --- a/ares/n64/cpu/cpu.cpp
 +++ b/ares/n64/cpu/cpu.cpp
-@@ -121,7 +121,112 @@ auto CPU::interruptPoll() -> void {
+@@ -121,7 +121,127 @@ auto CPU::interruptPoll() -> void {
    }
  }
  
@@ -106,6 +106,21 @@ index ec4a52d..80c0514 100644
 +      e.ifills += profile.icacheMisses - imisses;
 +    }
 +    if((++cpuProfTotal & 0x1ffffff) == 0) cpuProfWrite();
++    //ARES_CPUPROF_MARK=<hex address of a u32 in RDRAM>: each time the game changes that word, the profile so far is
++    //also saved as <file>.seg<count>.<the word's old value> (the totals up to then: a leg's cost is the difference
++    //between two)
++    static const char* markEnv = getenv("ARES_CPUPROF_MARK");
++    if(markEnv && (cpuProfTotal & 0xfff) == 0) {
++      static u32 markAddr = strtoul(markEnv, nullptr, 16) & 0x7fffff, markLast = 0, markCount = 0;
++      u32 mark = rdram.ram.read<Word>(markAddr, RBusDevice::ARES_DEBUGGER);
++      if(mark != markLast) {
++        const char* keep = cpuProfPath;
++        static char name[1024];
++        snprintf(name, sizeof(name), "%s.seg%04u.%u", keep, markCount++, markLast);
++        cpuProfPath = name; cpuProfWrite(); cpuProfPath = keep;
++        markLast = mark;
++      }
++    }
 +    return result;
 +  }
 +  return instructionInner();
@@ -115,7 +130,7 @@ index ec4a52d..80c0514 100644
    if(auto interrupts = scc.cause.interruptPending & scc.status.interruptMask) {
      if(scc.status.interruptEnable && !scc.status.exceptionLevel && !scc.status.errorLevel) {
        debugger.interrupt(scc.cause.interruptPending);
-@@ -145,7 +250,7 @@ auto CPU::instruction() -> bool {
+@@ -145,7 +265,7 @@ auto CPU::instruction() -> bool {
    auto access = devirtualize<Read, Word>(ipu.pc);
    if(!access) return true;
  

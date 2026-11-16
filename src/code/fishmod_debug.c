@@ -145,6 +145,11 @@ typedef struct FishmodScript {
 #ifndef FISHMOD_SCRIPT_BENCH
 #define FISHMOD_SCRIPT_BENCH 0
 #endif
+#ifdef FISHMOD_SWEEP_SCENES
+void Audio_SetSoundOutputMode(s8 soundSetting);
+#include "carthandle.h"
+u32 gFishmodSweepLeg; // the sweep leg being played (the profiler cuts its totals when this changes)
+#endif
 #ifdef FISHMOD_SCRIPT_ADULT
 #define SF_ADULT FISHMOD_SCRIPT_F_ADULT
 #else
@@ -1144,6 +1149,74 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     // session settings by scene: other reverbs, one of them downsampled; other voice counts, fonts and music), so
     // the check walks one or two scenes of each. Every FISHMOD_AUDWORLD_FRAMES frames, the next entrance; the
     // script's steps (run, roll, swing) go round and round meanwhile.
+#ifdef FISHMOD_SWEEP_SCENES
+    // The audio sweep's scenes leg (fishmod/docs/audio-sweep.md; the sweep_scenes script): every scene in the
+    // entrance table by its first entrance, in the table's order, so a scene added to the game is in the sweep
+    // without being added here. FISHMOD_SWEEP_PART of FISHMOD_SWEEP_PARTS: this build's share of the scenes (the
+    // parts run side by side in the emulator). gFishmodSweepLeg: the scene being played (0 the start, then the
+    // entrance + 1), for the profiler's cut between legs (ARES_CPUPROF_MARK).
+    if (sPlacedPlayer && (play->transitionTrigger == TRANS_TRIGGER_OFF) && (play->transitionMode == TRANS_MODE_OFF)) {
+        static u8 sSweepSeen[(SCENE_ID_MAX + 7) / 8];
+        static s32 sSweepEntrance;
+        static s32 sSweepScenes;
+        static s32 sAudWorldTimer;
+        static u8 sSweepSound;
+        static u8 sSweepChildNight;
+        static u8 sSweepParts;
+        static u8 sSweepPart;
+
+        if (!sSweepSound) {
+            // The run's options, from the ROM's header (the word at 0x38, which nothing uses: fishmod/tools/
+            // audio_sweep.sh writes it), so one build plays every variant and their code sits at the same addresses:
+            // bits 0-1 the sound setting (0 stereo, 1 mono, 2 headphones, 3 surround), bit 4 child Link at night
+            // (else adult by day), bits 8-15 how many parts the scenes are dealt into (0: one), bits 16-23 which.
+            u32 opt = 0;
+
+            osEPiReadIo(gCartHandle, 0x38, &opt);
+            sSweepSound = true;
+            sSweepChildNight = (opt >> 4) & 1;
+            sSweepParts = (opt >> 8) & 0xFF;
+            sSweepPart = (opt >> 16) & 0xFF;
+            if (sSweepParts == 0) {
+                sSweepParts = 1;
+            }
+            gSaveContext.soundSetting = opt & 3;
+            Audio_SetSoundOutputMode(gSaveContext.soundSetting);
+        }
+        if (++sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES) {
+            while (sSweepEntrance < ENTR_MAX) {
+                s32 entrance = sSweepEntrance++;
+                s32 scene = gEntranceTable[entrance].sceneId;
+
+                if (scene < 0) {
+                    scene = -scene;
+                }
+                if ((scene >= SCENE_ID_MAX) || (sSweepSeen[scene >> 3] & (1 << (scene & 7)))) {
+                    continue;
+                }
+                sSweepSeen[scene >> 3] |= 1 << (scene & 7);
+                if ((sSweepScenes++ % sSweepParts) != sSweepPart) {
+                    continue;
+                }
+                sAudWorldTimer = 0;
+                gFishmodSweepLeg = entrance + 1;
+                if (sSweepChildNight) {
+                    play->linkAgeOnLoad = LINK_AGE_CHILD;
+                    gSaveContext.save.dayTime = gSaveContext.skyboxTime = CLOCK_TIME(22, 0);
+                }
+                play->nextEntranceIndex = entrance;
+                play->transitionTrigger = TRANS_TRIGGER_START;
+                play->transitionType = TRANS_TYPE_FADE_BLACK;
+                break;
+            }
+            if ((sSweepEntrance >= ENTR_MAX) && (sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES + 20)) {
+                gFishmodSweepLeg = 0xFFFE; // (and the profiler has saved a cut named 65535: the runner's sign to stop)
+            } else if ((sSweepEntrance >= ENTR_MAX) && (sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES)) {
+                gFishmodSweepLeg = 0xFFFF; // (the last scene's time is up: the sweep's end)
+            }
+        }
+    }
+#else
     if (sPlacedPlayer && (play->transitionTrigger == TRANS_TRIGGER_OFF) && (play->transitionMode == TRANS_MODE_OFF)) {
         static const s16 sAudWorldEntrances[] = { FISHMOD_AUDWORLD_ENTRANCES };
         static s32 sAudWorldIndex;
@@ -1156,6 +1229,7 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             play->transitionType = TRANS_TYPE_FADE_BLACK;
         }
     }
+#endif
 #endif
 #ifdef FISHMOD_PCPROF
     PcProf_Update();

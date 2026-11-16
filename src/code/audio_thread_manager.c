@@ -71,7 +71,7 @@ void AudioMgr_LockstepTick(u32 gameFrame) {
 
             gFishmodAudioAhead = true;
         }
-        gFishmodAudLogMax = 24000; // (about a lap of the play route at three updates a frame)
+        gFishmodAudLogMax = 40000; // (the longest check: a part of the sweep's scenes at three updates a frame)
         gFishmodAudLog = SYSTEM_ARENA_MALLOC(gFishmodAudLogMax * 4 * sizeof(u32), "../audio_thread_manager.c", __LINE__);
         gFishmodAudNoise = SYSTEM_ARENA_MALLOC(0x10000 + 0x100, "../audio_thread_manager.c", __LINE__);
         if (gFishmodAudNoise != NULL) {
