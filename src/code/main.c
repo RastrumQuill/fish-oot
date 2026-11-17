@@ -169,6 +169,13 @@ void Main(void* arg) {
     IrqMgr_AddClient(&gIrqMgr, &irqClient, &irqMgrMsgQueue);
 
     StackCheck_Init(&sAudioStackInfo, sAudioStack, STACK_TOP(sAudioStack), 0, 0x100, "audio");
+#if FISHMOD_DEBUG
+    {
+        void Fishmod_SweepEarly(void);
+
+        Fishmod_SweepEarly(); // (the audio sweep's runs in real time: decided before the audio thread starts)
+    }
+#endif
     AudioMgr_Init(&sAudioMgr, STACK_TOP(sAudioStack), THREAD_PRI_AUDIOMGR, THREAD_ID_AUDIOMGR, &gScheduler, &gIrqMgr);
 
     StackCheck_Init(&sPadMgrStackInfo, sPadMgrStack, STACK_TOP(sPadMgrStack), 0, 0x100, "padmgr");

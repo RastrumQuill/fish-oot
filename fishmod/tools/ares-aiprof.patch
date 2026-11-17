@@ -1,0 +1,81 @@
+diff --git a/ares/n64/ai/ai.cpp b/ares/n64/ai/ai.cpp
+index a3e60bc..d2b2b51 100644
+--- a/ares/n64/ai/ai.cpp
++++ b/ares/n64/ai/ai.cpp
+@@ -3,6 +3,46 @@
+ namespace ares::Nintendo64 {
+ 
+ AI ai;
++
++//fish-oot: ARES_AIPROF=<file>: what the audio interface played, for runs in real time (fishmod/docs/audio-sweep.md).
++//One line per value of the word at ARES_CPUPROF_MARK (the sweep's leg), totals up to then, and a last line "now":
++//  leg  buffers taken  buffers refused (written while two were waiting)  times it ran dry  samples of silence since
++//  the first buffer  samples played  hash of the samples played
++//The file is rewritten about twice a second of sound.
++static const char* aiProfPath = getenv("ARES_AIPROF");
++static struct AiProf {
++  u64 taken = 0, refused = 0, dry = 0, silent = 0, played = 0;
++  u32 hash = 2166136261u;
++  u32 mark = 0, leg = 0, ticks = 0;
++  bool init = false;
++  std::vector<std::string> lines;
++  auto line(const char* name, u32 leg) -> std::string {
++    char s[256];
++    if(name) snprintf(s, sizeof(s), "%s %llu %llu %llu %llu %llu %08x\n", name, (unsigned long long)taken,
++      (unsigned long long)refused, (unsigned long long)dry, (unsigned long long)silent, (unsigned long long)played, hash);
++    else snprintf(s, sizeof(s), "%u %llu %llu %llu %llu %llu %08x\n", leg, (unsigned long long)taken,
++      (unsigned long long)refused, (unsigned long long)dry, (unsigned long long)silent, (unsigned long long)played, hash);
++    return s;
++  }
++  auto write() -> void {
++    if(!init) {
++      init = true;
++      if(auto m = getenv("ARES_CPUPROF_MARK")) mark = strtoul(m, nullptr, 16) & 0x7fffff;
++    }
++    if(mark) {
++      u32 now = rdram.ram.read<Word>(mark, RBusDevice::ARES_DEBUGGER);
++      if(now != leg) { lines.push_back(line(nullptr, leg)); leg = now; }
++    }
++    string tmp{aiProfPath, ".tmp"};
++    if(auto fp = fopen(tmp, "w")) {
++      for(auto& l : lines) fputs(l.c_str(), fp);
++      fputs(line("now", 0).c_str(), fp);
++      fclose(fp);
++      rename(tmp, aiProfPath);
++    }
++  }
++} aiProf;
++
+ #include "io.cpp"
+ #include "debugger.cpp"
+ #include "serialization.cpp"
+@@ -45,9 +85,15 @@ auto AI::sample() -> void {
+     io.dmaAddressCarry = io.dmaAddress[0].bit(0,12) == 0;
+     io.dmaLength[0] -= 4;
+     active = true;
++    if(aiProfPath) { aiProf.played++; aiProf.hash = (aiProf.hash ^ (u32)data) * 16777619u; }
++  }
++  if(aiProfPath) {
++    if(!active && aiProf.taken) aiProf.silent++;
++    if((++aiProf.ticks & 0x3fff) == 0) aiProf.write();
+   }
+ 
+   if(io.dmaCount && io.dmaLength[0] == 0) {
++    if(aiProfPath && io.dmaCount == 1) aiProf.dry++;
+     if(--io.dmaCount) {
+       io.dmaAddress[0]  = io.dmaAddress[1];
+       io.dmaLength[0]   = io.dmaLength[1];
+diff --git a/ares/n64/ai/io.cpp b/ares/n64/ai/io.cpp
+index 37e54ef..a00d393 100644
+--- a/ares/n64/ai/io.cpp
++++ b/ares/n64/ai/io.cpp
+@@ -41,7 +41,8 @@ auto AI::writeWord(u32 address, u32 data_, Thread& thread) -> void {
+       io.dmaLength[io.dmaCount] = length;
+       io.dmaOriginPc[io.dmaCount] = cpu.ipu.pc;
+       io.dmaCount++;
+-    }
++      if(aiProfPath && length) aiProf.taken++;
++    } else if(aiProfPath) aiProf.refused++;
+   }
+ 
+   if(address == 2) {

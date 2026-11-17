@@ -1267,6 +1267,7 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             // audio_sweep.sh writes it), so one build plays every variant and their code sits at the same addresses:
             // bits 0-1 the sound setting (0 stereo, 1 mono, 2 headphones, 3 surround), bit 4 child Link at night
             // (else adult by day), bits 8-15 how many parts the scenes are dealt into (0: one), bits 16-23 which.
+            extern s32 gFishmodAudioLockstep;
             u32 opt = 0;
 
             osEPiReadIo(gCartHandle, 0x38, &opt);
@@ -1280,6 +1281,11 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             }
             gSaveContext.soundSetting = opt & 3;
             Audio_SetSoundOutputMode(gSaveContext.soundSetting);
+            if (!gFishmodAudioLockstep) {
+                // (a run in real time: the RSP's audio on, which the title screen the scripts skip turns on; the
+                // lockstep does it at its first tick)
+                R_AUDIOMGR_ACTIVITY_LEVEL = AUDIOMGR_ACTIVITY_LEVEL_ALL;
+            }
         }
         if (sSweepKind != 0) {
             if (sSweepOver || Sweep_Leg(sSweepKind, sSweepParts, sSweepPart)) {
@@ -1827,6 +1833,33 @@ s32 gFishmodAudioLockstep = true; // the audio check: from boot (audio_thread_ma
 #else
 s32 gFishmodAudioLockstep = false;
 #endif
+
+/**
+ * Before the audio thread starts (main.c). The audio sweep's runs in real time (fishmod/docs/audio-sweep.md): bit 5
+ * of the run's options (the word at 0x38 of the ROM's header) leaves the audio at the game's own timing, as shipped,
+ * so the code the lockstep goes around is played too (the retrace handlers, the audio interface's own length);
+ * bit 6 then has the updates built ahead and bit 7 the RSP tasks sent early (--expak; audio/internal/thread.c).
+ */
+void Fishmod_SweepEarly(void) {
+#ifdef FISHMOD_AUDLOG
+    u32 opt = 0;
+
+    osEPiReadIo(gCartHandle, 0x38, &opt);
+    if (opt & 0x20) {
+        extern u8 gFishmodAudioAhead;
+
+        gFishmodAudioLockstep = false;
+        gFishmodAudioAhead = (opt >> 6) & 1;
+#if FISHMOD_EXPAK
+        {
+            extern u8 gFishmodAudioLazy;
+
+            gFishmodAudioLazy = (opt >> 7) & 1;
+        }
+#endif
+    }
+#endif
+}
 #if defined(FISHMOD_HWBENCH) || defined(FISHMOD_PCPROF)
 s32 gFishmodTimingAsShipped = true;
 #else
