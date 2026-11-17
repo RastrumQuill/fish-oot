@@ -49,8 +49,9 @@ Nothing is drawn over the picture while recording or replaying (debug text is of
 ## Playing it back
 
 ```bash
-fishmod/build.sh --script inputplay --hw --colpack --meshpack --gcc-all
-fishmod/tools/inputrec.py attach fishmod/out/fish-oot-debug-inputplay-....z64 session1.finp replay1.z64
+fishmod/build.sh --script inputplay_clean --no-timers --hw --colpack --meshpack --gcc-all   # for ares (see below)
+fishmod/build.sh --script inputplay --hw --colpack --meshpack --gcc-all                      # for the console
+fishmod/tools/inputrec.py attach fishmod/out/fish-oot-debug-inputplay....z64 session1.finp replay1.z64
 ```
 
 `replay1.z64` (64 MB: the recording sits at 0x03000000) plays the session by itself, in ares or on the console, with
@@ -85,14 +86,35 @@ path through the game for a profile, but the frames around a repair aren't what 
 Variants for testing: `inputplay_loose` (counts drift, repairs nothing: what a build drifts by on its own),
 `inputplay_perturb` (knocks the random numbers out of step every 7 seconds: tests the repairs).
 
+## Measure with the clean build
+
+The in-ROM profiler is not a few percent. The same 5,000 recorded frames (the opening), replayed under ares's exact
+profiler by two builds of the same code (17 Nov):
+
+| per frame | `inputplay` (sampler, frame log, debug timers) | `inputplay_clean --no-timers` |
+|---|---:|---:|
+| CPU working (cycles) | 2,516,565 | 1,749,575 (30% less) |
+| of that, the game's own code | 2,320,480 | 1,741,283 (25% less) |
+| data cache fills | 15,968 | 11,064 |
+| code cache fills | 12,261 | 8,322 |
+
+The sampler's own code is 4.5% of the run. The rest is what its 4,000 interrupts a second do to everything else: the
+OS's exception, dispatch and timer code (libultra down from 725k to 286k cycles a frame), and the caches it empties
+under the game (`SkinMatrix_MtxFMtxFMult`, untouched code, costs 45% less in the clean build). So a number measured
+on a build with the sampler running is a number about that build. For comparing two versions of the game, and for
+anything about the caches, use `inputplay_clean --no-timers` under ares; keep the sampler builds for what only the
+console can say (the RDP, real bus timing), compared like with like.
+
 ## Profiling a replay
 
 Exactly, in ares (the build from `fishmod/tools/build_ares.sh`, with `ares-prof.patch`):
 
 ```bash
 OVL=$(mips-linux-gnu-nm build/ntsc-1.2/oot-ntsc-1.2.elf | awk '/ gFishmodOvlMap$/ {print $1}')
-ARES_CPUPROF=cpu.bin ARES_CPUPROF_OVL=$OVL ARES_FAST=1 fishmod/tools/ares_run.sh 0 replay1.z64 SECONDS usb1
-fishmod/tools/sysprof.py report cpu.bin --elf build/ntsc-1.2/oot-ntsc-1.2.elf -o report.md --json report.json
+END=$(mips-linux-gnu-nm build/ntsc-1.2/oot-ntsc-1.2.elf | awk '/ gFishmodReplay$/ {printf "%x", strtonum("0x"$1) + 48}')
+ARES_CPUPROF=cpu.bin ARES_CPUPROF_OVL=$OVL ARES_CPUPROF_MARK=$END ARES_FAST=1 fishmod/tools/ares_run.sh 0 replay1.z64 SECONDS
+# cpu.bin.seg0000.0 is the profile up to the recording's last frame (the game idles on after it)
+fishmod/tools/sysprof.py report cpu.bin.seg0000.0 --frames FRAMES --elf build/ntsc-1.2/oot-ntsc-1.2.elf -o report.md --json report.json
 ```
 
 `ARES_CPUPROF_OVL` is new: the game keeps a map of where each overlay (actors, Link, the pause menu, the file select)

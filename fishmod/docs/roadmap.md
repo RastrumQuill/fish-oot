@@ -17,6 +17,29 @@ table (a quirk, a needless instruction, a bad layout), the assembly can be fixed
 or by hand, as long as the result is checked (the same answers, the same sound, the same picture) like any other
 change. The cost that counts is the console's, at run time.
 
+## Rule: hot code fits the instruction cache; layout comes last
+
+We're past the point where a bench run can rank changes worth a millisecond or two (one build to the next moves the
+code in the caches by that much). Reason from the hardware: the instruction cache is 16 KB, direct-mapped (code 16 KB
+apart evicts itself), 32-byte lines at about 48 cycles a fill (about 1.5 us a KB), shared with the audio thread, the
+OS and the game. The cost is **hot bytes x reloads a frame**, so the filter for "look at this function":
+
+| how it runs | look at it when |
+|---|---|
+| per item (a fish, an actor, a prop, a polygon, a note) | its loop body and what it calls is over **2 KB** |
+| once a frame, looping inside | the loop body and what it calls is over **4 KB** |
+| once a frame, straight through | over about 16 KB |
+| larger than the cache | always |
+
+The fix in order: the rare branches out of the loop (often enough), then the hot loop in hand-scheduled assembly
+sized to stay in the cache with its callees, checked exactly like any change (SCATTER_VERIFY, the fish state hashes,
+the command lists compared). **Code and data layout for the caches is done once, at the end, for everything** (not
+only audio): anything added before then moves it, and it takes too long to redo for each test. Our first ones:
+EnFishmod_ScatterDraw (17.9 KB, larger than the cache), EnFishmod_FishAI (10.9 KB, per fish), EnFishmod_RigDraw
+(4.5 KB, per fish), EnFishmod_ManagerUpdate and Scatter_Touch (3.3 KB each). The leads' own: AudioSynth_ProcessNote
+(3.3 KB, per note), BgCheck_SphVsStaticWall (4.9 KB) and BgCheck_RaycastDownImpl (5.4 KB), per query. The audio lead is
+making ares fit this work; the collision lead is adding it to the profiler.
+
 ## Test5: biomes, time and behaviour
 
 The plan is in [v5-plan.md](v5-plan.md). Items:

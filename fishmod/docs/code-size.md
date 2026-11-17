@@ -45,6 +45,22 @@ What these point at, in the order I'd try:
 4. **Draw order**: the 23.6 KB of draw code runs as one interleaved pass; grouped by kind (all rigs, then all
    billboards, then props) each piece is fetched once.
 
+**A list of the mod's five biggest routines, against these measurements**
+
+The list (sizes from a build where `Scatter_Touch` is its own routine; in the GCC bench build it's inlined into
+`EnFishmod_ScatterDraw`, which is 14.4 KB there against the list's 17.9 KB):
+
+| routine (list's size) | measured here | agrees? |
+|---|---|---|
+| `EnFishmod_ScatterDraw` (17.9 KB, "can't stay in cache by itself") | 8.3 KB of it runs on a call; 35% of its time is code fills | yes; the part to shrink is what runs, 8.3 KB |
+| `EnFishmod_FishAI` (10.9 KB, "run dozens of times a frame") | 3.7 KB runs per call, 9.6 calls a frame, 72% of its time is code fills | yes, and it's the worst by share; per call it's 3.7 KB, not 10.9, so running the fish back to back is enough to fix most of it |
+| `EnFishmod_RigDraw` (4.5 KB, "hot path is small") | 5.5 KB with its helpers, 2.9 calls a frame, 0.50 ms, 26% code fills; its inner loop is 0.1 KB | yes: lower priority |
+| `Scatter_Touch` (3.3 KB, per touched plant) | not measured: inlined here, and the lake route's first laps touch few plants | open: needs a route that walks through the reeds |
+| `EnFishmod_ManagerUpdate` (3.3 KB, "loop body could shrink a lot") | 2.0 KB runs per call, its loop 0.3 KB at 15.9 passes, 0.22 ms, 18% code fills | the loop is already small in this build; little to gain |
+
+These were measured on the bench build with the sampler running, which inflates code fills (see input-replay.md,
+"Measure with the clean build"): the ranking should hold, the shares will come down. To be redone on a clean build.
+
 **The engine**
 
 | what | size | how often | fills' share | reading |
