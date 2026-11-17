@@ -14,7 +14,7 @@ A sweep in the queue:
    "jobs": [["t2", 2], ["o2", 1], ["s2", 4], ...]}          (variant, parts: fishmod/tools/audio_sweep.sh)
 A unit of work is one part of one variant, played on every build (so the unit can be checked where it ran: the same
 sound as the reference build, the end reached, nothing stopped). Results go to the results branch:
-  <id>/<variant>.<part>/<build>/{aud.bin, report.json, report.txt, run.log}   and   <id>/<variant>.<part>/check.txt
+  <id>/<variant>.<part>/<build>/{aud.bin, report.json, report.txt, run.log, bus.txt, rsp.bin}   and   <id>/<variant>.<part>/check.txt
 and a unit being worked on has <id>/claims/<variant>.<part>.json (who and when; stale after --claim-hours).
 
 Usage:
@@ -46,7 +46,7 @@ QUEUE_PATH = "fishmod/sweep/queue.json"
 QUEUE_BRANCH = "claude/harkinian-tp-fishing-mod-ehepm9"
 RESULTS_BRANCH = "sweep-results"
 WORK = os.environ.get("FISHOOT_SWEEP_WORK") or os.path.expanduser("~/.fishoot-sweep")
-KEEP = ("aud.bin", "report.json", "report.txt", "run.log")
+KEEP = ("aud.bin", "report.json", "report.txt", "run.log", "bus.txt", "rsp.bin")
 KINDS = {"s": (0, 0), "c": (0, 1), "q": (1, 0), "e": (2, 0), "o": (3, 0), "t": (4, 0)}  # letter: (leg, child at night)
 
 
@@ -270,6 +270,7 @@ def check_unit(sweep, unit):
                 bad.append("FRAMES DIFFER")
             cost = [l for l in c.splitlines() if l.startswith("all ")]
             lines.append("%s vs %s: %s; %s" % (b, ref, snd, " ".join(cost[0].split()) if cost else "no cost line"))
+            lines += ["  " + " ".join(l.split()) for l in c.splitlines() if l.startswith("memory ")]
         else:
             lines.append("%s: %d legs, %s buffers" % (b, len(r["legs"]), r.get("buffers", "?")))
         if bad:

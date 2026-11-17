@@ -1,8 +1,8 @@
 diff --git a/ares/n64/cpu/cpu.cpp b/ares/n64/cpu/cpu.cpp
-index ec4a52d..82653d7 100644
+index ec4a52d..16164c8 100644
 --- a/ares/n64/cpu/cpu.cpp
 +++ b/ares/n64/cpu/cpu.cpp
-@@ -121,7 +121,199 @@ auto CPU::interruptPoll() -> void {
+@@ -121,7 +121,179 @@ auto CPU::interruptPoll() -> void {
    }
  }
  
@@ -21,7 +21,7 @@ index ec4a52d..82653d7 100644
 +static auto cpuProfWrite() -> void {
 +  string tmp{cpuProfPath, ".tmp"};
 +  if(auto fp = fopen(tmp, "wb")) {
-+    for(u32 n : range(0x300000)) {
++    for(u32 n : range(0x200000)) {
 +      auto& e = cpuProf[n];
 +      if(!e.instructions) continue;
 +      u32 head[2] = {0x80000000u + (n << 2), e.instructions};
@@ -57,6 +57,9 @@ index ec4a52d..82653d7 100644
 +
 +static const char* busProfPath = getenv("ARES_BUSPROF");
 +static u32 busProfLo = 0, busProfHi = 0;
++//ARES_BUSPROF_RANGES=<file>: the audio code as "lo hi" lines (hex, hi exclusive) instead of the one LO..HI range,
++//for builds whose audio functions aren't together (a bit per instruction of the first 8 MB)
++static u8* busProfMap = nullptr;
 +static u64 busProfTicks = 0;
 +static auto busProfWrite() -> void {
 +  static const char* names[14] = {"unknown", "cpu_code", "cpu_data", "cpu_uncached", "sp_other", "pi", "si", "vi", "ai",
@@ -83,14 +86,25 @@ index ec4a52d..82653d7 100644
 +      busProf.on = true;
 +      if(auto lo = getenv("ARES_BUSPROF_LO")) busProfLo = strtoul(lo, nullptr, 16);
 +      if(auto hi = getenv("ARES_BUSPROF_HI")) busProfHi = strtoul(hi, nullptr, 16);
++      if(auto path = getenv("ARES_BUSPROF_RANGES")) {
++        if(auto fp = fopen(path, "r")) {
++          busProfMap = (u8*)calloc(0x200000, 1);
++          unsigned lo, hi;
++          while(fscanf(fp, "%x %x", &lo, &hi) == 2) {
++            for(u32 a = lo; a < hi; a += 4) busProfMap[(a & 0x7fffff) >> 2] = 1;
++          }
++          fclose(fp);
++        }
++      }
 +    }
 +    u32 pc = (u32)ipu.pc;
-+    busProf.cpuAudio = pc >= busProfLo && pc < busProfHi;
++    if(busProfMap) busProf.cpuAudio = (pc >> 23) == (0x80000000u >> 23) && busProfMap[(pc & 0x7fffff) >> 2];
++    else busProf.cpuAudio = pc >= busProfLo && pc < busProfHi;
 +    if((++busProfTicks & 0xfffff) == 0) busProfWrite();
 +  }
 +  if(cpuProfPath) {
 +    if(!cpuProf) {
-+      cpuProf = (CpuProfEntry*)calloc(0x300000, sizeof(CpuProfEntry));
++      cpuProf = (CpuProfEntry*)calloc(0x200000, sizeof(CpuProfEntry));
 +      cpuProfLines = (u32*)calloc(0x80000 * 2, sizeof(u32));
 +      if(getenv("ARES_CPUPROF_LO")) cpuProfBytes = (u32*)calloc(0x800000 * 2, sizeof(u32));
 +      if(auto lo = getenv("ARES_CPUPROF_LO")) cpuProfLo = strtoul(lo, nullptr, 16);
@@ -100,41 +114,7 @@ index ec4a52d..82653d7 100644
 +    auto imisses = profile.icacheMisses;
 +    bool result = instructionInner();
 +    if((pc >> 23) == (0xffffffff80000000ull >> 23)) {
-+      //ARES_CPUPROF_OVL=<hex address of the game's map of loaded overlays>: code loaded at an address of its own
-+      //each time (the game's overlays) is counted at the address it was linked for (0x80800000 up), so a profile
-+      //of a whole play reads against the ELF. The map: u32 a count that changes with it, u32 entries, then
-+      //entries of (u32 RAM address, u32 bytes, u32 linked address).
-+      static const char* ovlEnv = getenv("ARES_CPUPROF_OVL");
-+      u32 slot = (pc & 0x7fffff) >> 2;
-+      if(ovlEnv) {
-+        static u32 ovlAddr = strtoul(ovlEnv, nullptr, 16) & 0x7fffff, ovlGen = 0, ovlMin = 0, ovlMax = 0;
-+        static u32 hitLo = 0, hitHi = 0, hitVram = 0, ovlN = 0;
-+        static u32 ovl[512][3];
-+        u32 gen = rdram.ram.read<Word>(ovlAddr, RBusDevice::ARES_DEBUGGER);
-+        if(gen != ovlGen) {
-+          ovlGen = gen; hitLo = hitHi = 0; ovlMin = ~0u; ovlMax = 0;
-+          ovlN = min(512u, rdram.ram.read<Word>(ovlAddr + 4, RBusDevice::ARES_DEBUGGER));
-+          for(u32 n : range(ovlN)) {
-+            for(u32 k : range(3)) ovl[n][k] = rdram.ram.read<Word>(ovlAddr + 8 + n * 12 + k * 4, RBusDevice::ARES_DEBUGGER);
-+            ovl[n][0] &= 0x7fffff;
-+            ovlMin = min(ovlMin, ovl[n][0]); ovlMax = max(ovlMax, ovl[n][0] + ovl[n][1]);
-+          }
-+        }
-+        u32 p = pc & 0x7fffff;
-+        if(p >= ovlMin && p < ovlMax) {
-+          if(p < hitLo || p >= hitHi) {
-+            hitLo = hitHi = 0;
-+            for(u32 n : range(ovlN)) if(p >= ovl[n][0] && p < ovl[n][0] + ovl[n][1]) {
-+              hitLo = ovl[n][0]; hitHi = hitLo + ovl[n][1]; hitVram = ovl[n][2];
-+            }
-+          }
-+          if(hitHi) {
-+            u32 v = hitVram + (p - hitLo) - 0x80800000u;
-+            if(v < 0x400000) slot = 0x200000 + (v >> 2);
-+          }
-+        }
-+      }
-+      auto& e = cpuProf[slot];
++      auto& e = cpuProf[(pc & 0x7fffff) >> 2];
 +      e.instructions++; e.clocks += Thread::clock - clock;
 +      e.fills += cpuProfFills - fills; e.writebacks += cpuProfWritebacks - writebacks;
 +      e.ifills += profile.icacheMisses - imisses;
@@ -202,7 +182,7 @@ index ec4a52d..82653d7 100644
    if(auto interrupts = scc.cause.interruptPending & scc.status.interruptMask) {
      if(scc.status.interruptEnable && !scc.status.exceptionLevel && !scc.status.errorLevel) {
        debugger.interrupt(scc.cause.interruptPending);
-@@ -145,7 +337,7 @@ auto CPU::instruction() -> bool {
+@@ -145,7 +317,7 @@ auto CPU::instruction() -> bool {
    auto access = devirtualize<Read, Word>(ipu.pc);
    if(!access) return true;
  
@@ -311,82 +291,6 @@ index 5ed3774..06a07e8 100644
    //Devices that can request RI to access RDRAM
    enum class RBusDevice {
      UNKNOWN,
-diff --git a/ares/n64/pi/bus.hpp b/ares/n64/pi/bus.hpp
-index f554df8..a8ef9bc 100644
---- a/ares/n64/pi/bus.hpp
-+++ b/ares/n64/pi/bus.hpp
-@@ -1,3 +1,49 @@
-+
-+// fish-oot test hook: a minimal SummerCart64 (ARES_SC64_DIR: its USB writes are saved there, one file a packet)
-+struct FishSc64 {
-+  u8 buf[8192];
-+  u32 data0 = 0, data1 = 0, scr = 0, key = 0, unlocked = 0, busyReads = 0, packets = 0;
-+  static auto dir() -> const char* { static const char* d = getenv("ARES_SC64_DIR"); return d; }
-+  auto command(u32 id) -> void {
-+    scr = 0;
-+    if(id == 'M') {
-+      u32 addr = data0, len = data1 & 0xffffff;
-+      if(addr >= 0x1ffe'0000 && len <= 8192) {
-+        char name[512]; snprintf(name, sizeof(name), "%s/binaryout-%06u.bin", dir(), packets++);
-+        if(FILE* f = fopen(name, "wb")) { fwrite(buf + (addr - 0x1ffe'0000), 1, len, f); fclose(f); }
-+      } else scr = 1u << 30;
-+      busyReads = 4; // (the USB "sending" for the next few status checks)
-+    } else if(id == 'U') {
-+      data0 = busyReads ? (1u << 31) : 0;
-+      if(busyReads) busyReads--;
-+    }
-+  }
-+  auto read(u32 address) -> u32 {
-+    if(address >= 0x1ffe'0000 && address < 0x1ffe'2000) {
-+      u32 o = address & 0x1ffe; return buf[o] << 8 | buf[o + 1];
-+    }
-+    switch(address & 0x1f) {
-+    case 0x00: return scr; case 0x04: return data0; case 0x08: return data1;
-+    case 0x0c: return unlocked ? 0x53437632 : 0;
-+    }
-+    return 0;
-+  }
-+  auto write(u32 address, u32 data, bool half) -> void {
-+    if(address >= 0x1ffe'0000 && address < 0x1ffe'2000) {
-+      u32 o = address & 0x1fff;
-+      if(half) { o &= ~1; buf[o] = data >> 8; buf[o + 1] = data; }
-+      else { o &= ~3; buf[o] = data >> 24; buf[o + 1] = data >> 16; buf[o + 2] = data >> 8; buf[o + 3] = data; }
-+      return;
-+    }
-+    switch(address & 0x1f) {
-+    case 0x00: command(data & 0xff); return;
-+    case 0x04: data0 = data; return; case 0x08: data1 = data; return;
-+    case 0x10: if(key == 0x5F554E4C && data == 0x4F434B5F) unlocked = 1; key = data; return;
-+    }
-+  }
-+};
-+inline FishSc64 fishSc64;
-+
- inline auto PI::readWord(u32 address, Thread& thread) -> u32 {
-   if(address <= 0x046f'ffff) return ioRead(address);
- 
-@@ -18,6 +64,11 @@ inline auto PI::busRead(u32 address) -> u32 {
-   const u32 unmapped = (address & 0xFFFF) | (address << 16);
- 
-   if(address <= 0x04ff'ffff) return unmapped; //Address range not memory mapped, only accessible via DMA
-+  if(FishSc64::dir() && address >= 0x1ffe'0000 && address <= 0x1fff'001f) {
-+    u32 v = fishSc64.read(address & ~(Size == Word ? 3 : 1));
-+    if(Size == Word && address < 0x1fff'0000) v = v << 16 | fishSc64.read((address & ~3) + 2);
-+    return v;
-+  }
-   if(address <= 0x0500'03ff) {
-     if(_DD()) return dd.c2s.read<Size>(address);
-     return unmapped;
-@@ -69,6 +120,9 @@ template <u32 Size>
- inline auto PI::busWrite(u32 address, u32 data) -> void {
-   static_assert(Size == Half || Size == Word);  //PI bus will do 32-bit (CPU) or 16-bit (DMA) only
-   if(address <= 0x04ff'ffff) return; //Address range not memory mapped, only accessible via DMA
-+  if(FishSc64::dir() && address >= 0x1ffe'0000 && address <= 0x1fff'001f) {
-+    return fishSc64.write(address, data, Size == Half);
-+  }
-   if(address <= 0x0500'03ff) {
-     if(_DD()) return dd.c2s.write<Size>(address, data);
-     return;
 diff --git a/ares/n64/rdram/rdram.cpp b/ares/n64/rdram/rdram.cpp
 index f099508..335f576 100644
 --- a/ares/n64/rdram/rdram.cpp
@@ -538,37 +442,3 @@ index d110fe2..6e6b1f9 100644
  }
  
  auto RSP::instructionPrologue(u32 instruction) -> void {
-diff --git a/desktop-ui/program/platform.cpp b/desktop-ui/program/platform.cpp
-index 4f49c5a..8f07c98 100644
---- a/desktop-ui/program/platform.cpp
-+++ b/desktop-ui/program/platform.cpp
-@@ -84,6 +84,29 @@ auto Program::video(ares::Node::Video::Screen node, const u32* data, u32 pitch,
-     requestScreenshot = false;
-     captureScreenshot(data, pitch, width, height);
-   }
-+  // fish-oot: ARES_AUTOSHOT=<dir> saves every ARES_AUTOSHOT_EVERY-th frame (default 15) raw, for A/B captures
-+  if(auto dir = getenv("ARES_AUTOSHOT")) {
-+    static u32 autoshotFrame = 0;
-+    u32 every = getenv("ARES_AUTOSHOT_EVERY") ? atoi(getenv("ARES_AUTOSHOT_EVERY")) : 15;
-+    if((autoshotFrame++ % every) == 0) {
-+      string name{dir, "/frame_", pad(autoshotFrame, 7, '0'), ".png"};
-+      Encode::PNG::RGB8(name, data, pitch, width, height);
-+    }
-+  }
-+  // fish-oot: ARES_FRAMEHASH=<file> appends a hash of every frame (FNV-1a over the pixels): two builds that should
-+  // draw the same can be compared by their sequences of distinct frames, whatever their timing
-+  if(auto path = getenv("ARES_FRAMEHASH")) {
-+    static FILE* hashes = fopen(path, "w");
-+    if(hashes) {
-+      u64 h = 0xcbf29ce484222325ull;
-+      for(u32 y = 0; y < height; y++) {
-+        auto row = (const u8*)data + y * pitch;
-+        for(u32 x = 0; x < width * 4; x++) h = (h ^ row[x]) * 0x100000001b3ull;
-+      }
-+      fprintf(hashes, "%ux%u %016llx\n", width, height, (unsigned long long)h);
-+      fflush(hashes);
-+    }
-+  }
- 
-   if(node->width() != emulator->latch.width || node->height() != emulator->latch.height || node->rotation() != emulator->latch.rotation) {
-     emulator->latch.width = node->width();
