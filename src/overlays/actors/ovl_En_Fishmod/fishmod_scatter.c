@@ -17,6 +17,7 @@
 #include "stddef.h"
 #include "fishmod.h"
 #include "fishmod_scatter.h"
+#include "fishmod_lod_pop.h"
 
 #include "gfx.h"
 #include "gfx_setupdl.h"
@@ -155,8 +156,9 @@ static f32 sKindMax[FISHMOD_PROP_KIND_MAX]; // how far each kind is drawn, as la
 static s16 sBillboardYaw;                    // the single cards' turn: facing the camera (as last built)
 // Under water the haze hides detail much sooner, and the kinds' distances are shorter (500-900): the tiers' distances
 // are this much nearer there, so the far tiers still do their work
-#define UNDER_LOD_SCALE 0.5f
+#define UNDER_LOD_SCALE FISHMOD_UNDER_LOD_SCALE // (fishmod_lod_pop.h: was 0.5)
 static f32 sLodScale = 1.0f; // (as last built: UNDER_LOD_SCALE under water)
+static f32 sNearScale[FISHMOD_PROP_KIND_MAX]; // each kind's near distance over PROP_FAR_DIST (fishmod_lod_pop.h; 0: 1)
 // With the camera under water, each kind's distances as the LOD tuning measured them (fishmod_lod_tune.h: the
 // shortest that changed no view, per time of day), at the prop's scale; 0: the defaults. Above water the defaults
 // (set by eye: the tuning's views there were harsher than the game's).
@@ -274,6 +276,13 @@ static void Scatter_InitKinds(void) {
     sKinds[FISHMOD_PROP_##id].materialImp = gFishmodProp_##name##DLImpMaterial; \
     sKinds[FISHMOD_PROP_##id].impDist = (dist);
     FISHMOD_PROP_KINDS_IMP(X)
+#undef X
+    // (the tiers' distances as the pop-in test set them: fishmod_lod_pop.h)
+#define X(id, card, half, near)                   \
+    sKinds[FISHMOD_PROP_##id].impDist *= (card);  \
+    sKinds[FISHMOD_PROP_##id].halfDist *= (half); \
+    sNearScale[FISHMOD_PROP_##id] = (near);
+    FISHMOD_LOD_POP(X)
 #undef X
     // each kind's settings (fishmod/data/prop_kinds.json); swaying: weed slowly with the water's movement, reeds above
     // it faster in the wind (the shear moves a point by its height, so tall kinds get less of it: every tip moves about
@@ -554,6 +563,7 @@ static s32 sSetAge = 1000;
 #define REUSE_TURN_COS 0.99756f // 4 degrees
 #define REUSE_FRAMES 20
 static s32 sSetUnder; // the set was made with the camera under water
+static f32 sSetHaze;  // and this far into its haze (a new set each frame while it comes or goes)
 
 /**
  * The props' commands kept (fish-oot). While the set, the light on the props and the mode stay the same, the commands
@@ -1251,7 +1261,11 @@ static void Scatter_PropFogSetup(void) {
     sPropFog.key = !gFishmodWaterFog.on ? 0
                                         : (0x80000000 | ((u32)gFishmodWaterFog.water[0] << 16) |
                                            ((u32)gFishmodWaterFog.water[1] << 8) | gFishmodWaterFog.water[2]) ^
-                                              ((u32)(s32)(gFishmodWaterFog.h * 4.0f) << 4);
+                                              ((u32)(s32)((gFishmodWaterFog.h < 40.0f) ? gFishmodWaterFog.h * 4.0f
+                                                                                     : 120.0f + gFishmodWaterFog.h)
+                                               << 4);
+    // (the camera's height over the water in quarter units near it, whole units from 40 up, where a unit is under
+    // 2.5% of the fog's slope: every quarter unit, a camera that bobs made every frame's commands anew)
 }
 
 /** The prop's water fog step, the same whatever the camera (0: none, over the water or floating; else its depth step
@@ -2154,7 +2168,7 @@ static void Scatter_Sway(PlayState* play, ScatterFrame* frame, ScatterSet* set) 
 /** How a prop at this (squared, flat) distance is drawn: see ScatterTier. */
 static s32 Scatter_Tier(FishmodProp* prop, FishmodPropKindInfo* info, s32 kind, f32 dSq, f32 eyeY) {
     f32 s = prop->scale * (1.0f / 64.0f) * sLodScale;
-    f32 farDist = PROP_FAR_DIST * sLodScale;
+    f32 farDist = PROP_FAR_DIST * sLodScale * ((sNearScale[kind] > 0.0f) ? sNearScale[kind] : 1.0f);
     f32 dy = eyeY - prop->y;
     f32 impDist = (sTunedImp[kind] > 0.0f) ? sTunedImp[kind] * prop->scale * (1.0f / 64.0f) : info->impDist * s;
     f32 halfDist = (sTunedHalf[kind] > 0.0f) ? sTunedHalf[kind] * prop->scale * (1.0f / 64.0f) : info->halfDist * s;
@@ -2223,6 +2237,7 @@ typedef struct KindScan {
     f32 impK;      // times a prop's scale: the single card from this far
     f32 halfK;     // times a prop's scale: the half-size texture from this far
     f32 kindMaxSq; // the kind's distance, squared: the dissolve from here
+    f32 farSq;     // its near drawing as far as this (squared): PROP_FAR_DIST, times the kind's own share
     u16 flags;     // KS_*
 } KindScan;
 #define KS_SKIP_DRY (1 << 0) // not drawn in a dry chunk
@@ -2236,6 +2251,24 @@ typedef struct KindScan {
 #define KS_SWAY (1 << 8)
 #define KS_ROCK (1 << 9)
 
+#if FISHMOD_DEBUG
+static u32 sSetPop; // the pop-in test the set was made for
+/** A prop's (squared, flat) distance as its cut, tier and dissolve take it: nearer by the pop-in test's step. */
+static f32 Scatter_PopSq(f32 dSq, s32 kind) {
+    if ((gFishmodPop.step > 0.0f) && ((gFishmodPop.kind < 0) || (gFishmodPop.kind == kind))) {
+        f32 d = sqrtf(dSq) - gFishmodPop.step;
+
+        return (d > 0.0f) ? SQ(d) : 0.0f;
+    }
+    return dSq;
+}
+#define POP_SQ(dSq, kind) Scatter_PopSq(dSq, kind)
+#define POP_REACH gFishmodPop.step
+#else
+#define POP_SQ(dSq, kind) (dSq)
+#define POP_REACH 0.0f
+#endif
+
 static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f32 lookZ) {
     static u16 sVisible[256];                       // chunks near the camera
     static f32 sChunkDistSq[ARRAY_COUNT(sVisible)]; // their centres' distance from the eye, squared
@@ -2248,7 +2281,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     static u16 sOrder[VISIBLE_MAX];                 // nearest band first, kind by kind within a band
     static KindScan sKindScan[FISHMOD_PROP_KIND_MAX];
     s32 kindStart[FISHMOD_PROP_KIND_MAX + 1];
-    f32 farSq;
+    f32 hz;
     f32 cosBill;
     f32 sinBill;
     Vec3f eye = *eyeP;
@@ -2257,7 +2290,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
     s32 visibleCount = 0;
     s32 chunk = sScatter->chunk;
     s32 under = (gFishmodHaze > 0.5f);
-    f32 distFar = sDistFar[under];
+    f32 distFar;
     s32 mats = 0;
     s32 matsXlu = 0;
     s32 lastOpa = -1;
@@ -2311,7 +2344,17 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
     }
 
-    Scatter_TunedDistances(under);
+    // (how far the camera is into the water's haze, 0 to 1: the distances go from the over-water ones to the
+    // under-water ones with it, over the ten frames it takes, not all at once at its middle: at the crossing the
+    // lily pads and far clumps past 500 to 700 units vanished in one frame, LPIPS up to 27 by the pop-in test)
+    hz = CLAMP(gFishmodHaze, 0.0f, 1.0f);
+#if FISHMOD_DEBUG
+    if (gFishmodPop.under >= 0.0f) {
+        hz = gFishmodPop.under; // (the pop-in test: the props' distances as this far into the haze)
+    }
+#endif
+    distFar = sDistFar[0] + (sDistFar[1] - sDistFar[0]) * hz + POP_REACH;
+    Scatter_TunedDistances(hz > 0.0f);
 #if FISHMOD_DEBUG
     // the rotation check (FISHMOD_LOD_ROTATE) draws a reference with a much wider cone and nothing cut by distance
     if (gFishmodLodTest.active && gFishmodLodTest.wide) {
@@ -2404,7 +2447,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             {
                 f32 dx = sBedCards[card].x - eye.x;
                 f32 dz = sBedCards[card].z - eye.z;
-                f32 dSq = SQ(dx) + SQ(dz);
+                f32 dSq = POP_SQ(SQ(dx) + SQ(dz), -1);
 
                 if ((dSq > SQ(BEDCARD_DIST)) && (dSq < SQ(distFar * (1.0f + FADE_BAND))) &&
                     (BedCard_Views(card) != NULL)) {
@@ -2418,11 +2461,11 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
 
     // Each kind's numbers, once: how far it's drawn (above or under water), and what the choice of tier needs
     sLodScale = under ? UNDER_LOD_SCALE : 1.0f;
-    farSq = SQ(PROP_FAR_DIST * sLodScale);
     for (kind = 0; kind < FISHMOD_PROP_KIND_MAX; kind++) {
         FishmodPropKindInfo* info = &sKinds[kind];
         KindScan* ks = &sKindScan[kind];
-        f32 maxDist = under ? ((sTunedCut[kind] > 0.0f) ? sTunedCut[kind] : info->drawDistUnder) : info->drawDist;
+        f32 maxUnder = (sTunedCut[kind] > 0.0f) ? sTunedCut[kind] : info->drawDistUnder;
+        f32 maxDist = info->drawDist + (maxUnder - info->drawDist) * hz;
 
 #if FISHMOD_DEBUG
         if (gFishmodLodTest.active && !gFishmodLodTest.asGame) {
@@ -2432,6 +2475,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
 #endif
         sKindMax[kind] = maxDist;
         ks->kindMaxSq = SQ(maxDist);
+        ks->farSq = SQ(PROP_FAR_DIST * sLodScale * ((sNearScale[kind] > 0.0f) ? sNearScale[kind] : 1.0f));
         if ((info->modelImp != NULL) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOIMP | FISHMOD_BENCH_NODISSOLVE)
 #if FISHMOD_DEBUG
             && !gFishmodLodTest.active
@@ -2440,7 +2484,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             maxDist *= 1.0f + FADE_BAND; // the dissolve, past the kind's distance
         }
         ks->maxSq = SQ(maxDist);
-        ks->reachSq = SQ(maxDist + chunk * 0.71f);
+        ks->reachSq = SQ(maxDist + chunk * 0.71f + POP_REACH);
         // (a prop's own are these times its scale: the same numbers as scale / 64 times the kind's, as 1 / 64 and the
         // under-water scale are powers of two)
         ks->extentK = info->extent * (1.0f / 64.0f);
@@ -2510,7 +2554,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             dx = prop->x - eye.x;
             dz = prop->z - eye.z;
             dSq = SQ(dx) + SQ(dz);
-            if (dSq > maxSq) {
+            if (POP_SQ(dSq, curKind) > maxSq) {
                 continue;
             }
             dy = prop->y - eye.y;
@@ -2596,7 +2640,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         FishmodProp* prop = &sProps[id];
         s32 k = sCandKind[ci];
         KindScan* ks = &sKindScan[k];
-        f32 dSq = sCandDSq[ci];
+        f32 dSq = POP_SQ(sCandDSq[ci], k); // (as its tier and its dissolve take it)
         s32 tier;
         s32 key;
 
@@ -2613,9 +2657,9 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
 
             // (the dissolve past the cutoff comes first: under water the cutoffs can be nearer than PROP_FAR_DIST)
             if ((ks->flags & KS_IMP) && (SQ(dy) <= IMP_SLOPE_SQ * dSq) &&
-                (((dSq >= SQ(ks->impK * prop->scale)) && (dSq >= farSq)) || (dSq >= ks->kindMaxSq))) {
+                (((dSq >= SQ(ks->impK * prop->scale)) && (dSq >= ks->farSq)) || (dSq >= ks->kindMaxSq))) {
                 tier = TIER_IMP;
-            } else if (dSq < farSq) {
+            } else if (dSq < ks->farSq) {
                 tier = TIER_NEAR;
             } else if ((ks->flags & KS_HALF) && (dSq >= SQ(ks->halfK * prop->scale))) {
                 tier = TIER_HALF;
@@ -2909,11 +2953,12 @@ void EnFishmod_ScatterDraw(PlayState* play) {
     // remake what's drawn only when the camera has moved or turned (or now and then anyway)
     sSetAge++;
 
-    if ((sSetAge >= REUSE_FRAMES) || ((gFishmodHaze > 0.5f) != sSetUnder) ||
+    if ((sSetAge >= REUSE_FRAMES) || ((gFishmodHaze > 0.5f) != sSetUnder) || (gFishmodHaze != sSetHaze) ||
 #if FISHMOD_DEBUG
         gFishmodLodTest.active || // calibrating: what's drawn changes with the test, not the camera
         ((u32)gFishmodBench != sSetBench) || // the bench switched a mode: the tiers are chosen here
         (gFishmodPropTest.serial != sSetPropTest) || // the prop sweep switched its test
+        (gFishmodPop.serial != sSetPop) ||
 #endif
         ((SQ(eye.x - sSetEye.x) + SQ(eye.y - sSetEye.y) + SQ(eye.z - sSetEye.z)) > SQ(REUSE_MOVE)) ||
         ((lookX * sSetLook.x + lookY * sSetLook.y + lookZ * sSetLook.z) < REUSE_TURN_COS)) {
@@ -2922,9 +2967,11 @@ void EnFishmod_ScatterDraw(PlayState* play) {
 #if FISHMOD_DEBUG
         sSetBench = gFishmodBench;
         sSetPropTest = gFishmodPropTest.serial;
+        sSetPop = gFishmodPop.serial;
 #endif
         sSetAge = 0;
         sSetUnder = (gFishmodHaze > 0.5f);
+        sSetHaze = gFishmodHaze;
         sSetEye = eye;
         sSetLook.x = lookX;
         sSetLook.y = lookY;

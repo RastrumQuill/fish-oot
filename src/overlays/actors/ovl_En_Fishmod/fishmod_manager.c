@@ -798,7 +798,14 @@ typedef struct ManagerDrawItem {
     u8 variant;
     u8 whiskers;
     s16 fog; // -1: lit; else flat, this fogged (EnFishmod_FogAmount)
+    u16 dist;  // from the camera
+    u8 hero;   // one of the HERO_MAX nearest that would have the full rig: it keeps it
+    u8 wantFull;
 } ManagerDrawItem;
+// Heroes and the crowd (fish-oot). The full rig (every spine bone, the fins' own bones) is for the few fish nearest
+// the camera, where it shows; every other fish in range has the reduced rig, however many swim close.
+// (Was: every fish within LOD_FULL_DIST had the full rig, a school at the camera all of them at once.)
+#define HERO_MAX 4
 
 void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
     // static: too big for the graphics thread's stack
@@ -869,9 +876,10 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
 
             item->fish = fish;
             fish->drawnFull = 3; // (its swim wave keeps running while this lasts)
-            item->variant = (close || ((dist < LOD_FULL_DIST) && (fish->lengthInches >= FISHMOD_SMALL_RIG_LENGTH)))
-                                ? FISH_RIG_FULL
-                                : FISH_RIG_REDUCED;
+            item->wantFull = (close || ((dist < LOD_FULL_DIST) && (fish->lengthInches >= FISHMOD_SMALL_RIG_LENGTH)));
+            item->variant = item->wantFull ? FISH_RIG_FULL : FISH_RIG_REDUCED;
+            item->dist = close ? 0 : (u16)CLAMP_MAX(dist, 65535.0f);
+            item->hero = false;
             if (FISHMOD_STUDIO_ON) {
                 // the animation studio picks the rig per fish
                 s32 k;
@@ -888,6 +896,35 @@ void EnFishmod_ManagerDraw(EnFishmod* this, PlayState* play) {
         }
     }
 
+    // the heroes: of the fish that would have the full rig, the HERO_MAX nearest keep it; the rest are the crowd
+    if (!FISHMOD_STUDIO_ON) {
+        s32 h;
+
+        for (h = 0; h < HERO_MAX; h++) {
+            s32 best = -1;
+
+            for (i = 0; i < fullCount; i++) {
+                if (full[i].wantFull && !full[i].hero && ((best < 0) || (full[i].dist < full[best].dist))) {
+                    best = i;
+                }
+            }
+            if (best < 0) {
+                break;
+            }
+            full[best].hero = true;
+        }
+        for (i = 0; i < fullCount; i++) {
+            if (full[i].wantFull && !full[i].hero) {
+                full[i].variant = FISH_RIG_REDUCED;
+                full[i].whiskers = false;
+            }
+        }
+    } else {
+        // (the animation studio picks each fish's rig itself: those on the full rig are heroes)
+        for (i = 0; i < fullCount; i++) {
+            full[i].hero = (full[i].variant == FISH_RIG_FULL);
+        }
+    }
     // sorted by species, rig and material, so each species' textures and vertices, and each material, are set up once
 #define DRAW_KEY(item) ((((item).fish->species - gFishmodSpecies) * 2 + (item).variant) * 2 + ((item).fog >= 0))
     for (i = 1; i < fullCount; i++) {

@@ -558,6 +558,18 @@ typedef struct FishmodPropTest {
     u32 serial; // changes with each test (the props' set made again)
 } FishmodPropTest;
 extern FishmodPropTest gFishmodPropTest;
+// The pop-in test (FISHMOD_POP_AB, fishmod/tools/pop_ab_capture.py): the props' distances taken `step` units nearer
+// than they are (how far each is drawn, its tier, its dissolve, the bed cards), for every kind or one (kind < 0:
+// all), with the camera where it is: against the same view without it, what differs is what pops in or changes
+// tier over the next `step` units of travel, and nothing else.
+typedef struct FishmodPopTest {
+    f32 step;
+    s32 kind;
+    u32 serial; // (a change: the set is made again)
+    f32 haze;   // the underwater haze held at this (the moment the camera crosses the surface is 0.5); < 0: as it is
+    f32 under;  // the props' distances as this far into the haze (0 over the water, 1 under it); < 0: as it is
+} FishmodPopTest;
+extern FishmodPopTest gFishmodPop;
 // The flat fish compared (fishmod_manager.c, LIT_DIST): set by a script (FISHMOD_FLAT_TEST_INIT), else normal
 extern s32 gFishmodFlatTest;
 #define FISHMOD_FLAT_TEST gFishmodFlatTest

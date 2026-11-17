@@ -1286,10 +1286,18 @@ static void Fishmod_UpdateHaze(PlayState* play) {
     if ((eye.x == eye.x) && (eye.z == eye.z) && (fabsf(eye.x) < 30000.0f) && (fabsf(eye.z) < 30000.0f)) {
         under = BgCheck_GetWaterSurface(play, &play->colCtx, eye.x, eye.z, &surface, &box) && (eye.y < surface);
     }
-    if (!under && (gFishmodHaze <= 0.0f)) {
-        return;
+#if FISHMOD_DEBUG
+    if (gFishmodPop.haze >= 0.0f) {
+        // (the pop-in test: the haze held where the camera crosses the surface)
+        gFishmodHaze = gFishmodPop.haze;
+    } else
+#endif
+    {
+        if (!under && (gFishmodHaze <= 0.0f)) {
+            return;
+        }
+        Math_StepToF(&gFishmodHaze, under ? 1.0f : 0.0f, 0.1f);
     }
-    Math_StepToF(&gFishmodHaze, under ? 1.0f : 0.0f, 0.1f);
     env->adjFogNear = (env->lightSettings.fogNear > HAZE_FOG_NEAR)
                           ? (s16)((HAZE_FOG_NEAR - env->lightSettings.fogNear) * gFishmodHaze)
                           : 0;
