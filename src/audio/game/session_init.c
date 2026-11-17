@@ -15,7 +15,7 @@ TempoData gTempoData = {
 };
 
 // Sizes of everything on the init pool
-#define AI_BUFFERS_SIZE (AIBUF_SIZE * ARRAY_COUNT(gAudioCtx.aiBuffers))
+#define AI_BUFFERS_SIZE (AIBUF_SIZE * 3) // (fish-oot: the three the heap holds; any more are static: load.c)
 #define SOUNDFONT_LIST_SIZE (NUM_SOUNDFONTS * sizeof(SoundFont))
 #if OOT_VERSION < PAL_1_0 || !PLATFORM_N64
 #define PERMANENT_POOL_SIZE (SFX_SEQ_SIZE + SFX_SOUNDFONTS_SIZE)

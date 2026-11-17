@@ -462,12 +462,12 @@ Acmd* func_800DB828(Acmd* cmd, s32 aiBufLen, SynthesisReverb* reverb, s16 update
  */
 Acmd* AudioSynth_FilterReverb(Acmd* cmd, s32 size, SynthesisReverb* reverb) {
     if (reverb->filterLeft != NULL) {
-        aFilter(cmd++, 2, size, reverb->filterLeft);
+        AudioSynth_LoadFilterSize(cmd++, size, reverb->filterLeft); // (fish-oot: its own copy if the task wants)
         aFilter(cmd++, reverb->resampleFlags, DMEM_WET_LEFT_CH, reverb->filterLeftState);
     }
 
     if (reverb->filterRight != NULL) {
-        aFilter(cmd++, 2, size, reverb->filterRight);
+        AudioSynth_LoadFilterSize(cmd++, size, reverb->filterRight);
         aFilter(cmd++, reverb->resampleFlags, DMEM_WET_RIGHT_CH, reverb->filterRightState);
     }
     return cmd;
@@ -619,11 +619,73 @@ void AudioSynth_Stub_800DBE64(void) {
 void AudioSynth_Stub_800DBE6C(void) {
 }
 
+#if FISHMOD_EXPAK
+/*
+ * fish-oot: a filter's coefficients are read by the RSP when its task runs, from where the driver keeps them, and
+ * the driver rewrites them tick by tick (a channel's, a note's own). A task run a refresh or two after it was
+ * built (the updates built ahead: thread.c) would filter with the later ones. So such a task is given its own
+ * copy: gFishmodFilterSnap points at room for the next one (NULL: none wanted, or the room's all used: the
+ * driver's own, as always).
+ *
+ * The copy is of what the filter holds when the update is finished, not when the command is written: an update is
+ * several ticks, a filter can change between them, and the game's task, run after its update, filters all of them
+ * with the last tick's (the sweep's scenes found the difference: sound effects whose filter moves, in the first
+ * frames of five scenes). So each filter an update uses has one copy, filled in by AudioSynth_FishmodFilterFinish
+ * at the update's end.
+ */
+s16* gFishmodFilterSnap;
+s16* gFishmodFilterSnapEnd;
+static s16* sFishmodFilterSrc[160];
+static s16* sFishmodFilterDst[160];
+static s32 sFishmodFilterCount;
+
+static void* AudioSynth_FishmodFilter(void* addr) {
+    s16* snap = gFishmodFilterSnap;
+    s32 i;
+
+    if (snap == NULL) {
+        return addr;
+    }
+    for (i = sFishmodFilterCount - 1; i >= 0; i--) {
+        if (sFishmodFilterSrc[i] == (s16*)addr) {
+            return sFishmodFilterDst[i];
+        }
+    }
+    if ((snap + 8 > gFishmodFilterSnapEnd) || (sFishmodFilterCount >= 160)) {
+        return addr;
+    }
+    sFishmodFilterSrc[sFishmodFilterCount] = (s16*)addr;
+    sFishmodFilterDst[sFishmodFilterCount] = snap;
+    sFishmodFilterCount++;
+    gFishmodFilterSnap = snap + 8;
+    return snap;
+}
+
+// The update's commands are written: its filters' copies are made (thread.c calls this after AudioSynth_Update).
+void AudioSynth_FishmodFilterFinish(void) {
+    s32 i;
+    s32 j;
+
+    for (i = 0; i < sFishmodFilterCount; i++) {
+        s16* src = sFishmodFilterSrc[i];
+        s16* dst = sFishmodFilterDst[i];
+
+        for (j = 0; j < 8; j++) {
+            dst[j] = src[j];
+        }
+    }
+    sFishmodFilterCount = 0;
+}
+#else
+#define AudioSynth_FishmodFilter(addr) (addr)
+#endif
+
 void AudioSynth_LoadFilterBuffer(Acmd* cmd, s32 flags, s32 buf, void* addr) {
     aFilter(cmd, flags, buf, addr);
 }
 
 void AudioSynth_LoadFilterSize(Acmd* cmd, s32 size, void* addr) {
+    addr = AudioSynth_FishmodFilter(addr);
     aFilter(cmd, 2, size, addr);
 }
 

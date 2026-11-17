@@ -1276,12 +1276,23 @@ void AudioOcarina_SetCustomButtonMapping(u8 useCustom) {
 
 #endif
 
+#if FISHMOD_DEBUG
+void (*gFishmodOcarinaPad)(Input* input) = NULL;
+#endif
+
 void AudioOcarina_ReadControllerInput(void) {
     Input inputs[MAXCONTROLLERS];
     Input* input = &inputs[0];
     u32 ocarinaInputButtonPrev = sOcarinaInputButtonCur;
 
     PadMgr_RequestPadData(&gPadMgr, inputs, false);
+#if FISHMOD_DEBUG
+    // fish-oot: a test script playing the ocarina (the audio sweep's ocarina leg, code/fishmod_debug_sweep.inc.c):
+    // the ocarina reads the controller itself, so the script's buttons and stick are handed to it here
+    if (gFishmodOcarinaPad != NULL) {
+        gFishmodOcarinaPad(input);
+    }
+#endif
     sOcarinaInputButtonCur = input->cur.button;
     sOcarinaInputButtonPrev = ocarinaInputButtonPrev;
     sOcarinaInputStickAdj.x = input->rel.stick_x;
@@ -2333,6 +2344,8 @@ void Audio_UpdateFanfare(void);
 /**
  * This is Audio_Update for the graph thread
  */
+u32 gFishmodAudioFrameFlushes;
+
 void Audio_Update(void) {
     if (func_800FAD34() == 0) {
 #if DEBUG_FEATURES
@@ -2359,6 +2372,9 @@ void Audio_Update(void) {
         AudioDebug_ProcessInput();
 #endif
 
+        // fish-oot: the game's once-a-frame hand-over of its commands to the driver, counted: the driver builds
+        // updates ahead only straight after one (audio/internal/thread.c)
+        gFishmodAudioFrameFlushes++;
         AudioThread_ScheduleProcessCmds();
 
 #if DEBUG_FEATURES

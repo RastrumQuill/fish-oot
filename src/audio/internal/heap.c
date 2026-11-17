@@ -930,7 +930,7 @@ s32 AudioHeap_ResetStep(void) {
         case 1:
             AudioHeap_Init();
             gAudioCtx.resetStatus = 0;
-            for (i = 0; i < 3; i++) {
+            for (i = 0; i < FISHMOD_AI_RING; i++) {
                 gAudioCtx.aiBufLengths[i] = gAudioCtx.audioBufferParameters.maxAiBufferLength;
                 for (j = 0; j < AIBUF_LEN; j++) {
                     gAudioCtx.aiBuffers[i][j] = 0;
@@ -1087,6 +1087,19 @@ void AudioHeap_Init(void) {
         gAudioCtx.abiCmdBufs[i] =
             AudioHeap_AllocDmaMemoryZeroed(&gAudioCtx.miscPool, gAudioCtx.maxAudioCmds * sizeof(Acmd));
     }
+#if FISHMOD_EXPAK
+    {
+        // fish-oot: four more command lists, for the updates built ahead (thread.c): static, outside the audio heap
+        // (its pools are sized for two). A spec whose lists could be longer keeps to the heap's two, one update a wake.
+        static ALIGNED(16) Acmd sFishmodCmdBufs[FISHMOD_TASK_RING - 2][FISHMOD_CMD_BUF_MAX];
+        extern u8 gFishmodTaskRing;
+
+        gFishmodTaskRing = (gAudioCtx.maxAudioCmds <= FISHMOD_CMD_BUF_MAX) ? FISHMOD_TASK_RING : 2;
+        for (i = 2; i < FISHMOD_TASK_RING; i++) {
+            gAudioCtx.abiCmdBufs[i] = sFishmodCmdBufs[i - 2];
+        }
+    }
+#endif
 
     // Initialize the decay rate table for adsr
     gAudioCtx.adsrDecayTable = AudioHeap_Alloc(&gAudioCtx.miscPool, 256 * sizeof(f32));

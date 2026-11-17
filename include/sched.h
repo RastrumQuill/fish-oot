@@ -11,6 +11,7 @@
 #define OS_SC_PARALLEL_TASK 0x0010  // Unimplemented
 #define OS_SC_LAST_TASK     0x0020  // Unimplemented
 #define OS_SC_SWAPBUFFER    0x0040  // Swap framebuffer when done
+#define OS_SC_FISHMOD_LAZY  0x0080  // fish-oot: an audio task with time to spare: run when the RSP is free (sched.c)
 
 #define OS_SC_DP        OS_SC_NEEDS_RDP // Task is using the RDP
 #define OS_SC_SP        OS_SC_NEEDS_RSP // Task is using the RSP

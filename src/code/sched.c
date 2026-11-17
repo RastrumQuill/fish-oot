@@ -210,6 +210,10 @@ void Sched_HandleNMI(UNUSED Scheduler* sc) {
 /**
  * Enqueue a task to either the audio task list or the gfx task list
  */
+// fish-oot: set by the audio manager, taken by Sched_HandleNotification (defined with the audio driver, so this
+// file's own data is the size it was: src/audio/fishmod_audio_pin.c)
+extern OSScTask* volatile gFishmodSchedUrgent;
+
 void Sched_QueueTask(Scheduler* sc, OSScTask* task) {
     s32 type = task->list.t.type;
 
@@ -229,7 +233,16 @@ void Sched_QueueTask(Scheduler* sc, OSScTask* task) {
         sc->audioListTail = task;
 
         // Set audio flag
-        sc->doAudio = true;
+        // (fish-oot: not for a task with time to spare, OS_SC_FISHMOD_LAZY: it runs when the RSP is next free, and only
+        // takes the RSP from a graphics task if the audio manager says its time is up: Sched_FishmodUrgent)
+        if (!(task->flags & OS_SC_FISHMOD_LAZY)) {
+            OSScTask* t;
+
+            for (t = sc->audioListHead; t != NULL; t = t->next) {
+                t->flags &= ~OS_SC_FISHMOD_LAZY; // (the ones before it go first, and now)
+            }
+            sc->doAudio = true;
+        }
     } else {
 
         SCHED_DEBUG_PRINTF(T("グラフタスクをエントリしました\n", "Entered graph task\n"));
@@ -329,12 +342,13 @@ s32 Sched_Schedule(Scheduler* sc, OSScTask** spTaskOut, OSScTask** dpTaskOut, s3
         //! @bug If there is more than one audio task in the queue at any time, unsetting doAudio here
         //! will cause only one task to be processed until a new audio task is enqueued. In practice, audio
         //! tasks are sent infrequently enough that there are never two audio tasks in the queue.
-        sc->doAudio = false;
         // Advance task queue
         sc->audioListHead = sc->audioListHead->next;
         if (sc->audioListHead == NULL) {
             sc->audioListTail = NULL;
         }
+        // (fish-oot: the flag is the head's: set if another task that can't wait is behind this one)
+        sc->doAudio = (sc->audioListHead != NULL) && !(sc->audioListHead->flags & OS_SC_FISHMOD_LAZY);
     } else if (gfxTask != NULL) {
         // GFX Task
 
@@ -367,6 +381,17 @@ s32 Sched_Schedule(Scheduler* sc, OSScTask** spTaskOut, OSScTask** dpTaskOut, s3
                 }
             }
         }
+    }
+    // fish-oot: the RSP still free and nothing of the graphics' ready for it: an audio task with time to spare
+    // (OS_SC_FISHMOD_LAZY) runs now, in the gap, instead of taking the RSP from a graphics task at the next refresh
+    if ((nextState & OS_SC_SP) && (*spTaskOut == NULL) && (sc->audioListHead != NULL)) {
+        *spTaskOut = sc->audioListHead;
+        nextState &= ~OS_SC_SP;
+        sc->audioListHead = sc->audioListHead->next;
+        if (sc->audioListHead == NULL) {
+            sc->audioListTail = NULL;
+        }
+        sc->doAudio = (sc->audioListHead != NULL) && !(sc->audioListHead->flags & OS_SC_FISHMOD_LAZY);
     }
     return nextState;
 }
@@ -533,10 +558,30 @@ void Sched_HandleNotification(Scheduler* sc) {
         Sched_QueueTask(sc, task);
     }
 
+    // fish-oot: the audio manager says a task it sent with time to spare has run out of it: that task and any before
+    // it can't wait any more. (Already running or done: not in the queue, nothing to do.)
+    if (gFishmodSchedUrgent != NULL) {
+        OSScTask* target = gFishmodSchedUrgent;
+        OSScTask* t;
+
+        gFishmodSchedUrgent = NULL;
+        for (t = sc->audioListHead; (t != NULL) && (t != target); t = t->next) {}
+        if (t != NULL) {
+            for (t = sc->audioListHead; t != NULL; t = t->next) {
+                t->flags &= ~OS_SC_FISHMOD_LAZY;
+                if (t == target) {
+                    break;
+                }
+            }
+            sc->doAudio = true;
+        }
+    }
+
     // If an audio task has been enqueued and there is currently an RSP task running,
     // signal to the currently running task to yield the RSP so that the audio task may
     // be ran as soon as possible.
-    if (sc->doAudio && sc->curRSPTask != NULL) {
+    // (fish-oot: unless what's running is itself an audio task, one that was sent with time to spare: it finishes)
+    if (sc->doAudio && sc->curRSPTask != NULL && sc->curRSPTask->list.t.type != M_AUDTASK) {
         SCHED_DEBUG_PRINTF("[YIELD B]");
 
         Sched_Yield(sc);

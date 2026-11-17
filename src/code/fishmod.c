@@ -194,7 +194,34 @@ f32 Fishmod_RandCenteredFloat(FishmodRng* rng, f32 f) {
     return (Fishmod_RandZeroOne(rng) - 0.5f) * f;
 }
 
+/*
+ * The game's View_Init sets the X of the view's look-at point and leaves its Y and Z as the memory was. The camera
+ * fills them in at the end of the first frame, but Kokiri Forest's fairies (ObjectKankyo_Fairies) read them on it.
+ * In the game as shipped that memory holds zero or the last scene's look-at point. A build that starts straight in
+ * the forest (the test and debug builds) finds whatever used the memory before: seen, two words of code, which as
+ * floats are denormal, and the CPU stops on arithmetic with those (a floating-point exception on the first frame, in
+ * one build and not the next: it goes by where things fall in memory). A value that isn't a usable number (denormal,
+ * infinite or not a number) is made zero here, after View_Init and before anything reads it; a usable one is left as
+ * the game would have had it.
+ */
+static void Fishmod_ViewSane(f32* f) {
+    u32 bits = *(u32*)f;
+    u32 exponent = bits & 0x7F800000;
+
+    if ((exponent == 0x7F800000) || ((exponent == 0) && ((bits & 0x007FFFFF) != 0))) {
+        *f = 0.0f;
+    }
+}
+
 void Fishmod_OnSceneLoad(PlayState* play) {
+#ifdef FISHMOD_TEST_VIEW_GARBAGE // (the fix's own test: the two words the crash was seen with)
+    *(u32*)&play->view.at.y = 0x04410002;
+    *(u32*)&play->view.at.z = 0x00400821;
+#endif
+#ifndef FISHMOD_TEST_VIEW_NOFIX
+    Fishmod_ViewSane(&play->view.at.y);
+    Fishmod_ViewSane(&play->view.at.z);
+#endif
     gFishmodRod = NULL;
     Fishmod_ResetRodInfo();
     Fishmod_RandSeed(&gFishmodRng, FISHMOD_TIME_SEED() + play->sceneId);
@@ -2107,4 +2134,27 @@ Gfx* Fishmod_Relight(PlayState* play, Lights* lights, Gfx* gfx) {
     }
     gSPSegment(gfx++, FISHMOD_RELIT_SEG, sRelitBuf[sRelitFront]);
     return gfx;
+}
+
+/*
+ * A build that needs the Expansion Pak (fishmod/build.sh --expak), started without one: says so and stops there,
+ * before anything is set up that counts on the 8 MB (called from SysCfb_Init, code/sys_cfb.c, on the flag below).
+ * Drawn with the crash screen's own text, into a frame buffer at the top of the 4 MB that are there.
+ */
+#include "fault.h"
+const u8 gFishmodExpakRequired = FISHMOD_EXPAK;
+
+void Fishmod_NeedsExpansionPak(void) {
+    u16* fb = (u16*)(0x80400000 - (SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u16)));
+
+    Fault_SetFrameBuffer(fb, SCREEN_WIDTH, SCREEN_HEIGHT);
+    Fault_DrawRecBlack(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    Fault_DrawText(56, 96, "THIS VERSION NEEDS THE");
+    Fault_DrawText(56, 108, "EXPANSION PAK.");
+    Fault_DrawText(56, 132, "TURN THE CONSOLE OFF AND");
+    Fault_DrawText(56, 144, "PUT ONE IN.");
+    osWritebackDCacheAll();
+    osViSwapBuffer(fb);
+    osViBlack(false);
+    for (;;) {}
 }

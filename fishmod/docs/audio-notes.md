@@ -176,3 +176,54 @@ its 240 DMAs to about 20 with larger pieces); the microcode's own load and the d
 driver less often (every second refresh: -11% of the audio's traffic, measured; releases/notes-audio-laps.md); the
 codebooks, if DMEM had room to keep them (it doesn't, as laid out). The reverbs, the samples, the states and the
 sound itself are the work.
+
+## The rule for this work (16 November)
+
+**Build time is free.** No amount of work before the game runs is too much: anything that can be worked out at build
+time is, however long the tools take. The compiler's output isn't sacred either: where it leaves something on the
+table (a quirk, a needless instruction, a bad layout), the assembly can be fixed after it's compiled, by a build step
+or by hand, as long as the result is checked (the same answers, the same sound, the same picture) like any other
+change. The cost that counts is the console's, at run time.
+
+## Updates built ahead (`--expak`, off by default: `gFishmodAudioAhead`)
+
+`audio/internal/thread.c`: the audio update split into the refresh's own part (the output buffer queued) and its
+body (the game's update, unchanged: `AudioThread_Body`); with the Expansion Pak's memory (six output buffers and six
+command lists and tasks instead of three and two) the body that takes the game's commands is followed by the next
+two refreshes' bodies in the same wake. The RSP's tasks and the output are as they were. Same sound: the audio check,
+1,894 buffers, against the build without.
+
+For the check to compare the two, three of its stand-ins changed (so its logs from before 16 November don't compare
+with later ones): the random number no longer adds the output buffer's old samples (which old buffer depends on the
+ring's size), and a sample preload or a sample store copy in flight is waited for, as an async load's chunk already
+was (updates back to back outrun the cart).
+
+What the first try got wrong, kept for the next: the game's commands reach the driver on the *second* update after a
+frame, so batches that started on the first pushed every sound two updates later (the check's 22nd buffer).
+
+## The audio check's tour, and what it caught (16 November)
+
+One map isn't the game. `fishmod/scripts/audlog_world.inc.c` is the audio check on a tour: Hyrule Field, then 16
+entrances covering the audio session settings the scenes use (the market, Kakariko, Link's house, Zora's Fountain,
+the Shadow Temple, Jabu-Jabu, the Fire Temple, the Forest Temple, the Temple of Time, the Desert Colossus, the
+Haunted Wasteland, the Lost Woods, a Great Fairy's fountain, the Deku Tree, the lake), 10 seconds each, Link running,
+rolling and swinging. **A change to the driver is checked on both: the lake's route and the tour.**
+
+Building updates ahead matched on the lake's route and differed on the tour, three ways (releases/notes-audio-sched-
+ab.md): each was real, and none could have been found at the lake.
+
+Still to cover: the ocarina (the game's custom update function), headset output (the Haas delays), and whatever the
+title screen and the cutscenes play that the tour doesn't reach.
+
+Found on the way and not the audio's: adult Link put down in Kokiri Forest stops on his first frame with a
+floating-point exception in the forest's fairies (`ObjectKankyo_Fairies`), in the build without `--expak` and not in
+the one with. Not yet looked into.
+
+## Where things sit in the caches is worth milliseconds
+
+The `--expak` build's first run (releases/notes-audio-sched-ab.md): 100 KB of new buffers in the middle of the
+engine's data moved the kernel's thread records, and the thread switch alone cost 4.3 ms a frame more under the PC
+sampler; frames over 52 ms went from 23% to 75% in ares with nothing switched on. The audio driver is pinned now, as
+the mod's own code was (fishmod_pin.c), so its size moves nothing after it. By the rule above (build time is free)
+the placement of the engine's hot code and data is something a build step could search for, not leave to where the
+link order happens to put it: `cpuprof.py` already gives the fills by function and by line.

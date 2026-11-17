@@ -1,8 +1,8 @@
 diff --git a/ares/n64/cpu/cpu.cpp b/ares/n64/cpu/cpu.cpp
-index ec4a52d..80c0514 100644
+index ec4a52d..0d8c859 100644
 --- a/ares/n64/cpu/cpu.cpp
 +++ b/ares/n64/cpu/cpu.cpp
-@@ -121,7 +121,112 @@ auto CPU::interruptPoll() -> void {
+@@ -121,7 +121,165 @@ auto CPU::interruptPoll() -> void {
    }
  }
  
@@ -105,7 +105,60 @@ index ec4a52d..80c0514 100644
 +      e.fills += cpuProfFills - fills; e.writebacks += cpuProfWritebacks - writebacks;
 +      e.ifills += profile.icacheMisses - imisses;
 +    }
++    //ARES_ITRACE=<file>: what one thread executes, in order, as runs of consecutive instructions (u32 first pc,
++    //u32 count), for laying code out; ARES_ITRACE_THREAD=<hex address of __osRunningThread>:<thread id>;
++    //ARES_ITRACE_WINDOW runs recorded out of every ARES_ITRACE_PERIOD (the thread's own); (0xFFFFFFFF, 0) opens a
++    //window, (0xFFFFFFFE, n) says n runs of other threads went by
++    static const char* itracePath = getenv("ARES_ITRACE");
++    if(itracePath) {
++      static FILE* fp = fopen(itracePath, "wb");
++      static u32 runAddr = 0, wantId = 0, nextPc = 0, runPc = 0, runLen = 0, gap = 0;
++      static u64 window = 2000000, period = 64000000, count = 0;
++      static bool init = false, mine = false;
++      if(!init) {
++        init = true;
++        if(auto t = getenv("ARES_ITRACE_THREAD")) { runAddr = strtoul(t, nullptr, 16) & 0x7fffff; if(auto c = strchr(t, ':')) wantId = strtoul(c + 1, nullptr, 0); }
++        if(auto t = getenv("ARES_ITRACE_WINDOW")) window = strtoull(t, nullptr, 0);
++        if(auto t = getenv("ARES_ITRACE_PERIOD")) period = strtoull(t, nullptr, 0);
++      }
++      if(fp && (u32)pc != nextPc) {
++        if(runLen) {
++          if(!mine) gap++;
++          else {
++            u64 at = count++ % period;
++            if(at < window) {
++              if(at == 0) { u32 m[2] = {0xffffffffu, 0}; fwrite(m, 4, 2, fp); gap = 0; }
++              if(gap) { u32 m[2] = {0xfffffffeu, gap}; fwrite(m, 4, 2, fp); gap = 0; }
++              u32 m[2] = {runPc, runLen}; fwrite(m, 4, 2, fp);
++              if(at == window - 1) fflush(fp);
++            } else gap = 0;
++          }
++        }
++        runPc = (u32)pc; runLen = 0;
++        mine = (pc >> 31) == 0x1ffffffffull;
++        if(mine && runAddr) {
++          u32 th = rdram.ram.read<Word>(runAddr, RBusDevice::ARES_DEBUGGER) & 0x7fffff;
++          mine = th && rdram.ram.read<Word>(th + 0x14, RBusDevice::ARES_DEBUGGER) == wantId;
++        }
++      }
++      runLen++; nextPc = (u32)pc + 4;
++    }
 +    if((++cpuProfTotal & 0x1ffffff) == 0) cpuProfWrite();
++    //ARES_CPUPROF_MARK=<hex address of a u32 in RDRAM>: each time the game changes that word, the profile so far is
++    //also saved as <file>.seg<count>.<the word's old value> (the totals up to then: a leg's cost is the difference
++    //between two)
++    static const char* markEnv = getenv("ARES_CPUPROF_MARK");
++    if(markEnv && (cpuProfTotal & 0xfff) == 0) {
++      static u32 markAddr = strtoul(markEnv, nullptr, 16) & 0x7fffff, markLast = 0, markCount = 0;
++      u32 mark = rdram.ram.read<Word>(markAddr, RBusDevice::ARES_DEBUGGER);
++      if(mark != markLast) {
++        const char* keep = cpuProfPath;
++        static char name[1024];
++        snprintf(name, sizeof(name), "%s.seg%04u.%u", keep, markCount++, markLast);
++        cpuProfPath = name; cpuProfWrite(); cpuProfPath = keep;
++        markLast = mark;
++      }
++    }
 +    return result;
 +  }
 +  return instructionInner();
@@ -115,7 +168,7 @@ index ec4a52d..80c0514 100644
    if(auto interrupts = scc.cause.interruptPending & scc.status.interruptMask) {
      if(scc.status.interruptEnable && !scc.status.exceptionLevel && !scc.status.errorLevel) {
        debugger.interrupt(scc.cause.interruptPending);
-@@ -145,7 +250,7 @@ auto CPU::instruction() -> bool {
+@@ -145,7 +303,7 @@ auto CPU::instruction() -> bool {
    auto access = devirtualize<Read, Word>(ipu.pc);
    if(!access) return true;
  
@@ -224,6 +277,82 @@ index 5ed3774..06a07e8 100644
    //Devices that can request RI to access RDRAM
    enum class RBusDevice {
      UNKNOWN,
+diff --git a/ares/n64/pi/bus.hpp b/ares/n64/pi/bus.hpp
+index f554df8..a8ef9bc 100644
+--- a/ares/n64/pi/bus.hpp
++++ b/ares/n64/pi/bus.hpp
+@@ -1,3 +1,49 @@
++
++// fish-oot test hook: a minimal SummerCart64 (ARES_SC64_DIR: its USB writes are saved there, one file a packet)
++struct FishSc64 {
++  u8 buf[8192];
++  u32 data0 = 0, data1 = 0, scr = 0, key = 0, unlocked = 0, busyReads = 0, packets = 0;
++  static auto dir() -> const char* { static const char* d = getenv("ARES_SC64_DIR"); return d; }
++  auto command(u32 id) -> void {
++    scr = 0;
++    if(id == 'M') {
++      u32 addr = data0, len = data1 & 0xffffff;
++      if(addr >= 0x1ffe'0000 && len <= 8192) {
++        char name[512]; snprintf(name, sizeof(name), "%s/binaryout-%06u.bin", dir(), packets++);
++        if(FILE* f = fopen(name, "wb")) { fwrite(buf + (addr - 0x1ffe'0000), 1, len, f); fclose(f); }
++      } else scr = 1u << 30;
++      busyReads = 4; // (the USB "sending" for the next few status checks)
++    } else if(id == 'U') {
++      data0 = busyReads ? (1u << 31) : 0;
++      if(busyReads) busyReads--;
++    }
++  }
++  auto read(u32 address) -> u32 {
++    if(address >= 0x1ffe'0000 && address < 0x1ffe'2000) {
++      u32 o = address & 0x1ffe; return buf[o] << 8 | buf[o + 1];
++    }
++    switch(address & 0x1f) {
++    case 0x00: return scr; case 0x04: return data0; case 0x08: return data1;
++    case 0x0c: return unlocked ? 0x53437632 : 0;
++    }
++    return 0;
++  }
++  auto write(u32 address, u32 data, bool half) -> void {
++    if(address >= 0x1ffe'0000 && address < 0x1ffe'2000) {
++      u32 o = address & 0x1fff;
++      if(half) { o &= ~1; buf[o] = data >> 8; buf[o + 1] = data; }
++      else { o &= ~3; buf[o] = data >> 24; buf[o + 1] = data >> 16; buf[o + 2] = data >> 8; buf[o + 3] = data; }
++      return;
++    }
++    switch(address & 0x1f) {
++    case 0x00: command(data & 0xff); return;
++    case 0x04: data0 = data; return; case 0x08: data1 = data; return;
++    case 0x10: if(key == 0x5F554E4C && data == 0x4F434B5F) unlocked = 1; key = data; return;
++    }
++  }
++};
++inline FishSc64 fishSc64;
++
+ inline auto PI::readWord(u32 address, Thread& thread) -> u32 {
+   if(address <= 0x046f'ffff) return ioRead(address);
+ 
+@@ -18,6 +64,11 @@ inline auto PI::busRead(u32 address) -> u32 {
+   const u32 unmapped = (address & 0xFFFF) | (address << 16);
+ 
+   if(address <= 0x04ff'ffff) return unmapped; //Address range not memory mapped, only accessible via DMA
++  if(FishSc64::dir() && address >= 0x1ffe'0000 && address <= 0x1fff'001f) {
++    u32 v = fishSc64.read(address & ~(Size == Word ? 3 : 1));
++    if(Size == Word && address < 0x1fff'0000) v = v << 16 | fishSc64.read((address & ~3) + 2);
++    return v;
++  }
+   if(address <= 0x0500'03ff) {
+     if(_DD()) return dd.c2s.read<Size>(address);
+     return unmapped;
+@@ -69,6 +120,9 @@ template <u32 Size>
+ inline auto PI::busWrite(u32 address, u32 data) -> void {
+   static_assert(Size == Half || Size == Word);  //PI bus will do 32-bit (CPU) or 16-bit (DMA) only
+   if(address <= 0x04ff'ffff) return; //Address range not memory mapped, only accessible via DMA
++  if(FishSc64::dir() && address >= 0x1ffe'0000 && address <= 0x1fff'001f) {
++    return fishSc64.write(address, data, Size == Half);
++  }
+   if(address <= 0x0500'03ff) {
+     if(_DD()) return dd.c2s.write<Size>(address, data);
+     return;
 diff --git a/ares/n64/rdram/rdram.cpp b/ares/n64/rdram/rdram.cpp
 index f099508..335f576 100644
 --- a/ares/n64/rdram/rdram.cpp
@@ -273,13 +402,39 @@ index 9b4adbb..d3b68fe 100644
          self.profile.metrics[(u32)device].reads += Size;
        }
 diff --git a/ares/n64/rsp/dma.cpp b/ares/n64/rsp/dma.cpp
-index d49cbd6..4d59b23 100644
+index d49cbd6..4e0183b 100644
 --- a/ares/n64/rsp/dma.cpp
 +++ b/ares/n64/rsp/dma.cpp
-@@ -22,6 +22,18 @@ auto RSP::dmaTransferStart(Thread& thread) -> void {
+@@ -22,6 +22,44 @@ auto RSP::dmaTransferStart(Thread& thread) -> void {
  }
  
  auto RSP::dmaTransferStep() -> void {
++  {
++    //fish-oot: ARES_SPDMALOG=<file>: every DMA of the audio microcode's tasks numbered ARES_SPDMALOG_FROM..TO
++    //(counted from 1 as their text is loaded): r/w, the DMEM address, the RDRAM address, the length and a hash
++    //of the bytes moved. Two builds' logs compared line by line name the first input that differs.
++    static const char* logPath = getenv("ARES_SPDMALOG");
++    if(logPath) {
++      static FILE* fp = fopen(logPath, "w");
++      static u32 from = getenv("ARES_SPDMALOG_FROM") ? strtoul(getenv("ARES_SPDMALOG_FROM"), nullptr, 10) : 0;
++      static u32 to = getenv("ARES_SPDMALOG_TO") ? strtoul(getenv("ARES_SPDMALOG_TO"), nullptr, 10) : 0xffffffff;
++      static u32 task = 0; static bool audio = false;
++      if(dma.busy.read && dma.current.pbusRegion && dma.current.pbusAddress == 0 && dma.current.length >= 0x87) {
++        audio = rdram.ram.read<Word>(dma.current.dramAddress + 0x80, RBusDevice::ARES_DEBUGGER) == 0x00400008;
++        if(audio) { task++; if(fp && task >= from && task <= to) fprintf(fp, "task %u\n", task); }
++      } else if(fp && audio && task >= from && task <= to && !dma.current.pbusRegion) {
++        u32 h = 2166136261u;
++        for(u32 i = 0; i <= dma.current.length; i += 4) {
++          u32 w = dma.busy.read ? rdram.ram.read<Word>(dma.current.dramAddress + i, RBusDevice::ARES_DEBUGGER)
++                                : dmem.read<Word>(dma.current.pbusAddress + i);
++          h = (h ^ w) * 16777619u;
++        }
++        fprintf(fp, "%c %03x %08x %03x %08x\n", dma.busy.read ? 'r' : 'w', (u32)dma.current.pbusAddress & 0xfff,
++                (u32)dma.current.dramAddress, (u32)dma.current.length + 1, h);
++        if(task == to) fflush(fp);
++      }
++    }
++  }
 +  if(busProf.on && dma.busy.read && dma.current.pbusRegion && dma.current.pbusAddress == 0 && dma.current.length >= 0x87) {
 +    //fish-oot: a microcode's text being loaded (by the CPU, the RSP stopped): counted as that microcode's
 +    static u32 busKey = getenv("ARES_RSPPROF_KEY") ? strtoul(getenv("ARES_RSPPROF_KEY"), nullptr, 16) : 0;
@@ -349,3 +504,37 @@ index d110fe2..6e6b1f9 100644
  }
  
  auto RSP::instructionPrologue(u32 instruction) -> void {
+diff --git a/desktop-ui/program/platform.cpp b/desktop-ui/program/platform.cpp
+index 4f49c5a..8f07c98 100644
+--- a/desktop-ui/program/platform.cpp
++++ b/desktop-ui/program/platform.cpp
+@@ -84,6 +84,29 @@ auto Program::video(ares::Node::Video::Screen node, const u32* data, u32 pitch,
+     requestScreenshot = false;
+     captureScreenshot(data, pitch, width, height);
+   }
++  // fish-oot: ARES_AUTOSHOT=<dir> saves every ARES_AUTOSHOT_EVERY-th frame (default 15) raw, for A/B captures
++  if(auto dir = getenv("ARES_AUTOSHOT")) {
++    static u32 autoshotFrame = 0;
++    u32 every = getenv("ARES_AUTOSHOT_EVERY") ? atoi(getenv("ARES_AUTOSHOT_EVERY")) : 15;
++    if((autoshotFrame++ % every) == 0) {
++      string name{dir, "/frame_", pad(autoshotFrame, 7, '0'), ".png"};
++      Encode::PNG::RGB8(name, data, pitch, width, height);
++    }
++  }
++  // fish-oot: ARES_FRAMEHASH=<file> appends a hash of every frame (FNV-1a over the pixels): two builds that should
++  // draw the same can be compared by their sequences of distinct frames, whatever their timing
++  if(auto path = getenv("ARES_FRAMEHASH")) {
++    static FILE* hashes = fopen(path, "w");
++    if(hashes) {
++      u64 h = 0xcbf29ce484222325ull;
++      for(u32 y = 0; y < height; y++) {
++        auto row = (const u8*)data + y * pitch;
++        for(u32 x = 0; x < width * 4; x++) h = (h ^ row[x]) * 0x100000001b3ull;
++      }
++      fprintf(hashes, "%ux%u %016llx\n", width, height, (unsigned long long)h);
++      fflush(hashes);
++    }
++  }
+ 
+   if(node->width() != emulator->latch.width || node->height() != emulator->latch.height || node->rotation() != emulator->latch.rotation) {
+     emulator->latch.width = node->width();

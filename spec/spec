@@ -695,6 +695,8 @@ beginseg
     include "$(BUILD_DIR)/src/audio/game/data.o"
     include "$(BUILD_DIR)/src/audio/game/session_config.o"
     include "$(BUILD_DIR)/src/audio/game/session_init.o"
+    // fish-oot: the audio driver's sections each end on a fixed boundary, so its size never moves what follows
+    include "$(BUILD_DIR)/src/audio/fishmod_audio_pin.o"
 
     // libu64
 #if PLATFORM_N64

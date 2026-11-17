@@ -862,6 +862,8 @@ static void PcProf_Update(void) {
                     gFishmodAudioAbReport,
 #ifdef FISHMOD_AUDIO_AB
                     (gFishmodAudioAbReport - 1) % 3,
+#elif defined(FISHMOD_AUDIO_SCHED_AB)
+                    (gFishmodAudioAbReport - 1) & 3, // (bit 0: the lap's updates built ahead; bit 1: its tasks sent early)
 #else
                     0,
 #endif
