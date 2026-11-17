@@ -347,7 +347,7 @@ def cover(a):
     print("\nfunctions with instructions not reached (%d): missing/all, then the source lines" % len(partial))
     for miss, n, name, src, addr, offs in sorted(partial, reverse=True):
         lines = run("mips-linux-gnu-addr2line", "-e", elf, *["0x%x" % (addr + o) for o in offs]).split()
-        nums = sorted(set(int(l.rsplit(":", 1)[1].split()[0]) for l in lines if l.rsplit(":", 1)[1].split()[0].isdigit()))
+        nums = sorted(set(int(m.group(1)) for m in (re.search(r":(\d+)$", l) for l in lines) if m))
         print("  %4d/%-5d %-40s %s: %s" % (miss, n, name, os.path.basename(src), " ".join(map(str, nums))[:400]))
 
 

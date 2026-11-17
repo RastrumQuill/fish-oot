@@ -28,6 +28,9 @@ git -C "$DIR" apply "$(dirname "$PATCH")/ares-prof.patch"
 # ARES_NORDP=1: the RDP's commands are read and its interrupts raised, but nothing is drawn (the audio sweep's runs,
 # which read only the CPU's and the sound's results: about twice as fast)
 git -C "$DIR" apply "$(dirname "$PATCH")/ares-nodraw.patch"
+# ARES_AIPROF=<file>: what the audio interface played, by sweep leg: buffers taken and refused, times it ran dry,
+# silence, a hash of the samples (the audio sweep's runs in real time)
+git -C "$DIR" apply "$(dirname "$PATCH")/ares-aiprof.patch"
 cmake -S "$DIR" -B "$DIR/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DARES_CORES=n64 -DARES_ENABLE_LIBRASHADER=OFF \
     -DARES_ENABLE_SDL=OFF
 ninja -C "$DIR/build"

@@ -47,7 +47,7 @@ QUEUE_PATH = "fishmod/sweep/queue.json"
 QUEUE_BRANCH = "claude/harkinian-tp-fishing-mod-ehepm9"
 RESULTS_BRANCH = "sweep-results"
 WORK = os.environ.get("FISHOOT_SWEEP_WORK") or os.path.expanduser("~/.fishoot-sweep")
-KEEP = ("aud.bin", "report.json", "report.txt", "run.log", "bus.txt", "rsp.bin")
+KEEP = ("aud.bin", "report.json", "report.txt", "run.log", "bus.txt", "rsp.bin", "ai.txt")
 KINDS = {"s": (0, 0), "c": (0, 1), "q": (1, 0), "e": (2, 0), "o": (3, 0), "t": (4, 0)}  # letter: (leg, child at night)
 
 
@@ -209,7 +209,9 @@ def one_run(sweep, unit, build, roms, slots, ares, env):
     os.makedirs(d)
     variant, part = unit.split(".")
     rom = bytearray(open(rom_path, "rb").read())
-    struct.pack_into(">I", rom, 0x38, variant_word(variant, parts_of(sweep, unit), int(part)))
+    # (a build's "opt": more bits of the options word, for the runs in real time: 0x20, and 0x40 / 0x80 the switches)
+    struct.pack_into(">I", rom, 0x38, variant_word(variant, parts_of(sweep, unit), int(part))
+                     | sweep["builds"][build].get("opt", 0))
     open(os.path.join(d, "rom.z64"), "wb").write(rom)
     slot = slots.get()
     t0 = time.time()
@@ -217,6 +219,8 @@ def one_run(sweep, unit, build, roms, slots, ares, env):
         e = dict(env, ARES=ares, FISHMOD_ROOT=ROOT)
         if sweep.get("nodraw"):
             e["ARES_NORDP"] = "1"
+        if sweep.get("realtime"):
+            e["ARES_AIPROF"] = os.path.join(d, "ai.txt")
         with open(os.path.join(d, "run.log"), "w") as f:
             subprocess.run(["bash", os.path.join(TOOLS, "audio_sweep_run.sh"), str(slot), os.path.join(d, "rom.z64"),
                             sym_path, d, str(sweep.get("maxsecs", 9000))], stdout=f, stderr=subprocess.STDOUT, env=e)
@@ -233,9 +237,62 @@ def one_run(sweep, unit, build, roms, slots, ares, env):
     return d
 
 
+def ai_totals(path):
+    """ARES_AIPROF's last line: buffers taken, refused, times the audio interface ran dry, samples of silence, played."""
+    try:
+        last = open(path).read().split("\n")[-2].split()
+        return dict(zip(("taken", "refused", "dry", "silent", "played"), map(int, last[1:6])))
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def check_unit_realtime(sweep, unit):
+    """A unit played in real time: (passed, text). The sound can't be compared buffer for buffer (the timing is the
+    console's, and differs by build), so: every build runs to the end, no thread stopped, and the audio interface
+    is never refused a buffer or left dry more often than on the reference, nor silent for more than a tenth of a
+    second longer."""
+    base = os.path.join(WORK, "runs", sweep["id"], unit)
+    ref = sweep.get("ref", "R")
+    lines, ok = [], True
+    rt = ai_totals(os.path.join(base, ref, "ai.txt"))
+    for b in sweep["builds"]:
+        bad = []
+        try:
+            r = json.load(open(os.path.join(base, b, "report.json")))
+        except (OSError, ValueError):
+            lines.append("%s: NO REPORT (the run didn't start or was cut short)" % b)
+            ok = False
+            continue
+        if not r.get("ended"):
+            bad.append("END NOT REACHED")
+        if r.get("stopped"):
+            bad.append("STOPPED %s" % ["thread %d at %s" % (t["id"], t["at"]) for t in r["stopped"]])
+        a = ai_totals(os.path.join(base, b, "ai.txt"))
+        if a is None or rt is None:
+            bad.append("NO AUDIO INTERFACE LOG")
+        else:
+            lines.append("%s: %d legs; buffers %d, refused %d, ran dry %d, silence %d samples, played %d" %
+                         (b, len(r["legs"]), a["taken"], a["refused"], a["dry"], a["silent"], a["played"]))
+            if a["played"] == 0:
+                bad.append("NOTHING PLAYED")
+            if a["refused"] > rt["refused"]:
+                bad.append("BUFFERS REFUSED %d (reference %d)" % (a["refused"], rt["refused"]))
+            if a["dry"] > rt["dry"]:
+                bad.append("RAN DRY %d times (reference %d)" % (a["dry"], rt["dry"]))
+            if a["silent"] > rt["silent"] + 3200:
+                bad.append("SILENCE %d samples (reference %d)" % (a["silent"], rt["silent"]))
+        if bad:
+            ok = False
+            lines.append("  %s FAILED: %s" % (b, "; ".join(bad)))
+    return ok, "%s %s (%s, %s)\n%s\n" % ("PASS" if ok else "FAIL", unit, socket.gethostname(),
+                                         time.strftime("%Y-%m-%d %H:%M"), "\n".join(lines))
+
+
 def check_unit(sweep, unit):
     """The unit's verdict: (passed, text). Every build against the reference: the same sound, buffer for buffer; both
     run to the end; no thread stopped; the sound log not full (then its end wasn't compared)."""
+    if sweep.get("realtime"):
+        return check_unit_realtime(sweep, unit)
     base = os.path.join(WORK, "runs", sweep["id"], unit)
     ref = sweep.get("ref", "R")
     lines, ok = [], True
