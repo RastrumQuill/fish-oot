@@ -91,7 +91,7 @@ def main():
     ap.add_argument("profiles", nargs="+")
     ap.add_argument("--elf", required=True)
     ap.add_argument("--build")
-    ap.add_argument("--frames", type=int, required=True)
+    ap.add_argument("--frames", type=int, default=1)
     ap.add_argument("--hot-kb", type=float, default=4.0)
     ap.add_argument("--item-kb", type=float, default=2.0)
     ap.add_argument("--hot-share", type=float, default=0.25, help="least share of working time (%%) for a 'hot' row")
@@ -101,6 +101,8 @@ def main():
     ap.add_argument("--all", action="store_true", help="with --match: every matching routine, over the lines or not")
     ap.add_argument("--wrappers", action="store_true",
                     help="also list routines whose path is nearly all (85%%) one listed callee's")
+    ap.add_argument("--map", default="", help="one routine's running code by source line (and what's inlined there)")
+    ap.add_argument("--map-min", type=int, default=24, help="with --map: only lines with at least this many running bytes")
     ap.add_argument("--why", action="store_true", help="under each row, the routines its path is made of, by size")
     ap.add_argument("-o", "--output")
     a = ap.parse_args()
@@ -159,6 +161,35 @@ def main():
         path = (fr[-1].get("FileName", "") if fr else "") or sources.get(f["name"], "")
         f["file"] = sysprof.rel_file(path) if path else ""
         f["system"], f["sub"] = sysprof.classify(path, f["name"])
+
+    if a.map:
+        # one routine's running code by source line: where the bytes that run per call are
+        k = next((k for k, f in F.items() if f["name"] == a.map), None)
+        if k is None:
+            sys.exit(f"{a.map}: not in the profile")
+        f = F[k]
+        c = max(f["calls"], 1)
+        fr = sysprof.n64prof.symbolize(a.elf, f["ins"].keys())
+        by = {}
+        for pc, e in f["ins"].items():
+            chain = fr.get(pc) or []
+            # the line in this routine's own source (the outermost frame), and what's inlined there
+            line = chain[-1].get("Line", 0) if chain else 0
+            inl = chain[0]["FunctionName"] if len(chain) > 1 else ""
+            r = by.setdefault((line, inl), [0, 0, 0, 0])
+            r[0] += 4
+            r[1] += 4 if e[1] >= 0.25 * c else 0
+            r[2] = max(r[2], e[1])
+            r[3] += e[0]
+        tot = sum(r[1] for r in by.values())
+        print(f"{a.map}: {f['size']} bytes, {sum(r[0] for r in by.values())} ever run, {tot} run in at least a quarter "
+              f"of its {c} calls")
+        print(f"{'line':>6} {'bytes':>6} {'run':>6} {'times/call':>10} {'time':>6}  inlined")
+        allt = max(sum(r[3] for r in by.values()), 1)
+        for (line, inl), r in sorted(by.items()):
+            if r[1] >= a.map_min:
+                print(f"{line:6d} {r[0]:6d} {r[1]:6d} {r[2] / c:10.1f} {100.0 * r[3] / allt:5.1f}%  {inl}")
+        return
 
     # the working time: the game's own (idle and the test harness's code left out, here and in every path's time)
     for f in F.values():
