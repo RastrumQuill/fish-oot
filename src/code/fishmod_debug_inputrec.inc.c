@@ -29,7 +29,7 @@
  */
 #if defined(FISHMOD_INPUTREC) || defined(FISHMOD_INPUTPLAY)
 
-#ifndef FISHMOD_PCPROF
+#if defined(FISHMOD_INPUTREC) && !defined(FISHMOD_PCPROF)
 #error "the input recorder shares the profiler's SummerCart64 link: define FISHMOD_PCPROF"
 #endif
 
@@ -68,6 +68,7 @@ static s32 InputRec_StateIndex(GameStateFunc init) {
 }
 
 static void InputRec_Line(const char* fmt, ...) {
+#ifdef FISHMOD_SCREEN_TEXT
     va_list args;
     char buf[128];
 
@@ -76,6 +77,9 @@ static void InputRec_Line(const char* fmt, ...) {
     va_end(args);
     buf[FISHMOD_DEBUG_LINE_LEN - 1] = '\0';
     bcopy(buf, sDebugLines[4], FISHMOD_DEBUG_LINE_LEN);
+#else
+    (void)fmt;
+#endif
 }
 
 #ifdef FISHMOD_INPUTREC
@@ -296,6 +300,7 @@ static u32 sIrLate;
 
 /** Reads from the ROM past the game's files (the DMA manager only reads inside its file table). */
 static void InputPlay_Read(void* buf, u32 rom, u32 size) {
+    extern OSPiHandle* gCartHandle;
     static OSMesgQueue sQueue;
     static OSMesg sMsg;
     static OSIoMesg sIo;
@@ -365,12 +370,16 @@ static s32 InputPlay_Setup(void) {
 }
 
 static void InputPlay_Report(const char* what) {
+#ifdef FISHMOD_PCPROF
     char line[160];
 
     sprintf(line, "FISHMOD-REPLAY %s state %u frame %u: early %u (%u frames) late %u forced %u snaps %u rng %u\n", what,
             gFishmodReplay.segs, gFishmodReplay.frames, gFishmodReplay.early, gFishmodReplay.skipped,
             gFishmodReplay.late, gFishmodReplay.forced, gFishmodReplay.snaps, gFishmodReplay.rng);
     Sc64_UsbText(line);
+#else
+    (void)what; // (no USB in this build: the counts are read from gFishmodReplay)
+#endif
 }
 
 void Fishmod_InputRecSram(u8* sram) {
@@ -511,7 +520,11 @@ void Fishmod_InputRecInput(GameState* gameState, Input* inputs) {
     if (sIrEnded) {
         static s32 sSaid;
 
+#ifdef FISHMOD_PCPROF
         if (!sSaid && sPcUsb && (sPcOut != NULL)) {
+#else
+        if (!sSaid) {
+#endif
             sSaid = true;
             InputPlay_Report("END");
             gFishmodBenchDone = true; // (the profiler sends its last counts and stops)
@@ -547,6 +560,7 @@ void Fishmod_InputRecInput(GameState* gameState, Input* inputs) {
                 }
                 if ((w & 0xFF) == IR_END) {
                     sIrEnded = true;
+                    gFishmodReplay.ended = 1; // (a runner watching this word stops the emulator here)
                     return;
                 }
                 if ((w & 0xFF) == IR_SEG) {

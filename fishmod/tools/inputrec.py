@@ -5,7 +5,7 @@
                                                 patched ares's binaryout-*.bin files) joined into one recording
   inputrec.py info REC.finp [-v]                what's in a recording: its length, each game state and scene
   inputrec.py attach ROM.z64 REC.finp OUT.z64   a replay build's ROM with the recording attached (64 MB)
-  inputrec.py cut REC.finp OUT.finp --states N  the recording's first N game states (a short one for a test)
+  inputrec.py cut REC.finp OUT.finp --states N  the recording's first N game states (or --frames N: its first N frames)
 
 A recording: 'FINP', 1, the save memory's bytes, the stream's words, the save context's words, three spare words; the
 save memory as the game found it at power-on; the stream (32-bit big-endian words, described in the .inc.c).
@@ -202,18 +202,24 @@ def cmd_attach(args):
 
 def cmd_cut(args):
     sram, words, save_words = load(args.rec)
-    out, i, segs = [], 0, 0
+    out, i, segs, frames = [], 0, 0, 0
     words = complete(words)
     while i < len(words):
         w = words[i]
         if w & 0xFFFF0000 == TAG:
             if (w & 0xFF) == SEG:
                 segs += 1
-                if segs > args.states:
+                if args.states and segs > args.states:
                     break
             n = 2 + words[i + 1]
         else:
             n = 1
+            step = (w & 0xFFFF) if w & 0xFFFF0000 == REPEAT else 1
+            if args.frames and frames + step > args.frames:
+                if w & 0xFFFF0000 == REPEAT and args.frames > frames:
+                    out.append(REPEAT | (args.frames - frames))
+                break
+            frames += step
         out += words[i:i + n]
         i += n
     out += [TAG | END, 0]
@@ -241,7 +247,8 @@ def main():
     p = sub.add_parser("cut")
     p.add_argument("rec")
     p.add_argument("out")
-    p.add_argument("--states", type=int, required=True)
+    p.add_argument("--states", type=int, default=0)
+    p.add_argument("--frames", type=int, default=0)
     p.set_defaults(fn=cmd_cut)
     args = ap.parse_args()
     args.fn(args)

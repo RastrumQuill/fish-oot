@@ -305,8 +305,15 @@ typedef struct FishmodSaveData {
 // The debug timers' clock: the CPU's count register, read directly (osGetTime turns interrupts off and on and adds the
 // 64-bit time to it every call: hundreds of calls a frame cost a few percent of the CPU in the bench builds). Only
 // differences are taken, so its wrapping every 91 seconds doesn't matter: the same differences as osGetTime's.
+#ifndef FISHMOD_NOTIMERS
 #define FISHMOD_CLOCK() ((OSTime)osGetCount())
 #define FISHMOD_SINCE(start) ((u32)(osGetCount() - (u32)(start)))
+#else
+// A build measured from outside (ares's exact profile; fishmod/build.sh --no-timers): the debug timers read nothing
+// and add nothing, so the compiler drops them and the game's code runs as a release's does.
+#define FISHMOD_CLOCK() ((OSTime)0)
+#define FISHMOD_SINCE(start) ((u32)((start) & 0))
+#endif
 
 // A seed from the clock, except in scripted debug runs, which must replay exactly (fishmod/tools/state_hash.py)
 #ifdef FISHMOD_SCRIPT
@@ -752,6 +759,7 @@ typedef struct FishmodReplay {
     u32 syncs;   // times those two were checked
     u32 lost;    // (recording) words dropped: nobody listening on the USB
     u32 rom;
+    u32 ended;   // 1 once the recording's last frame has played
 } FishmodReplay;
 extern FishmodReplay gFishmodReplay;
 void Fishmod_InputRecInput(struct GameState* gameState, Input* inputs);

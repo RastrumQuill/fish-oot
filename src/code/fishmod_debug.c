@@ -1911,6 +1911,9 @@ void Fishmod_DebugPrintf(s32 line, const char* fmt, ...) {
     if ((line < 0) || (line >= FISHMOD_DEBUG_LINES)) {
         return;
     }
+#ifndef FISHMOD_SCREEN_TEXT
+    return; // (nothing is drawn: nothing formatted either)
+#endif
 #ifdef FISHMOD_PCPROF
     // the profile build: only the profiler's own line (the others' formatting every frame skews the profile)
     if (line != 5) {
