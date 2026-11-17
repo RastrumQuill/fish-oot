@@ -5,6 +5,7 @@
 #   OUT/cpu.bin        the CPU profile of the whole run, and OUT/cpu.bin.segNNNN.LEG its totals at each change of
 #                      leg (cpuprof.py; audio_sweep_report.py takes the differences)
 #   OUT/rsp.bin        the RSP profile of the audio tasks
+#   OUT/bus.txt        the bytes moved to and from RDRAM over the run, by who asked (the audio driver's apart)
 # The run ends when the game says the sweep is over (the cut named 65535) or after MAXSECS (default 3600), which
 # is then a failure the report shows (the game stopped or hung).
 # Usage: fishmod/tools/audio_sweep_run.sh SLOT ROM ELF OUT [MAXSECS]
@@ -13,7 +14,7 @@ SLOT=$1 ROM=$2 ELF=$3 OUT=$4 MAXSECS=${5:-3600}
 ARES=${ARES:-/opt/src/ares/build/rundir/bin/ares}
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PORT=$((${SWEEP_PORT_BASE:-9123} + SLOT))  # (SWEEP_PORT_BASE: another base when two sweeps share a machine)
-mkdir -p "$OUT"; rm -f "$OUT"/cpu.bin* "$OUT"/rsp.bin* "$OUT"/ram.bin
+mkdir -p "$OUT"; rm -f "$OUT"/cpu.bin* "$OUT"/rsp.bin* "$OUT"/ram.bin "$OUT"/bus.txt*
 CONF=$(mktemp --suffix=.bml)
 sed "s/^\(\s*Port:\s*\)9123/\1$PORT/" "$HERE/ares_debug.bml" > "$CONF"
 sed -i -e '/^Video$/,/^[A-Z]/ s/^  Driver: .*/  Driver: None/' -e '/^Audio$/,/^[A-Z]/ s/^  Driver: .*/  Driver: None/' \
@@ -26,6 +27,8 @@ case "$ELF" in
     *) MARK=$(mips-linux-gnu-nm "$ELF" | awk '$3=="gFishmodSweepLeg"{print $1}') ;;
 esac
 [ -n "$MARK" ] || { echo "no gFishmodSweepLeg in $ELF"; exit 1; }
+python3 "$HERE/audio_sweep_report.py" --busrange "$ELF" > "$OUT/bus.ranges"
+ARES_BUSPROF="$OUT/bus.txt" ARES_BUSPROF_RANGES="$OUT/bus.ranges" \
 ARES_CPUPROF="$OUT/cpu.bin" ARES_CPUPROF_MARK=$MARK ARES_RSPPROF="$OUT/rsp.bin" ARES_RSPPROF_KEY=00400008 \
     timeout $((MAXSECS + 120)) "$ARES" --settings-file "$CONF" --system "Nintendo 64" --no-file-prompt "$ROM" >/dev/null 2>&1 &
 APID=$!

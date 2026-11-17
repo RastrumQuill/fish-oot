@@ -13,6 +13,8 @@ writes what the sweep's checks need:
     audio_sweep_report.py --syms ELF OUT.sym.gz        the ELF's symbols as a small file: wherever a run or a report
                                                        takes an ELF it takes this instead (a worker without the
                                                        188 MB ELF or the MIPS tools: fishmod/sweep/)
+    audio_sweep_report.py --busrange ELF               the audio driver's code as address ranges (audio_sweep_run.sh:
+                                                       its traffic on the memory bus is counted apart, bus.txt)
     audio_sweep_report.py --cover ELF DIR [DIR...]     what of the audio driver no run in DIRs reached (the DIRs'
                                                        builds differ only by the script's options; ELF is one of them)
 
@@ -79,6 +81,46 @@ def symbols(elf):
         if len(p) == 3:
             d[p[2]] = int(p[0], 16) & 0xFFFFFFFF
     return d
+
+
+BUS_AUDIO = ("cpu_code_audio", "cpu_data_audio", "sp_audio")
+
+
+def bus_ranges(elf):
+    """The audio driver's code as [(lo, hi)] (the same functions the cycle counts call audio), for ARES_BUSPROF_RANGES:
+    its traffic on the memory bus is counted apart, wherever a build puts each function."""
+    funcs = functions(elf)
+    out = []
+    for i, (a, n, src) in enumerate(funcs):
+        if AUDIO_SRC.search(src) and i + 1 < len(funcs):
+            if out and out[-1][1] == a:
+                out[-1][1] = funcs[i + 1][0]
+            else:
+                out.append([a, funcs[i + 1][0]])
+    return out
+
+
+def read_bus(path):
+    """ARES_BUSPROF's file: {who: [bytes read, reads, bytes written, writes]} (RDRAM traffic over the whole run)."""
+    d = {}
+    try:
+        for line in open(path):
+            p = line.split()
+            if len(p) == 5 and not line.startswith("#"):
+                d[p[0]] = [int(x) for x in p[1:]]
+    except OSError:
+        pass
+    return d
+
+
+def bus_kb(rep):
+    """(the audio's, everything's) KB on the memory bus per game frame of sound played (50 ms: busprof.py)."""
+    d = rep.get("bus") or {}
+    if not d.get("ai") or not d["ai"][0]:
+        return None
+    frames = d["ai"][0] / (32006 * 4) * 20
+    tot = lambda keys: sum(d[k][0] + d[k][2] for k in keys if k in d and not k.endswith("_dmas")) / frames / 1024
+    return tot(BUS_AUDIO), tot(d.keys())
 
 
 def read_prof(path):
@@ -182,7 +224,8 @@ def report(a):
                                   "ifills": tot["rest"][4], "instr": tot["rest"][0]}})
         prev = cur
     ended = any(c.endswith(".65535") for c in cuts)
-    out = {"legs": legs, "ended": ended, "cover": {k: sorted(v) for k, v in cover.items()}}
+    out = {"legs": legs, "ended": ended, "cover": {k: sorted(v) for k, v in cover.items()},
+           "bus": read_bus(os.path.join(a.run, "bus.txt"))}
     rampath = os.path.join(a.run, "ram.bin")
     if os.path.exists(rampath):
         ram = open(rampath, "rb").read()
@@ -242,6 +285,19 @@ def compare(a):
         ar, an, rr, rn = tot[0] / tot[4], tot[1] / tot[5], tot[2] / tot[4], tot[3] / tot[5]
         print("%-40s %6d %6d | %9.0f %9.0f %+6.1f%% | %9.0f %9.0f %+6.1f%%" % ("all", tot[4], tot[5], ar, an,
               100 * (an / ar - 1), rr, rn, 100 * (rn / rr - 1)))
+    # memory: cache lines moved per game frame (data filled, written back, code filled), then bytes on the bus
+    def mem(d, who):
+        fr = max(sum(l["frames"] for l in d["legs"]), 1)
+        return [sum(l[who][k] for l in d["legs"]) / fr for k in ("fills", "wbacks", "ifills")]
+    for who in ("audio", "rest"):
+        r, n = mem(ref, who), mem(new, who)
+        print("memory %-5s lines/frame: data in %7.1f %7.1f %+5.1f%% | data out %7.1f %7.1f %+5.1f%% | code in %7.1f %7.1f %+5.1f%%" % (
+            who, r[0], n[0], 100 * (n[0] / r[0] - 1) if r[0] else 0, r[1], n[1], 100 * (n[1] / r[1] - 1) if r[1] else 0,
+            r[2], n[2], 100 * (n[2] / r[2] - 1) if r[2] else 0))
+    br, bn = bus_kb(ref), bus_kb(new)
+    if br and bn:
+        print("memory bus KB/frame: audio %7.1f %7.1f %+5.1f%% | everything %7.1f %7.1f %+5.1f%%" % (
+            br[0], bn[0], 100 * (bn[0] / br[0] - 1) if br[0] else 0, br[1], bn[1], 100 * (bn[1] / br[1] - 1) if br[1] else 0))
     for k in ("ref", "new"):
         d = ref if k == "ref" else new
         if not d["ended"] or d.get("stopped"):
@@ -299,8 +355,12 @@ def main():
     ap.add_argument("--compare", nargs=2)
     ap.add_argument("--cover", nargs="+")
     ap.add_argument("--syms", nargs=2)
+    ap.add_argument("--busrange", metavar="ELF")
     a = ap.parse_args()
-    if a.syms:
+    if a.busrange:
+        for lo, hi in bus_ranges(a.busrange):
+            print("%x %x" % (lo, hi))
+    elif a.syms:
         write_syms(*a.syms)
     elif a.compare:
         compare(a)

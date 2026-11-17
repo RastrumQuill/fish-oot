@@ -14,7 +14,7 @@ A sweep in the queue:
    "jobs": [["t2", 2], ["o2", 1], ["s2", 4], ...]}          (variant, parts: fishmod/tools/audio_sweep.sh)
 A unit of work is one part of one variant, played on every build (so the unit can be checked where it ran: the same
 sound as the reference build, the end reached, nothing stopped). Results go to the results branch:
-  <id>/<variant>.<part>/<build>/{aud.bin, report.json, report.txt, run.log}   and   <id>/<variant>.<part>/check.txt
+  <id>/<variant>.<part>/<build>/{aud.bin, report.json, report.txt, run.log, bus.txt, rsp.bin}   and   <id>/<variant>.<part>/check.txt
 and a unit being worked on has <id>/claims/<variant>.<part>.json (who and when; stale after --claim-hours).
 
 Usage:
@@ -23,6 +23,7 @@ Usage:
   fishmod/sweep/worker.py --collect ZIP...  (no git login on the worker: it made zips with --no-push; this adds them)
 """
 import argparse
+import atexit
 import concurrent.futures
 import hashlib
 import json
@@ -46,7 +47,7 @@ QUEUE_PATH = "fishmod/sweep/queue.json"
 QUEUE_BRANCH = "claude/harkinian-tp-fishing-mod-ehepm9"
 RESULTS_BRANCH = "sweep-results"
 WORK = os.environ.get("FISHOOT_SWEEP_WORK") or os.path.expanduser("~/.fishoot-sweep")
-KEEP = ("aud.bin", "report.json", "report.txt", "run.log")
+KEEP = ("aud.bin", "report.json", "report.txt", "run.log", "bus.txt", "rsp.bin")
 KINDS = {"s": (0, 0), "c": (0, 1), "q": (1, 0), "e": (2, 0), "o": (3, 0), "t": (4, 0)}  # letter: (leg, child at night)
 
 
@@ -68,6 +69,7 @@ class Source:
 
     def __init__(self, branch, local):
         self.ref = None
+        self.root = local if isinstance(local, str) else ROOT
         if not local:
             git("fetch", "-q", "origin", branch)
             self.ref = git("rev-parse", "FETCH_HEAD")
@@ -76,7 +78,7 @@ class Source:
         if os.path.isabs(path) or ".." in path.split("/"):
             raise RuntimeError("the queue names a path outside the repository: %s" % path)
         if self.ref is None:
-            return open(os.path.join(ROOT, path), "rb").read()
+            return open(os.path.join(self.root, path), "rb").read()
         return git("show", "%s:%s" % (self.ref, path), binary=True)
 
     def queue(self):
@@ -270,6 +272,7 @@ def check_unit(sweep, unit):
                 bad.append("FRAMES DIFFER")
             cost = [l for l in c.splitlines() if l.startswith("all ")]
             lines.append("%s vs %s: %s; %s" % (b, ref, snd, " ".join(cost[0].split()) if cost else "no cost line"))
+            lines += ["  " + " ".join(l.split()) for l in c.splitlines() if l.startswith("memory ")]
         else:
             lines.append("%s: %d legs, %s buffers" % (b, len(r["legs"]), r.get("buffers", "?")))
         if bad:
@@ -293,8 +296,9 @@ def start_display():
     """A display of our own (nothing appears on your screen)."""
     for n in range(197, 207):
         if not os.path.exists("/tmp/.X11-unix/X%d" % n):
-            subprocess.Popen(["Xvfb", ":%d" % n, "-screen", "0", "1024x768x24"], stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
+            x = subprocess.Popen(["Xvfb", ":%d" % n, "-screen", "0", "1024x768x24"], stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+            atexit.register(x.terminate)
             time.sleep(2)
             return ":%d" % n
     sys.exit("no free display number")
@@ -380,7 +384,8 @@ def main():
     ap.add_argument("--name", default=socket.gethostname(), help="this worker's name in the claims")
     ap.add_argument("--ares")
     ap.add_argument("--branch", default=QUEUE_BRANCH, help="the branch the queue is read from")
-    ap.add_argument("--local", action="store_true", help="the queue and its files from this checkout, not the remote")
+    ap.add_argument("--local", nargs="?", const=True, metavar="DIR",
+                    help="the queue and its files from this checkout (or from DIR, laid out the same), not the remote")
     ap.add_argument("--from-end", action="store_true", help="take units from the end of the queue (two workers meet in the middle)")
     ap.add_argument("--no-push", action="store_true", help="keep the results here and zip them (no git login)")
     ap.add_argument("--once", type=int, metavar="N", help="at most N units, then stop")
