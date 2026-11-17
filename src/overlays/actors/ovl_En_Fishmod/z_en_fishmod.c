@@ -1215,9 +1215,10 @@ __attribute__((always_inline)) static inline f32 EnFishmod_SchoolSlot(EnFishmod*
  * its place in the school without steering or looking at the water itself (the leader did that for the school: its
  * water is borrowed). Far away a follower's own steering only showed as a fish a little out of place; this costs a
  * small part of it. False (the full AI) when it's on its own, the leader isn't cruising, or it has fallen well
- * behind (it may have a bank to get round).
+ * behind (it may have a bank to get round). `frames`: how many frames this one stands for (the furthest only keep
+ * their places every 2nd or 4th frame: EnFishmod_Update): that many frames' way toward its place at once.
  */
-__attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlayState* play) {
+__attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlayState* play, s32 frames) {
     EnFishmod* lead;
     Vec3f slot;
     f32 unit;
@@ -1243,7 +1244,7 @@ __attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlaySt
         return false;
     }
     // the leader's pace, more while out of place (as up close), straight at the slot
-    step = lead->speed + 1.5f;
+    step = (lead->speed + 1.5f) * frames;
     if (distSq > SQ(step)) {
         f32 scale = step / sqrtf(distSq);
 
@@ -1267,9 +1268,7 @@ __attribute__((noinline)) static s32 EnFishmod_FollowFar(EnFishmod* this, PlaySt
     this->stateTimer = 1;
     this->stuckTimer = 0;
     this->stuckPos = this->actor.world.pos;
-    if (this->cooldown > 0) {
-        this->cooldown--;
-    }
+    this->cooldown = (this->cooldown > frames) ? (this->cooldown - frames) : 0;
     this->blocked = false;
     return true;
 }
@@ -2322,7 +2321,19 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     // less: past 500 units it thinks every 2nd frame, past 800 every 4th, past 1200 every 8th (gliding on in
     // between), and past 1600 it goes dormant: it holds still (and is out of drawing range) until attention comes.
     f32 attnDist = 0.0f; // (once a frame: it was worked out twice)
+    s32 followFrames;
 
+    // A school member that only kept its place behind its leader last time, too far off to be drawn as more than its
+    // far shape: it does that every 2nd frame past 800 units from attention, every 4th past 1200 (a few units' move,
+    // under a pixel or two at that distance), and nothing in between. Each has its own frames (by its number), and
+    // anything else happening to it (a fright, a startle, its full model drawn) has it back on every frame at once.
+    if ((this->followSkip != 0) && (((this->timer + this->actor.params) & this->followSkip) != 0) &&
+        (this->fishState == FISH_STATE_WANDER) && (this->drawnFull == 0) && (this->startle == 0) &&
+        !FISHMOD_PHOTO_ON) {
+        return;
+    }
+    followFrames = this->followSkip + 1; // (the frames since it last kept its place)
+    this->followSkip = 0;                // (and every frame from here, unless it only keeps its place again)
     if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON) {
         FISHMOD_PROF(FISHMOD_PROF_U_ATTN, attnDist = EnFishmod_AttentionDist(this, play));
         if (attnDist > 1600.0f) {
@@ -2336,8 +2347,9 @@ void EnFishmod_Update(Actor* thisx, PlayState* play) {
     if ((this->fishState == FISH_STATE_WANDER) && !FISHMOD_PHOTO_ON && (attnDist > FISHMOD_FOLLOW_FAR_DIST)) {
         s32 followed;
 
-        FISHMOD_PROF(FISHMOD_PROF_U_FOLLOW, followed = EnFishmod_FollowFar(this, play));
+        FISHMOD_PROF(FISHMOD_PROF_U_FOLLOW, followed = EnFishmod_FollowFar(this, play, followFrames));
         if (followed) {
+            this->followSkip = (attnDist > 1200.0f) ? 3 : (attnDist > 800.0f) ? 1 : 0;
             if (this->drawnFull == 0) {
                 // (EnFishmod_UpdateSwim's first case, here: most of these fish aren't drawn in full, and the swim
                 // function's code is a cache line or two more each)
@@ -2684,7 +2696,7 @@ void EnFishmod_FlatLight(PlayState* play, u8* out) {
     out[2] = sLight[2];
 }
 
-s32 EnFishmod_FogAmount(PlayState* play, Vec3f* pos) {
+s32 EnFishmod_FogAmount(PlayState* play, Vec3f* pos, u8* rgb) {
     MtxF* m = &play->viewProjectionMtxF;
     s32 near = play->lightCtx.fogNear;
     s32 far = 1000 - (s32)((1000 - FISHMOD_HAZE_FOG_FAR) * gFishmodHaze);
@@ -2693,7 +2705,23 @@ s32 EnFishmod_FogAmount(PlayState* play, Vec3f* pos) {
     f32 fm;
     f32 fo;
     f32 fog;
+    s16 wfm;
+    s16 wfo;
 
+    // under the lake's surface, seen from above it: the water's fog (fishmod.c Fishmod_WaterFogFactor), as the bed's
+    if (Fishmod_WaterFogFactor(FISHMOD_LAKE_SURFACE - pos->y, &wfm, &wfo)) {
+        rgb[0] = gFishmodWaterFog.water[0];
+        rgb[1] = gFishmodWaterFog.water[1];
+        rgb[2] = gFishmodWaterFog.water[2];
+        if (w < 1.0f) {
+            return 0;
+        }
+        fog = (z / w) * wfm + wfo;
+        return (fog <= 0.0f) ? 0 : (fog >= 255.0f) ? 255 : (s32)fog;
+    }
+    rgb[0] = play->lightCtx.fogColor[0];
+    rgb[1] = play->lightCtx.fogColor[1];
+    rgb[2] = play->lightCtx.fogColor[2];
     if (far == near) {
         far++;
     }
@@ -2805,7 +2833,7 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     const u8* tint = this->species->tint;
     s32 i;
     // (all lit, a comparison: the blender fogs it, as before)
-    s32 fog = (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT) ? 0 : EnFishmod_FogAmount(play, &this->actor.world.pos);
+    s32 fog = (FISHMOD_FLAT_TEST == FISHMOD_FLAT_TEST_ALL_LIT) ? 0 : EnFishmod_FogAmount(play, &this->actor.world.pos, this->fogRgb);
     s32 keep = 255 - fog;
     u8 light[3] = { 255, 255, 255 }; // (all lit, a comparison: unlit, as before)
     s32 scale[3];
@@ -2905,8 +2933,8 @@ void EnFishmod_DrawBillboard(EnFishmod* this, PlayState* play) {
     }
 
     OPEN_DISPS(gfxCtx, "../z_en_fishmod.c", __LINE__);
-    gDPSetEnvColor(POLY_OPA_DISP++, (play->lightCtx.fogColor[0] * fog) >> 8, (play->lightCtx.fogColor[1] * fog) >> 8,
-                   (play->lightCtx.fogColor[2] * fog) >> 8, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, (this->fogRgb[0] * fog) >> 8, (this->fogRgb[1] * fog) >> 8,
+                   (this->fogRgb[2] * fog) >> 8, 255);
     gSPVertex(POLY_OPA_DISP++, vtx, 6, 0);
     gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
     gSP2Triangles(POLY_OPA_DISP++, 0, 3, 4, 0, 0, 4, 5, 0);

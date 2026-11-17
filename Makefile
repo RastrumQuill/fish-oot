@@ -250,6 +250,10 @@ COMPARE := 0
 # FISHMOD_EXPAK=1: the ROM needs the Expansion Pak (fishmod/build.sh --expak): code under #if FISHMOD_EXPAK can count
 # on the 8 MB (the heap's extra 4 MB, the third frame buffer, the audio's sample store: code/sys_cfb.c); without the
 # pak the game says so at power-on instead of starting. 0 (the default): it runs either way, using the pak if it's there
+# FISHMOD_MESHPACK=1: the build reads tools/meshpack.py's copy of the assets (fishmod/build.sh --meshpack): code that
+# draws what it changed (the lake's water surface) knows by #if FISHMOD_MESHPACK
+FISHMOD_MESHPACK ?= 0
+CPP_DEFINES += -DFISHMOD_MESHPACK=$(FISHMOD_MESHPACK)
 FISHMOD_EXPAK ?= 0
 ifeq ($(FISHMOD_EXPAK),1)
   CPP_DEFINES += -DFISHMOD_EXPAK=1

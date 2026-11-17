@@ -90,6 +90,8 @@ typedef struct EnFishmod {
     /* 0x401 */ u8 drawnFull;                      // frames the full model was drawn lately (the swim wave runs while > 0)
     /* 0x3CD */ u8 blocked;                        // the last SwimToward hit the shore (debug display)
     /* 0x40E */ u8 look;                           // its own looks: EnFishmod_LookTable (saved with it in a bottle)
+    /*       */ u8 followSkip;                     // a far school member keeping its place: the frames it sits out
+                                                   // between two (a mask on its timer: 0, 1 or 3; EnFishmod_Update)
     /* 0x352 */ s16 timer;
     /* 0x37A */ s16 stateTimer;
     /* 0x37C */ s16 cooldown;   // frames before it will look at the bobber again
@@ -159,6 +161,7 @@ typedef struct EnFishmod {
     Gfx flatGfx[(FISHMOD_PART_MAX + FISHMOD_TEX_ROLE_MAX) * 2]; // the same for drawing flat: tints by light and fog
     u32 flatKey; // what flatGfx was made for (its looks, the light, the fog in 64 steps), 0: not made
     s32 bbKey;                                     // what bbColor was made for (as lookKey)
+    u8 fogRgb[3];                                  // the colour its flat fog goes to (EnFishmod_FogAmount)
     u8 bbColor[6][3];                              // its far shape's corner colours (EnFishmod_DrawBillboard), made once
 } EnFishmod;
 
@@ -303,7 +306,7 @@ void EnFishmod_RigRestoreSegments(struct PlayState* play);
 // fog: -1 lit (the model's own material), else flat with this much fog (0-255, EnFishmod_FogAmount)
 void EnFishmod_RigDraw(struct EnFishmod* this, struct PlayState* play, s32 variant, s32 wantBounds, s32 fog);
 // How fogged a point is (0-255), as the RSP would fog a vertex there with the scene's fog now (Play_SetFog)
-s32 EnFishmod_FogAmount(struct PlayState* play, Vec3f* pos);
+s32 EnFishmod_FogAmount(struct PlayState* play, Vec3f* pos, u8* rgb);
 // The light a flat fish is coloured by (RGB): the scene's ambient and a share of its directional lights
 void EnFishmod_FlatLight(struct PlayState* play, u8* out);
 void EnFishmod_BillboardMaterial(struct EnFishmod* this, struct PlayState* play);

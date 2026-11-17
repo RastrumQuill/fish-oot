@@ -265,6 +265,19 @@ s32 Fishmod_DpadItem(PlayState* play, s32 button) {
     return item;
 }
 
+/** Whether a D-pad button holds this item now (the lens's magic: z_parameter.c turned it off unless a C button held
+ * it, so the lens on the D-pad went off the moment it came on). */
+s32 Fishmod_DpadHasItem(PlayState* play, s32 item) {
+    s32 b;
+
+    for (b = FISHMOD_BUTTON_DPAD; b < FISHMOD_BUTTON_MAX; b++) {
+        if (Fishmod_DpadItem(play, b) == item) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Who can wear what (the pause menu's gEquipAgeReqs, which lives in its overlay): 0 either age, else the LINK_AGE_*
 // plus one
 static const u8 sEquipAge[EQUIP_TYPE_MAX][4] = {

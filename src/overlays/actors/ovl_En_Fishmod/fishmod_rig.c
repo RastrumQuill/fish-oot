@@ -1331,7 +1331,6 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
         // flat (Rig_Flatten): its tints by the scene's light and (1 - fog), the fog colour x fog added in the
         // environment colour. The tints in the fish's own memory, made again only when its looks, the light or its fog
         // (in 64 steps, 1.6% each) change: once a frame they cost about 40 us a fish (ares)
-        LightContext* lights = &play->lightCtx;
         u8 light[3];
         u32 key;
 
@@ -1360,8 +1359,8 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
             }
         }
         gSPSegment(POLY_OPA_DISP++, RIG_SEG_TINT, this->flatGfx);
-        gDPSetEnvColor(POLY_OPA_DISP++, (lights->fogColor[0] * fog) >> 8, (lights->fogColor[1] * fog) >> 8,
-                       (lights->fogColor[2] * fog) >> 8, 255);
+        gDPSetEnvColor(POLY_OPA_DISP++, (this->fogRgb[0] * fog) >> 8, (this->fogRgb[1] * fog) >> 8,
+                       (this->fogRgb[2] * fog) >> 8, 255);
         if ((model == FISH_RIG_BASS) && (this->jawRot > 0)) {
             gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
             gSPDisplayList(POLY_OPA_DISP++, base->dlFlat);

@@ -15,6 +15,7 @@
 #include "translation.h"
 #include "z_lib.h"
 #include "bgcheck.h"
+#include "sys_cfb.h"
 #include "play_state.h"
 #include "player.h"
 #include "skin_matrix.h"
@@ -43,6 +44,7 @@ s32 BgCheck_CheckLineAgainstDyna(CollisionContext* colCtx, u16 xpFlags, Vec3f* p
 s32 BgCheck_SphVsFirstDynaPoly(CollisionContext* colCtx, u16 xpFlags, CollisionPoly** outPoly, s32* outBgId,
                                Vec3f* center, f32 radius, Actor* actor, u16 bciFlags);
 void BgCheck_ResetPolyCheckTbl(SSNodeList* nodeList, s32 numPolys);
+u32 SurfaceType_IsSoft(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId);
 
 #define SS_NULL 0xFFFF
 
@@ -59,6 +61,61 @@ static s32 sDynaHighWater;
 // the actor holds none, so DynaPoly_UnsetAllInteractFlags has nothing to look for; a set bit, look as before.
 static u32 sDynaActorBits[2];
 
+/*
+ * collision-opt: each moving-platform slot's reach across the ground, for the searches' slot loops: its bounding
+ * sphere's box (x and z, a little wider), made when the platforms are set up for the frame (DynaPoly_UpdateContext),
+ * all the slots' in a few cache lines (the slots themselves are 100 bytes apart, their flags elsewhere). A question
+ * out of a slot's reach is one its own sphere test would turn away (each search's test, below, is at least as narrow),
+ * so the slot is passed over without reading it: the same slots searched, in the same order. Not used from when a slot
+ * is taken until the next setup (its sphere isn't made yet: the loops as they were).
+ */
+typedef struct {
+    f32 minX;
+    f32 maxX;
+    f32 minZ;
+    f32 maxZ;
+} DynaReach;
+static DynaReach sDynaReach[BG_ACTOR_MAX];
+static s32 sDynaReachValid;
+
+// (the same boxes a unit wider, as 16-bit integers, for a point cut to an integer: the floor search's question to them
+// all at once, DynaPoly_PointInAnyReach)
+typedef struct {
+    s16 minX;
+    s16 maxX;
+    s16 minZ;
+    s16 maxZ;
+} DynaReach16;
+static DynaReach16 sDynaReach16[BG_ACTOR_MAX];
+
+/**
+ * collision-opt: whether the point may be in any slot's reach (if not, BgCheck_RaycastDownDyna would pass over every
+ * slot: its answer is then BGCHECK_Y_MIN, with nothing written but the bgId it starts with, BGCHECK_SCENE)
+ */
+static s32 DynaPoly_PointInAnyReach(Vec3f* pos) {
+    DynaReach16* reach;
+    DynaReach16* end;
+    s32 x;
+    s32 z;
+
+    if (!sDynaReachValid || !(fabsf(pos->x) < 30000.0f) || !(fabsf(pos->z) < 30000.0f)) {
+        return true;
+    }
+    x = (s32)pos->x;
+    z = (s32)pos->z;
+    end = &sDynaReach16[sDynaHighWater];
+    for (reach = sDynaReach16; reach < end; reach++) {
+        if ((x >= reach->minX) && (x <= reach->maxX) && (z >= reach->minZ) && (z <= reach->maxZ)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+#define DYNA_OUT_OF_REACH(i, xLo, xHi, zLo, zHi)                                                  \
+    (sDynaReachValid && (((xHi) < sDynaReach[i].minX) || (sDynaReach[i].maxX < (xLo)) || \
+                         ((zHi) < sDynaReach[i].minZ) || (sDynaReach[i].maxZ < (zLo))))
+
 static u32 DynaPoly_ActorBit(Actor* actor) {
     u32 a = (u32)actor;
 
@@ -71,16 +128,32 @@ static Vec3f* sStaticVtxF;
 // the floor search's first tests read (the flags that exclude it, whether it faces down, its lowest vertex), all in one
 // 16-byte record: one cache line for a poly passed over, where the poly, its three vertices and the box were up to five.
 // The box and height are the vertices' own 16-bit values (compared as floats, as before: the same comparisons).
+// collision-opt: the wall, ceiling, line and sphere searches read their first tests from it too, and the wall search
+// its 1 / the normal's length across the ground (BgCheck_SphVsStaticWallImpl), made here once with the expressions the
+// search used to compute for each wall it reached: the same floats.
 typedef struct {
     s16 minZ;
     s16 maxZ;
     s16 minX;
     s16 maxX;
     s16 minY;   // the lowest of its vertices' y
-    u16 flags;  // flags_vIA's exclusion bits (0xE000), and bit 0: its normal's y is below 0
-    s32 pad;
+    u16 flags;  // flags_vIA's exclusion bits (0xE000), and the STATICPOLY_* bits below
+    f32 invNormalXZ; // 1.0f / sqrtf(SQ(nx) + SQ(nz)) (0 with STATICPOLY_NO_XZ)
 } StaticPolyBox;
 static StaticPolyBox* sStaticPolyBox;
+
+// collision-opt: StaticPolyBox.flags' low bits
+#define STATICPOLY_FACES_DOWN (1 << 0)  // its normal's y is below 0
+#define STATICPOLY_STEEP_FOR_Z (1 << 1) // the wall search's z pass passes it over: fabsf(nz) * invNormalXZ < 0.4f
+#define STATICPOLY_STEEP_FOR_X (1 << 2) // the x pass passes it over: fabsf(nx) * invNormalXZ < 0.4f
+#define STATICPOLY_NO_XZ (1 << 3)       // its normal has no length across the ground: the wall search computes as before
+#define STATICPOLY_LINE_X (1 << 5) // the line test's x projection may take it: fabsf(nx) > 0.5f (CollisionPoly_LineVsPoly)
+#define STATICPOLY_LINE_Y (1 << 6) // its y projection: fabsf(ny) > 0.5f
+#define STATICPOLY_LINE_Z (1 << 7) // its z projection: fabsf(nz) > 0.5f
+#define STATICPOLY_SOFT (1 << 8)   // SurfaceType_IsSoft's answer for it (the floor search lowers a soft floor by a unit)
+#define STATICPOLY_GETMINY_DIFFERS (1 << 4) // CollisionPoly_GetMinY gives another height than minY (its @bug: a poly whose
+                                            // normal's y is stored as exactly 1 or -1 gives its first vertex's): the line
+                                            // test asks it, as before
 
 // fishmod: answers of the scene's floor search kept for questions asked again exactly (BgCheck_RaycastDownImplBody);
 // emptied when a scene's collision is made (a new generation)
@@ -141,7 +214,7 @@ static void FloorCache_Store(FloorCacheEntry* e, Vec3f* pos, u16 xpFlags, u32 do
 
 /*
  * fishmod: a scene poly's height under (x, z) if the point is within chkDist of it seen from above, for the floor
- * (detMax 0) and ceiling (detMax 300, chkDist 1) searches, which have already tested its box: what
+ * (detMax 0) and ceiling (detMax 300, chkDist 1) searches, which have already tested its box when there are records: what
  * CollisionPoly_CheckYIntersect and CollisionPoly_CheckYIntersectApprox2 compute (the same vertices, normal and
  * expressions), with the point test inlined and its box test skipped (fishmod_tri.h). The same answers.
  */
@@ -174,7 +247,7 @@ static s32 StaticPoly_CheckYIntersect(CollisionContext* colCtx, s32 polyId, f32 
         v1 = &verts[1];
         v2 = &verts[2];
     }
-    if (Fishmod_TriChkPointParaY(v0, v1, v2, z, x, detMax, chkDist, ny, true)) {
+    if (Fishmod_TriChkPointParaY(v0, v1, v2, z, x, detMax, chkDist, ny, sStaticPolyBox != NULL)) {
         *yIntersect = (f32)((((-nx * x) - (nz * z)) - (f32)poly->dist) / ny);
         return true;
     }
@@ -740,7 +813,7 @@ f32 BgCheck_RaycastDownStaticList(CollisionContext* colCtx, u16 xpFlags, SSList*
             StaticPolyBox* box = &sStaticPolyBox[polyId];
 
             if (COLPOLY_VTX_CHECK_FLAGS_ANY(box->flags, xpFlags) ||
-                ((groundChk & BGCHECK_GROUND_CHECK_ON) && (box->flags & 1))) {
+                ((groundChk & BGCHECK_GROUND_CHECK_ON) && (box->flags & STATICPOLY_FACES_DOWN))) {
                 if (curNode->next == SS_NULL) {
                     break;
                 }
@@ -785,6 +858,447 @@ f32 BgCheck_RaycastDownStaticList(CollisionContext* colCtx, u16 xpFlags, SSList*
         curNode = &colCtx->polyNodes.tbl[curNode->next];
     }
     return result;
+}
+
+/*
+ * collision-opt: the floor search's index. A lookup cell's lists hold every poly near the cell, and the floor search
+ * (BgCheck_RaycastDownStaticList) walks them testing each poly's box against the point: some 30 boxes for the 3
+ * triangles it tests. Here each list is kept again as plain poly numbers, a long one cut by the ground it covers: the
+ * cell's ground is cut BGSUB_S x BGSUB_S, and each piece has the list's polys, in the list's order, whose box (widened
+ * by BGSUB_MARGIN + 1) reaches it. The short way (BgCheck_RaycastDownFast) walks these.
+ *
+ * The same answers, for a list sorted by lowest vertex (each poly's no lower than the one before): the walk ends at
+ * the first poly it doesn't exclude whose lowest vertex is above the point, and in a sorted list every poly after it
+ * is above the point too, so whether the walk ends at that poly or at a later one, the same polys were tested before
+ * the end; and the polys a piece's list leaves out are ones whose box test fails for any point of the piece (the
+ * search checks the point is in the piece it computed, within half a unit, and its chkDist is no more than the
+ * margin). A list that isn't sorted (the insertion's quirk with CollisionPoly_GetMinY's @bug) isn't kept: the search
+ * as it was.
+ *
+ * A cell's lists in sSubEntries, from its base: at off[k] (BGSUB_NONE: not kept), a count and that many polys (a short
+ * list, whole), or -1, the pieces' starts (BGSUB_S * BGSUB_S + 1 of them) and the polys they count from.
+ */
+#define BGSUB_S 4
+#define BGSUB_MIN_LIST 6
+#define BGSUB_MARGIN 1.0f
+#define BGSUB_NONE 0xFFFF
+
+typedef struct {
+    f32 minX; // the cell's corner
+    f32 minZ;
+    u32 base;
+    u16 off[3]; // floor, wall, ceiling
+    u16 pad;
+} SubCell; // 20 bytes
+
+static u16* sSubCellOf; // each lookup cell's SubCell (BGSUB_NONE: none; BGSUB_UNBUILT: not made yet)
+static SubCell* sSubCells;
+static s16* sSubEntries;
+static f32 sSubW; // a piece's size
+static f32 sSubD;
+static f32 sSubWInv;
+static f32 sSubDInv;
+
+/** A list's length if it's sorted by lowest vertex, else -1 */
+static s32 BgCheck_SubListLength(CollisionContext* colCtx, SSList* ssList) {
+    s32 n = 0;
+    s32 prev = -0x8000;
+    u16 at = ssList->head;
+
+    while (at != SS_NULL) {
+        SSNode* node = &colCtx->polyNodes.tbl[at];
+        s32 minY = sStaticPolyBox[node->polyId].minY;
+
+        if (minY < prev) {
+            return -1;
+        }
+        prev = minY;
+        n++;
+        at = node->next;
+    }
+    return n;
+}
+
+/**
+ * Walks a list, counting for each piece of the cell the polys that reach it (`counts`), and, with `out`, writing them
+ * there in the list's order (each piece's from `starts`). Returns the pieces' counts' sum.
+ */
+static s32 BgCheck_SubWalkList(CollisionContext* colCtx, SSList* ssList, f32 cellMinX, f32 cellMinZ, s32* counts,
+                               s16* out, s16* starts) {
+    u16 at = ssList->head;
+    s32 sum = 0;
+    s32 i;
+
+    for (i = 0; i < BGSUB_S * BGSUB_S; i++) {
+        counts[i] = 0;
+    }
+    while (at != SS_NULL) {
+        SSNode* node = &colCtx->polyNodes.tbl[at];
+        StaticPolyBox* box = &sStaticPolyBox[node->polyId];
+        s32 sx;
+        s32 sz;
+
+        for (sz = 0; sz < BGSUB_S; sz++) {
+            f32 rectMinZ = cellMinZ + sz * sSubD;
+
+            if (((box->maxZ + (BGSUB_MARGIN + 1.0f)) < rectMinZ) ||
+                ((rectMinZ + sSubD) < (box->minZ - (BGSUB_MARGIN + 1.0f)))) {
+                continue;
+            }
+            for (sx = 0; sx < BGSUB_S; sx++) {
+                f32 rectMinX = cellMinX + sx * sSubW;
+
+                if (((box->maxX + (BGSUB_MARGIN + 1.0f)) < rectMinX) ||
+                    ((rectMinX + sSubW) < (box->minX - (BGSUB_MARGIN + 1.0f)))) {
+                    continue;
+                }
+                i = sz * BGSUB_S + sx;
+                if (out != NULL) {
+                    out[starts[i] + counts[i]] = node->polyId;
+                }
+                counts[i]++;
+                sum++;
+            }
+        }
+        at = node->next;
+    }
+    return sum;
+}
+
+#define BGSUB_UNBUILT 0xFFFE
+#define BGSUB_BUDGET 0x18000 // the index's memory, past its table of cells (what's made of it: the cells searched)
+
+static u32 sSubCellCount; // cells made so far
+static s16* sSubTop;      // the entries grow down from the memory's end to here, the SubCells up from its start
+
+/**
+ * Makes a cell's part of the index, when the short way first comes to the cell (a scene has thousands of cells and a
+ * frame's searches are in a few: made at once for all, the index held up a scene's loading by a quarter of a second).
+ * Returns its SubCell's number, or BGSUB_NONE: none of its lists is kept, or there's no room left.
+ */
+static u16 BgCheck_SubBuildCell(CollisionContext* colCtx, s32 c) {
+    StaticLookup* lookup = &colCtx->lookupTbl[c];
+    s32 len[3];
+    s32 words[3];
+    s32 counts[3][BGSUB_S * BGSUB_S];
+    s32 k;
+    s32 i;
+    f32 cellMinX;
+    f32 cellMinZ;
+    s32 cellWords = 0;
+    s32 at = 0;
+    SubCell* cell;
+
+    sSubCellOf[c] = BGSUB_NONE;
+    cellMinX = colCtx->minBounds.x + (c % colCtx->subdivAmount.x) * colCtx->subdivLength.x;
+    cellMinZ = colCtx->minBounds.z + (c / (colCtx->subdivAmount.x * colCtx->subdivAmount.y)) * colCtx->subdivLength.z;
+    for (k = 0; k < 3; k++) {
+        len[k] = BgCheck_SubListLength(colCtx, (SSList*)lookup + k);
+        words[k] = 0;
+        if (len[k] > 0) {
+            words[k] = (len[k] < BGSUB_MIN_LIST)
+                           ? (1 + len[k])
+                           : (2 + BGSUB_S * BGSUB_S + BgCheck_SubWalkList(colCtx, (SSList*)lookup + k, cellMinX,
+                                                                          cellMinZ, counts[k], NULL, NULL));
+        }
+        cellWords += words[k];
+    }
+    if ((cellWords == 0) || (cellWords > 0x7FFE) || (sSubCellCount >= BGSUB_UNBUILT)) {
+        return BGSUB_NONE;
+    }
+    // (room for one more SubCell below the entries, and these entries above the SubCells)
+    if ((uintptr_t)&sSubCells[sSubCellCount + 1] > (uintptr_t)(sSubTop - cellWords)) {
+        return BGSUB_NONE;
+    }
+    sSubTop -= cellWords;
+    cell = &sSubCells[sSubCellCount];
+    cell->minX = cellMinX;
+    cell->minZ = cellMinZ;
+    cell->base = sSubTop - sSubEntries;
+    cell->pad = 0;
+    for (k = 0; k < 3; k++) {
+        s16* e = sSubTop + at;
+
+        if (words[k] == 0) {
+            cell->off[k] = BGSUB_NONE;
+            continue;
+        }
+        cell->off[k] = at;
+        at += words[k];
+        if (len[k] < BGSUB_MIN_LIST) {
+            u16 node = ((SSList*)lookup + k)->head;
+
+            *e++ = len[k];
+            while (node != SS_NULL) {
+                *e++ = colCtx->polyNodes.tbl[node].polyId;
+                node = colCtx->polyNodes.tbl[node].next;
+            }
+        } else {
+            s32 sum = 0;
+
+            e[0] = -1;
+            for (i = 0; i < BGSUB_S * BGSUB_S; i++) {
+                e[1 + i] = sum;
+                sum += counts[k][i];
+            }
+            e[1 + BGSUB_S * BGSUB_S] = sum;
+            BgCheck_SubWalkList(colCtx, (SSList*)lookup + k, cellMinX, cellMinZ, counts[k], e + 2 + BGSUB_S * BGSUB_S,
+                                e + 1);
+        }
+    }
+    sSubCellOf[c] = sSubCellCount;
+    return sSubCellCount++;
+}
+
+/**
+ * Sets the index up, empty, if the polys have their records and there's memory for it that the game didn't have (see
+ * BgCheck_MakeStaticTables): a table of the lookup's cells, and BGSUB_BUDGET (or what there is) for the cells made.
+ */
+static void BgCheck_MakeSubIndex(CollisionContext* colCtx, PlayState* play) {
+    s32 numLookups = colCtx->subdivAmount.x * colCtx->subdivAmount.y * colCtx->subdivAmount.z;
+    u32 tableSize = ALIGN16(numLookups * sizeof(u16));
+    u32 size;
+    uintptr_t mem;
+    s32 c;
+
+    sSubCellOf = NULL;
+    if (sStaticPolyBox == NULL) {
+        return;
+    }
+    sSubW = colCtx->subdivLength.x / BGSUB_S;
+    sSubD = colCtx->subdivLength.z / BGSUB_S;
+    sSubWInv = 1.0f / sSubW;
+    sSubDInv = 1.0f / sSubD;
+    // (fish-oot: with an Expansion Pak, from the 2 MB more the mod gives Play; without one, none)
+    if (osMemSize < 0x800000) {
+        return;
+    }
+    size = tableSize + BGSUB_BUDGET;
+    mem = (uintptr_t)GAME_STATE_ALLOC(&play->state, size + 15, "../z_bgcheck.c", __LINE__);
+    if (mem == 0) {
+        return;
+    }
+    mem = ALIGN16(mem);
+    sSubCells = (SubCell*)(mem + tableSize);
+    sSubEntries = (s16*)sSubCells;
+    sSubTop = (s16*)((mem + size) & ~(uintptr_t)1);
+    sSubCellCount = 0;
+    sSubCellOf = (u16*)mem;
+    for (c = 0; c < numLookups; c++) {
+        sSubCellOf[c] = BGSUB_UNBUILT;
+    }
+}
+
+/**
+ * collision-opt: the floor search's short way. A floor question runs through a dozen functions (the cell, its lists,
+ * each poly's tests, the triangle test's every case), some 8 KB of code that the rest of the frame has pushed out of
+ * the instruction cache by the next question: most of a search's time was fetching its own code. This is the usual
+ * search in one small function: the point's cell and piece, the piece's lists (the list walk's tests),
+ * the triangle test (StaticPoly_CheckYIntersect's) and the height, all with the same expressions as the long way.
+ * Anything else goes the long way: a search this can't answer (a list that isn't kept, a point out of the scene's box
+ * or of its piece) returns false with nothing written, for the search as it was.
+ */
+static s32 BgCheck_RaycastDownFast(CollisionContext* colCtx, u16 xpFlags, CollisionPoly** outPoly, Vec3f* pos,
+                                   u32 downChkFlags, f32 chkDist, f32* outY) {
+    StaticLookup* lookup;
+    SubCell* cell;
+    CollisionPoly* polyList;
+    CollisionPoly* poly;
+    StaticPolyBox* box;
+    s16* entries;
+    Vec3f* v0;
+    Vec3f* v1;
+    Vec3f* v2;
+    s32 sx;
+    s32 sy;
+    s32 sz;
+    s32 piece;
+    s32 k;
+    s32 count;
+    s32 polyId;
+    s32 lists;
+    u16 skip;
+    u16 id;
+    f32 rectMin;
+    f32 result;
+    f32 yIntersect;
+    f32 nx;
+    f32 ny;
+    f32 nz;
+    f32 detv0v1;
+    f32 detv1v2;
+    f32 detv2v0;
+    f32 chkDistSq;
+    f32 distToEdgeSq;
+    f32 checkY;
+    s32 wanted;
+    f32 x = pos->x;
+    f32 z = pos->z;
+
+    if ((sSubCellOf == NULL) || (sStaticVtxF == NULL) || !(chkDist <= BGSUB_MARGIN) ||
+        (colCtx->colHeader->vtxList != sStaticVtxS)) {
+        return false;
+    }
+    // the lists the search walks (BgCheck_RaycastDownStatic)
+    wanted = 0;
+    if (downChkFlags & BGCHECK_RAYCAST_DOWN_CHECK_FLOORS) {
+        wanted |= 1;
+    }
+    if (downChkFlags & (BGCHECK_RAYCAST_DOWN_CHECK_WALLS | BGCHECK_RAYCAST_DOWN_CHECK_WALLS_SIMPLE)) {
+        wanted |= 2;
+    }
+    if (downChkFlags & BGCHECK_RAYCAST_DOWN_CHECK_CEILINGS) {
+        wanted |= 4;
+    }
+    polyList = colCtx->colHeader->polyList;
+
+    // down the cells under the point, as the search's loop: until one has a floor, or below the scene's box
+    for (checkY = pos->y;; checkY -= colCtx->subdivLength.y) {
+        if (checkY < colCtx->minBounds.y) {
+            *outY = BGCHECK_Y_MIN;
+            return true;
+        }
+        // the cell (BgCheck_GetStaticLookup's tests and expressions)
+        if ((x < (colCtx->minBounds.x - BGCHECK_SUBDIV_OVERLAP)) || ((colCtx->maxBounds.x + BGCHECK_SUBDIV_OVERLAP) < x) ||
+            (checkY < (colCtx->minBounds.y - BGCHECK_SUBDIV_OVERLAP)) ||
+            ((colCtx->maxBounds.y + BGCHECK_SUBDIV_OVERLAP) < checkY) ||
+            (z < (colCtx->minBounds.z - BGCHECK_SUBDIV_OVERLAP)) || ((colCtx->maxBounds.z + BGCHECK_SUBDIV_OVERLAP) < z)) {
+            return false;
+        }
+        sx = (x - colCtx->minBounds.x) * colCtx->subdivLengthInv.x;
+        sy = (checkY - colCtx->minBounds.y) * colCtx->subdivLengthInv.y;
+        sz = (z - colCtx->minBounds.z) * colCtx->subdivLengthInv.z;
+        if (sx < 0) {
+            sx = 0;
+        } else if (sx >= colCtx->subdivAmount.x) {
+            sx = colCtx->subdivAmount.x - 1;
+        }
+        if (sy < 0) {
+            sy = 0;
+        } else if (sy >= colCtx->subdivAmount.y) {
+            sy = colCtx->subdivAmount.y - 1;
+        }
+        if (sz < 0) {
+            sz = 0;
+        } else if (sz >= colCtx->subdivAmount.z) {
+            sz = colCtx->subdivAmount.z - 1;
+        }
+        k = sx + (sy + sz * colCtx->subdivAmount.y) * colCtx->subdivAmount.x;
+        lookup = &colCtx->lookupTbl[k];
+        id = sSubCellOf[k];
+        if (id == BGSUB_UNBUILT) {
+            id = BgCheck_SubBuildCell(colCtx, k);
+        }
+        lists = wanted;
+        if (id == BGSUB_NONE) {
+            // (none of its lists kept: an empty cell is passed, as the search passes it; else the search as it was)
+            for (k = 0; k < 3; k++) {
+                if ((lists & (1 << k)) && (((SSList*)lookup + k)->head != SS_NULL)) {
+                    return false;
+                }
+            }
+            continue;
+        }
+        cell = &sSubCells[id];
+        // the point's piece of it
+        sx = (s32)((x - cell->minX) * sSubWInv);
+        sz = (s32)((z - cell->minZ) * sSubDInv);
+        if ((sx < 0) || (sx >= BGSUB_S) || (sz < 0) || (sz >= BGSUB_S)) {
+            return false;
+        }
+        rectMin = cell->minX + sx * sSubW;
+        if (!((x >= (rectMin - 0.5f)) && (x <= ((rectMin + sSubW) + 0.5f)))) {
+            return false;
+        }
+        rectMin = cell->minZ + sz * sSubD;
+        if (!((z >= (rectMin - 0.5f)) && (z <= ((rectMin + sSubD) + 0.5f)))) {
+            return false;
+        }
+        piece = sz * BGSUB_S + sx;
+        // each list the search walks must be kept, or be empty
+        for (k = 0; k < 3; k++) {
+            if ((lists & (1 << k)) && (cell->off[k] == BGSUB_NONE)) {
+                if (((SSList*)lookup + k)->head != SS_NULL) {
+                    return false;
+                }
+                lists &= ~(1 << k);
+            }
+        }
+
+        result = BGCHECK_Y_MIN;
+        for (k = 0; k < 3; k++) {
+            if (!(lists & (1 << k))) {
+                continue;
+            }
+            skip = (xpFlags & 7) << 13;
+            if ((k != 0) && (downChkFlags & BGCHECK_RAYCAST_DOWN_CHECK_GROUND_ONLY)) {
+                skip |= STATICPOLY_FACES_DOWN;
+            }
+            entries = &sSubEntries[cell->base + cell->off[k]];
+            if (entries[0] >= 0) {
+                count = entries[0];
+                entries++;
+            } else {
+                count = entries[2 + piece] - entries[1 + piece];
+                entries += (2 + BGSUB_S * BGSUB_S) + entries[1 + piece];
+            }
+            for (; count > 0; count--, entries++) {
+                polyId = *entries;
+                box = &sStaticPolyBox[polyId];
+                if (box->flags & skip) {
+                    continue;
+                }
+                if (pos->y < box->minY) {
+                    break;
+                }
+                if (!(((box->minZ - chkDist) <= z) && ((box->maxZ + chkDist) >= z) && ((box->minX - chkDist) <= x) &&
+                      ((box->maxX + chkDist) >= x))) {
+                    continue;
+                }
+                // (StaticPoly_CheckYIntersect, for a point the triangle test's determinants take)
+                poly = &polyList[polyId];
+                ny = COLPOLY_GET_NORMAL(poly->normal.y);
+                if (IS_ZERO(ny)) {
+                    continue;
+                }
+                v0 = &sStaticVtxF[COLPOLY_VTX_INDEX(poly->flags_vIA)];
+                v1 = &sStaticVtxF[COLPOLY_VTX_INDEX(poly->flags_vIB)];
+                v2 = &sStaticVtxF[poly->vIC];
+                detv0v1 = ((v0->z - z) * (v1->x - x)) - ((v0->x - x) * (v1->z - z));
+                detv1v2 = ((v1->z - z) * (v2->x - x)) - ((v1->x - x) * (v2->z - z));
+                detv2v0 = ((v2->z - z) * (v0->x - x)) - ((v2->x - x) * (v0->z - z));
+                if (((0.0f >= detv0v1) && (0.0f >= detv1v2) && (0.0f >= detv2v0)) ||
+                    ((-0.0f <= detv0v1) && (-0.0f <= detv1v2) && (-0.0f <= detv2v0))) {
+                    nx = COLPOLY_GET_NORMAL(poly->normal.x);
+                    nz = COLPOLY_GET_NORMAL(poly->normal.z);
+                    yIntersect = (f32)((((-nx * x) - (nz * z)) - (f32)poly->dist) / ny);
+                } else {
+                    // (the rest of the triangle test: near a corner, or, for a poly this flat, near an edge)
+                    chkDistSq = SQ(chkDist);
+                    if (!((((SQ(v0->z - z) + SQ(v0->x - x)) < chkDistSq) || ((SQ(v1->z - z) + SQ(v1->x - x)) < chkDistSq) ||
+                           ((SQ(v2->z - z) + SQ(v2->x - x)) < chkDistSq)) ||
+                          ((fabsf(ny) > 0.5f) &&
+                           ((Fishmod_PointDistSqToSeg2D(z, x, v0->z, v0->x, v1->z, v1->x, &distToEdgeSq) && (distToEdgeSq < chkDistSq)) ||
+                            (Fishmod_PointDistSqToSeg2D(z, x, v1->z, v1->x, v2->z, v2->x, &distToEdgeSq) && (distToEdgeSq < chkDistSq)) ||
+                            (Fishmod_PointDistSqToSeg2D(z, x, v2->z, v2->x, v0->z, v0->x, &distToEdgeSq) && (distToEdgeSq < chkDistSq)))))) {
+                        continue;
+                    }
+                    nx = COLPOLY_GET_NORMAL(poly->normal.x);
+                    nz = COLPOLY_GET_NORMAL(poly->normal.z);
+                    yIntersect = (f32)((((-nx * x) - (nz * z)) - (f32)poly->dist) / ny);
+                }
+                // if poly is closer to pos without going over
+                if (yIntersect < pos->y && result < yIntersect) {
+                    result = yIntersect;
+                    *outPoly = poly;
+                }
+            }
+        }
+        if (result > BGCHECK_Y_MIN) {
+            *outY = result;
+            return true;
+        }
+    }
 }
 
 /**
@@ -861,8 +1375,8 @@ s32 BgCheck_ComputeWallDisplacement(CollisionContext* colCtx, CollisionPoly* pol
  * `outX` `outZ` return the displaced x,z coordinates,
  * `outPoly` returns the pointer to the nearest poly collided with, or NULL
  */
-static s32 BgCheck_SphVsStaticWallImpl(StaticLookup* lookup, CollisionContext* colCtx, u16 xpFlags, f32* outX,
-                                       f32* outZ, Vec3f* pos, f32 radius, CollisionPoly** outPoly) {
+static s32 BgCheck_SphVsStaticWallImplPlain(StaticLookup* lookup, CollisionContext* colCtx, u16 xpFlags, f32* outX,
+                                            f32* outZ, Vec3f* pos, f32 radius, CollisionPoly** outPoly) {
     Vec3f resultPos;
     f32 zTemp;
     f32 xTemp;
@@ -1085,6 +1599,134 @@ static s32 BgCheck_SphVsStaticWallImpl(StaticLookup* lookup, CollisionContext* c
 }
 
 /*
+ * collision-opt: the wall search from the polys' records (StaticPolyBox): the same walls tested with the same floats in
+ * the same order, so the same answers; what changed is what a wall passed over costs.
+ * - Below the cell's walls (the list is sorted by lowest vertex): the record's minY, one load, where the poly and its
+ *   three vertices were read (below all three exactly when below the lowest).
+ * - The flags that exclude a wall and the steepness that each pass skips (fabsf(nz) or fabsf(nx) times 1 / the
+ *   normal's length across the ground, under 0.4) from the record's flags, before the plane distance: tests with no
+ *   effects, so their order doesn't change which walls are passed over.
+ * - 1 / that length from the record (made with the same expressions at BgCheck_Allocate) instead of a square root and
+ *   a division for each wall reached.
+ * - The poly's z (x) range with the radius, tested a second time from its vertices, now only once (from the record:
+ *   the same 16-bit values less or plus the same radius, compared the same way).
+ * Without the records, or in a scene with a wall whose normal has no length across the ground (the search's own
+ * arithmetic goes through infinities there), the search as it was (BgCheck_SphVsStaticWallImplPlain).
+ */
+static s32 sWallRecordsUsable;
+
+static s32 BgCheck_SphVsStaticWallImpl(StaticLookup* lookup, CollisionContext* colCtx, u16 xpFlags, f32* outX,
+                                       f32* outZ, Vec3f* pos, f32 radius, CollisionPoly** outPoly) {
+    Vec3f resultPos;
+    f32 planeDist;
+    f32 intersect;
+    s32 result;
+    CollisionPoly* curPoly;
+    CollisionPoly* polyList;
+    SSNode* nodeTbl;
+    SSNode* curNode;
+    StaticPolyBox* box;
+    f32 invNormalXZ;
+    f32 ratio;
+    f32 nx;
+    f32 ny;
+    f32 nz;
+    Vec3s* vtxList;
+    u16 skipFlags;
+
+    if ((sStaticPolyBox == NULL) || !sWallRecordsUsable) {
+        return BgCheck_SphVsStaticWallImplPlain(lookup, colCtx, xpFlags, outX, outZ, pos, radius, outPoly);
+    }
+    result = false;
+    if (lookup->wall.head == SS_NULL) {
+        return result;
+    }
+    resultPos = *pos;
+
+    polyList = colCtx->colHeader->polyList;
+    vtxList = colCtx->colHeader->vtxList;
+    nodeTbl = colCtx->polyNodes.tbl;
+
+    // the z pass
+    skipFlags = ((xpFlags & 7) << 13) | STATICPOLY_STEEP_FOR_Z;
+    curNode = &nodeTbl[lookup->wall.head];
+    while (true) {
+        box = &sStaticPolyBox[curNode->polyId];
+        if (pos->y < box->minY) {
+            break;
+        }
+        if (!((resultPos.z < (box->minZ - radius)) || (resultPos.z > (box->maxZ + radius)) ||
+              (box->flags & skipFlags))) {
+            curPoly = &polyList[curNode->polyId];
+            nx = COLPOLY_GET_NORMAL(curPoly->normal.x);
+            ny = COLPOLY_GET_NORMAL(curPoly->normal.y);
+            nz = COLPOLY_GET_NORMAL(curPoly->normal.z);
+            planeDist = Math3D_DistPlaneToPos(nx, ny, nz, curPoly->dist, &resultPos);
+            if (!(radius < fabsf(planeDist))) {
+                invNormalXZ = box->invNormalXZ;
+                ratio = fabsf(nz) * invNormalXZ;
+                if (CollisionPoly_CheckZIntersectApprox(curPoly, vtxList, resultPos.x, pos->y, &intersect)) {
+                    f32 zIntersectDist = intersect - resultPos.z;
+
+                    if (fabsf(zIntersectDist) <= radius / ratio) {
+                        if (zIntersectDist * nz <= 4.0f) {
+                            BgCheck_ComputeWallDisplacement(colCtx, curPoly, &resultPos.x, &resultPos.z, nx, ny, nz,
+                                                            invNormalXZ, planeDist, radius, outPoly);
+                            result = true;
+                        }
+                    }
+                }
+            }
+        }
+        if (curNode->next == SS_NULL) {
+            break;
+        }
+        curNode = &nodeTbl[curNode->next];
+    }
+
+    // the x pass
+    skipFlags = ((xpFlags & 7) << 13) | STATICPOLY_STEEP_FOR_X;
+    curNode = &nodeTbl[lookup->wall.head];
+    while (true) {
+        box = &sStaticPolyBox[curNode->polyId];
+        if (pos->y < box->minY) {
+            break;
+        }
+        if (!((resultPos.x < (box->minX - radius)) || ((box->maxX + radius) < resultPos.x) ||
+              (box->flags & skipFlags))) {
+            curPoly = &polyList[curNode->polyId];
+            nx = COLPOLY_GET_NORMAL(curPoly->normal.x);
+            ny = COLPOLY_GET_NORMAL(curPoly->normal.y);
+            nz = COLPOLY_GET_NORMAL(curPoly->normal.z);
+            planeDist = Math3D_DistPlaneToPos(nx, ny, nz, curPoly->dist, &resultPos);
+            if (!(radius < fabsf(planeDist))) {
+                invNormalXZ = box->invNormalXZ;
+                ratio = fabsf(nx) * invNormalXZ;
+                if (CollisionPoly_CheckXIntersectApprox(curPoly, vtxList, pos->y, resultPos.z, &intersect)) {
+                    f32 xIntersectDist = intersect - resultPos.x;
+
+                    if (fabsf(xIntersectDist) <= radius / ratio) {
+                        if (xIntersectDist * nx <= 4.0f) {
+                            BgCheck_ComputeWallDisplacement(colCtx, curPoly, &resultPos.x, &resultPos.z, nx, ny, nz,
+                                                            invNormalXZ, planeDist, radius, outPoly);
+                            result = true;
+                        }
+                    }
+                }
+            }
+        }
+        if (curNode->next == SS_NULL) {
+            break;
+        }
+        curNode = &nodeTbl[curNode->next];
+    }
+
+    *outX = resultPos.x;
+    *outZ = resultPos.z;
+    return result;
+}
+
+/*
  * fishmod: the scene's wall answers kept for questions asked again exactly (an actor standing still or pressed against
  * a wall asks the same one every frame), like the floor's (sFloorCache): the static part of a wall test depends only on
  * its inputs (the cell, the sphere, the flags and the wall already found, which decides between two) while the scene's
@@ -1276,7 +1918,11 @@ s32 BgCheck_CheckStaticCeiling(StaticLookup* lookup, u16 xpFlags, CollisionConte
         f32 ny;
 
         curPolyId = curNode->polyId;
-        if (COLPOLY_VTX_CHECK_FLAGS_ANY(colCtx->colHeader->polyList[curPolyId].flags_vIA, xpFlags)) {
+        // collision-opt: the flags from the poly's record (its flags_vIA's bits 0xE000), so a poly passed over costs
+        // its record's cache line, not the poly's as well
+        if (COLPOLY_VTX_CHECK_FLAGS_ANY((sStaticPolyBox != NULL) ? sStaticPolyBox[curPolyId].flags
+                                                                 : colCtx->colHeader->polyList[curPolyId].flags_vIA,
+                                        xpFlags)) {
             if (curNode->next == SS_NULL) {
                 break;
             } else {
@@ -1313,6 +1959,51 @@ s32 BgCheck_CheckStaticCeiling(StaticLookup* lookup, u16 xpFlags, CollisionConte
 }
 
 /**
+ * collision-opt: whether CollisionPoly_LineVsPoly certainly returns false for this poly and line, by its record alone.
+ * It returns true only for a point P of the line (where it crosses the poly's plane: posA + (posB - posA) * ratio,
+ * ratio in [0, 1]) that one of its projections takes, and each projection starts with the triangle's box widened by
+ * chkDist (Math3D_CirSquareVsTriSquare): the x projection needs P.z in the box, the y projection P.x and P.z, the z
+ * projection P.x. P is within the line's own range on each axis but for the rounding of a few operations, far under
+ * a unit: so if the line's x and z ranges, widened by chkDist + 1, leave out every projection the poly can be taken by,
+ * the test can't be true (and its other output, the plane's crossing point, is only read when it is).
+ */
+static s32 BgCheck_LineMissesPoly(StaticPolyBox* box, u16 flags, Vec3f* posA, Vec3f* posB, f32 chkDist) {
+    f32 margin = chkDist + 1.0f;
+    f32 lo;
+    f32 hi;
+    s32 xIn;
+    s32 zIn;
+
+    if (posA->x < posB->x) {
+        lo = posA->x;
+        hi = posB->x;
+    } else {
+        lo = posB->x;
+        hi = posA->x;
+    }
+    xIn = !((hi < (box->minX - margin)) || ((box->maxX + margin) < lo));
+    if (posA->z < posB->z) {
+        lo = posA->z;
+        hi = posB->z;
+    } else {
+        lo = posB->z;
+        hi = posA->z;
+    }
+    zIn = !((hi < (box->minZ - margin)) || ((box->maxZ + margin) < lo));
+
+    if ((flags & STATICPOLY_LINE_X) && zIn) {
+        return false;
+    }
+    if ((flags & STATICPOLY_LINE_Y) && xIn && zIn) {
+        return false;
+    }
+    if ((flags & STATICPOLY_LINE_Z) && xIn) {
+        return false;
+    }
+    return true;
+}
+
+/**
  * Tests if line `posA` to `posB` intersects with a static poly in list `ssList`. Uses polyCheckTbl
  * returns true if such a poly exists, else false
  * `outPoly` returns the pointer of the poly intersected
@@ -1340,11 +2031,15 @@ s32 BgCheck_CheckLineAgainstSSList(SSList* ssList, CollisionContext* colCtx, u16
     curNode = &colCtx->polyNodes.tbl[ssList->head];
     while (true) {
         s16 polyId = curNode->polyId;
+        // collision-opt: the flags and the lowest vertex from the poly's record (the same bits, the same 16-bit y; the
+        // polys where CollisionPoly_GetMinY gives another, its @bug, still ask it), so a poly passed over costs its
+        // record, not the poly and its three vertices as well
+        u16 polyFlags = (sStaticPolyBox != NULL) ? sStaticPolyBox[polyId].flags : polyList[polyId].flags_vIA;
 
         checkedPoly = &colCtx->polyNodes.polyCheckTbl[polyId];
 
-        if (*checkedPoly == sPolyCheckStamp || COLPOLY_VTX_CHECK_FLAGS_ANY(polyList[polyId].flags_vIA, xpFlags1) ||
-            !(xpFlags2 == 0 || COLPOLY_VTX_CHECK_FLAGS_ANY(polyList[polyId].flags_vIA, xpFlags2))) {
+        if (*checkedPoly == sPolyCheckStamp || COLPOLY_VTX_CHECK_FLAGS_ANY(polyFlags, xpFlags1) ||
+            !(xpFlags2 == 0 || COLPOLY_VTX_CHECK_FLAGS_ANY(polyFlags, xpFlags2))) {
 
             if (curNode->next == SS_NULL) {
                 break;
@@ -1355,9 +2050,19 @@ s32 BgCheck_CheckLineAgainstSSList(SSList* ssList, CollisionContext* colCtx, u16
         }
         *checkedPoly = sPolyCheckStamp;
         curPoly = &polyList[polyId];
-        minY = CollisionPoly_GetMinY(curPoly, colCtx->colHeader->vtxList);
+        minY = ((sStaticPolyBox != NULL) && !(polyFlags & STATICPOLY_GETMINY_DIFFERS))
+                   ? sStaticPolyBox[polyId].minY
+                   : CollisionPoly_GetMinY(curPoly, colCtx->colHeader->vtxList);
         if (posA->y < minY && posB->y < minY) {
             break;
+        }
+        // collision-opt: a poly the line can't touch, by its record, isn't tested (see BgCheck_LineMissesPoly)
+        if ((sStaticPolyBox != NULL) && BgCheck_LineMissesPoly(&sStaticPolyBox[polyId], polyFlags, posA, posB, chkDist)) {
+            if (curNode->next == SS_NULL) {
+                break;
+            }
+            curNode = &colCtx->polyNodes.tbl[curNode->next];
+            continue;
         }
         if (CollisionPoly_LineVsPoly(curPoly, colCtx->colHeader->vtxList, posA, posB, &polyIntersect,
                                      (bccFlags & BGCHECK_CHECK_ONE_FACE) != 0, chkDist)) {
@@ -1377,6 +2082,15 @@ s32 BgCheck_CheckLineAgainstSSList(SSList* ssList, CollisionContext* colCtx, u16
         curNode = &colCtx->polyNodes.tbl[curNode->next];
     }
     return result;
+}
+
+/**
+ * collision-opt: whether `lookup` has any of the lists BgCheck_CheckLineInSubdivision would test for `bccFlags`
+ */
+static s32 BgCheck_LookupHasLineLists(StaticLookup* lookup, u32 bccFlags) {
+    return ((bccFlags & BGCHECK_CHECK_FLOOR) && (lookup->floor.head != SS_NULL)) ||
+           ((bccFlags & BGCHECK_CHECK_WALL) && (lookup->wall.head != SS_NULL)) ||
+           ((bccFlags & BGCHECK_CHECK_CEILING) && (lookup->ceiling.head != SS_NULL));
 }
 
 /**
@@ -1429,19 +2143,35 @@ s32 BgCheck_SphVsFirstStaticPolyList(SSNode* node, u16 xpFlags, CollisionContext
         s16 curPolyId = node->polyId;
         CollisionPoly* curPoly = &polyList[curPolyId];
 
-        if (COLPOLY_VTX_CHECK_FLAGS_ANY(colCtx->colHeader->polyList[curPolyId].flags_vIA, xpFlags)) {
-            if (node->next == SS_NULL) {
-                break;
-            } else {
-                node = &colCtx->polyNodes.tbl[node->next];
-                continue;
+        // collision-opt: the flags and the lowest vertex from the poly's record, as the line test
+        if (sStaticPolyBox != NULL) {
+            if (COLPOLY_VTX_CHECK_FLAGS_ANY(sStaticPolyBox[curPolyId].flags, xpFlags)) {
+                if (node->next == SS_NULL) {
+                    break;
+                } else {
+                    node = &colCtx->polyNodes.tbl[node->next];
+                    continue;
+                }
             }
-        }
+            // (below all three exactly when below the lowest)
+            if (center->y + radius < sStaticPolyBox[curPolyId].minY) {
+                break;
+            }
+        } else {
+            if (COLPOLY_VTX_CHECK_FLAGS_ANY(colCtx->colHeader->polyList[curPolyId].flags_vIA, xpFlags)) {
+                if (node->next == SS_NULL) {
+                    break;
+                } else {
+                    node = &colCtx->polyNodes.tbl[node->next];
+                    continue;
+                }
+            }
 
-        if (center->y + radius < vtxList[COLPOLY_VTX_INDEX(curPoly->flags_vIA)].y &&
-            center->y + radius < vtxList[COLPOLY_VTX_INDEX(curPoly->flags_vIB)].y &&
-            center->y + radius < vtxList[curPoly->vIC].y) {
-            break;
+            if (center->y + radius < vtxList[COLPOLY_VTX_INDEX(curPoly->flags_vIA)].y &&
+                center->y + radius < vtxList[COLPOLY_VTX_INDEX(curPoly->flags_vIB)].y &&
+                center->y + radius < vtxList[curPoly->vIC].y) {
+                break;
+            }
         }
 
         if (CollisionPoly_SphVsPoly(curPoly, vtxList, center, radius)) {
@@ -1961,6 +2691,116 @@ static void BgCheck_CompactStaticLists(CollisionContext* colCtx) {
     SYSTEM_ARENA_FREE(old, "../z_bgcheck.c", __LINE__);
 }
 
+/**
+ * collision-opt: the scene's vertices as floats (CollisionPoly_GetVertices) and each poly's record (StaticPolyBox), made
+ * once the lookup is built. Their memory, without taking any from what the game had (the play state's memory left after
+ * the scene is set up becomes the actors' heap, so it isn't taken from there):
+ * - the static node table's unused end (the table gets all of the scene's collision memory the lookup doesn't, and
+ *   nothing uses its nodes past the last one the lookup took);
+ * - or, when the scene's tables don't fit there, the Expansion Pak's memory, if there is one and the game left it
+ *   unused (a retail build puts its frame buffers below 0x80400000, and nothing above them: SysCfb_Init);
+ * - or none: then every search runs as it did (each has its way without the tables), the same answers either way.
+ * fish-oot: before none, the play state's memory (as the mod's tables always took): the mod gives Play 2 MB more with
+ * an Expansion Pak (and moves its frame buffers above 0x80400000, so the second choice above never applies).
+ */
+#ifndef BGCHECK_TABLES_RAM
+#define BGCHECK_TABLES_RAM 0x80400000
+#endif
+#define BGCHECK_TABLES_RAM_SIZE 0x100000
+
+static void BgCheck_MakeStaticTables(CollisionContext* colCtx, PlayState* play, CollisionHeader* colHeader) {
+    SSNodeList* nodes = &colCtx->polyNodes;
+    u32 vtxSize = ALIGN16(colHeader->numVertices * sizeof(Vec3f));
+    u32 size = vtxSize + colHeader->numPolygons * sizeof(StaticPolyBox);
+    uintptr_t start = ALIGN16((uintptr_t)&nodes->tbl[nodes->count]);
+    uintptr_t mem;
+    s32 i;
+
+    if ((nodes->tbl != NULL) && (start + size <= (uintptr_t)&nodes->tbl[nodes->max])) {
+        mem = start;
+    } else if ((osMemSize >= 0x800000) && ((uintptr_t)SysCfb_GetFbEnd() <= (uintptr_t)BGCHECK_TABLES_RAM) &&
+               (size <= BGCHECK_TABLES_RAM_SIZE)) {
+        mem = (uintptr_t)BGCHECK_TABLES_RAM;
+    } else {
+        mem = (uintptr_t)GAME_STATE_ALLOC(&play->state, size + 15, "../z_bgcheck.c", __LINE__);
+        if (mem == 0) {
+            return;
+        }
+        mem = ALIGN16(mem);
+    }
+
+    sStaticVtxF = (Vec3f*)mem;
+    for (i = 0; i < colHeader->numVertices; i++) {
+        BgCheck_Vec3sToVec3f(&colHeader->vtxList[i], &sStaticVtxF[i]);
+    }
+
+    // (a record a cache line: 16 bytes, from a 16-byte boundary)
+    sStaticPolyBox = (StaticPolyBox*)(mem + vtxSize);
+    sWallRecordsUsable = true;
+    for (i = 0; i < colHeader->numPolygons; i++) {
+        CollisionPoly* poly = &colHeader->polyList[i];
+        Vec3s* va = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIA)];
+        Vec3s* vb = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIB)];
+        Vec3s* vc = &colHeader->vtxList[poly->vIC];
+
+        sStaticPolyBox[i].minZ = MIN(MIN(va->z, vb->z), vc->z);
+        sStaticPolyBox[i].maxZ = MAX(MAX(va->z, vb->z), vc->z);
+        sStaticPolyBox[i].minX = MIN(MIN(va->x, vb->x), vc->x);
+        sStaticPolyBox[i].maxX = MAX(MAX(va->x, vb->x), vc->x);
+        sStaticPolyBox[i].minY = MIN(MIN(va->y, vb->y), vc->y);
+        sStaticPolyBox[i].flags = (poly->flags_vIA & 0xE000) | ((poly->normal.y < 0) ? STATICPOLY_FACES_DOWN : 0);
+        if (CollisionPoly_GetMinY(poly, colHeader->vtxList) != sStaticPolyBox[i].minY) {
+            sStaticPolyBox[i].flags |= STATICPOLY_GETMINY_DIFFERS;
+        }
+        if (SurfaceType_IsSoft(colCtx, poly, BGCHECK_SCENE)) {
+            sStaticPolyBox[i].flags |= STATICPOLY_SOFT;
+        }
+        // (which of the line test's projections can take it: CollisionPoly_GetNormalF's values, compared as it does)
+        {
+            f32 lnx;
+            f32 lny;
+            f32 lnz;
+
+            CollisionPoly_GetNormalF(poly, &lnx, &lny, &lnz);
+            if (fabsf(lnx) > 0.5f) {
+                sStaticPolyBox[i].flags |= STATICPOLY_LINE_X;
+            }
+            if (fabsf(lny) > 0.5f) {
+                sStaticPolyBox[i].flags |= STATICPOLY_LINE_Y;
+            }
+            if (fabsf(lnz) > 0.5f) {
+                sStaticPolyBox[i].flags |= STATICPOLY_LINE_Z;
+            }
+        }
+        // collision-opt: what the wall search computed for each wall it reached (BgCheck_SphVsStaticWallImpl), with
+        // the same expressions: the same floats
+        {
+            f32 nx = COLPOLY_GET_NORMAL(poly->normal.x);
+            f32 nz = COLPOLY_GET_NORMAL(poly->normal.z);
+            f32 normalXZ = sqrtf(SQ(nx) + SQ(nz));
+
+            if (normalXZ == 0.0f) {
+                sStaticPolyBox[i].invNormalXZ = 0.0f;
+                sStaticPolyBox[i].flags |= STATICPOLY_NO_XZ;
+                // (a wall like this, in a wall list (StaticLookup_AddPoly): the wall search as it was)
+                if ((poly->normal.y <= COLPOLY_SNORMAL(0.5f)) && (poly->normal.y >= COLPOLY_SNORMAL(-0.8f))) {
+                    sWallRecordsUsable = false;
+                }
+            } else {
+                f32 invNormalXZ = 1.0f / normalXZ;
+
+                sStaticPolyBox[i].invNormalXZ = invNormalXZ;
+                if ((fabsf(nz) * invNormalXZ) < 0.4f) {
+                    sStaticPolyBox[i].flags |= STATICPOLY_STEEP_FOR_Z;
+                }
+                if ((fabsf(nx) * invNormalXZ) < 0.4f) {
+                    sStaticPolyBox[i].flags |= STATICPOLY_STEEP_FOR_X;
+                }
+            }
+        }
+    }
+}
+
 void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader* colHeader) {
     static BgCheckSceneSubdivisionEntry sceneSubdivisionList[] = {
         { SCENE_SHADOW_TEMPLE, { 23, 7, 14 }, -1 },
@@ -1982,38 +2822,11 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
         bzero(sWallCache, sizeof(sWallCache));
         sFloorCacheGen = 1;
     }
-    // fishmod: the scene's vertices as floats, once (CollisionPoly_GetVertices)
+    // collision-opt: no tables for this scene's collision until BgCheck_MakeStaticTables makes them (after the lookup)
     sStaticVtxS = colHeader->vtxList;
-    sStaticVtxF = GAME_STATE_ALLOC(&play->state, colHeader->numVertices * sizeof(Vec3f), "../z_bgcheck.c", __LINE__);
-    if (sStaticVtxF != NULL) {
-        s32 i;
-
-        for (i = 0; i < colHeader->numVertices; i++) {
-            BgCheck_Vec3sToVec3f(&colHeader->vtxList[i], &sStaticVtxF[i]);
-        }
-    }
-    // fishmod: each poly's box on the ground (the floor check's early out)
-    sStaticPolyBox = GAME_STATE_ALLOC(&play->state, colHeader->numPolygons * sizeof(StaticPolyBox) + 15,
-                                      "../z_bgcheck.c", __LINE__);
-    if (sStaticPolyBox != NULL) {
-        sStaticPolyBox = (StaticPolyBox*)ALIGN16((uintptr_t)sStaticPolyBox); // (a record a cache line)
-        s32 i;
-
-        for (i = 0; i < colHeader->numPolygons; i++) {
-            CollisionPoly* poly = &colHeader->polyList[i];
-            Vec3s* va = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIA)];
-            Vec3s* vb = &colHeader->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIB)];
-            Vec3s* vc = &colHeader->vtxList[poly->vIC];
-
-            sStaticPolyBox[i].minZ = MIN(MIN(va->z, vb->z), vc->z);
-            sStaticPolyBox[i].maxZ = MAX(MAX(va->z, vb->z), vc->z);
-            sStaticPolyBox[i].minX = MIN(MIN(va->x, vb->x), vc->x);
-            sStaticPolyBox[i].maxX = MAX(MAX(va->x, vb->x), vc->x);
-            sStaticPolyBox[i].minY = MIN(MIN(va->y, vb->y), vc->y);
-            sStaticPolyBox[i].flags = (poly->flags_vIA & 0xE000) | ((poly->normal.y < 0) ? 1 : 0);
-            sStaticPolyBox[i].pad = 0;
-        }
-    }
+    sStaticVtxF = NULL;
+    sStaticPolyBox = NULL;
+    sSubCellOf = NULL;
     customNodeListMax = -1;
 
     PRINTF(T("/*---------------- BGCheck バッファーメモリサイズ -------------*/\n",
@@ -2117,6 +2930,8 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
 #ifndef FISHMOD_NO_COMPACT_LISTS
     BgCheck_CompactStaticLists(colCtx);
 #endif
+    BgCheck_MakeStaticTables(colCtx, play, colCtx->colHeader);
+    BgCheck_MakeSubIndex(colCtx, play);
 #if FISHMOD_DEBUG
     Fishmod_DebugColNodes(play->sceneId, colCtx->polyNodes.count, colCtx->polyNodes.max);
 #endif
@@ -2315,6 +3130,8 @@ static f32 BgCheck_RaycastDownImplBody(PlayState* play, CollisionContext* colCtx
             yIntersect = e->result;
             *outPoly = e->poly;
         } else {
+            // collision-opt: the short way first (BgCheck_RaycastDownFast); the search as it was if it has no answer
+            if (!BgCheck_RaycastDownFast(colCtx, xpFlags, outPoly, pos, downChkFlags, chkDist, &yIntersect))
             while (true) {
                 if (checkPos.y < colCtx->minBounds.y) {
                     break;
@@ -2355,14 +3172,24 @@ static f32 BgCheck_RaycastDownImplBody(PlayState* play, CollisionContext* colCtx
     dynaRaycastDown.downChkFlags = downChkFlags;
     dynaRaycastDown.chkDist = chkDist;
 
-    yIntersectDyna = BgCheck_RaycastDownDyna(&dynaRaycastDown);
+    // collision-opt: the platforms only when the point is in a slot's reach (else their search finds nothing)
+    if (DynaPoly_PointInAnyReach(pos)) {
+        yIntersectDyna = BgCheck_RaycastDownDyna(&dynaRaycastDown);
 
-    if (yIntersect < yIntersectDyna) {
-        yIntersect = yIntersectDyna;
+        if (yIntersect < yIntersectDyna) {
+            yIntersect = yIntersectDyna;
+        }
     }
 
-    if (yIntersect != BGCHECK_Y_MIN && SurfaceType_IsSoft(colCtx, *outPoly, *outBgId)) {
-        yIntersect -= 1.0f;
+    // (a scene poly's softness from its record: what SurfaceType_IsSoft answers for it)
+    if (yIntersect != BGCHECK_Y_MIN) {
+        if ((*outBgId == BGCHECK_SCENE) && (sStaticPolyBox != NULL) && (*outPoly != NULL)) {
+            if (sStaticPolyBox[*outPoly - colCtx->colHeader->polyList].flags & STATICPOLY_SOFT) {
+                yIntersect -= 1.0f;
+            }
+        } else if (SurfaceType_IsSoft(colCtx, *outPoly, *outBgId)) {
+            yIntersect -= 1.0f;
+        }
     }
     return yIntersect;
 }
@@ -2971,7 +3798,11 @@ static s32 BgCheck_CheckLineImplBody(CollisionContext* colCtx, u16 xpFlags1, u16
                 sectorMax.x = colCtx->subdivLength.x + sectorMin.x;
 
                 for (k = subdivMin[0]; k < subdivMax[0] + 1; k++) {
-                    if (Math3D_LineVsCube(&sectorMin, &sectorMax, posA, &posBTemp) == true &&
+                    // collision-opt: a cell with none of the lists the test looks at is passed over before the line
+                    // is tested against its cube (BgCheck_CheckLineInSubdivision would test nothing there, and the
+                    // cube test has no effects): the same answers
+                    if (BgCheck_LookupHasLineLists(lookup, bccFlags) &&
+                        Math3D_LineVsCube(&sectorMin, &sectorMax, posA, &posBTemp) == true &&
                         BgCheck_CheckLineInSubdivision(lookup, colCtx, xpFlags1, xpFlags2, posA, &posBTemp, posResult,
                                                        outPoly, chkDist, &distSq, bccFlags)) {
                         result = true;
@@ -3444,6 +4275,8 @@ void DynaPoly_Init(PlayState* play, DynaCollisionContext* dyna) {
 void DynaPoly_Alloc(PlayState* play, DynaCollisionContext* dyna) {
     s32 i;
 
+    sDynaReachValid = false;
+
     for (i = 0; i < BG_ACTOR_MAX; i++) {
         BgActor_Initialize(play, &dyna->bgActors[i]);
         dyna->bgActorFlags[i] = 0;
@@ -3488,6 +4321,7 @@ s32 DynaPoly_SetBgActor(UNUSED PlayState* play, DynaCollisionContext* dyna, Acto
 
     BgActor_SetActor(&dyna->bgActors[bgId], actor, colHeader);
     dyna->bitFlag |= DYNAPOLY_INVALIDATE_LOOKUP;
+    sDynaReachValid = false; // (this slot's sphere isn't made until DynaPoly_UpdateContext)
     sDynaActorBits[DynaPoly_ActorBit(actor) >> 5] |= 1u << (DynaPoly_ActorBit(actor) & 31);
 
     dyna->bgActorFlags[bgId] &= ~BGACTOR_1;
@@ -3808,6 +4642,7 @@ void DynaPoly_UpdateContext(PlayState* play, DynaCollisionContext* dyna) {
     s32 i;
 
     DynaSSNodeList_ResetCount(&dyna->polyNodes);
+    sDynaReachValid = false;
 
     for (i = 0; i < BG_ACTOR_MAX; i++) {
         DynaLookup_ResetLists(&dyna->bgActors[i].dynaLookup);
@@ -3848,6 +4683,22 @@ void DynaPoly_UpdateContext(PlayState* play, DynaCollisionContext* dyna) {
         }
     }
     dyna->bitFlag &= ~DYNAPOLY_INVALIDATE_LOOKUP;
+    // collision-opt: the slots' reach (sDynaReach): each sphere's box, 2 units wider (the searches' own tests are in
+    // floats of these 16-bit values: a point more than a unit out of the box is out of the sphere, whatever the rounding)
+    for (i = 0; i < sDynaHighWater; i++) {
+        Sphere16* sph = &dyna->bgActors[i].boundingSphere;
+        s32 r = ABS(sph->radius) + 2;
+
+        sDynaReach[i].minX = sph->center.x - r;
+        sDynaReach[i].maxX = sph->center.x + r;
+        sDynaReach[i].minZ = sph->center.z - r;
+        sDynaReach[i].maxZ = sph->center.z + r;
+        sDynaReach16[i].minX = CLAMP(sph->center.x - (r + 1), -0x8000, 0x7FFF);
+        sDynaReach16[i].maxX = CLAMP(sph->center.x + (r + 1), -0x8000, 0x7FFF);
+        sDynaReach16[i].minZ = CLAMP(sph->center.z - (r + 1), -0x8000, 0x7FFF);
+        sDynaReach16[i].maxZ = CLAMP(sph->center.z + (r + 1), -0x8000, 0x7FFF);
+    }
+    sDynaReachValid = true;
     // (the slot holders' bits made again: the slots in use now)
     sDynaActorBits[0] = sDynaActorBits[1] = 0;
     for (i = 0; i < sDynaHighWater; i++) {
@@ -3959,6 +4810,10 @@ f32 BgCheck_RaycastDownDyna(DynaRaycastDown* dynaRaycastDown) {
     *dynaRaycastDown->bgId = BGCHECK_SCENE;
 
     for (i = 0; i < sDynaHighWater; i++) {
+        if (DYNA_OUT_OF_REACH(i, dynaRaycastDown->pos->x, dynaRaycastDown->pos->x, dynaRaycastDown->pos->z,
+                              dynaRaycastDown->pos->z)) {
+            continue; // (collision-opt: its Math3D_XZInSphere below would turn the point away)
+        }
         if (!(dynaRaycastDown->colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE)) {
             continue;
         }
@@ -4267,6 +5122,10 @@ s32 BgCheck_SphVsDynaWall(CollisionContext* colCtx, u16 xpFlags, f32* outX, f32*
     resultPos = *pos;
 
     for (i = 0; i < sDynaHighWater; i++) {
+        if (DYNA_OUT_OF_REACH(i, resultPos.x - (radius + 1.0f), resultPos.x + (radius + 1.0f),
+                              resultPos.z - (radius + 1.0f), resultPos.z + (radius + 1.0f))) {
+            continue; // (collision-opt: SQ(r) < SQ(dx) + SQ(dz) below would turn it away, r the two radii's sum)
+        }
         if (!(colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE)) {
             continue;
         }
@@ -4386,6 +5245,9 @@ s32 BgCheck_CheckDynaCeiling(CollisionContext* colCtx, u16 xpFlags, f32* outY, V
     resultY = tempY;
 
     for (i = 0; i < sDynaHighWater; i++) {
+        if (DYNA_OUT_OF_REACH(i, pos->x, pos->x, pos->z, pos->z)) {
+            continue; // (collision-opt: its Math3D_XZInSphere below would turn the point away)
+        }
         if (!(colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE)) {
             continue;
         }
@@ -4521,6 +5383,11 @@ s32 BgCheck_CheckLineAgainstDyna(CollisionContext* colCtx, u16 xpFlags, Vec3f* p
     f32 by;
 
     for (i = 0; i < sDynaHighWater; i++) {
+        // collision-opt: Math3D_LineVsSph below is only true for a point of the segment within the sphere
+        if (DYNA_OUT_OF_REACH(i, ((posA->x < posB->x) ? posA->x : posB->x), ((posA->x < posB->x) ? posB->x : posA->x),
+                              ((posA->z < posB->z) ? posA->z : posB->z), ((posA->z < posB->z) ? posB->z : posA->z))) {
+            continue;
+        }
         if (colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE) {
             if (actor != colCtx->dyna.bgActors[i].actor) {
                 ay = posA->y;
@@ -4626,6 +5493,11 @@ s32 BgCheck_SphVsFirstDynaPoly(CollisionContext* colCtx, u16 xpFlags, CollisionP
     Sphere16 testSphere;
 
     for (i = 0; i < sDynaHighWater; i++) {
+        if ((fabsf(center->x) < 30000.0f) && (fabsf(center->z) < 30000.0f) && (radius >= 0.0f) && (radius < 30000.0f) &&
+            DYNA_OUT_OF_REACH(i, center->x - (radius + 3.0f), center->x + (radius + 3.0f), center->z - (radius + 3.0f),
+                              center->z + (radius + 3.0f))) {
+            continue; // (collision-opt: Math3D_SphVsSph below would find the spheres apart)
+        }
         if (!(colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE)) {
             continue;
         }

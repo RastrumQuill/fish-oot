@@ -23,6 +23,7 @@ Usage: tools/meshpack.py SRC_TREE OUT_TREE [--report]
 """
 import collections
 import os
+import random
 import re
 import shutil
 import sys
@@ -56,10 +57,117 @@ if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
 GREY_CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_scene", ["spot06_scene_000170B8_Tex"])]
 if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
     GREY_CAUSTICS = []
-# Water fog (fishmod.c Fishmod_WaterFog): the relit vertices under the surface, each with the colour that, times its
-# texture's mean, is the water's (the CPU blends each one's lit colour towards the water by the eye's ray through the
-# water to it: a fog in the vertex colours, the scene's own distance fog left as it is)
+# Water fog (fishmod.c Fishmod_WaterFogBands): the camera-under-water fog seen from above, done by the RSP's own fog.
+# The cut pieces' triangles under the surface are split at these depths into bands (the first: the surface itself;
+# the parts above it stay as they were), each band's lists called after a list of segment 0x0A's (after the caustic
+# steps) that sets the fog for that band: the fog over the share of the view's ray inside the water at the band's
+# depth, as the RSP's own distance fog with its two numbers scaled (and the water's colour); then a list setting the
+# scene's fog back. Scene_DrawConfigLakeHylia makes the lists each frame (empty with the camera under water, the lake
+# drained, or the bench's NOWATERFOG).
 WATER_FOG = not os.environ.get("MESHPACK_NO_WATER_FOG")
+WATER_BANDS = [0, 12, 30, 60, 100, 160, 250, 400]   # each band's top, by depth under the surface
+# (the game's band lists: these 8, by their middles' depths, fishmod.c sWaterBandMid)
+GAME_BAND_MID = [6, 21, 45, 80, 130, 205, 325, 520]
+# tests: MESHPACK_FOG_BANDS="0,30,100,250" cuts at fewer depths (each band's fog the game's list nearest its middle);
+# uncut (the default): each whole triangle in the band of its middle's depth
+if os.environ.get("MESHPACK_FOG_BANDS"):
+    WATER_BANDS = [int(x) for x in os.environ["MESHPACK_FOG_BANDS"].split(",")]
+# (the default since rc1: the cuts made long thin slivers, each scanline of each a triangle setup for the RDP: the
+# console's frames28 set, 8 cut bands 54% hitches and 17.2 fps, uncut 32% and 18.2 fps, no bed fog at all 30-31%.
+# MESHPACK_FOG_CUT=1 cuts again)
+FOG_NOCUT = not os.environ.get("MESHPACK_FOG_CUT")
+
+
+def game_band(k):
+    """the game's band list for this band (by the depth of its middle)"""
+    top = WATER_BANDS[k]
+    bottom = WATER_BANDS[k + 1] if k + 1 < len(WATER_BANDS) else top + 250
+    mid = (top + bottom) / 2.0
+    return min(range(len(GAME_BAND_MID)), key=lambda i: abs(GAME_BAND_MID[i] - mid))
+FOG_SEG_BASE = 0x0A000000 + 3 * 16                    # (after the three caustic steps, two commands each)
+
+
+def fog_band_call(k):
+    return "gsSPDisplayList(0x%08X)" % (FOG_SEG_BASE + game_band(k) * 32)
+
+
+FOG_OFF_CALL = "gsSPDisplayList(0x%08X)" % (FOG_SEG_BASE + len(GAME_BAND_MID) * 32)
+FOG_CALLS = {fog_band_call(k) for k in range(len(WATER_BANDS))} | {FOG_OFF_CALL}
+
+
+def _sb(v):
+    v = int(v, 0) & 0xFF
+    return v - 256 if v > 127 else v
+
+
+def lerp_vtx(a, b, f, lit):
+    """the vertex f of the way from a to b (a and b in a fixed order, so an edge two triangles share is cut at the
+    same point in both: no crack); a lit vertex's normal interpolated and kept its length, else its colour"""
+    if a > b:
+        a, b, f = b, a, 1.0 - f
+    ia = [int(x, 0) for x in a]
+    ib = [int(x, 0) for x in b]
+    out = [round(ia[i] + (ib[i] - ia[i]) * f) for i in range(5)]
+    if lit:
+        na = [_sb(x) for x in a[5:8]]
+        nb = [_sb(x) for x in b[5:8]]
+        n = [na[i] + (nb[i] - na[i]) * f for i in range(3)]
+        ln = max(1e-6, sum(x * x for x in n) ** 0.5)
+        want = max(sum(x * x for x in na) ** 0.5, sum(x * x for x in nb) ** 0.5)
+        out += [round(x * want / ln) & 0xFF for x in n]
+    else:
+        out += [round(ia[i] + (ib[i] - ia[i]) * f) for i in range(5, 8)]
+    out.append(round(ia[8] + (ib[8] - ia[8]) * f))
+    v = tuple(str(x) for x in out)
+    ORIGIN.setdefault(v, ORIGIN.get(a if f < 0.5 else b))
+    return v
+
+
+def clip_poly(poly, y0, lit):
+    """the polygon's parts at or over height y0 and under it"""
+    above, below = [], []
+    n = len(poly)
+    for i in range(n):
+        p, q = poly[i], poly[(i + 1) % n]
+        yp, yq = int(p[1], 0), int(q[1], 0)
+        (above if yp >= y0 else below).append(p)
+        if (yp >= y0) != (yq >= y0):
+            m = lerp_vtx(p, q, (y0 - yp) / float(yq - yp), lit)
+            above.append(m)
+            below.append(m)
+    return above, below
+
+
+def band_split(tri, lit):
+    """the triangle's parts by band: [(band (-1: over the surface), triangle)]"""
+    if FOG_NOCUT:
+        d = WATER_Y - sum(int(v[1], 0) for v in tri) / 3.0
+        b = -1
+        for k, top in enumerate(WATER_BANDS):
+            if d > top:
+                b = k
+        return [(b, tuple(tri))]
+    out = []
+    poly = list(tri)
+    for k, d in enumerate(WATER_BANDS):
+        above, below = clip_poly(poly, WATER_Y - d, lit)
+        if len(above) >= 3:
+            out += [(k - 1, (above[0], above[i], above[i + 1])) for i in range(1, len(above) - 1)]
+        poly = below
+        if len(poly) < 3:
+            return out
+    out += [(len(WATER_BANDS) - 1, (poly[0], poly[i], poly[i + 1])) for i in range(1, len(poly) - 1)]
+    return out
+
+
+def tri_area(t):
+    p = [[int(v[i], 0) for i in range(3)] for v in t]
+    u = [p[1][i] - p[0][i] for i in range(3)]
+    w = [p[2][i] - p[0][i] for i in range(3)]
+    c = (u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0])
+    return 0.5 * sum(x * x for x in c) ** 0.5
+
+
 RELIGHT = {"spot06_room_0"}  # rooms whose lit pieces read their vertices lit by the CPU (segment RELIT_SEG)
 if os.environ.get("MESHPACK_NO_RELIGHT"):  # (a test: the areas without the CPU's lighting)
     RELIGHT = set()
@@ -369,6 +477,13 @@ def cut_by_material(dl, stream, tris, cells, order):
     by_state = collections.OrderedDict()
     for t in tris:  # (the original order: the state points ascending)
         by_state.setdefault(t[0], collections.defaultdict(list))[area_of[id(t)]].append(t)
+    # each state point's lighting (G_LIGHTING as the piece's state has it there): a split vertex's normal or colour
+    lit_at, lit = {}, None
+    for j, c in enumerate(stream + [None]):
+        lit_at[j] = lit
+        if c is not None and name_of(c) in ("gsSPSetGeometryMode", "gsSPClearGeometryMode") and \
+                "G_LIGHTING" in [x.strip() for x in args_of(c)[0].split("|")]:
+            lit = name_of(c) == "gsSPSetGeometryMode"
     sub_dls, sub_vtx, new_dl = [], [], []
     sub_state = []  # (each area list, the state point it's drawn at)
     emitted = 0
@@ -376,8 +491,16 @@ def cut_by_material(dl, stream, tris, cells, order):
         new_dl.extend(stream[emitted:k])
         emitted = k
         for ai in sorted(areas):
-            parts = [(areas[ai], False, "")]
-            for ts, under, suffix in parts:
+            if WATER_FOG and any(min(int(v[1], 0) for v in t[1]) < WATER_Y for t in areas[ai]):
+                by_band = collections.defaultdict(list)
+                for t in areas[ai]:
+                    for b, piece in band_split(t[1], lit_at[t[0]]):
+                        by_band[b].append((t[0], piece, t[2], t[3]))
+                parts = [(by_band[b], b, "" if b < 0 else "b%d" % b) for b in sorted(by_band)]
+            else:
+                parts = [(areas[ai], -1, "")]
+            wet = False
+            for ts, band, suffix in parts:
                 name = "%s_mp%d_%d%s" % (dl, ai, mi, suffix)
                 vname = name + "_Vtx"
                 vtx = []
@@ -396,7 +519,12 @@ def cut_by_material(dl, stream, tris, cells, order):
                 sub_dls.append((name, out))
                 sub_vtx.append((vname, vtx))
                 sub_state.append((name, k))
+                if band >= 0:
+                    new_dl.append(fog_band_call(band))  # (that band's fog)
+                    wet = True
                 new_dl.append("gsSPDisplayList(%s)" % name)
+            if wet:
+                new_dl.append(FOG_OFF_CALL)  # (the scene's fog again)
     new_dl.extend(stream[emitted:])
     new_dl.append("gsSPEndDisplayList()")
     # check: walking the piece's list, every state command of the original once and in order, and every triangle
@@ -407,6 +535,8 @@ def cut_by_material(dl, stream, tris, cells, order):
     n_state = 0
     for it in new_dl[:-1]:
         nm = name_of(it)
+        if it in FOG_CALLS:
+            continue  # (the water fog's lists: no state of the piece's)
         if nm == "gsSPDisplayList" and args_of(it)[0] in subs:
             name = args_of(it)[0]
             sl = [None] * 64
@@ -432,14 +562,14 @@ def cut_by_material(dl, stream, tris, cells, order):
         return None, "check: %d of %d state commands" % (n_state, len(stream))
     want = collections.Counter((t[0], t[1]) for t in tris)
     if got != want:
-        return None, "check: the triangles differ"
-    # each area list's lighting where it's called (G_LIGHTING as the piece's state has it there)
-    lit_at, lit = {}, None
-    for j, c in enumerate(stream + [None]):
-        lit_at[j] = lit
-        if c is not None and name_of(c) in ("gsSPSetGeometryMode", "gsSPClearGeometryMode") and \
-                "G_LIGHTING" in [x.strip() for x in args_of(c)[0].split("|")]:
-            lit = name_of(c) == "gsSPSetGeometryMode"
+        # (split at the water's bands: the same surface after each state point, in its pieces)
+        ga, wa = collections.defaultdict(float), collections.defaultdict(float)
+        for (k, t), c in got.items():
+            ga[k] += tri_area(t) * c
+        for (k, t), c in want.items():
+            wa[k] += tri_area(t) * c
+        if not WATER_FOG or any(abs(ga[k] - wa[k]) > 0.002 * wa[k] + 4 for k in set(ga) | set(wa)):
+            return None, "check: the triangles differ"
     entry_lit = {}
     for name, k in sub_state:
         entry_lit[name] = lit_at[k]
@@ -649,78 +779,108 @@ def unsize(dirpath, room, dl):
             open(p, "w").write(new)
 
 
-def relit_means(d, pieces, areas):
-    """Each relit vertex's texture's mean colour (r, g, b), 0-255, as its combiner's first cycle makes it from its
-    textures' means (of the texels seen: by their alpha), the primitive and environment colours (the shade as 1, the
-    environment's alpha as 1: the lake bed's caustics faded out, deep down, its sand): the pieces walked in order,
-    into the lists they call."""
-    cache = {}
+# The lake's water surface (object_spot06_objects: gLakeHyliaHighWaterDL, gLakeHyliaLowWaterDL), its texture and
+# material made again from vanilla's: its 32x32 colour texture (2 KB) as the template, its brightness upscaled to a 64x64
+# intensity texture (I4: the same 2 KB, 4 times the texels), its two layers at vanilla's sizes on the water (a ripple
+# every 77 units, the second layer every 154, mirrored) with twice the texels, each scrolled its own way
+# (z_bg_spot06_objects.c). The colour is the frame's: the waves move it from vanilla's darkest colour (the
+# environment's) to its brightest (the primitive's), in the scene's light (fishmod_water_colours.h, written here); the
+# alpha is vanilla's, one value over the whole surface (the environment's). MESHPACK_NO_WATER_SURFACE=1: vanilla's.
+WATER_SURFACE = not os.environ.get("MESHPACK_NO_WATER_SURFACE")
+WATER_DIR = "assets/objects/object_spot06_objects"
+WATER_TEX = "gLakeHyliaWaterTex"
+WATER_W = 64
 
-    def tex_mean(t):
-        if t not in cache:
-            cache[t] = None
-            for f in os.listdir(d):
-                if f.startswith(t + ".") and f.endswith(".png"):
-                    import numpy as np
-                    from PIL import Image
-                    im = np.asarray(Image.open(os.path.join(d, f)).convert("RGBA"), float).reshape(-1, 4)
-                    w = im[:, 3] if im[:, 3].sum() > 0 else np.ones(len(im))
-                    cache[t] = tuple((im[:, :3] * w[:, None]).sum(0) / w.sum() / 255.0)  # (the texels seen)
-                    break
-        return cache[t]
 
-    out = {}
-    state = {"tiles": {}, "comb": ("0", "0", "0", "TEXEL0"), "PRIMITIVE": (1.0,) * 3, "ENVIRONMENT": (1.0,) * 3}
+def water_texture(src_png, path):
+    """the waves: vanilla's own texture as the template, its brightness (its colour is the frame's now: z_bg_spot06_
+    objects.c) upscaled to 64x64 (tiled 3 x 3 first, so the edges join as they did), 4-bit grey; and the base and
+    highlight colours it's drawn between, fitted to vanilla's (below)"""
+    import numpy as np
+    from PIL import Image
+    im = np.asarray(Image.open(src_png).convert("RGB"), float)
+    lum = im @ np.array([0.299, 0.587, 0.114])
+    n = im.shape[0]
+    big = Image.fromarray(np.tile(lum, (3, 3)).astype(np.float32), "F").resize((WATER_W * 3, WATER_W * 3),
+                                                                                 Image.BICUBIC)
+    h = np.asarray(big)[WATER_W:2 * WATER_W, WATER_W:2 * WATER_W]
+    h = np.clip((h - h.min()) / max(h.max() - h.min(), 1e-6), 0, 1)
+    v = np.round(h * 15).astype(np.uint8) * 17
+    Image.fromarray(v, "L").save(path)
+    # the base and highlight: vanilla's colour against its brightness, a line fitted per channel through its texels as
+    # the game shows them (its two layers averaged, at many offsets), taken at the darkest and brightest brightness
+    # (the texture's 0 and 1): the waves' colours then go as vanilla's do (within about 4 of 255)
+    rng = np.random.default_rng(1)
+    cols = []
+    lums = []
+    for _ in range(64):
+        dy, dx = rng.integers(0, n, 2)
+        cols.append(((im + np.roll(im, (dy, dx), (0, 1))) / 2).reshape(-1, 3))
+        lums.append(((lum + np.roll(lum, (dy, dx), (0, 1))) / 2).ravel())
+    cols = np.concatenate(cols)
+    lums = np.concatenate(lums)
+    coef = np.linalg.lstsq(np.stack([np.ones_like(lums), lums], 1), cols, rcond=None)[0]
+    low = np.clip(coef[0] + coef[1] * lum.min(), 0, 255)
+    high = np.clip(coef[0] + coef[1] * lum.max(), 0, 255)
+    mean = im.reshape(-1, 3).mean(0)
+    return ([int(round(c)) for c in low], [int(round(c)) for c in high], [int(round(c)) for c in mean])
 
-    def value(x):
-        if x in ("TEXEL0", "TEXEL1"):
-            m = state["tiles"].get(0 if x == "TEXEL0" else 1)
-            m = tex_mean(m) if m else None
-            return m or (0.5, 0.5, 0.5)
-        if x == "0":
-            return (0.0, 0.0, 0.0)
-        if x in ("PRIMITIVE", "ENVIRONMENT"):
-            return state[x]
-        return (1.0, 1.0, 1.0)  # (shade, primitive, environment, their alphas, 1, ...)
 
-    def mean():
-        a, b, c, dd = (value(x) for x in state["comb"])
-        return tuple(max(0, min(255, round(((a[k] - b[k]) * c[k] + dd[k]) * 255))) for k in range(3))
+WATER_MATERIAL_OLD = re.compile(r"gsDPLoadTextureBlock\(gLakeHyliaWaterTex,.*?gsSPSetGeometryMode\(G_FOG \| G_LIGHTING\),",
+                                re.S)
+WATER_MATERIAL = (
+    "gsDPLoadTextureBlock_4b(gLakeHyliaWaterTex, G_IM_FMT_I, 64, 64, 0, G_TX_NOMIRROR | G_TX_WRAP, "
+    "G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 13, 13),\n"
+    "    gsDPTileSync(),\n"
+    "    gsDPSetTile(G_IM_FMT_I, G_IM_SIZ_4b, 4, 0x0000, 1, 0, G_TX_MIRROR | G_TX_WRAP, 6, 14, "
+    "G_TX_MIRROR | G_TX_WRAP, 6, 14),\n"
+    "    gsDPSetTileSize(1, 0, 0, 0x00FC, 0x00FC),\n"
+    "    gsDPSetCombineLERP(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, PRIMITIVE, "
+    "ENVIRONMENT, COMBINED, ENVIRONMENT, 0, 0, 0, ENVIRONMENT),\n"
+    "    gsDPSetRenderMode(G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2),\n"
+    "    gsSPClearGeometryMode(G_CULL_BACK | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR | G_LIGHTING),\n"
+    "    gsSPSetGeometryMode(G_FOG),")
 
-    seen = set()
 
-    def walk(cmds):
-        for c in cmds:
-            n = name_of(c)
-            a = args_of(c) if "(" in c else []
-            if n in ("gsDPLoadTextureBlock", "gsDPLoadTextureBlock_4b"):
-                state["tiles"][0] = a[0].strip()
-            elif n in ("gsDPLoadMultiBlock", "gsDPLoadMultiBlock_4b"):
-                state["tiles"][int(a[2], 0)] = a[0].strip()
-            elif n == "gsDPSetCombineLERP":
-                state["comb"] = tuple(x.strip() for x in a[:4])
-            elif n in ("gsDPSetPrimColor", "gsDPSetEnvColor"):
-                rgb = [int(x, 0) / 255.0 for x in a[-4:-1]]
-                state["PRIMITIVE" if n == "gsDPSetPrimColor" else "ENVIRONMENT"] = tuple(rgb)
-            elif n == "gsDPSetCombineMode":
-                state["comb"] = ("0", "0", "0", "TEXEL0")
-            elif n == "gsSPVertex" and "(Vtx*)0x" in c:
-                off = (int(a[0].split("0x")[1].rstrip(")"), 16) & 0xFFFFFF) // 16
-                m = mean()
-                for i in range(off, off + int(a[1], 0)):
-                    out.setdefault(i, m)
-            elif n == "gsSPDisplayList":
-                t = a[0].strip()
-                if t in areas:
-                    walk(areas[t])
-                elif t in pieces:
-                    walk(pieces[t])
-                elif re.fullmatch(r"\w+", t) and t not in seen and os.path.exists(os.path.join(d, t + ".inc.c")):
-                    seen.add(t)  # (a scene material list: its state)
-                    walk(split_items(open(os.path.join(d, t + ".inc.c")).read()))
-    for cmds in pieces.values():
-        walk(cmds)
-    return out
+def water_surface(out):
+    d = os.path.join(out, WATER_DIR)
+    n = 0
+    for dl in ("gLakeHyliaHighWaterDL", "gLakeHyliaLowWaterDL"):
+        p = os.path.join(d, dl + ".inc.c")
+        t = open(p).read()
+        t2, k = WATER_MATERIAL_OLD.subn(WATER_MATERIAL, t)
+        if k != 1:
+            sys.exit("meshpack: %s's material not as expected" % dl)
+        # (the colours and alphas are the frame's, in the scroll lists of segments 8 and 9: the list's own go)
+        t2 = re.sub(r"\s*gsDPSetPrimColor\(0, 0, 255, 255, 255, \d+\),", "", t2)
+        os.remove(p)
+        open(p, "w").write(t2)
+        n += 1
+    template = os.path.join(d, WATER_TEX + ".rgba16.png")
+    out_png = os.path.join(d, WATER_TEX + ".i4.png")
+    tmp = out_png + ".tmp.png"
+    low, high, mean = water_texture(template, tmp)
+    for f in os.listdir(d):
+        if f.startswith(WATER_TEX + ".") and not f.endswith(".tmp.png"):
+            os.remove(os.path.join(d, f))
+    os.rename(tmp, out_png)
+    # (the base and highlight colours for the game: vanilla's own, by its darkest and brightest texels)
+    hp = os.path.join(d, "fishmod_water_colours.h")
+    open(hp, "w").write("// tools/meshpack.py: vanilla's water texture's darkest, brightest and average colours\n"
+                        "#define FISHMOD_WATER_BASE { %d, %d, %d }\n#define FISHMOD_WATER_HIGH { %d, %d, %d }\n"
+                        "#define FISHMOD_WATER_MEAN { %d, %d, %d }\n" % tuple(low + high + mean))
+    for f, a, b in (("object_spot06_objects.c", WATER_TEX + ".rgba16.inc.c", WATER_TEX + ".i4.inc.c"),
+                    ("object_spot06_objects.c", "gLakeHyliaWaterTex_HEIGHT, 16)]", "gLakeHyliaWaterTex_HEIGHT, 4)]"),
+                    ("object_spot06_objects.h", "gLakeHyliaWaterTex_WIDTH 32", "gLakeHyliaWaterTex_WIDTH 64"),
+                    ("object_spot06_objects.h", "gLakeHyliaWaterTex_HEIGHT 32", "gLakeHyliaWaterTex_HEIGHT 64"),
+                    ("object_spot06_objects.h", "gLakeHyliaWaterTex_HEIGHT, 16)]", "gLakeHyliaWaterTex_HEIGHT, 4)]")):
+        p = os.path.join(d, f)
+        t = open(p).read()
+        if a not in t:
+            sys.exit("meshpack: %s: %r not found" % (f, a))
+        os.remove(p)
+        open(p, "w").write(t.replace(a, b))
+    return n
 
 
 def main():
@@ -732,6 +892,10 @@ def main():
         shutil.rmtree(out)
     # a copy of the tree of hard links (the files changed below are written fresh, breaking their link)
     shutil.copytree(src, out, copy_function=os.link)
+    if WATER_SURFACE:
+        n = water_surface(out)
+        if report:
+            print("meshpack: the lake's water surface: %d lists, a 64x64 intensity texture of waves" % n)
     for scene_dir, scene, texs in GREY_CAUSTICS:
         dls = [dl for sd, _, ds in CAUSTICS if sd == scene_dir for dl in ds]
         n = grey_caustics(os.path.join(out, scene_dir), scene, texs, dls)
@@ -767,7 +931,6 @@ def main():
             if report:
                 print("meshpack: %s: %d triangles in %d areas, %d area lists" % (dl, ntri, nareas, len(area_dls)))
         table = None
-        fog_vtx = {}  # relit vertex index -> its texture's mean colour (the water fog's)
         if room in RELIGHT:
             # every piece of the room (cut or not) relit
             ent = [f for f in os.listdir(d) if f.startswith(room) and f.endswith("_CullableEntries.inc.c")]
@@ -793,14 +956,8 @@ def main():
             for n in lists:
                 if n in areas:
                     areas[n] = lists[n]
-            # the water fog's vertices: every relit one under the surface, with its texture's mean colour
-            means = relit_means(d, pieces, areas)
-            for i, v in enumerate(table):
-                if int(v[1]) < WATER_Y:
-                    fog_vtx[i] = means.get(i, (255, 255, 255))
             if report:
-                print("meshpack: %s: %d vertices lit by the CPU (segment 0x%02X), %d of them water-fogged" % (
-                    room, len(table), RELIT_SEG, len(fog_vtx)))
+                print("meshpack: %s: %d vertices lit by the CPU (segment 0x%02X)" % (room, len(table), RELIT_SEG))
         for dl, cmds in pieces.items():
             p = os.path.join(d, dl + ".inc.c")
             os.remove(p)  # (a hard link: written fresh)
@@ -830,18 +987,6 @@ def main():
                 "    &%s,\n" % ORIGIN[v] for v in table)))
             defs.append("void* %s_fishmodRelit[3] = { (void*)%d, %s_relitVtx, %s_relitSrc };\n" % (
                 room, len(table), room, room))
-            if WATER_FOG and fog_vtx:
-                # the water fog's table: the count and the colours' count, each colour's inverse (64 * 255 / mean, per
-                # channel: the water's colour times it, / 64, is the vertex colour that gives it), then each vertex's
-                # index and colour
-                mats = sorted(set(fog_vtx.values()))
-                # (at most twice: a dark texture with light marks, the pit's walls, would have its marks shine; it
-                # ends darker than the water instead)
-                inv = [min(128, round(64 * 255 / max(c, 16))) for m in mats for c in m]
-                pairs = [x for i in sorted(fog_vtx) for x in (i, mats.index(fog_vtx[i]))]
-                words = [len(fog_vtx), len(mats)] + inv + pairs
-                defs.append("u16 %s_fogVtx[] = { %s };\n" % (room, ", ".join(str(w) for w in words)))
-                defs.append("void* %s_fishmodFog[1] = { %s_fogVtx };\n" % (room, room))
         if not defs:
             continue
         rp = os.path.join(d, room + ".c")

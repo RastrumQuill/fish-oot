@@ -72,6 +72,14 @@ areas follow the rule.
 | Zora's Domain, Zora's Fountain | Large | Up to about 30 in |
 | Lake Hylia | Huge | Everything, including the record fish (36 in and up) |
 
+### A special fish at the ice block (to make)
+
+A kind of fish found only at the ice block by the way into Zora's Domain (Lake Hylia's Zora shortcut, blocked by ice
+in the adult years: object_spot06_objects' iceblock), and nowhere else. Its home is anchored to the block, as the other
+species' homes are to their cover (the sub-biomes above), with no range outside it. Not decided yet: what it is (a
+cold-water fish fits the ice), whether it's there only while the ice is (the adult years), how rare, its size, and
+what (if anything) catching it gives.
+
 ## Biome ideas (other areas)
 
 - **Grottos**: at least one grotto has a large body of water. Pale cave fish, fireflies as bait.

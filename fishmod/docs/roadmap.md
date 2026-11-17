@@ -8,6 +8,15 @@ plan after test 5; the sections after it are ideas for later, not being worked o
 Visual extras only go in if they don't cost performance. Each one gets measured in ares with the debug timing line
 (RSP/RDP, CPU update/draw, frame time) against the build without it, and it is dropped if the frame gets slower.
 
+## Rule: build time is free
+
+No amount of work before the game runs is too much: anything that can be worked out at build time is (packing
+textures, cutting and relighting meshes, baking collision, laying out data and code for the caches, tables in place
+of maths), however long the tools take. The compiler's output isn't sacred either: where it leaves something on the
+table (a quirk, a needless instruction, a bad layout), the assembly can be fixed after it's compiled, by a build step
+or by hand, as long as the result is checked (the same answers, the same sound, the same picture) like any other
+change. The cost that counts is the console's, at run time.
+
 ## Test5: biomes, time and behaviour
 
 The plan is in [v5-plan.md](v5-plan.md). Items:
