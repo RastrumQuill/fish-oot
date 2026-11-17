@@ -61,6 +61,43 @@ The list (sizes from a build where `Scatter_Touch` is its own routine; in the GC
 These were measured on the bench build with the sampler running, which inflates code fills (see input-replay.md,
 "Measure with the clean build"): the ranking should hold, the shares will come down. To be redone on a clean build.
 
+**What compiling for size saves (17 Nov)**
+
+The same ROM (`bench_clean --no-timers`) built three ways with GCC: everything at `-O2`; the mod's own files at `-Os`
+(`--mod-opt Os`); the whole game at `-Os` (`--gcc Os`).
+
+Whole code, as linked:
+
+| | `-O2` | `-Os` | saved |
+|---|---:|---:|---:|
+| the mod's overlay (`ovl_En_Fishmod`) | 139,456 | 124,000 | 11% |
+| the engine (`code`) | 962,336 | 848,256 | 12% |
+| Link (`ovl_player_actor`) | 175,136 | 128,656 | 27% |
+| the pause menu | 84,480 | 78,352 | 7% |
+
+Routine by routine in the mod it's mostly 10-20% (`EnFishmod_RigDraw` 4,184 to 3,308, `EnFishmod_ManagerUpdate` 3,304
+to 2,704, `EnFishmod_FishAI` with its swim routine 11,872 to 10,764). The props' family changes shape (at `-Os` the
+build routine is inlined into the draw and the touch code is split out) and comes to 24,468 against 21,976: 10%.
+
+What runs per call, from ares's exact profile of both over the bench's first three legs:
+
+| path | `-O2` | mod at `-Os` | saved |
+|---|---:|---:|---:|
+| the mod's whole draw (`EnFishmod_ManagerDraw` and below) | 33.4 KB | 31.9 KB | 4% |
+| `EnFishmod_ScatterDraw`, a call | 21.4 KB | 20.6 KB | 4% |
+| `EnFishmod_RigDraw`, a call | 5.2 KB | 4.9 KB | 6% |
+| `EnFishmod_FishAI`, a call | 4.2 KB | 4.1 KB | 2% |
+| `EnFishmod_Update`, a call | 2.5 KB | 2.4 KB | 4% |
+| `EnFishmod_SwimToward`, a call | 2.1 KB | 2.1 KB | 0% |
+| `EnFishmod_ManagerUpdate`, a call | 2.0 KB | 2.1 KB | none |
+
+So the flag takes a tenth off the mod on disk and 2-6% off the paths that matter. What `-Os` removes is mostly
+what wasn't running: copies made by inlining, padding, the cold ends of routines. The instructions on the hot paths
+are nearly the same ones. Nothing here moves a path across the 2 KB or 4 KB lines. (These paths are bigger than the
+lake table's above: this route walks through plants, so the touch code runs, and the timers are compiled out.)
+The whole game at `-Os` wasn't profiled; clang at `-Os` doesn't build this tree (an inline `cache` instruction in
+fishmod.c it rejects).
+
 **The engine**
 
 | what | size | how often | fills' share | reading |
