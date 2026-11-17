@@ -1,8 +1,8 @@
 diff --git a/ares/n64/cpu/cpu.cpp b/ares/n64/cpu/cpu.cpp
-index ec4a52d..0d8c859 100644
+index ec4a52d..82653d7 100644
 --- a/ares/n64/cpu/cpu.cpp
 +++ b/ares/n64/cpu/cpu.cpp
-@@ -121,7 +121,165 @@ auto CPU::interruptPoll() -> void {
+@@ -121,7 +121,199 @@ auto CPU::interruptPoll() -> void {
    }
  }
  
@@ -21,7 +21,7 @@ index ec4a52d..0d8c859 100644
 +static auto cpuProfWrite() -> void {
 +  string tmp{cpuProfPath, ".tmp"};
 +  if(auto fp = fopen(tmp, "wb")) {
-+    for(u32 n : range(0x200000)) {
++    for(u32 n : range(0x300000)) {
 +      auto& e = cpuProf[n];
 +      if(!e.instructions) continue;
 +      u32 head[2] = {0x80000000u + (n << 2), e.instructions};
@@ -90,7 +90,7 @@ index ec4a52d..0d8c859 100644
 +  }
 +  if(cpuProfPath) {
 +    if(!cpuProf) {
-+      cpuProf = (CpuProfEntry*)calloc(0x200000, sizeof(CpuProfEntry));
++      cpuProf = (CpuProfEntry*)calloc(0x300000, sizeof(CpuProfEntry));
 +      cpuProfLines = (u32*)calloc(0x80000 * 2, sizeof(u32));
 +      if(getenv("ARES_CPUPROF_LO")) cpuProfBytes = (u32*)calloc(0x800000 * 2, sizeof(u32));
 +      if(auto lo = getenv("ARES_CPUPROF_LO")) cpuProfLo = strtoul(lo, nullptr, 16);
@@ -100,7 +100,41 @@ index ec4a52d..0d8c859 100644
 +    auto imisses = profile.icacheMisses;
 +    bool result = instructionInner();
 +    if((pc >> 23) == (0xffffffff80000000ull >> 23)) {
-+      auto& e = cpuProf[(pc & 0x7fffff) >> 2];
++      //ARES_CPUPROF_OVL=<hex address of the game's map of loaded overlays>: code loaded at an address of its own
++      //each time (the game's overlays) is counted at the address it was linked for (0x80800000 up), so a profile
++      //of a whole play reads against the ELF. The map: u32 a count that changes with it, u32 entries, then
++      //entries of (u32 RAM address, u32 bytes, u32 linked address).
++      static const char* ovlEnv = getenv("ARES_CPUPROF_OVL");
++      u32 slot = (pc & 0x7fffff) >> 2;
++      if(ovlEnv) {
++        static u32 ovlAddr = strtoul(ovlEnv, nullptr, 16) & 0x7fffff, ovlGen = 0, ovlMin = 0, ovlMax = 0;
++        static u32 hitLo = 0, hitHi = 0, hitVram = 0, ovlN = 0;
++        static u32 ovl[512][3];
++        u32 gen = rdram.ram.read<Word>(ovlAddr, RBusDevice::ARES_DEBUGGER);
++        if(gen != ovlGen) {
++          ovlGen = gen; hitLo = hitHi = 0; ovlMin = ~0u; ovlMax = 0;
++          ovlN = min(512u, rdram.ram.read<Word>(ovlAddr + 4, RBusDevice::ARES_DEBUGGER));
++          for(u32 n : range(ovlN)) {
++            for(u32 k : range(3)) ovl[n][k] = rdram.ram.read<Word>(ovlAddr + 8 + n * 12 + k * 4, RBusDevice::ARES_DEBUGGER);
++            ovl[n][0] &= 0x7fffff;
++            ovlMin = min(ovlMin, ovl[n][0]); ovlMax = max(ovlMax, ovl[n][0] + ovl[n][1]);
++          }
++        }
++        u32 p = pc & 0x7fffff;
++        if(p >= ovlMin && p < ovlMax) {
++          if(p < hitLo || p >= hitHi) {
++            hitLo = hitHi = 0;
++            for(u32 n : range(ovlN)) if(p >= ovl[n][0] && p < ovl[n][0] + ovl[n][1]) {
++              hitLo = ovl[n][0]; hitHi = hitLo + ovl[n][1]; hitVram = ovl[n][2];
++            }
++          }
++          if(hitHi) {
++            u32 v = hitVram + (p - hitLo) - 0x80800000u;
++            if(v < 0x400000) slot = 0x200000 + (v >> 2);
++          }
++        }
++      }
++      auto& e = cpuProf[slot];
 +      e.instructions++; e.clocks += Thread::clock - clock;
 +      e.fills += cpuProfFills - fills; e.writebacks += cpuProfWritebacks - writebacks;
 +      e.ifills += profile.icacheMisses - imisses;
@@ -168,7 +202,7 @@ index ec4a52d..0d8c859 100644
    if(auto interrupts = scc.cause.interruptPending & scc.status.interruptMask) {
      if(scc.status.interruptEnable && !scc.status.exceptionLevel && !scc.status.errorLevel) {
        debugger.interrupt(scc.cause.interruptPending);
-@@ -145,7 +303,7 @@ auto CPU::instruction() -> bool {
+@@ -145,7 +337,7 @@ auto CPU::instruction() -> bool {
    auto access = devirtualize<Read, Word>(ipu.pc);
    if(!access) return true;
  

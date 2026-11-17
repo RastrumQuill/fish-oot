@@ -10,13 +10,16 @@ writes what the sweep's checks need:
 
     audio_sweep_report.py RUN_DIR --elf ELF            one run
     audio_sweep_report.py --compare REF_DIR NEW_DIR    two builds' reports of the same part, leg by leg
+    audio_sweep_report.py --syms ELF OUT.sym.gz        the ELF's symbols as a small file: wherever a run or a report
+                                                       takes an ELF it takes this instead (a worker without the
+                                                       188 MB ELF or the MIPS tools: fishmod/sweep/)
     audio_sweep_report.py --cover ELF DIR [DIR...]     what of the audio driver no run in DIRs reached (the DIRs'
                                                        builds differ only by the script's options; ELF is one of them)
 
 The audio driver: every function whose source is under src/audio/ or is audio_thread_manager.c. Cycles are the
 emulator's (clocks / 2), the same from run to run for the same ROM.
 """
-import argparse, bisect, collections, glob, json, os, re, struct, subprocess, sys
+import argparse, bisect, collections, glob, gzip, json, os, re, struct, subprocess, sys
 
 AUDIO_SRC = re.compile(r"/src/audio/|/audio_thread_manager\.c")
 IDLE = re.compile(r"^(Idle_ThreadEntry|__osIdle|Fishmod_Idle)")
@@ -26,8 +29,38 @@ def run(*args):
     return subprocess.run(args, capture_output=True, text=True).stdout
 
 
+def is_syms(path):
+    return path.endswith((".sym", ".sym.gz"))
+
+
+def read_syms(path):
+    """The --syms file: ([(address, name, source file)] of the functions, {name: address} of everything)."""
+    funcs, sym = [], {}
+    with (gzip.open(path, "rt") if path.endswith(".gz") else open(path)) as f:
+        for line in f:
+            p = line.rstrip("\n").split(" ", 3)
+            sym[p[2]] = int(p[1], 16)
+            if p[0] == "F":
+                funcs.append((int(p[1], 16), p[2], p[3]))
+    return funcs, sym
+
+
+def write_syms(elf, out):
+    funcs, sym = functions(elf), symbols(elf)
+    root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")) + "/"
+    with gzip.GzipFile(out, "wb", mtime=0) as f:
+        for a, n, src in funcs:
+            f.write(("F %x %s %s\n" % (a, n, "/" + src[len(root):] if src.startswith(root) else src)).encode())
+        fn = set(n for _, n, _ in funcs)
+        for n, a in sorted(sym.items()):
+            if n not in fn and not n.startswith(("$", ".L")):
+                f.write(("S %x %s\n" % (a, n)).encode())
+
+
 def functions(elf):
     """[(address, name, source file)] of the ELF's functions, in address order."""
+    if is_syms(elf):
+        return read_syms(elf)[0]
     syms = []
     for line in run("mips-linux-gnu-nm", "-n", "--defined-only", elf).splitlines():
         p = line.split()
@@ -38,6 +71,8 @@ def functions(elf):
 
 
 def symbols(elf):
+    if is_syms(elf):
+        return read_syms(elf)[1]
     d = {}
     for line in run("mips-linux-gnu-nm", elf).splitlines():
         p = line.split()
@@ -263,8 +298,11 @@ def main():
     ap.add_argument("--elf")
     ap.add_argument("--compare", nargs=2)
     ap.add_argument("--cover", nargs="+")
+    ap.add_argument("--syms", nargs=2)
     a = ap.parse_args()
-    if a.compare:
+    if a.syms:
+        write_syms(*a.syms)
+    elif a.compare:
         compare(a)
     elif a.cover:
         cover(a)

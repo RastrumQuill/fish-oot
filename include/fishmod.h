@@ -305,8 +305,15 @@ typedef struct FishmodSaveData {
 // The debug timers' clock: the CPU's count register, read directly (osGetTime turns interrupts off and on and adds the
 // 64-bit time to it every call: hundreds of calls a frame cost a few percent of the CPU in the bench builds). Only
 // differences are taken, so its wrapping every 91 seconds doesn't matter: the same differences as osGetTime's.
+#ifndef FISHMOD_NOTIMERS
 #define FISHMOD_CLOCK() ((OSTime)osGetCount())
 #define FISHMOD_SINCE(start) ((u32)(osGetCount() - (u32)(start)))
+#else
+// A build measured from outside (ares's exact profile; fishmod/build.sh --no-timers): the debug timers read nothing
+// and add nothing, so the compiler drops them and the game's code runs as a release's does.
+#define FISHMOD_CLOCK() ((OSTime)0)
+#define FISHMOD_SINCE(start) ((u32)((start) & 0))
+#endif
 
 // A seed from the clock, except in scripted debug runs, which must replay exactly (fishmod/tools/state_hash.py)
 #ifdef FISHMOD_SCRIPT
@@ -737,6 +744,28 @@ s32 Fishmod_DebugWantsFish(void);
 // Fish per scene roster wanted by the autoplay script (benchmarks), 0 = the game's own count
 s32 Fishmod_DebugRosterCount(void);
 void Fishmod_AutoplayInput(struct GameState* gameState, Input* inputs);
+// The input recorder and its replay (fishmod_debug_inputrec.inc.c): the controller as the game read it this frame; a
+// game state about to start; the save memory just read at power-on. The counts are the replay's report.
+typedef struct FishmodReplay {
+    u32 state;   // the game state's number (0xE1: no recording in the ROM; 0xE2: one for another build)
+    u32 segs;    // game states started
+    u32 frames;
+    u32 early;   // states the replay left before the recording did
+    u32 skipped; // the recording's frames those skipped
+    u32 late;    // states the replay was still in when the recording left
+    u32 forced;  // of those, left by force
+    u32 snaps;   // times Link was put back where the recording had him
+    u32 rng;     // times the random numbers differed from the recording's
+    u32 syncs;   // times those two were checked
+    u32 lost;    // (recording) words dropped: nobody listening on the USB
+    u32 rom;
+    u32 ended;   // 1 once the recording's last frame has played
+} FishmodReplay;
+extern FishmodReplay gFishmodReplay;
+void Fishmod_InputRecInput(struct GameState* gameState, Input* inputs);
+void Fishmod_InputRecState(struct GameState* gameState, void (*init)(struct GameState*));
+void Fishmod_InputRecSram(u8* sram);
+u32* Fishmod_RandState(void);
 void Fishmod_DebugPlayUpdate(struct PlayState* play);
 void Fishmod_DebugDrawText(struct GameState* gameState, Gfx** gfxP);
 void Fishmod_DebugPrintf(s32 line, const char* fmt, ...);
