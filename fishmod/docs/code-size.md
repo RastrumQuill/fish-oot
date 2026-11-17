@@ -98,6 +98,35 @@ lake table's above: this route walks through plants, so the touch code runs, and
 The whole game at `-Os` wasn't profiled; clang at `-Os` doesn't build this tree (an inline `cache` instruction in
 fishmod.c it rejects).
 
+**Where the instruction cache's cost actually is (17 Nov, the clean `-O2` build, the bench's first three legs)**
+
+| | share of the CPU's working time |
+|---|---:|
+| all code fills, the whole game | 25.1% |
+| all data fills | 25.6% |
+| the mod's code, all of it | 16.1% |
+| the mod's code fills | 3.6% (23% of the mod's own time) |
+| the mod's data fills | 3.8% |
+
+The mod's code fills are 3.6% of the frame. That is the most that any amount of shrinking, splitting or assembly
+in the mod's five routines can give back, and nothing gives back all of it. The other 21.5% of code fills is the
+engine's: Link, collision, the actor framework, the camera, the OS.
+
+Two things tried against the mod's share:
+
+- `hotcode.py --map ROUTINE` (new) lists a routine's running bytes by source line. `EnFishmod_ScatterDraw`'s 9.0 KB
+  and `Scatter_Build`'s 7.7 KB are spread thin: the biggest single pieces are the touch code (1.7 KB + 1.0 KB) and the
+  sway (0.5 KB), and the rest is hundreds of lines of under 100 bytes each. There's no block to lift out; shrinking
+  them means rewriting them.
+- The fish's thinking run back to back after all actors (instead of one per actor update): its code fills fell 23%
+  and its time 7%, about 0.03 ms a frame. The "72% of its time is fetching" above was a ceiling (a path's routines'
+  fills from every caller), and the real figure is far lower. Not kept: too little for changing the order fish
+  update in.
+
+The whole game at `-Os` (`--gcc Os --gcc-all`) doesn't boot (it never starts the graphics thread; libultra at `-Os`
+is the known cause on clang), so the engine's side is still unmeasured. That's the next thing to measure: the game's
+C at `-Os` with libultra left at `-O2`, then code layout (hot routines together, cold apart).
+
 **The engine**
 
 | what | size | how often | fills' share | reading |
