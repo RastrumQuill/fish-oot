@@ -128,6 +128,108 @@
      4
     ]
    ]
+  },
+  {
+   "id": "audio-rt-1",
+   "realtime": true,
+   "nodraw": true,
+   "maxsecs": 9000,
+   "ref": "R",
+   "builds": {
+    "R": {
+     "patches": [
+      "releases/sweep/audio-1-R.bps",
+      "releases/sweep/audio-rt-1-R.bps"
+     ],
+     "syms": "releases/sweep/audio-rt-1-R.sym.gz",
+     "sha1": "6e13f1fdf98137eae122f85aacfb0f867b5084c6",
+     "opt": 32
+    },
+    "A": {
+     "patches": [
+      "releases/sweep/audio-1-R.bps",
+      "releases/sweep/audio-rt-1-R.bps",
+      "releases/sweep/audio-rt-1-A.bps"
+     ],
+     "syms": "releases/sweep/audio-rt-1-A.sym.gz",
+     "sha1": "ab122627242a484184800916eae197c241b8dc25",
+     "opt": 32
+    },
+    "B": {
+     "patches": [
+      "releases/sweep/audio-1-R.bps",
+      "releases/sweep/audio-rt-1-R.bps",
+      "releases/sweep/audio-rt-1-B.bps"
+     ],
+     "syms": "releases/sweep/audio-rt-1-B.sym.gz",
+     "sha1": "a90ac01d0ea0c2f661885fffa7e6721ce3a3e515",
+     "opt": 32
+    },
+    "Bahead": {
+     "patches": [
+      "releases/sweep/audio-1-R.bps",
+      "releases/sweep/audio-rt-1-R.bps",
+      "releases/sweep/audio-rt-1-B.bps"
+     ],
+     "syms": "releases/sweep/audio-rt-1-B.sym.gz",
+     "sha1": "a90ac01d0ea0c2f661885fffa7e6721ce3a3e515",
+     "opt": 96
+    },
+    "Blazy": {
+     "patches": [
+      "releases/sweep/audio-1-R.bps",
+      "releases/sweep/audio-rt-1-R.bps",
+      "releases/sweep/audio-rt-1-B.bps"
+     ],
+     "syms": "releases/sweep/audio-rt-1-B.sym.gz",
+     "sha1": "a90ac01d0ea0c2f661885fffa7e6721ce3a3e515",
+     "opt": 160
+    },
+    "Bboth": {
+     "patches": [
+      "releases/sweep/audio-1-R.bps",
+      "releases/sweep/audio-rt-1-R.bps",
+      "releases/sweep/audio-rt-1-B.bps"
+     ],
+     "syms": "releases/sweep/audio-rt-1-B.sym.gz",
+     "sha1": "a90ac01d0ea0c2f661885fffa7e6721ce3a3e515",
+     "opt": 224
+    }
+   },
+   "jobs": [
+    [
+     "o2",
+     1
+    ],
+    [
+     "e2",
+     2
+    ],
+    [
+     "t2",
+     2
+    ],
+    [
+     "q2",
+     4
+    ],
+    [
+     "s2",
+     4
+    ],
+    [
+     "c2",
+     4
+    ],
+    [
+     "o0",
+     1
+    ],
+    [
+     "t0",
+     2
+    ]
+   ]
   }
  ]
 }

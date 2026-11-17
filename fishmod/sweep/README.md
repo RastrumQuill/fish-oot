@@ -77,3 +77,9 @@ prints, per sweep: units done, failed (with why), claimed (by whom) and left. `-
 Runs are the same on every machine: the emulator's cycle counts and the sound log depend only on the ROM and the
 emulator's source, both fixed by the repository. `"nodraw": true` in a sweep runs the emulator without drawing the
 picture (`ARES_NORDP=1`), which is faster and changes nothing the audio checks read.
+
+`"realtime": true` in a sweep runs the game without lockstep. There is no sound log then; the worker has the
+emulator count what the audio interface played (`ARES_AIPROF`, needs `ares-aiprof.patch`, applied by
+`fishmod/tools/build_ares.sh`) and compares each build's refused buffers, dry runs and silence with the reference's.
+`"opt": N` on a build is OR'd into the options word at ROM 0x38, so one ROM can run under several switch settings
+(32 real time, 64 updates built ahead, 128 tasks sent early).
