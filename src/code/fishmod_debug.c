@@ -279,6 +279,7 @@ static void Fishmod_ViewUpdate(PlayState* play) {
 }
 #endif
 
+static s32 gFishmodAudioAbReport; // (the audio A/B: the lap that just ended, 1-based, for the profiler to report)
 #ifdef FISHMOD_TOUR
 /*
  * Camera tour: a free camera glides between the script's stops (sTourStops) and a Navi-style caption names each.
@@ -635,7 +636,6 @@ static void Fishmod_TourUpdate(PlayState* play) {
 #ifdef FISHMOD_HWBENCH
 static u32 sLastCpu[FISHMOD_CPU_MAX];
 #endif
-static s32 gFishmodAudioAbReport; // (the audio A/B: the lap that just ended, 1-based, for the profiler to report)
 #include "fishmod_debug_bench.inc.c" // the hardware benches: the play bench and the area bench (FISHMOD_HWBENCH)
 
 static void Fishmod_TourDraw(Gfx** gfxP) {
@@ -1071,7 +1071,11 @@ s32 Fishmod_DebugRosterCount(void) {
 #ifdef FISHMOD_RDP_BENCH
 static u32 sRdpTag; // (fishmod_debug_rdpbench.inc.c: the frame log's tag)
 #endif
+#ifdef FISHMOD_INPUTREC
+static s32 InputRec_Pump(void);
+#endif
 #include "fishmod_debug_pcprof.inc.c" // the PC-sampling profiler (FISHMOD_PCPROF)
+#include "fishmod_debug_inputrec.inc.c" // the input recorder and its replay (FISHMOD_INPUTREC, FISHMOD_INPUTPLAY)
 #include "fishmod_debug_rdpbench.inc.c" // the RDP calibration bench (FISHMOD_RDP_BENCH)
 
 #include "fishmod_debug_vrtime.inc.c" // the VR4300 timing tests (FISHMOD_VRTIME)
@@ -1779,6 +1783,45 @@ struct Actor* gFishmodDrawingActor;
 u32 gFishmodRigCheck[16 * 4]; // fishmod_rig.c: (raw start, raw end, cleaned start, cleaned end) per rig list built
 u32 gFishmodRigCheckCount;    // (in code, not the overlay: the checker finds them by the ELF's addresses)
 s32 gFishmodBenchDone = false;
+
+/*
+ * The map of loaded overlays, for a profiler outside the game (ares's ARES_CPUPROF_OVL, fishmod/tools/sysprof.py): an
+ * overlay's code runs wherever it was loaded this time, and the map says what's where, so its time is counted at the
+ * addresses the ELF has for it. Kept by Overlay_Load: the newest load first out of any that overlap (an overlay freed
+ * stays listed until something is loaded over it; its code isn't run meanwhile).
+ */
+#define OVLMAP_MAX 500
+struct {
+    u32 gen; // changes with the map
+    u32 count;
+    struct {
+        u32 ram, size, vram;
+    } e[OVLMAP_MAX];
+} gFishmodOvlMap;
+
+void Fishmod_OverlayLoaded(void* vramStart, void* ram, u32 size) {
+    u32 lo = (u32)ram;
+    u32 hi = lo + size;
+    u32 i;
+    u32 n = 0;
+
+    for (i = 0; i < gFishmodOvlMap.count; i++) {
+        if ((gFishmodOvlMap.e[i].ram < hi) && (gFishmodOvlMap.e[i].ram + gFishmodOvlMap.e[i].size > lo)) {
+            continue; // (loaded over)
+        }
+        gFishmodOvlMap.e[n++] = gFishmodOvlMap.e[i];
+    }
+    if (n >= OVLMAP_MAX) {
+        // (full of overlays long freed: the oldest goes)
+        bcopy(&gFishmodOvlMap.e[1], &gFishmodOvlMap.e[0], (OVLMAP_MAX - 1) * sizeof(gFishmodOvlMap.e[0]));
+        n = OVLMAP_MAX - 1;
+    }
+    gFishmodOvlMap.e[n].ram = lo;
+    gFishmodOvlMap.e[n].size = size;
+    gFishmodOvlMap.e[n].vram = (u32)vramStart;
+    gFishmodOvlMap.count = n + 1;
+    gFishmodOvlMap.gen++;
+}
 #ifdef FISHMOD_AUDLOG
 s32 gFishmodAudioLockstep = true; // the audio check: from boot (audio_thread_manager.c)
 #else
@@ -1868,6 +1911,9 @@ void Fishmod_DebugPrintf(s32 line, const char* fmt, ...) {
     if ((line < 0) || (line >= FISHMOD_DEBUG_LINES)) {
         return;
     }
+#ifndef FISHMOD_SCREEN_TEXT
+    return; // (nothing is drawn: nothing formatted either)
+#endif
 #ifdef FISHMOD_PCPROF
     // the profile build: only the profiler's own line (the others' formatting every frame skews the profile)
     if (line != 5) {
@@ -1917,6 +1963,13 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
     }
 #endif
 
+#ifndef FISHMOD_SCREEN_TEXT
+    // Nothing over the picture: the debug lines are for a script that asks for them (FISHMOD_SCREEN_TEXT). What a run
+    // has to say goes over the SummerCart64's USB as text, read on the PC (`sc64deployer debug`).
+    (void)printer;
+    (void)i;
+    return;
+#else
     GfxPrint_Init(&printer);
     GfxPrint_Open(&printer, *gfxP);
     GfxPrint_SetColor(&printer, 255, 255, 100, 255);
@@ -1930,6 +1983,7 @@ void Fishmod_DebugDrawText(GameState* gameState, Gfx** gfxP) {
 
     *gfxP = GfxPrint_Close(&printer);
     GfxPrint_Destroy(&printer);
+#endif
 }
 
 #endif

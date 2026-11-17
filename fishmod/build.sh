@@ -35,6 +35,8 @@
 #                  extracted assets (after --texpack's, if both); outputs get a -colpack suffix
 #   --meshpack     the lake's widest mesh pieces cut into areas, each culled by the RSP on its own (tools/meshpack.py):
 #                  the build reads a copy (after the other packs); outputs get a -meshpack suffix
+#   --no-timers    a debug build measured from outside (ares's exact profile): the debug timers compiled out; outputs
+#                  get a -notimers suffix
 #   --pgo          (implies --clang) clang optimises with the console's sample profile, PGO_PROFILE (default
 #                  n64prof/profiles/oot-console2.prof; see its README); outputs get a -clang-pgo suffix
 # The release patch: fishmod/tools/bps.py (Flips' format; any BPS patcher applies it), or FLIPS=/path/to/flips. Flips'
@@ -61,6 +63,7 @@ TEXPACK=0
 COLPACK=0
 MESHPACK=0
 PGO=0
+NOTIMERS=0
 SCRIPT=""
 F3DEX3=0
 TESTMODE=0
@@ -82,6 +85,7 @@ while [ $# -gt 0 ]; do
         --ido) GCC="" ;;
         --clang) CLANG=1 ;;
         --pgo) CLANG=1; PGO=1 ;;
+        --no-timers) NOTIMERS=1 ;;
         --clang-game) CLANG=1; CLANG_GAME=1 ;;
         --clang-audio) CLANG_AUDIO=1 ;;
         --gcc-audio) GCC_AUDIO=1 ;;
@@ -175,7 +179,7 @@ if [ "$MESHPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$MP_OUT")
 fi
-MODE="texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+MODE="notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -231,7 +235,7 @@ elif [ "$CLANG" = 1 ]; then
     echo "error: --clang goes with the GCC build (not --ido)" >&2
     exit 1
 fi
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} ${TEXPACK_ARGS[@]+"${TEXPACK_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_EXPAK=$EXPAK FISHMOD_MESHPACK=$MESHPACK FISHMOD_SCRIPT="$SCRIPT" F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC F3DEX3_PROF=${F3DEX3_PROF:-} FISHMOD_TESTMODE=$TESTMODE \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} ${TEXPACK_ARGS[@]+"${TEXPACK_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_EXPAK=$EXPAK FISHMOD_MESHPACK=$MESHPACK FISHMOD_SCRIPT="$SCRIPT" FISHMOD_NOTIMERS=$NOTIMERS F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC F3DEX3_PROF=${F3DEX3_PROF:-} FISHMOD_TESTMODE=$TESTMODE \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -258,6 +262,9 @@ elif [ "$GCC" != "O2" ]; then
 fi
 if [ "$CLANG" = 1 ]; then
     SUFFIX="$SUFFIX-clang$([ "$CLANG_GAME" = 1 ] && echo game)$CLANG_OPT"
+fi
+if [ "$NOTIMERS" = 1 ]; then
+    SUFFIX="$SUFFIX-notimers"
 fi
 if [ "$PGO" = 1 ]; then
     SUFFIX="$SUFFIX-pgo"

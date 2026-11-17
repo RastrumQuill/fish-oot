@@ -303,6 +303,7 @@ void GameState_ReqPadData(GameState* gameState) {
     PadMgr_RequestPadData(&gPadMgr, gameState->input, true);
 #if FISHMOD_DEBUG
     Fishmod_AutoplayInput(gameState, gameState->input);
+    Fishmod_InputRecInput(gameState, gameState->input);
 #endif
 }
 
@@ -506,6 +507,9 @@ void GameState_Init(GameState* gameState, GameStateFunc init, GraphicsContext* g
     GameState_InitArena(gameState, 0x100000);
 
     R_UPDATE_RATE = 3;
+#if FISHMOD_DEBUG
+    Fishmod_InputRecState(gameState, init);
+#endif
     init(gameState);
     endTime = osGetTime();
     PRINTF(T("init 処理時間 %d us\n", "init processing time %d us\n"), OS_CYCLES_TO_USEC(endTime - startTime));

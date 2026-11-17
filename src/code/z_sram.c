@@ -1035,6 +1035,9 @@ void Sram_InitSram(UNUSED_NDEBUG GameState* gameState, SramContext* sramCtx) {
 
     PRINTF("sram_initialize( Game *game, Sram *sram )\n");
     SRAM_READ(OS_K1_TO_PHYSICAL(0xA8000000), sramCtx->readBuff, SRAM_SIZE);
+#if FISHMOD_DEBUG
+    Fishmod_InputRecSram(sramCtx->readBuff);
+#endif
 
     for (i = 0; i < ARRAY_COUNTU(sSramDefaultHeader) - SRAM_HEADER_MAGIC; i++) {
         if (sSramDefaultHeader[i + SRAM_HEADER_MAGIC] != sramCtx->readBuff[i + SRAM_HEADER_MAGIC]) {
