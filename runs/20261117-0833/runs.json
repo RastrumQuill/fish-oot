@@ -1,0 +1,58 @@
+[
+ {
+  "run": 1,
+  "label": "rc2-base-1",
+  "patch": "releases\\fish-oot-rc2-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-17 08:33:44",
+  "patch_sha1": "3e7bd44e6092262efbc6c59ae6a78f20d56f6190",
+  "upload_check": "ok",
+  "packets": 420,
+  "bytes": 3181208,
+  "packs": 1,
+  "seconds": 219
+ },
+ {
+  "run": 2,
+  "label": "rc2-expak-1",
+  "patch": "releases\\fish-oot-rc2-expak-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-17 08:37:25",
+  "patch_sha1": "deb6d1c2c13b2c39bce1cddf25f0c8799f506200",
+  "upload_check": "ok",
+  "packets": 432,
+  "bytes": 3272448,
+  "packs": 1,
+  "seconds": 221
+ },
+ {
+  "run": 3,
+  "label": "rc2-base-2",
+  "patch": "releases\\fish-oot-rc2-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-17 08:41:09",
+  "patch_sha1": "3e7bd44e6092262efbc6c59ae6a78f20d56f6190",
+  "upload_check": "ok",
+  "packets": 421,
+  "bytes": 3187240,
+  "packs": 1,
+  "seconds": 227
+ },
+ {
+  "run": 4,
+  "label": "rc2-expak-2",
+  "patch": "releases\\fish-oot-rc2-expak-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-17 08:44:58",
+  "patch_sha1": "deb6d1c2c13b2c39bce1cddf25f0c8799f506200",
+  "upload_check": "ok",
+  "packets": 431,
+  "bytes": 3271312,
+  "packs": 1,
+  "seconds": 220
+ }
+]
