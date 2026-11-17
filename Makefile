@@ -499,7 +499,7 @@ CPPFLAGS += -P -xc -fno-dollars-in-identifiers $(CPP_DEFINES) $(GBI_DEFINES)
 ASFLAGS += -march=vr4300 -32 -no-pad-sections -Iinclude -I$(EXTRACTED_DIR)
 
 ifeq ($(COMPILER),gcc)
-  CFLAGS += $(CPP_DEFINES) $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 -mabi=32 -mno-abicalls -mdivide-breaks -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin -fno-builtin-sinf -fno-builtin-cosf $(CHECK_WARNINGS)
+  CFLAGS += $(CPP_DEFINES) $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 -mabi=32 -mno-abicalls -mno-check-zero-division -mno-memcpy -fno-builtin-bzero -fno-builtin-bcopy -fno-builtin-bcmp -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin -fno-builtin-sinf -fno-builtin-cosf $(CHECK_WARNINGS)
   CCASFLAGS += $(CPP_DEFINES) $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 -mabi=32 -mno-abicalls -fno-PIC -fno-common -Wa,-no-pad-sections
   MIPS_VERSION := -mips3
 else
@@ -910,7 +910,7 @@ endif
 # the level. Both follow the o32 ABI, so the objects link together.
 ifeq ($(GCC_CODE),1)
 GCC_CODE_CFLAGS := $(CPP_DEFINES) -DCOMPILER_GCC $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 \
-  -mabi=32 -mno-abicalls -mdivide-breaks -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
+  -mabi=32 -mno-abicalls -mno-check-zero-division -mno-memcpy -fno-builtin-bzero -fno-builtin-bcopy -fno-builtin-bcmp -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
   -fno-builtin-sinf -fno-builtin-cosf -fexec-charset=euc-jp -w
 GCC_OPT ?= O2
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: CC := tools/fishmod_gcc_cc.sh
@@ -928,7 +928,7 @@ $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS := -$(GCC_OPT)
 $(BUILD_DIR)/src/gcc_fix/%.o: CC := tools/fishmod_gcc_cc.sh
 $(BUILD_DIR)/src/gcc_fix/%.o: CC_CHECK := @:
 $(BUILD_DIR)/src/gcc_fix/%.o: PREPROCESS :=
-$(BUILD_DIR)/src/gcc_fix/%.o: CFLAGS := $(GCC_CODE_CFLAGS) -fno-builtin
+$(BUILD_DIR)/src/gcc_fix/%.o: CFLAGS := $(GCC_CODE_CFLAGS) -fno-builtin -fno-tree-loop-distribute-patterns
 $(BUILD_DIR)/src/gcc_fix/%.o: MIPS_VERSION := -mips3
 $(BUILD_DIR)/src/gcc_fix/%.o: OPTFLAGS := -O2 -fno-strict-aliasing
 # FISHMOD_MOD_OPT (fishmod/build.sh --mod-opt Os): the mod's own files at another level than the game's, e.g. for
@@ -957,12 +957,17 @@ $(BUILD_DIR)/src/code/fishmod.o $(BUILD_DIR)/src/code/fishmod_%.o: CC := tools/f
 $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/%.o: CC := tools/fishmod_clang_cc.sh
 $(SEGMENTS_DIR)/ovl_En_Fishmod.reloc.o: POSTPROCESS_OBJ := $(PYTHON) tools/reloc_elf_pairing.py
 endif
+# The GCC builds' two options beyond the CPU's: -mno-check-zero-division (no trap after every integer divide: about
+# 1,600 of them, each a compare and a break; a division by zero gives a wrong number instead of the crash screen) and
+# -mno-memcpy (a structure copied in line even at -Os, a matrix or a vector, not by a call to memcpy)
+# -fno-builtin-bzero/bcopy/bcmp: libultra's own (assembly, a cache line at a time) stay the ones called: with the
+# builtins GCC makes every bzero a memset
 # fish-oot: GCC_AUDIO=1, GCC_LIBULTRA=1: the audio driver, and libultra's C (os, io, gu), on GCC too (IDO otherwise), so the
 # whole game's C is GCC's. No -ffast-math here: audio's floats stay as IDO computes them (the audlog script checks)
 GCC_PLAIN_OPT = -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
 # (recursive, so each file's own defines, MML_VERSION and the like, still reach it)
 GCC_PLAIN_CFLAGS = $(CPP_DEFINES) -DCOMPILER_GCC $(GBI_DEFINES) -G 0 -nostdinc -MD -MP $(INC) -march=vr4300 -mfix4300 \
-  -mabi=32 -mno-abicalls -mdivide-breaks -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
+  -mabi=32 -mno-abicalls -mno-check-zero-division -mno-memcpy -fno-builtin-bzero -fno-builtin-bcopy -fno-builtin-bcmp -fno-PIC -fno-common -ffreestanding -funsigned-char -fbuiltin \
   -fno-builtin-sinf -fno-builtin-cosf -fexec-charset=euc-jp -w
 ifeq ($(GCC_AUDIO),1)
 $(BUILD_DIR)/src/audio/%.o: CC := tools/fishmod_gcc_cc.sh
@@ -987,8 +992,8 @@ GCC_LIBULTRA_OBJS := $(BUILD_DIR)/src/libultra/os/%.o $(BUILD_DIR)/src/libultra/
 $(GCC_LIBULTRA_OBJS): CC := tools/fishmod_gcc_cc.sh
 $(GCC_LIBULTRA_OBJS): CC_CHECK := @:
 $(GCC_LIBULTRA_OBJS): PREPROCESS :=
-$(GCC_LIBULTRA_OBJS): CFLAGS = $(GCC_PLAIN_CFLAGS) -fno-builtin
-# (-fno-builtin: GCC would turn libultra's own byte compares into calls to memcmp, which the game doesn't have)
+$(GCC_LIBULTRA_OBJS): CFLAGS = $(GCC_PLAIN_CFLAGS)
+# (builtins on: sqrtf is the CPU's instruction; a byte compare may become a call to memcmp, which is in boot now)
 $(GCC_LIBULTRA_OBJS): MIPS_VERSION := -mips3
 # GCC_LIBULTRA_OPT: libultra's own level (default the game's)
 GCC_LIBULTRA_OPT ?= $(GCC_OPT)
@@ -1009,7 +1014,9 @@ GCC_REST_OBJS := $(BUILD_DIR)/src/boot/%.o $(BUILD_DIR)/src/libu64/%.o $(BUILD_D
 $(GCC_REST_OBJS): CC := tools/fishmod_gcc_cc.sh
 $(GCC_REST_OBJS): CC_CHECK := @:
 $(GCC_REST_OBJS): PREPROCESS :=
-$(GCC_REST_OBJS): CFLAGS = $(GCC_PLAIN_CFLAGS) -fno-builtin
+$(GCC_REST_OBJS): CFLAGS = $(GCC_PLAIN_CFLAGS)
+# (builtins off only where the C library's own routines are written: memcpy's loop mustn't become a call to memcpy)
+$(BUILD_DIR)/src/libc/%.o $(BUILD_DIR)/src/libultra/libc/%.o: CFLAGS = $(GCC_PLAIN_CFLAGS) -fno-builtin -fno-tree-loop-distribute-patterns
 $(GCC_REST_OBJS): MIPS_VERSION := -mips3
 $(GCC_REST_OBJS): OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
 $(GCC_REST_OBJS): POSTPROCESS_OBJ := @:

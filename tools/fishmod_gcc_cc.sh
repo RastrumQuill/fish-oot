@@ -13,4 +13,11 @@ for a in "$@"; do
         *) args+=("$a") ;;
     esac
 done
-exec "${FISHMOD_GCC:-mips-linux-gnu-gcc}" "${args[@]}"
+# (GCC 14 makes errors of what the game's old C does in places, as calling a function before its declaration: they
+# stay the warnings they were, so one source builds with GCC 10 and 14 alike)
+# FISHMOD_GCC_AS_DIR: a folder holding the assembler to use as `as` (a bare-metal GCC's own writes IRIX-flavoured
+# objects the build's linker won't take; the build's mips-linux-gnu-as, linked there, writes the usual ones)
+extra=()
+[ -n "${FISHMOD_GCC_AS_DIR:-}" ] && extra+=("-B${FISHMOD_GCC_AS_DIR%/}/")
+exec "${FISHMOD_GCC:-mips-linux-gnu-gcc}" "${extra[@]}" -Wno-error=implicit-function-declaration -Wno-error=int-conversion \
+    -Wno-error=incompatible-pointer-types -Wno-error=implicit-int "${args[@]}"
