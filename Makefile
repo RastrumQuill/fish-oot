@@ -924,6 +924,13 @@ $(BUILD_DIR)/src/code/fishmod%.o $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod
   -fsyntax-only -funsigned-char -std=gnu90 -D_LANGUAGE_C $(CPP_DEFINES) $(MIPS_BUILTIN_DEFS) $(GBI_DEFINES) $(INC) -m32 \
   -Werror=implicit-function-declaration
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations $(GCC_EXTRA_OPT)
+# GCC's own helpers (64-bit divide, shifts, conversions; memcmp; strcpy): GCC's too, and never calling one another
+$(BUILD_DIR)/src/gcc_fix/%.o: CC := tools/fishmod_gcc_cc.sh
+$(BUILD_DIR)/src/gcc_fix/%.o: CC_CHECK := @:
+$(BUILD_DIR)/src/gcc_fix/%.o: PREPROCESS :=
+$(BUILD_DIR)/src/gcc_fix/%.o: CFLAGS := $(GCC_CODE_CFLAGS) -fno-builtin
+$(BUILD_DIR)/src/gcc_fix/%.o: MIPS_VERSION := -mips3
+$(BUILD_DIR)/src/gcc_fix/%.o: OPTFLAGS := -O2 -fno-strict-aliasing
 # FISHMOD_MOD_OPT (fishmod/build.sh --mod-opt Os): the mod's own files at another level than the game's, e.g. for
 # size: its hot paths against the instruction cache (fishmod/docs/code-size.md)
 ifneq ($(FISHMOD_MOD_OPT),)
@@ -1006,21 +1013,13 @@ $(GCC_REST_OBJS): CFLAGS = $(GCC_PLAIN_CFLAGS) -fno-builtin
 $(GCC_REST_OBJS): MIPS_VERSION := -mips3
 $(GCC_REST_OBJS): OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
 $(GCC_REST_OBJS): POSTPROCESS_OBJ := @:
-# (the two boot files with IDO options of their own: the same as the rest here)
-GCC_REST_OWN := $(BUILD_DIR)/src/boot/driverominit.o $(BUILD_DIR)/src/boot/viconfig.o
+# (the files with IDO options of their own: the same as the rest here. ll.c and llcvt.c, IDO's 64-bit helpers, are
+# plain C to GCC: its own helpers do the work, src/gcc_fix/missing_gcc_functions.c)
+GCC_REST_OWN := $(BUILD_DIR)/src/boot/driverominit.o $(BUILD_DIR)/src/boot/viconfig.o \
+  $(BUILD_DIR)/src/libultra/libc/ll.o $(BUILD_DIR)/src/libultra/libc/llcvt.o
+$(GCC_REST_OWN): POSTPROCESS_OBJ := @:
 $(GCC_REST_OWN): OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
 $(GCC_REST_OWN): MIPS_VERSION := -mips3
-# Not ll.c and llcvt.c (64-bit multiply, divide, shifts and conversions): IDO compiles them to the CPU's 64-bit
-# instructions, and GCC's own 64-bit helpers (__divdi3 and the rest, src/code/fishmod.c) are made of them: on GCC
-# they'd call each other for ever. They stay IDO's until they're written in assembly.
-GCC_REST_IDO := $(BUILD_DIR)/src/libultra/libc/ll.o $(BUILD_DIR)/src/libultra/libc/llcvt.o
-$(GCC_REST_IDO): CC := $(CC)
-$(GCC_REST_IDO): CC_CHECK := $(CC_CHECK)
-$(GCC_REST_IDO): PREPROCESS := ./tools/preprocess.sh -v $(VERSION) -i $(ICONV) --
-$(GCC_REST_IDO): CFLAGS := $(CFLAGS)
-$(GCC_REST_IDO): OPTFLAGS := -O1
-$(GCC_REST_IDO): MIPS_VERSION := -mips3 -32
-$(GCC_REST_IDO): POSTPROCESS_OBJ := $(PYTHON) tools/set_o32abi_bit.py
 # GCC_REST_SKIP: files (as boot/idle libc64/malloc) left on IDO, to find or set aside one that doesn't run on GCC
 GCC_REST_SKIP ?=
 GCC_REST_SKIPPED := $(foreach f,$(GCC_REST_SKIP),$(BUILD_DIR)/src/$(f).o)

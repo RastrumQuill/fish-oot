@@ -235,3 +235,92 @@ __divdi3:                                   \n\
                                             \n\
     .set pop                                \n\
                                             \n");
+
+#ifdef FISHMOD_GCC
+// fish-oot: memcpy by words. Compiled for size, GCC calls memcpy for every structure it copies (a matrix, a vector);
+// libultra's own copies a byte at a time, and was 4.7% of the CPU's working time at Lake Hylia in the first -Os
+// build. Aligned blocks (nearly all of them: structures) go four words, then one word, at a time.
+void* memcpy(void* dst, const void* src, size_t n) {
+    u32* d = dst;
+    const u32* s = src;
+    u8* db;
+    const u8* sb;
+
+    if ((((u32)dst | (u32)src) & 3) == 0) {
+        while (n >= 16) {
+            u32 a = s[0];
+            u32 b = s[1];
+            u32 c = s[2];
+            u32 e = s[3];
+
+            d[0] = a;
+            d[1] = b;
+            d[2] = c;
+            d[3] = e;
+            d += 4;
+            s += 4;
+            n -= 16;
+        }
+        while (n >= 4) {
+            *d++ = *s++;
+            n -= 4;
+        }
+    }
+    db = (u8*)d;
+    sb = (const u8*)s;
+    while (n != 0) {
+        *db++ = *sb++;
+        n--;
+    }
+    return dst;
+}
+
+// fish-oot: the helpers its GCC builds call beyond the above. 64-bit shifts, on the two 32-bit halves (written with
+// 32-bit operations only: a 64-bit shift here would be a call to itself)
+long long __ashldi3(long long a, int b) {
+    unsigned int lo = (unsigned int)a;
+    unsigned int hi = (unsigned int)((unsigned long long)a >> 32);
+
+    if (b >= 32) {
+        hi = lo << (b - 32);
+        lo = 0;
+    } else if (b > 0) {
+        hi = (hi << b) | (lo >> (32 - b));
+        lo <<= b;
+    }
+    return (long long)(((unsigned long long)hi << 32) | lo);
+}
+unsigned long long __lshrdi3(unsigned long long a, int b) {
+    unsigned int lo = (unsigned int)a;
+    unsigned int hi = (unsigned int)(a >> 32);
+
+    if (b >= 32) {
+        lo = hi >> (b - 32);
+        hi = 0;
+    } else if (b > 0) {
+        lo = (lo >> b) | (hi << (32 - b));
+        hi >>= b;
+    }
+    return ((unsigned long long)hi << 32) | lo;
+}
+long long __ashrdi3(long long a, int b) {
+    unsigned int lo = (unsigned int)a;
+    int hi = (int)((unsigned long long)a >> 32);
+
+    if (b >= 32) {
+        lo = (unsigned int)(hi >> (b - 32));
+        hi >>= 31;
+    } else if (b > 0) {
+        lo = (lo >> b) | ((unsigned int)hi << (32 - b));
+        hi >>= b;
+    }
+    return (long long)(((unsigned long long)(unsigned int)hi << 32) | lo);
+}
+// GCC -Os turns some string formatting into a call to strcpy, which the game's libc doesn't have
+char* strcpy(char* dst, const char* src) {
+    char* d = dst;
+
+    while ((*d++ = *src++) != '\0') {}
+    return dst;
+}
+#endif

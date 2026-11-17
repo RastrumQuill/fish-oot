@@ -102,17 +102,3 @@ void* memmove(void* dest, const void* src, size_t len) {
     return dest;
 }
 
-// (GCC at -Os calls memcmp for a block comparison it would expand in line at -O2)
-int memcmp(const void* a, const void* b, size_t len) {
-    const unsigned char* p = a;
-    const unsigned char* q = b;
-
-    while (len-- != 0) {
-        if (*p != *q) {
-            return (int)*p - (int)*q;
-        }
-        p++;
-        q++;
-    }
-    return 0;
-}

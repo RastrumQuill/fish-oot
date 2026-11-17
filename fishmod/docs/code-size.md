@@ -151,6 +151,49 @@ Still to do here, in the rule's order: the rare cases as routines of their own (
 despite the marks); the fog step from the chunk the scan already knows (308 bytes and two divides a prop, 9% of
 the routine's time); then the loop by hand if it's still near 2 KB.
 
+**Every C file on GCC, at `-Os` (17 Nov)**
+
+`fishmod/build.sh --gcc Os --gcc-everything`: the game's code, the audio driver, libultra, and now the boot code,
+libu64, libc64, libc, libultra's libc and the disk drive's code, all GCC's. What still goes through the old tools is
+hand-written assembly and data files.
+
+Two things stood in the way:
+
+- **The "all-GCC build hangs" was `memcpy`.** At `-Os` GCC makes `osInitialize`'s copies of the exception vectors
+  calls to `memcpy`, which lived in the code segment, not loaded yet at that point: the game jumped into empty
+  memory. `memcpy`, `memset`, `memmove`, `memcmp` and GCC's 64-bit helpers are now in the boot segment (spec).
+- **GCC's 64-bit helpers were made of IDO's** (`__divdi3` called `__ll_div`), so IDO's two files couldn't move.
+  They're now the real ones (`src/gcc_fix/missing_gcc_functions.c`: the CPU's 64-bit divide and conversions), and
+  `ll.c` and `llcvt.c` are plain C to GCC.
+
+Checked: it reaches play, and the recorded opening (power-on, the file select, a new save, the cutscenes; recorded
+on the `-O2` build) replays on it for its 5,000 frames with no repairs.
+
+Against the `-O2` build (the same three lake legs, ares's exact profile):
+
+| | `-O2`, boot and libs on IDO | all GCC `-Os`, first build | all GCC `-Os`, `memcpy` by words |
+|---|---:|---:|---:|
+| the engine's code (`code`) | 962,336 bytes | | 832,256 (-13.5%) |
+| Link's | 175,136 | | 128,656 (-26.5%) |
+| the mod's | 139,456 | | 124,064 (-11.0%) |
+| working cycles | | +6.5% | +1.9% |
+| instructions run | | +11.1% | +7.0% |
+| code fills, all | | +0.1% | +0.5% |
+| code fills in the overlays (actors, Link, the mod) | | -14.5% | -14.9% |
+| code fills in boot (the OS, the copies) | | +16.6% | +23.1% |
+| data fills | | +7.7% | -1.8% |
+
+The first `-Os` build was 6.5% slower, and the profile said why at once: compiled for size, GCC calls `memcpy` for
+every structure it copies (a matrix, a vector), and libultra's `memcpy` copies a byte at a time: 4.7% of the CPU's
+working time by itself. Copying by words brought that to 0.9% and the build to 1.9% slower than `-O2`.
+
+Where that leaves it: smaller everywhere, the overlays' code fills down 15%, but 7% more instructions run and the
+calls into boot (`memcpy`, `Matrix_MtxFCopy` and the like no longer in line) cost what the overlays saved. Not yet
+a win on the clock by the emulator's model. Next: the copies GCC calls out for (a matrix copy in line is 16 loads
+and stores; the call is a routine and a loop), and the hot routines that got slower at `-Os` kept at `-O2`
+(`GCC_LIBULTRA_KEEP` and a like list for the game's files), which is the "hot code small, by hand; the rest for
+size" split the roadmap's rule describes.
+
 **The engine**
 
 | what | size | how often | fills' share | reading |
