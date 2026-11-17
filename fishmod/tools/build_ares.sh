@@ -25,6 +25,9 @@ git -C "$DIR" apply "$(dirname "$PATCH")/ares-sc64.patch" # ARES_SC64_DIR=<dir>:
 # ARES_CPUPROF=<file> the CPU's instructions, cycles and cache fills by PC (cpuprof.py); ARES_BUSPROF=<file> the bytes
 # moved to and from RDRAM by who asked (busprof.py)
 git -C "$DIR" apply "$(dirname "$PATCH")/ares-prof.patch"
+# ARES_NORDP=1: the RDP's commands are read and its interrupts raised, but nothing is drawn (the audio sweep's runs,
+# which read only the CPU's and the sound's results: about twice as fast)
+git -C "$DIR" apply "$(dirname "$PATCH")/ares-nodraw.patch"
 cmake -S "$DIR" -B "$DIR/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DARES_CORES=n64 -DARES_ENABLE_LIBRASHADER=OFF \
     -DARES_ENABLE_SDL=OFF
 ninja -C "$DIR/build"

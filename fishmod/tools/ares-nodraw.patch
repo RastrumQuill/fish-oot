@@ -1,0 +1,66 @@
+diff --git a/ares/n64/vi/vi.cpp b/ares/n64/vi/vi.cpp
+index 32bf93c..8f1e351 100644
+--- a/ares/n64/vi/vi.cpp
++++ b/ares/n64/vi/vi.cpp
+@@ -84,7 +84,7 @@ auto VI::main() -> void {
+         io.field += !io.halfLinesPerField.bit(0);
+         if(++io.leapCounter == 5) io.leapCounter = 0;
+         #if defined(VULKAN)
+-        if (vulkan.enable) {
++        if (vulkan.enable && !vulkan.noDraw()) {
+           gpuOutputValid = vulkan.scanoutAsync(io.field);
+           vulkan.frame();
+         }
+@@ -133,6 +133,7 @@ auto VI::main() -> void {
+ 
+ auto VI::refresh() -> void {
+   #if defined(VULKAN)
++  if(vulkan.noDraw()) return;
+   if(vulkan.enable && gpuOutputValid) {
+     const u8* rgba = nullptr;
+     u32 width = 0, height = 0;
+diff --git a/ares/n64/vulkan/vulkan.cpp b/ares/n64/vulkan/vulkan.cpp
+index 04c570d..53965b0 100644
+--- a/ares/n64/vulkan/vulkan.cpp
++++ b/ares/n64/vulkan/vulkan.cpp
+@@ -71,6 +71,13 @@ auto Vulkan::unload() -> void {
+   implementation = nullptr;
+ }
+ 
++//ARES_NORDP=1: the RDP's commands are read and its interrupts raised as usual, but nothing is drawn (runs that
++//only need the CPU's and the sound's results)
++auto Vulkan::noDraw() -> bool {
++  static const bool no = getenv("ARES_NORDP") && getenv("ARES_NORDP")[0] == '1';
++  return no;
++}
++
+ auto Vulkan::render() -> bool {
+   if(!implementation) return false;
+ 
+@@ -121,12 +128,12 @@ auto Vulkan::render() -> bool {
+       return true;
+     }
+ 
+-    if(code >= 8) {
++    if(code >= 8 && !noDraw()) {
+       implementation->processor->enqueue_command(length * 2, buffer + queueOffset * 2);
+     }
+ 
+     if(::RDP::Op(code) == ::RDP::Op::SyncFull) {
+-      implementation->processor->wait_for_timeline(implementation->processor->signal_timeline());
++      if(!noDraw()) implementation->processor->wait_for_timeline(implementation->processor->signal_timeline());
+       rdp.syncFull();
+     }
+ 
+diff --git a/ares/n64/vulkan/vulkan.hpp b/ares/n64/vulkan/vulkan.hpp
+index 54be45a..3e86c47 100644
+--- a/ares/n64/vulkan/vulkan.hpp
++++ b/ares/n64/vulkan/vulkan.hpp
+@@ -7,6 +7,7 @@ struct Vulkan {
+   auto unload() -> void;
+ 
+   auto render() -> bool;
++  static auto noDraw() -> bool;
+   auto frame() -> void;
+   auto writeWord(u32 address, u32 data) -> void;
+   auto scanoutAsync(bool field) -> bool;

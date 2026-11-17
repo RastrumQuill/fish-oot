@@ -12,14 +12,19 @@ set -u
 SLOT=$1 ROM=$2 ELF=$3 OUT=$4 MAXSECS=${5:-3600}
 ARES=${ARES:-/opt/src/ares/build/rundir/bin/ares}
 HERE="$(cd "$(dirname "$0")" && pwd)"
-PORT=$((9123 + SLOT))
+PORT=$((${SWEEP_PORT_BASE:-9123} + SLOT))  # (SWEEP_PORT_BASE: another base when two sweeps share a machine)
 mkdir -p "$OUT"; rm -f "$OUT"/cpu.bin* "$OUT"/rsp.bin* "$OUT"/ram.bin
 CONF=$(mktemp --suffix=.bml)
 sed "s/^\(\s*Port:\s*\)9123/\1$PORT/" "$HERE/ares_debug.bml" > "$CONF"
 sed -i -e '/^Video$/,/^[A-Z]/ s/^  Driver: .*/  Driver: None/' -e '/^Audio$/,/^[A-Z]/ s/^  Driver: .*/  Driver: None/' \
     -e '/^Audio$/,/^[A-Z]/ s/^  Blocking: .*/  Blocking: false/' "$CONF"
 xdpyinfo >/dev/null 2>&1 || { (Xvfb "${DISPLAY:-:190}" -screen 0 1024x768x24 >/dev/null 2>&1 &); sleep 2; }
-MARK=$(mips-linux-gnu-nm "$ELF" | awk '$3=="gFishmodSweepLeg"{print $1}')
+# (ELF: the build's ELF, or its symbols file from audio_sweep_report.py --syms)
+case "$ELF" in
+    *.sym.gz) MARK=$(zcat "$ELF" | awk '$3=="gFishmodSweepLeg"{print $2}') ;;
+    *.sym) MARK=$(awk '$3=="gFishmodSweepLeg"{print $2}' "$ELF") ;;
+    *) MARK=$(mips-linux-gnu-nm "$ELF" | awk '$3=="gFishmodSweepLeg"{print $1}') ;;
+esac
 [ -n "$MARK" ] || { echo "no gFishmodSweepLeg in $ELF"; exit 1; }
 ARES_CPUPROF="$OUT/cpu.bin" ARES_CPUPROF_MARK=$MARK ARES_RSPPROF="$OUT/rsp.bin" ARES_RSPPROF_KEY=00400008 \
     timeout $((MAXSECS + 120)) "$ARES" --settings-file "$CONF" --system "Nintendo 64" --no-file-prompt "$ROM" >/dev/null 2>&1 &

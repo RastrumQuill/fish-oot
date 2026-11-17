@@ -4,3 +4,10 @@
 *.inc linguist-language=gas
 *.seq linguist-language=gas
 include/audio/aseq.h linguist-language=gas
+# run under Linux (WSL, Colab) from a Windows checkout too
+*.sh text eol=lf
+*.patch text eol=lf
+fishmod/sweep/*.py text eol=lf
+fishmod/tools/*.py text eol=lf
+fishmod/pc/bps.py text eol=lf
+*.bml text eol=lf
