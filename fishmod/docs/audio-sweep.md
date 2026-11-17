@@ -64,6 +64,25 @@ updates a frame: the same notes on every run, so two builds can be compared samp
    `src/audio/internal/*.c`, `src/audio/game/*.c`, the audio manager, the audio part of the scheduler and `aspMain`
    was never executed, per sound setting.
 
+## Memory, on every unit
+
+Each unit's check also reports memory, new build against the reference, per game frame:
+
+- **cache lines moved**, by function as the cycle counts are: data lines read in, data lines written back, code
+  lines read in, for the audio driver and for the rest of the game;
+- **bytes on the memory bus** (`bus.txt`, the emulator's count of everything moved to or from RDRAM: the CPU's
+  lines, the RSP's and the cart's transfers, the sound played), the audio's share and the total. The audio's share
+  is attributed by function ranges (`ARES_BUSPROF_RANGES`), so builds with different layouts compare like for like.
+
+These are reported, not pass or fail conditions: placement is not tuned before 1.0.
+
+## Running it: the worker, and the fast mode
+
+The sweep is run by `fishmod/sweep/worker.py` (see `fishmod/sweep/README.md`): a queue names the builds and the
+runs, any Linux machine takes units, and each unit is checked where it ran. The emulator runs without drawing the
+picture (`ARES_NORDP=1`, `fishmod/tools/ares-nodraw.patch`): about 1.7 times faster. Against a normal run of the
+same ROM the sound log and the coverage were identical and the cycle and memory figures within 0.01%.
+
 ## The legs
 
 Each leg is a script in `fishmod/scripts/sweep_*.inc.c`, run four times: stereo, mono, **headphones**, surround
