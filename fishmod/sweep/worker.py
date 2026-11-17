@@ -238,9 +238,13 @@ def one_run(sweep, unit, build, roms, slots, ares, env):
 
 
 def ai_totals(path):
-    """ARES_AIPROF's last line: buffers taken, refused, times the audio interface ran dry, samples of silence, played."""
+    """ARES_AIPROF's line for the last leg: buffers taken, refused, times the audio interface ran dry, samples of silence, played."""
     try:
-        last = open(path).read().split("\n")[-2].split()
+        # (the last leg's line, not "now" or the end marker's: after the script ends the game is silent until the
+        # emulator is stopped, and how long that takes is the machine's, not the build's)
+        rows = [l.split() for l in open(path).read().split("\n") if l.strip()]
+        legs = [r for r in rows if r[0] not in ("now", "65535")]
+        last = (legs or rows)[-1]
         return dict(zip(("taken", "refused", "dry", "silent", "played"), map(int, last[1:6])))
     except (OSError, ValueError, IndexError):
         return None
