@@ -20,6 +20,26 @@ sweep, in real time.
 | A | now, without `--expak` | layout, repacked notes, pins |
 | B | now, with `--expak`, updates built ahead | (lockstep turns building ahead on) |
 
+All three are built from the same tree (`fishmod/tools/audio_ref_tree.sh on`, build, `off` for R), so the game, the
+mod and the sweep's own code are the same in each, and R is rebuilt whenever any of those change.
+
+**Nothing outside the driver may move.** The CPU's caches are direct-mapped (16 KB of instructions, 8 KB of data):
+code that has only moved collides with other code than before, and can cost more or less for that alone. The first
+headphones run showed it: the sound identical in all 106 scenes, but the rest of the game 8% dearer in Zelda's
+courtyard, because the scheduler had grown 240 bytes and the code after the driver started elsewhere, and an actor's
+code now fell on `sinf`'s lines. So the link keeps everything outside the driver where R has it, modulo the cache
+sizes: the scheduler's three functions that grew are linked with the driver and their old room left empty
+(`fishmod/data/sched_text_slots.txt`), each section goes on after the driver at R's place
+(`fishmod/data/audio_pin.txt`), and the heap starts on a 16 KB boundary. `fishmod/tools/layout/check_outside.py R.elf
+NEW.elf` proves it for a build, symbol by symbol; a build that fails it is not swept. What the rest of the game then
+costs more or less than in R is the driver's doing (what it leaves in the caches, the scheduler's changes), not luck.
+
+Inside the driver the order of the functions is worked out, not guessed (`fishmod/tools/layout`): ares records what
+the audio thread executes (`ARES_ITRACE`), `icache_layout` plays the records through a model of the instruction
+cache for a candidate order and searches for the one with the fewest fills, over the pak and no-pak builds together
+(a function is padded to its largest size in any build, so one order puts it at the same address in all).
+(`tools/mkspecrules` is not rebuilt by the game's Makefile: `make -C tools mkspecrules` after changing it.)
+
 Each is built once per leg group with the same script, run in lockstep (the audio thread stepped by the game, three
 updates a frame: the same notes on every run, so two builds can be compared sample for sample and cycle for cycle).
 
@@ -57,7 +77,7 @@ time); the lot is a few hours of machine time, which is free.
 | **sequences** | every sequence in the table (113) started on the music player and left for 20 s, then the fanfare player over it, then two at once with one fading out | every sequence script, every instrument and drum, the script commands and layer paths the scenes' music doesn't use, fades, tempo changes, loads of every font and sample bank (and the sample store filling and evicting) |
 | **effects** | every sound effect in the seven banks (about 1,270), at positions sweeping round and away from the camera, in bursts dense enough to run out of voices | every effect's channel script, position to pan/volume/reverb/filter, voice stealing and release, the bank priority code, the highest voice count the driver can reach |
 | **ocarina** | the ocarina taken out and played from the controller: all five notes, each bent with the stick both ways, vibrato, R and Z modifiers; every song played correctly (the game recognises it and plays it back); a wrong song; the scarecrow's song recorded and played back; the memory game's playback | the ocarina's own update inside the audio thread (it reads the controller itself, so the script's inputs are also fed to it), free playing, recognition, playback, recording; the music ducking under it |
-| **states** | pause and unpause on each menu page; a text box with a choice; an item fanfare; a chest; game over and continue; a shop; enemy nearby (battle music in and out); riding Epona at a gallop; underwater; rain and thunder; the market's crowd from far to near; the Lost Woods' music by direction; a warp song's cutscene; day turning to night; the fishing pond and the mod's rod, cast and reel (the mod's own samples) | the base and extra low-pass filters, volume ducking and restore, a second sequence layered over the first, sequence channels switched on and off by the game, the mod's own sample path |
+| **states** | the game's other calls to the audio code, made directly as the game's code makes them (so the leg doesn't depend on reaching each place): battle music in and out, the indoor and underwater filters, pause, fanfares over music, Ganon's tower's music by floor, Saria's and Malon's songs by distance, the river's and waterfall's pitch, every effect-stopping call, every sequence command, every command to the audio thread, loads asked for outright, a reset into each of the 18 session settings with music and effects in each, and at the end the reset button | the base and extra low-pass filters, volume ducking and restore, a second sequence over the first, channels switched by the game, the command handlers, background loads, every session setting whether a scene uses it or not, the reset-time fade |
 | **system** | boot through the logo and the title demo, file select, new file, load a file, soft reset, the credits' start | settings and sequences outside play, loads while nothing is in memory yet, reset while sound is playing |
 | **loads** | scene changes back and forth across different session settings every 3 s; a fanfare during a scene load; sequences started the frame after a reset | the cases where building ahead must fall back to one update at a time (loads in flight, reset, filters changing) and the reset-time buffer handling |
 

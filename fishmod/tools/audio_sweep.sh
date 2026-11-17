@@ -4,7 +4,7 @@
 #   fishmod/tools/audio_sweep.sh ROM ELF OUT [PARTS] [VARIANTS...]
 # A variant is a leg's letter and the sound setting (0 stereo, 1 mono, 2 headphones, 3 surround): s0..s3 the scenes
 # with adult Link by day, c0..c3 the scenes with child Link at night, q0..q3 the sequences, e0..e3 the sound effects,
-# o0..o3 the ocarina (PARTS 1). Default: the scenes, all eight. PARTS (default 4): how many runs a leg is dealt into.
+# o0..o3 the ocarina, t0..t3 the states (PARTS 1 for both). Default: the scenes, all eight. PARTS (default 4): how many runs a leg is dealt into.
 # Each run is OUT/<variant>.<part>/ (audio_sweep_run.sh's files and audio_sweep_report.py's report.json, aud.bin).
 # Then, between two builds' OUT folders: fishmod/tools/audio_sweep_check.sh REF_OUT NEW_OUT
 set -u
@@ -17,7 +17,7 @@ cp "$ELF" "$OUT/rom.elf"
 JOBS=()
 for v in $VARIANTS; do
     sound=${v:1:1}; child=0; kind=0
-    case "${v:0:1}" in c) child=1 ;; q) kind=1 ;; e) kind=2 ;; o) kind=3 ;; esac
+    case "${v:0:1}" in c) child=1 ;; q) kind=1 ;; e) kind=2 ;; o) kind=3 ;; t) kind=4 ;; esac
     for ((k = 0; k < PARTS; k++)); do
         d="$OUT/$v.$k"
         mkdir -p "$d"
@@ -33,7 +33,7 @@ PY
     done
 done
 export HERE OUT
-printf '%s\n' "${JOBS[@]}" | xargs -P 4 -I{} bash -c '
+printf '%s\n' "${JOBS[@]}" | xargs -P ${PAR:-4} -I{} bash -c '
     d={}; slot=$(( $(echo "$d" | cksum | cut -d" " -f1) % 4 ))
     # (a free GDB port: four runs at once, one each)
     for s in 0 1 2 3; do if mkdir "$OUT/.slot$s" 2>/dev/null; then slot=$s; break; fi; done
