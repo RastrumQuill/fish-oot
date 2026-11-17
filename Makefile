@@ -920,6 +920,11 @@ $(BUILD_DIR)/src/code/fishmod%.o $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod
   -fsyntax-only -funsigned-char -std=gnu90 -D_LANGUAGE_C $(CPP_DEFINES) $(MIPS_BUILTIN_DEFS) $(GBI_DEFINES) $(INC) -m32 \
   -Werror=implicit-function-declaration
 $(BUILD_DIR)/src/code/%.o $(BUILD_DIR)/src/overlays/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations $(GCC_EXTRA_OPT)
+# FISHMOD_MOD_OPT (fishmod/build.sh --mod-opt Os): the mod's own files at another level than the game's, e.g. for
+# size: its hot paths against the instruction cache (fishmod/docs/code-size.md)
+ifneq ($(FISHMOD_MOD_OPT),)
+$(BUILD_DIR)/src/code/fishmod%.o $(BUILD_DIR)/src/overlays/actors/ovl_En_Fishmod/%.o: OPTFLAGS := -$(FISHMOD_MOD_OPT) -fno-strict-aliasing -ffast-math -fno-unsafe-math-optimizations $(GCC_EXTRA_OPT)
+endif
 # debug builds carry line tables, for the PC-sampling profile (n64prof) to map samples to source lines. Not quite
 # free: in the overlays (-mno-explicit-relocs) the assembler can't fill some branch delay slots across the line
 # markers, so a few functions grow; a profile must be read with the ELF of the build it was taken from
