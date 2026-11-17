@@ -28,4 +28,4 @@ Everything merged as of 17 November (commit 2d6f39f and the patches' own commit)
 rc2's bench against its `--expak` bench, A B A B, 12 minutes each, Expansion Pak in: the base's numbers, and whether
 `--expak` goes into it.
 
-Checked here: all four build; the bench runs the lake's route in ares.
+Checked here: all four build and their patches apply; both benches run the lake's route in ares.
