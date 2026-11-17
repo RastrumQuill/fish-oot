@@ -136,7 +136,12 @@ void func_800F4578(Vec3f* pos, u16 sfxId, f32 arg2);
 void func_800F45D0(f32 arg0);
 void func_800F7208(void);
 enum { SWEEP_STATES_BASE = __COUNTER__ + 1 };
-#define STEP case (__COUNTER__ - SWEEP_STATES_BASE):
+// (while sSeek is set the steps are passed over: that's how the second part starts at the split)
+#define STEP                                \
+    case (__COUNTER__ - SWEEP_STATES_BASE): \
+        if (sSeek) {                        \
+            break;                          \
+        }
 #define WAIT(n)   \
     sWait = (n);  \
     break
@@ -153,7 +158,10 @@ enum { SWEEP_STATES_BASE = __COUNTER__ + 1 };
 static void Sweep_StatesCustomUpdate(void) {
 }
 
-static s32 Sweep_States(void) {
+// The leg is longer than the sound log, so it's run in two parts: the first ends at the split, the second starts
+// there (with one part asked for it runs whole).
+static s32 Sweep_States(s32 parts, s32 part) {
+    static s8 sSeek = -1;
     static s32 sStep;
     static s32 sWait;
     static s32 sRep;
@@ -163,10 +171,14 @@ static s32 Sweep_States(void) {
     static u8 sSpec;
     s32 i;
 
+    if (sSeek < 0) {
+        sSeek = (parts > 1) && (part > 0);
+    }
     if (sWait > 0) {
         sWait--;
         return false;
     }
+    do {
     switch (sStep++) {
         // battle music in and out, standing still
         STEP MARK(0); Audio_PlaySceneSequence(NA_BGM_FIELD_LOGIC); WAIT(200);
@@ -268,6 +280,14 @@ static s32 Sweep_States(void) {
         }
         sWait = 12;
         FRAMES(8);
+        // the split
+        case (__COUNTER__ - SWEEP_STATES_BASE):
+            if (sSeek) {
+                sSeek = false;
+            } else if (parts > 1) {
+                return true;
+            }
+            break;
         // every sequence command
         STEP MARK(7); Audio_PlaySceneSequence(NA_BGM_FIELD_LOGIC); WAIT(120);
         STEP SEQCMD_SET_SEQPLAYER_VOLUME(SEQ_PLAYER_BGM_MAIN, 10, 60); SEQCMD_SET_SEQPLAYER_FREQ(SEQ_PLAYER_BGM_MAIN, 10, 1200); WAIT(40);
@@ -375,6 +395,7 @@ static s32 Sweep_States(void) {
         default:
             return true;
     }
+    } while (sSeek);
     return false;
 }
 
@@ -457,7 +478,7 @@ static s32 Sweep_Leg(s32 kind, s32 parts, s32 part) {
         return false;
     }
     if (kind == 4) {
-        return Sweep_States();
+        return Sweep_States(parts, part);
     }
     if (kind == 3) {
         const SweepOcaStep* step;
