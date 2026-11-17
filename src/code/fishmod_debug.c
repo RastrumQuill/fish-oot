@@ -918,6 +918,7 @@ u32 gFishmodProfCount[FISHMOD_PROF_MAX];
 u32 gFishmodPcTag; // the PC profile's tag for its samples now (FISHMOD_PCTAG_*)
 u32 gFishmodScatterDropped[4];
 void* gFishmodScatterDbg[8];
+u32 gFishmodScatterHash[128];
 FishmodPopTest gFishmodPop = { 0.0f, -1, 0, -1.0f, -1.0f };
 FishmodPropTest gFishmodPropTest; // props in view left out by the props' caps: budget, see-through, materials; and the most in view
 #ifndef FISHMOD_FLAT_TEST_INIT

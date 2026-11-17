@@ -551,6 +551,7 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 // audio under the fish's tag)
 extern u32 gFishmodPcTag;
 extern u32 gFishmodScatterDropped[4];
+extern u32 gFishmodScatterHash[128]; // (Scatter_Build's check: the running hash of every set it makes)
 extern void* gFishmodScatterDbg[8]; // (the props' last set and what it was made from: fishmod/tools/popin_check.py)
 // The prop sweep (fishmod_debug_bench.inc.c, FISHMOD_PROP_SWEEP): one prop kind drawn another way for a lap
 typedef enum FishmodPropTestMode {

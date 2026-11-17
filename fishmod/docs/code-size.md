@@ -127,6 +127,30 @@ The whole game at `-Os` (`--gcc Os --gcc-all`) doesn't boot (it never starts the
 is the known cause on clang), so the engine's side is still unmeasured. That's the next thing to measure: the game's
 C at `-Os` with libultra left at `-O2`, then code layout (hot routines together, cold apart).
 
+**`Scatter_Build`'s loops, measured one at a time (17 Nov)**
+
+`hotcode.py --loops ROUTINE:FIRST-LAST` (new) measures one loop by its source lines: its common path (instructions
+run in at least a quarter of the passes) and the cache lines that path lies on. The earlier "5.8 KB loop" was two
+loops and their rare branches counted as one.
+
+| loop | common path | cache lines it lies on | end to end |
+|---|---:|---:|---:|
+| the scan (every prop of the chunks in view: 101 passes a call) | 820 bytes | 29 = 0.91 KB | 0.88 KB |
+| the emit (each prop kept: tier, budget, matrix, entry), before | 1,764 bytes | 68 = 2.12 KB | 3.79 KB |
+| the emit, its rare branches marked (`RARE()`) | 1,780 bytes | 62 = 1.94 KB | 3.08 KB |
+
+The scan is fine. The emit loop's common path is 1.76 KB, but the compiler had laid it across 3.8 KB with the rare
+cases between (see-through kinds, cards that turn to the camera, hidden props, the dissolve, rocks, a matrix not
+made yet, the test hooks). Marking those branches as rare moved some of them after the routine: 6 fewer cache lines,
+0.7 KB shorter end to end, the same instructions. Checked exact: a running hash of every set the routine makes
+(`gFishmodScatterHash`: each prop, tier, matrix and entry), 592 sets over the bench's route, equal at all 37
+checkpoints against the unmarked build. Its code fills a call didn't move (91 to 90): once a call the whole routine is
+fetched whatever its layout, and the route makes a set one frame in four.
+
+Still to do here, in the rule's order: the rare cases as routines of their own (the compiler kept several in line
+despite the marks); the fog step from the chunk the scan already knows (308 bytes and two divides a prop, 9% of
+the routine's time); then the loop by hand if it's still near 2 KB.
+
 **The engine**
 
 | what | size | how often | fills' share | reading |

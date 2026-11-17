@@ -517,6 +517,12 @@ typedef struct ScatterEntry {
     /* 0x0E */ u8 tint;   // its colour's strength (255: full), before the light
     /* 0x0F */ u8 alpha;  // a single card past its kind's distance: how far it has dissolved (255: not at all)
 } ScatterEntry; // size = 0x10
+// a branch the loop seldom takes: the compiler puts its code after the routine's, out of the loop's own lines
+#ifdef SCATTER_NO_RARE // (the check's reference build: the same code, the branches unmarked)
+#define RARE(x) (x)
+#else
+#define RARE(x) __builtin_expect(!!(x), 0)
+#endif
 #define SE_TIER 3         // ScatterTier
 #define SE_XLU (1 << 2)
 #define SE_SWAY (1 << 3)
@@ -2646,11 +2652,11 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
 
         // how it's drawn (as Scatter_Tier, from the kind's numbers for this build)
 #if FISHMOD_DEBUG
-        if (gFishmodLodTest.active && !gFishmodLodTest.asGame) {
+        if (RARE(gFishmodLodTest.active && !gFishmodLodTest.asGame)) {
             tier = Scatter_Tier(prop, &sKinds[k], k, dSq, eye.y);
         } else
 #endif
-        if (ks->flags & KS_XLU) {
+        if (RARE(ks->flags & KS_XLU)) {
             tier = TIER_NEAR;
         } else {
             f32 dy = eye.y - prop->y;
@@ -2669,7 +2675,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
         key = k + tier * FISHMOD_PROP_KIND_MAX; // (a material per kind and tier)
 
-        if (ks->flags & KS_XLU) {
+        if (RARE(ks->flags & KS_XLU)) {
             if ((xluLeft <= 0) || ((k != lastXlu) && (matsXlu >= MAT_MAX_XLU))) {
 #if FISHMOD_DEBUG
                 gFishmodScatterDropped[1]++;
@@ -2682,7 +2688,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 lastXlu = k;
             }
         } else {
-            if ((key != lastOpa) && (mats >= MAT_MAX)) {
+            if (RARE((key != lastOpa) && (mats >= MAT_MAX))) {
 #if FISHMOD_DEBUG
                 gFishmodScatterDropped[2]++;
 #endif
@@ -2695,7 +2701,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
         budget--;
 #if FISHMOD_DEBUG
-        if (gFishmodLodTest.active) {
+        if (RARE(gFishmodLodTest.active)) {
             // the test's cut: the reference's props less these, so the budget and the materials go as before
             if ((gFishmodLodTest.dist[k] > 0) && (dSq > SQ(gFishmodLodTest.dist[k]))) {
                 continue;
@@ -2704,7 +2710,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         }
 #endif
         set->hidden[set->count] = sCandHidden[ci];
-        if (sCandHidden[ci]) {
+        if (RARE(sCandHidden[ci])) {
             set->mtxp[set->count] = NULL; // (not drawn: no matrix)
         } else if ((tier == TIER_IMP) && !SCATTER_IS_ROCK(k) && (prop->tiltX == 0) && (prop->tiltZ == 0)) {
             // a single card, standing: turned to the camera as every other (the turn's cosine and sine made once)
@@ -2721,7 +2727,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         } else {
             s16 yaw = (tier == TIER_IMP) ? sBillboardYaw : (s16)(prop->yaw << 8);
 
-            if ((ks->flags & KS_FACE_CAM) && (tier != TIER_IMP)) {
+            if (RARE((ks->flags & KS_FACE_CAM) && (tier != TIER_IMP))) {
                 // one card that only turns as far as it must: kept within 45 degrees of facing the camera (by where
                 // the camera is, not where it looks), so it never shows edge-on and doesn't spin as the view pans
                 s16 own = yaw;
@@ -2738,10 +2744,10 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                     yaw = own + (delta + 0x2000);
                 }
             }
-            if ((sPropMtx != NULL) && (tier != TIER_IMP) && !(ks->flags & KS_FACE_CAM)) {
+            if (!RARE((sPropMtx == NULL) || (tier == TIER_IMP) || (ks->flags & KS_FACE_CAM))) {
                 // (its own matrix, made once: it depends on the prop alone)
 
-                if (!sPropMtxMade[id]) {
+                if (RARE(!sPropMtxMade[id])) {
                     Scatter_MatrixInto(&sPropMtx[id], prop, k == FISHMOD_PROP_LILY_PAD, yaw);
                     sPropMtxMade[id] = true;
                 }
@@ -2768,7 +2774,7 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
                 set->mtxp[set->count] = Scatter_Matrix(prop, k == FISHMOD_PROP_LILY_PAD, yaw);
             }
         }
-        if (!sCandHidden[ci]) {
+        if (!RARE(sCandHidden[ci])) {
             // its commands, all but written
             ScatterEntry* e = &set->entry[set->entryCount++];
             FishmodPropKindInfo* info = &sKinds[k];
@@ -2785,13 +2791,13 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             e->tint = (prop->tint > 255 / 2) ? 255 : prop->tint * 2;
             e->alpha = 255;
             e->sway = 0;
-            if (ks->flags & KS_XLU) {
+            if (RARE(ks->flags & KS_XLU)) {
                 e->flags |= SE_XLU;
-            } else if ((tier == TIER_IMP) && (dSq > ks->kindMaxSq) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)
+            } else if (RARE((tier == TIER_IMP) && (dSq > ks->kindMaxSq) && !FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NODISSOLVE)
 #if FISHMOD_DEBUG
-                       && !gFishmodLodTest.active
+                            && !gFishmodLodTest.active
 #endif
-            ) {
+                       )) {
                 // past its distance: dissolving away (a dithered alpha test, no blending); as far as when the set
                 // was made (a camera that moves has a new set every few frames)
                 f32 from = sKindMax[k];
@@ -2807,17 +2813,17 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             }
 #if FISHMOD_DEBUG
             // (the prop sweep: this kind's near model whole, or its cut split low)
-            if ((gFishmodPropTest.mode != FISHMOD_PROPTEST_NONE) && (info == &sKinds[gFishmodPropTest.kind])) {
+            if (RARE((gFishmodPropTest.mode != FISHMOD_PROPTEST_NONE) && (info == &sKinds[gFishmodPropTest.kind]))) {
                 near = (gFishmodPropTest.mode == FISHMOD_PROPTEST_WHOLE) ? info->modelFar
                        : (gFishmodPropTest.mode == FISHMOD_PROPTEST_LOW) ? info->modelLow
                                                                          : near;
             }
 #endif
-            if (ks->flags & KS_ROCK) {
+            if (RARE(ks->flags & KS_ROCK)) {
                 // each rock a slightly different stone (by where it stands)
                 e->flags |= SE_ROCK | ((((u32)(prop->x * 7 + prop->z * 13) >> 4) & 3) << SE_STONE_SHIFT);
             }
-            if ((ks->flags & KS_ROCK) && (sRockList != NULL)) {
+            if (RARE((ks->flags & KS_ROCK) && (sRockList != NULL))) {
                 e->dl = sRockList[prop->yaw]; // (its own, near or far: few triangles, all of them shown)
             } else {
                 e->dl = (tier == TIER_IMP)    ? info->modelImp
@@ -2829,6 +2835,43 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
         set->tier[set->count] = tier;
         set->prop[set->count++] = id;
     }
+#if FISHMOD_DEBUG && !defined(FISHMOD_NOTIMERS)
+    {
+        // The check for a change to this routine that mustn't change what it makes: every set hashed into a running
+        // sum (what's in it, how each is drawn, every matrix and entry but its addresses), the sum kept after every
+        // 16th set, for two builds' runs of one route to be compared (gFishmodScatterHash: [0] the sum, [1] sets,
+        // [2 + n] the sum after set 16 n).
+        u32 h = gFishmodScatterHash[0];
+        s32 q;
+        s32 w;
+
+#define HASH(v) h = (h ^ (u32)(v)) * 16777619u
+        HASH(set->count);
+        HASH(set->entryCount);
+        for (q = 0; q < set->count; q++) {
+            HASH(set->prop[q]);
+            HASH(set->tier[q] | (set->hidden[q] << 4));
+            if (set->mtxp[q] != NULL) {
+                for (w = 0; w < (s32)(sizeof(Mtx) / sizeof(u32)); w++) {
+                    HASH(((u32*)set->mtxp[q])[w]);
+                }
+            }
+        }
+        for (q = 0; q < set->entryCount; q++) {
+            ScatterEntry* e = &set->entry[q];
+
+            HASH(e->sway | (e->prop << 16));
+            HASH(e->kind | (e->flags << 8) | (e->tint << 16) | (e->alpha << 24));
+            HASH(set->fogStep[q]);
+        }
+#undef HASH
+        gFishmodScatterHash[0] = h;
+        w = ++gFishmodScatterHash[1];
+        if (((w & 15) == 0) && ((w >> 4) < 126)) {
+            gFishmodScatterHash[2 + (w >> 4)] = h;
+        }
+    }
+#endif
 #if FISHMOD_DEBUG
     if (n < candCount) {
         gFishmodScatterDropped[0] += candCount - n; // (the budget ran out: the rest, farthest first, not drawn)
