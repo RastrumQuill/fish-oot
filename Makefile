@@ -275,6 +275,10 @@ ifeq ($(FISHMOD_DEBUG),1)
   CPP_DEFINES += -DFISHMOD_DEBUG=1
   COMPARE := 0
 endif
+# (the GCC builds: for the spec, which puts what GCC's code may call at any time in the boot segment)
+ifeq ($(GCC_CODE),1)
+  CPP_DEFINES += -DFISHMOD_GCC=1
+endif
 FISHMOD_NOTIMERS ?= 0
 ifeq ($(FISHMOD_NOTIMERS),1)
   CPP_DEFINES += -DFISHMOD_NOTIMERS=1
@@ -979,9 +983,57 @@ $(GCC_LIBULTRA_OBJS): PREPROCESS :=
 $(GCC_LIBULTRA_OBJS): CFLAGS = $(GCC_PLAIN_CFLAGS) -fno-builtin
 # (-fno-builtin: GCC would turn libultra's own byte compares into calls to memcmp, which the game doesn't have)
 $(GCC_LIBULTRA_OBJS): MIPS_VERSION := -mips3
-$(GCC_LIBULTRA_OBJS): OPTFLAGS := $(GCC_PLAIN_OPT)
+# GCC_LIBULTRA_OPT: libultra's own level (default the game's)
+GCC_LIBULTRA_OPT ?= $(GCC_OPT)
+$(GCC_LIBULTRA_OBJS): OPTFLAGS := -$(GCC_LIBULTRA_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
+# GCC_LIBULTRA_KEEP: files (as os/foo io/bar) kept at -O2 whatever the level: those that don't run right at -Os
+GCC_LIBULTRA_KEEP ?=
+$(foreach f,$(GCC_LIBULTRA_KEEP),$(eval $(BUILD_DIR)/src/libultra/$(f).o: OPTFLAGS := -O2 -fno-strict-aliasing -fno-math-errno $$(GCC_EXTRA_OPT)))
 ifeq ($(FISHMOD_DEBUG),1)
 $(GCC_LIBULTRA_OBJS): OPTFLAGS += -g
+endif
+endif
+# fish-oot: GCC_REST=1: what was still on IDO, on GCC too: the boot code, libu64, libc64, libc, libultra's libc, the
+# disk drive's code (n64dd, libleo). With GCC_CODE, GCC_AUDIO and GCC_LIBULTRA, every C file in the game is GCC's
+# (fishmod/build.sh --gcc-everything); what's left on the old tools is hand-written assembly and data.
+ifeq ($(GCC_REST),1)
+GCC_REST_OBJS := $(BUILD_DIR)/src/boot/%.o $(BUILD_DIR)/src/libu64/%.o $(BUILD_DIR)/src/libc64/%.o \
+  $(BUILD_DIR)/src/libc/%.o $(BUILD_DIR)/src/libultra/libc/%.o $(BUILD_DIR)/src/n64dd/%.o $(BUILD_DIR)/src/libleo/%.o
+$(GCC_REST_OBJS): CC := tools/fishmod_gcc_cc.sh
+$(GCC_REST_OBJS): CC_CHECK := @:
+$(GCC_REST_OBJS): PREPROCESS :=
+$(GCC_REST_OBJS): CFLAGS = $(GCC_PLAIN_CFLAGS) -fno-builtin
+$(GCC_REST_OBJS): MIPS_VERSION := -mips3
+$(GCC_REST_OBJS): OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
+$(GCC_REST_OBJS): POSTPROCESS_OBJ := @:
+# (the two boot files with IDO options of their own: the same as the rest here)
+GCC_REST_OWN := $(BUILD_DIR)/src/boot/driverominit.o $(BUILD_DIR)/src/boot/viconfig.o
+$(GCC_REST_OWN): OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing -fno-math-errno $(GCC_EXTRA_OPT)
+$(GCC_REST_OWN): MIPS_VERSION := -mips3
+# Not ll.c and llcvt.c (64-bit multiply, divide, shifts and conversions): IDO compiles them to the CPU's 64-bit
+# instructions, and GCC's own 64-bit helpers (__divdi3 and the rest, src/code/fishmod.c) are made of them: on GCC
+# they'd call each other for ever. They stay IDO's until they're written in assembly.
+GCC_REST_IDO := $(BUILD_DIR)/src/libultra/libc/ll.o $(BUILD_DIR)/src/libultra/libc/llcvt.o
+$(GCC_REST_IDO): CC := $(CC)
+$(GCC_REST_IDO): CC_CHECK := $(CC_CHECK)
+$(GCC_REST_IDO): PREPROCESS := ./tools/preprocess.sh -v $(VERSION) -i $(ICONV) --
+$(GCC_REST_IDO): CFLAGS := $(CFLAGS)
+$(GCC_REST_IDO): OPTFLAGS := -O1
+$(GCC_REST_IDO): MIPS_VERSION := -mips3 -32
+$(GCC_REST_IDO): POSTPROCESS_OBJ := $(PYTHON) tools/set_o32abi_bit.py
+# GCC_REST_SKIP: files (as boot/idle libc64/malloc) left on IDO, to find or set aside one that doesn't run on GCC
+GCC_REST_SKIP ?=
+GCC_REST_SKIPPED := $(foreach f,$(GCC_REST_SKIP),$(BUILD_DIR)/src/$(f).o)
+ifneq ($(GCC_REST_SKIPPED),)
+$(GCC_REST_SKIPPED): CC := $(CC)
+$(GCC_REST_SKIPPED): CC_CHECK := $(CC_CHECK)
+$(GCC_REST_SKIPPED): PREPROCESS := ./tools/preprocess.sh -v $(VERSION) -i $(ICONV) --
+$(GCC_REST_SKIPPED): CFLAGS := $(CFLAGS)
+$(GCC_REST_SKIPPED): OPTFLAGS := -O2
+$(GCC_REST_SKIPPED): MIPS_VERSION := -mips2
+endif
+ifeq ($(FISHMOD_DEBUG),1)
+$(GCC_REST_OBJS): OPTFLAGS += -g
 endif
 endif
 # fish-oot: CLANG_AUDIO=1: the audio driver alone on clang (IDO otherwise), to measure or check it apart from the rest

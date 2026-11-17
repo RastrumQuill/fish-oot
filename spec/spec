@@ -114,6 +114,13 @@ beginseg
     include "$(BUILD_DIR)/src/libc/memset.o"
     include "$(BUILD_DIR)/src/libc/memmove.o"
     include "$(BUILD_DIR)/src/gcc_fix/missing_gcc_functions.o"
+#elif defined(FISHMOD_GCC)
+    // fish-oot's GCC builds: memcpy, memset, memmove and memcmp in boot. GCC calls them for a block copy or compare
+    // wherever it likes (at -Os, osInitialize's copies of the exception vectors: before the code segment is loaded,
+    // where they used to be, the game jumped into empty memory and never started)
+    include "$(BUILD_DIR)/src/libultra/libc/string.o"
+    include "$(BUILD_DIR)/src/libc/memset.o"
+    include "$(BUILD_DIR)/src/libc/memmove.o"
 #endif
 
 endseg
