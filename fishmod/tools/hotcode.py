@@ -101,6 +101,7 @@ def main():
     ap.add_argument("--all", action="store_true", help="with --match: every matching routine, over the lines or not")
     ap.add_argument("--wrappers", action="store_true",
                     help="also list routines whose path is nearly all (85%%) one listed callee's")
+    ap.add_argument("--loops", default="", help="ROUTINE:FIRST-LAST (source lines): that loop's passes, common-path bytes and the cache lines they lie on")
     ap.add_argument("--map", default="", help="one routine's running code by source line (and what's inlined there)")
     ap.add_argument("--map-min", type=int, default=24, help="with --map: only lines with at least this many running bytes")
     ap.add_argument("--why", action="store_true", help="under each row, the routines its path is made of, by size")
@@ -161,6 +162,39 @@ def main():
         path = (fr[-1].get("FileName", "") if fr else "") or sources.get(f["name"], "")
         f["file"] = sysprof.rel_file(path) if path else ""
         f["system"], f["sub"] = sysprof.classify(path, f["name"])
+
+    if a.loops:
+        # a loop of one routine, named by its source lines (ROUTINE:FIRST-LAST): passes a call, the code its common
+        # path runs, and the cache lines that code lies on (rare branches left between the common ones cost lines
+        # without running; moved out, the same code lies on fewer)
+        name, _, span = a.loops.partition(":")
+        first, _, last = span.partition("-")
+        first, last = int(first), int(last)
+        k = next((k for k, f in F.items() if f["name"] == name), None)
+        if k is None:
+            sys.exit(f"{name}: not in the profile")
+        f = F[k]
+        c = max(f["calls"], 1)
+        fr = sysprof.n64prof.symbolize(a.elf, f["ins"].keys())
+        ins = []
+        for pc, e in f["ins"].items():
+            chain = fr.get(pc) or []
+            line = chain[-1].get("Line", 0) if chain else 0
+            if first <= line <= last:
+                ins.append((pc, e[1], e[0], e[4]))
+        counts = sorted(n for _, n, _, _ in ins)
+        passes = counts[len(counts) // 2]
+        common = [pc for pc, n, _, _ in ins if n >= 0.25 * passes]
+        lines = {pc >> 5 for pc in common}
+        every = {pc >> 5 for pc, n, _, _ in ins}
+        print(f"{name} lines {first}-{last}: {passes / c:.1f} passes a call ({c} calls)")
+        print(f"  code that ever ran: {4 * len(ins)} bytes on {len(every)} cache lines")
+        print(f"  common path (at least a quarter of the passes): {4 * len(common)} bytes on {len(lines)} cache lines "
+              f"= {len(lines) * 32 / 1024.0:.2f} KB of cache")
+        print(f"  from {min(common):#x} to {max(common) + 4:#x}: {(max(common) + 4 - min(common)) / 1024.0:.2f} KB end to end")
+        print(f"  cycles a pass {sum(t for _, _, t, _ in ins) / 2 / max(passes, 1):.0f}; code fills a call "
+              f"{sum(i for _, _, _, i in ins) / c:.1f}")
+        return
 
     if a.map:
         # one routine's running code by source line: where the bytes that run per call are
