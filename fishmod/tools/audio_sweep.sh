@@ -4,7 +4,7 @@
 #   fishmod/tools/audio_sweep.sh ROM ELF OUT [PARTS] [VARIANTS...]
 # A variant is a leg's letter and the sound setting (0 stereo, 1 mono, 2 headphones, 3 surround): s0..s3 the scenes
 # with adult Link by day, c0..c3 the scenes with child Link at night, q0..q3 the sequences, e0..e3 the sound effects,
-# o0..o3 the ocarina, t0..t3 the states (PARTS 1 for both). Default: the scenes, all eight. PARTS (default 4): how many runs a leg is dealt into.
+# o0..o3 the ocarina, t0..t3 the states (PARTS 1 for the ocarina; 2 for the states, which are longer than the sound log). Default: the scenes, all eight. PARTS (default 4): how many runs a leg is dealt into.
 # Each run is OUT/<variant>.<part>/ (audio_sweep_run.sh's files and audio_sweep_report.py's report.json, aud.bin).
 # Then, between two builds' OUT folders: fishmod/tools/audio_sweep_check.sh REF_OUT NEW_OUT
 set -u
