@@ -25,6 +25,8 @@
 #                  mod's; outputs get a -clanggame suffix
 #   --clang-audio  the audio driver alone on clang (IDO otherwise; --clang-game includes it): to measure it, or prove it
 #                  sounds the same (the audlog script); outputs get a -clangaudio suffix
+#   --gcc-everything  --gcc-all plus what was still on IDO (boot, libu64, libc64, libc, libultra's libc, the disk
+#                  drive's code): every C file on GCC; outputs get a -gccrest suffix
 #   --gcc-audio    the audio driver on GCC too (IDO otherwise); --gcc-libultra libultra's C (os, io, gu); --gcc-all both:
 #                  the whole game's C on GCC. Outputs get -gccaudio / -gccultra suffixes
 #   --clang-opt L  (implies --clang) clang's optimisation level for the mod's code (Os, Oz, O3...; default the GCC
@@ -94,6 +96,7 @@ while [ $# -gt 0 ]; do
         --gcc-audio) GCC_AUDIO=1 ;;
         --gcc-libultra) GCC_LIBULTRA=1 ;;
         --gcc-all) GCC_AUDIO=1; GCC_LIBULTRA=1 ;;
+        --gcc-everything) GCC_AUDIO=1; GCC_LIBULTRA=1; GCC_REST=1 ;;
         --texpack) TEXPACK=1 ;;
         --colpack) COLPACK=1 ;;
         --meshpack) MESHPACK=1 ;;
@@ -182,7 +185,7 @@ if [ "$MESHPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$MP_OUT")
 fi
-MODE="modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+MODE="gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -230,7 +233,7 @@ python3 fishmod/tools/gen_animcheck_cases.py > /dev/null
 
 GCC_ARGS=()
 if [ -n "$GCC" ]; then
-    GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC" CLANG_AUDIO=$CLANG_AUDIO GCC_AUDIO=$GCC_AUDIO GCC_LIBULTRA=$GCC_LIBULTRA)
+    GCC_ARGS=(GCC_CODE=1 GCC_OPT="$GCC" CLANG_AUDIO=$CLANG_AUDIO GCC_AUDIO=$GCC_AUDIO GCC_LIBULTRA=$GCC_LIBULTRA GCC_REST=${GCC_REST:-0})
     if [ "$CLANG" = 1 ]; then
         GCC_ARGS+=(CLANG_MOD=1 CLANG_GAME=$CLANG_GAME)
     fi
@@ -292,6 +295,9 @@ if [ "$GCC_AUDIO" = 1 ]; then
 fi
 if [ "$GCC_LIBULTRA" = 1 ]; then
     SUFFIX="$SUFFIX-gccultra"
+fi
+if [ "${GCC_REST:-0}" = 1 ]; then
+    SUFFIX="$SUFFIX-gccrest"
 fi
 
 if [ "$DEBUG" = 1 ]; then
