@@ -98,6 +98,7 @@ ASM_SYSTEMS = [
      "libultra (OS: threads, interrupts, PI, SI, VI, timers)", "assembly"),
 ]
 IDLE_FUNCS = {"Idle_ThreadEntry"}
+HARNESS = "Profiler and test harness (not in a release)"
 OVERLAY_LO = 0x80800000
 
 
@@ -273,7 +274,8 @@ def report(args):
         add(s["subs"][f["sub"]], f["w"])
         s["funcs"].append(f)
     idle = systems.get("(idle)", {"w": [0] * 5})["w"][0]
-    busy = max(total[0] - idle, 1)
+    harness = systems.get(HARNESS, {"w": [0] * 5})["w"][0]
+    busy = max(total[0] - idle - harness, 1)
     exact = kind == "clocks"
 
     def share(x):
@@ -294,7 +296,8 @@ def report(args):
     else:
         iv = heads[0]["interval"] if heads else 0
         w(f"- {total[0]:,} samples; idle {100.0 * idle / max(total[0], 1):.1f}% of them")
-    w(f"- shares below are of the time the CPU was working (idle left out)\n")
+    w(f"- the profiler and test harness's own code: {100.0 * harness / max(total[0], 1):.1f}% of the run")
+    w(f"- shares below are of the time the game's own code was working (idle and the harness left out)\n")
 
     w("## Systems\n")
     if exact:
@@ -305,7 +308,7 @@ def report(args):
         w("|---|---:|---:|")
     order = sorted(systems.items(), key=lambda kv: -kv[1]["w"][0])
     for name, s in order:
-        if name == "(idle)":
+        if name in ("(idle)", HARNESS):
             continue
         x = s["w"]
         if exact:
@@ -379,7 +382,7 @@ def report(args):
     else:
         sys.stdout.write(text)
     if args.json:
-        data = {"kind": kind, "total": total, "idle": idle, "frames": args.frames,
+        data = {"kind": kind, "total": total, "idle": idle + harness, "frames": args.frames,
                 "functions": {f["name"]: {"system": f["system"], "sub": f["sub"], "file": rel_file(f["file"]), "w": f["w"],
                                           "calls": f["calls"]} for f in funcs.values()}}
         json.dump(data, open(args.json, "w"))
@@ -426,7 +429,7 @@ def compare(args):
     print(f"({unit}; A = {args.a}, B = {args.b})\n")
     print(f"{'system':58s} {'A':>12s} {'B':>12s} {'B-A':>12s}")
     for s in sorted(set(sa) | set(sb), key=lambda s: -max(sa[s], sb[s])):
-        if s == "(idle)":
+        if s in ("(idle)", HARNESS):
             continue
         print(f"{s[:58]:58s} {sa[s]:12.2f} {sb[s]:12.2f} {sb[s] - sa[s]:+12.2f}")
     rows = []

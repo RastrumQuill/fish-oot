@@ -21,8 +21,9 @@ draw, callbacks) can't be followed, so each row says how many such calls its pat
 under its own name. A routine whose path is nearly all one listed callee's (a wrapper) is left out: --wrappers.
 
 Columns: ms/frame is the routine's own time plus its callees' (shared out by call counts); "code fills" are the
-instruction-cache line fills counted inside the path's routines over the run (the direct evidence of trouble),
-also given per frame.
+instruction-cache line fills counted inside the path's routines (the direct evidence of trouble), per frame, and
+as a share of the path's time at 48 cycles a fill. The fills are all of those routines' (a shared helper's fills
+count in every path that uses it), so the share is a ceiling for wide paths and close for narrow ones.
 """
 import argparse
 import bisect
@@ -127,9 +128,6 @@ def main():
         f["ins"][pc] = e
         for j in range(5):
             f["w"][j] += e[j]
-    all_clocks = sum(e[0] for e in total.values())
-    idle = sum(f["w"][0] for f in F.values() if syms[f["k"]][2] in sysprof.IDLE_FUNCS)
-    busy = max(all_clocks - idle, 1)
 
     for f in F.values():
         addr = syms[f["k"]][0]
@@ -161,6 +159,13 @@ def main():
         path = (fr[-1].get("FileName", "") if fr else "") or sources.get(f["name"], "")
         f["file"] = sysprof.rel_file(path) if path else ""
         f["system"], f["sub"] = sysprof.classify(path, f["name"])
+
+    # the working time: the game's own (idle and the test harness's code left out, here and in every path's time)
+    for f in F.values():
+        if f["system"] in ("(idle)", sysprof.HARNESS):
+            f["w"] = [0, 0, 0, 0, 0]
+            f["skip"] = True
+    busy = max(sum(f["w"][0] for f in F.values()), 1)
 
     # inclusive time: own plus each callee's, shared out by the calls made from here
     incl = {}
@@ -207,7 +212,7 @@ def main():
 
     rows = []
     for k, f in F.items():
-        if f["system"] == "(idle)":
+        if f.get("skip"):
             continue
         c = f["calls"]
         if c == 0:
@@ -285,16 +290,18 @@ def main():
             continue
         w(f"## {title}\n")
         w("| routine | what | times/frame | code KB | routines | calls by pointer | ms/frame | share | code fills/frame | "
-          "system | file |")
-        w("|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|")
+          "fills' share of its time | system | file |")
+        w("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|")
         for r in sel:
             f = r["f"]
             w(f"| `{f['name']}` | {r['what']} | {r['per_frame']:,.1f} | {r['kb']:.1f} | {len(r['path'])} | {r['ind']} | "
-              f"{r['ms']:.3f} | {r['share']:.2f}% | {r['fills'] / a.frames:,.1f} | {f['system']} | {f['file']} |")
+              f"{r['ms']:.3f} | {r['share']:.2f}% | {r['fills'] / a.frames:,.1f} | "
+              f"{min(100.0, 100.0 * r['fills'] * 48 / max(r['ms'] / 1000 * CPU_HZ * a.frames, 1)):.0f}% | {f['system']} | "
+              f"{f['file']} |")
             if a.why:
                 parts = sorted(r["path"].items(), key=lambda kv: -kv[1])[:12]
                 w("| | " + ", ".join(f"`{F[kk]['name']}` {b / 1024:.2f}" for kk, b in parts)
-                  + (f", +{len(r['path']) - 12} more" if len(r["path"]) > 12 else "") + " | | | | | | | | | |")
+                  + (f", +{len(r['path']) - 12} more" if len(r["path"]) > 12 else "") + " | | | | | | | | | | |")
         w("")
     text = "\n".join(out) + "\n"
     if a.output:
