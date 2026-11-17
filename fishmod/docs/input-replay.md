@@ -107,6 +107,37 @@ costliest functions (calls, cycles and instructions per call, cache fills) and t
 `sysprof.py compare before.json after.json` puts two runs side by side by system and by function: the check after an
 optimization.
 
+### Hot code by size
+
+```bash
+fishmod/tools/hotcode.py cpu.bin --elf ELF --frames N [--why] [--match REGEX [--all]]
+```
+
+A search over the profile for code that may be fighting the instruction cache (16 KB, direct mapped). Two lines,
+filters for what to look at and not targets:
+
+- **hot**: a routine with at least 0.25% of the working time whose code per call is over 4 KB;
+- **per item**: code that runs 8 or more times a frame (per fish, actor, prop, collision polygon), a routine called
+  that often or a loop inside one, whose code per item is over 2 KB.
+
+"Code per call" is the routine's own instructions that run in at least a quarter of its calls, plus the same for
+everything it calls from those (direct calls, followed down; calls through pointers are counted, not followed).
+Each row also has the instruction-cache fills counted inside its path: the measured cost, next to the size that
+suggests it. `--why` lists the routines a path is made of by size (what to split off or shrink); `--match` searches by
+routine, file or system (`--match scatter --all` shows the props' code whether or not it's over a line).
+`--hot-kb`, `--item-kb`, `--item-calls` move the lines.
+
+### Without a recording: every scene
+
+`--script prof_scenes` walks every scene in the entrance table (150 frames each, Link running, rolling, swinging;
+opening cutscenes play out) with no player. It's the path to profile until there's a recorded playthrough, and a
+check that a change didn't cost some scene the playthrough spends little time in.
+
+### A compiler's profile
+
+`sysprof.py dump cpu.bin -o cpu.n64p` writes ares's exact counts as an n64prof dump, so `n64prof.py llvm cpu.n64p
+--elf ELF -o game.prof` makes the sample profile from exact execution counts instead of timer samples.
+
 For a profile-guided build: `n64prof.py llvm` turns a console profile into the sample profile `fishmod/build.sh`'s
 clang option takes (`PGO_PROFILE=...`).
 

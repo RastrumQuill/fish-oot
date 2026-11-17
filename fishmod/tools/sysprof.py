@@ -3,6 +3,8 @@
 
   sysprof.py report PROFILE... --elf ELF [-o REPORT.md] [--json OUT.json] [--functions N] [--lines N]
   sysprof.py compare A.json B.json [--top N]        two reports' systems and functions side by side
+  sysprof.py dump PROFILE... -o OUT.n64p            ares's exact profile as an n64prof dump (for `n64prof.py llvm`:
+                                                    a compiler's sample profile from exact counts)
 
 PROFILE is either
   - ares's exact profile (ARES_CPUPROF=<file>, fishmod/tools/ares-prof.patch): every instruction run, with its clocks,
@@ -383,6 +385,24 @@ def report(args):
         json.dump(data, open(args.json, "w"))
 
 
+def todump(args):
+    """ares's exact profile as an n64prof dump (one bucket an instruction, its run count as the samples), so
+    n64prof.py's tools read it: `n64prof.py llvm` makes a compiler's sample profile from exact counts."""
+    total = {}
+    for p in args.profiles:
+        for pc, e in read_cpuprof(p).items():
+            total[pc] = total.get(pc, 0) + e[1]
+    top = max(total.values(), default=1)
+    scale = max(1, (top >> 31) + 1)  # (counts are 32 bits in a dump)
+    rows = [(pc, c // scale) for pc, c in sorted(total.items()) if c // scale]
+    head = [n64prof.MAGIC, 1, min(sum(c for _, c in rows), 0xFFFFFFFF), 0, 0, len(rows), 0, 0, 2, 1, 0, 0, 0, 0, 0, 0]
+    with open(args.output, "wb") as f:
+        f.write(struct.pack(n64prof.HEADER, *head))
+        for pc, c in rows:
+            f.write(struct.pack(">II", pc, c))
+    print(f"{args.output}: {len(rows)} instructions' counts" + (f" (divided by {scale})" if scale > 1 else ""))
+
+
 def compare(args):
     a = json.load(open(args.a))
     b = json.load(open(args.b))
@@ -436,6 +456,10 @@ def main():
     r.add_argument("--line-functions", type=int, default=8, help="functions per system whose lines are listed")
     r.add_argument("--line-min", type=float, default=0.2, help="only functions with at least this share (%%)")
     r.set_defaults(fn=report)
+    d = sub.add_parser("dump")
+    d.add_argument("profiles", nargs="+")
+    d.add_argument("-o", "--output", required=True)
+    d.set_defaults(fn=todump)
     c = sub.add_parser("compare")
     c.add_argument("a")
     c.add_argument("b")
