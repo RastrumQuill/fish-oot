@@ -74,7 +74,8 @@ def main():
         else:
             flush()
     flush()
-    hr, hn = rn["_buffersSegmentEnd"], nn["_buffersSegmentEnd"]
+    # (main.c starts the heap at the next 16 KB boundary after the buffers)
+    hr, hn = (rn["_buffersSegmentEnd"] + 0x3FFF) & ~0x3FFF, (nn["_buffersSegmentEnd"] + 0x3FFF) & ~0x3FFF
     print("heap start: %08x, was %08x: %s" % (hn, hr, "same place" if (hn - hr) % 0x4000 == 0 else "MOVED %#x" % ((hn - hr) % 0x4000)))
     bad += (hn - hr) % 0x4000 != 0
     print("moved runs: %d" % bad)
