@@ -69,6 +69,7 @@ class Source:
 
     def __init__(self, branch, local):
         self.ref = None
+        self.root = local if isinstance(local, str) else ROOT
         if not local:
             git("fetch", "-q", "origin", branch)
             self.ref = git("rev-parse", "FETCH_HEAD")
@@ -77,7 +78,7 @@ class Source:
         if os.path.isabs(path) or ".." in path.split("/"):
             raise RuntimeError("the queue names a path outside the repository: %s" % path)
         if self.ref is None:
-            return open(os.path.join(ROOT, path), "rb").read()
+            return open(os.path.join(self.root, path), "rb").read()
         return git("show", "%s:%s" % (self.ref, path), binary=True)
 
     def queue(self):
@@ -383,7 +384,8 @@ def main():
     ap.add_argument("--name", default=socket.gethostname(), help="this worker's name in the claims")
     ap.add_argument("--ares")
     ap.add_argument("--branch", default=QUEUE_BRANCH, help="the branch the queue is read from")
-    ap.add_argument("--local", action="store_true", help="the queue and its files from this checkout, not the remote")
+    ap.add_argument("--local", nargs="?", const=True, metavar="DIR",
+                    help="the queue and its files from this checkout (or from DIR, laid out the same), not the remote")
     ap.add_argument("--from-end", action="store_true", help="take units from the end of the queue (two workers meet in the middle)")
     ap.add_argument("--no-push", action="store_true", help="keep the results here and zip them (no git login)")
     ap.add_argument("--once", type=int, metavar="N", help="at most N units, then stop")
