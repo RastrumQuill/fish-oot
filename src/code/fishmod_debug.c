@@ -1284,7 +1284,7 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
             if (!gFishmodAudioLockstep) {
                 // (a run in real time: the RSP's audio on, which the title screen the scripts skip turns on; the
                 // lockstep does it at its first tick)
-                R_AUDIOMGR_ACTIVITY_LEVEL = AUDIOMGR_ACTIVITY_LEVEL_ALL;
+                R_AUDIOMGR_ACTIVITY_LEVEL = 0; /* AUDIOMGR_ACTIVITY_LEVEL_ALL */
             }
         }
         if (sSweepKind != 0) {
