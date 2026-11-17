@@ -108,11 +108,21 @@ scene or effect joins the sweep without anyone remembering to add it).
 Sending audio tasks to the RSP early (`gFishmodAudioLazy`) and the scheduler changes depend on real timing, which
 lockstep removes. For those:
 
-- the same legs run again in real time in the emulator with each of the four switch settings (as now / ahead / lazy /
-  both), checked for: still running (3), no AI buffer underrun or overrun (the AI's length register sampled each
-  retrace: a dropout is a count, and one is a failure), and every task's command list hashed and matched against the
-  set of lists the lockstep run produced for that leg (the lists can arrive at different times; they may not be
-  different lists);
+- the same legs run again in real time in the emulator (sweep `audio-rt-1`, `"realtime": true`), on six builds: the
+  reference, no-pak, and the Expansion Pak build as shipped, with updates built ahead, with tasks sent early, and
+  with both. Option bit 5 of the word at ROM 0x38 turns lockstep off; bits 6 and 7 set `gFishmodAudioAhead` and
+  `gFishmodAudioLazy` (`Fishmod_SweepEarly`, before the audio thread starts). A build's entry in the queue carries
+  the bits as `"opt"`.
+- There is no sound log in real time: the game's timing differs between builds, so samples can't be matched one for
+  one. Instead the emulator counts what the audio interface did (`ARES_AIPROF=<file>`,
+  `fishmod/tools/ares-aiprof.patch`): buffers taken, buffers refused (the game wrote a length while both slots were
+  full), times it ran dry (the last buffer ended with none queued), silent samples and samples played, per leg.
+- A real-time unit passes when every build reaches the end with no stopped thread, and no build has more refused
+  buffers, more dry runs, or more than 3,200 more silent samples (a tenth of a second) than the reference. Two dry
+  runs and about 510 silent samples at start-up are the reference's own.
+- That the sound is the same is the lockstep sweep's finding (which has updates built ahead on the Expansion Pak
+  build); the real-time pass adds that it is delivered on time and reaches the code lockstep can't: the retrace
+  handler, the early send, the real-time buffer length.
 - then the console run below.
 
 ## The console run (only after everything above passes)
