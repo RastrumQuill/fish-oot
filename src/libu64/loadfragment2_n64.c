@@ -242,6 +242,13 @@ size_t Overlay_Load(uintptr_t vromStart, uintptr_t vromEnd, void* vramStart, voi
 
     osWritebackDCache(allocatedRamAddr, size);
     osInvalICache(allocatedRamAddr, size);
+#if FISHMOD_DEBUG
+    {
+        void Fishmod_OverlayLoaded(void* vramStart, void* ram, u32 size);
+
+        Fishmod_OverlayLoaded(vramStart, allocatedRamAddr, size);
+    }
+#endif
 
     if (gOverlayLogSeverity >= 3) {
         osSyncPrintf(T("ダイナミックリンクファンクションのロードを終了します\n\n",

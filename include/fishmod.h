@@ -737,6 +737,27 @@ s32 Fishmod_DebugWantsFish(void);
 // Fish per scene roster wanted by the autoplay script (benchmarks), 0 = the game's own count
 s32 Fishmod_DebugRosterCount(void);
 void Fishmod_AutoplayInput(struct GameState* gameState, Input* inputs);
+// The input recorder and its replay (fishmod_debug_inputrec.inc.c): the controller as the game read it this frame; a
+// game state about to start; the save memory just read at power-on. The counts are the replay's report.
+typedef struct FishmodReplay {
+    u32 state;   // the game state's number (0xE1: no recording in the ROM; 0xE2: one for another build)
+    u32 segs;    // game states started
+    u32 frames;
+    u32 early;   // states the replay left before the recording did
+    u32 skipped; // the recording's frames those skipped
+    u32 late;    // states the replay was still in when the recording left
+    u32 forced;  // of those, left by force
+    u32 snaps;   // times Link was put back where the recording had him
+    u32 rng;     // times the random numbers differed from the recording's
+    u32 syncs;   // times those two were checked
+    u32 lost;    // (recording) words dropped: nobody listening on the USB
+    u32 rom;
+} FishmodReplay;
+extern FishmodReplay gFishmodReplay;
+void Fishmod_InputRecInput(struct GameState* gameState, Input* inputs);
+void Fishmod_InputRecState(struct GameState* gameState, void (*init)(struct GameState*));
+void Fishmod_InputRecSram(u8* sram);
+u32* Fishmod_RandState(void);
 void Fishmod_DebugPlayUpdate(struct PlayState* play);
 void Fishmod_DebugDrawText(struct GameState* gameState, Gfx** gfxP);
 void Fishmod_DebugPrintf(s32 line, const char* fmt, ...);

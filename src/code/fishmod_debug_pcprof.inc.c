@@ -137,6 +137,16 @@ static s32 Sc64_Init(void) {
     return Sc64_Read(SC64_IDENTIFIER) == 0x53437632; // "SCv2"
 }
 
+/** Sc64_Init once, whoever asks first (the profiler, the input recorder). */
+static s32 Sc64_Ensure(void) {
+    static s32 sState = -1;
+
+    if (sState < 0) {
+        sState = Sc64_Init();
+    }
+    return sState;
+}
+
 /** Still sending the last packet? */
 static s32 Sc64_UsbBusy(void) {
     u32 status;
@@ -772,7 +782,7 @@ static void PcProf_Update(void) {
 #endif
         u32 outSize = PCPROF_SRAM_SIZE;
 
-        sPcUsb = Sc64_Init();
+        sPcUsb = Sc64_Ensure();
         if (sPcUsb) {
             hash = PCPROF_USB_HASH;
             outSize = SC64_BUFFER_SIZE;
@@ -941,6 +951,11 @@ static void PcProf_Update(void) {
             sPcSendPos = 0;
             sLastSave = now;
         }
+#ifdef FISHMOD_INPUTREC
+        if (InputRec_Pump()) { // the recorded inputs before anything (one packet a frame in all)
+            return;
+        }
+#endif
 #ifdef FISHMOD_FRAMELOG
         // the frame log first (one packet a frame in all)
 #ifdef FISHMOD_FRAMELOG_NOSEND // (a console bisection: the records are made, never sent)

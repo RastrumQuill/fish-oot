@@ -61,6 +61,14 @@ static u32 sRandInt = 1;
  * @note Orignal name: __qrand_itemp
  */
 static FloatInt sRandFloat;
+
+#endif
+
+#if FISHMOD_DEBUG
+// (the input recorder: the random numbers' state, recorded and put back)
+u32* Fishmod_RandState(void) {
+    return &sRandInt;
+}
 #endif
 
 /**
