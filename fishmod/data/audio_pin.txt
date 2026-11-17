@@ -1,0 +1,9 @@
+# Where each section of the code segment goes on after the audio driver's last object (tools/mkspecrules.c):
+# SECTION MODULUS PHASE: at the next address that is PHASE past a multiple of MODULUS. The moduli are the CPU's caches
+# (16 KB of instructions, 8 KB of data, both direct-mapped); the phases are where what follows the driver started
+# before the audio work (the audio sweep's reference build), so the driver's size moves nothing after it and
+# everything after it collides in the caches exactly as it did. fishmod/tools/layout/check_outside.py checks it.
+text   0x4000 0x21E0
+data   0x2000 0x1860
+rodata 0x2000 0x10E0
+bss    0x2000 0x12C0

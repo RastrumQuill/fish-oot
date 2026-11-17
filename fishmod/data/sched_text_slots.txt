@@ -1,0 +1,24 @@
+# The scheduler's functions in the order they are linked (tools/mkspecrules.c), so that the code after it stays where
+# it was before the audio work: the three functions that grew with it (tasks sent with time to spare) leave their
+# old size free here and are linked with the audio driver's code instead (fishmod/data/audio_text_order.txt).
+# First line: the object. Then NAME, or NAME SIZE for a function that moved (SIZE: the bytes it used to take).
+src/code/sched.o
+Sched_SwapFrameBufferImpl
+Sched_SwapFrameBuffer
+Sched_TaskComplete.part.0
+Sched_HandlePreNMI
+Sched_HandleNMI
+Sched_QueueTask 108
+Sched_Yield
+Sched_GfxTaskFramebufferValid
+Sched_Schedule 312
+Sched_SetNextFramebufferFromTask
+Sched_TaskComplete
+Sched_RunTask
+Sched_HandleNotification 372
+Sched_HandleRetrace
+Sched_HandleRSPDone
+Sched_HandleRDPDone
+Sched_ThreadEntry
+Sched_Notify
+Sched_Init

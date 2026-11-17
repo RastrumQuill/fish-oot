@@ -22,6 +22,7 @@ for f in $FILES; do
     [ "$f" = Makefile ] || git show "$REF:$f" > "$f"
 done
 sed -i 's/ -ffunction-sections \$(GCC_EXTRA_OPT)/ $(GCC_EXTRA_OPT)/' Makefile
+sed -i '/src\/code\/sched.o: OPTFLAGS += -ffunction-sections/d' Makefile
 python3 - <<'PY'
 import re
 p = 'src/audio/internal/load.c'

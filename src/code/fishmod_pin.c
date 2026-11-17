@@ -16,4 +16,5 @@ __attribute__((used, aligned(0x2000))) s32 gFishmodPinData = 1;
 
 __attribute__((used, aligned(0x2000))) const s32 gFishmodPinRodata = 1;
 
-__attribute__((used, aligned(0x2000))) s32 gFishmodPinBss;
+// (16 KB: the heap starts after this, and actors' code is loaded into the heap)
+__attribute__((used, aligned(0x4000))) s32 gFishmodPinBss;

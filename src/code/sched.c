@@ -210,7 +210,9 @@ void Sched_HandleNMI(UNUSED Scheduler* sc) {
 /**
  * Enqueue a task to either the audio task list or the gfx task list
  */
-OSScTask* volatile gFishmodSchedUrgent; // fish-oot: set by the audio manager, taken by Sched_HandleNotification
+// fish-oot: set by the audio manager, taken by Sched_HandleNotification (defined with the audio driver, so this
+// file's own data is the size it was: src/audio/fishmod_audio_pin.c)
+extern OSScTask* volatile gFishmodSchedUrgent;
 
 void Sched_QueueTask(Scheduler* sc, OSScTask* task) {
     s32 type = task->list.t.type;

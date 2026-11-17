@@ -954,6 +954,9 @@ $(BUILD_DIR)/src/audio/%.o: OPTFLAGS := -$(GCC_AUDIO_OPT) -fno-strict-aliasing -
 ifeq ($(FISHMOD_DEBUG),1)
 $(BUILD_DIR)/src/audio/%.o: OPTFLAGS += -g
 endif
+# the scheduler function by function too: the ones the audio work grew are linked with the driver, the rest where they
+# were (fishmod/data/sched_text_slots.txt, tools/mkspecrules.c)
+$(BUILD_DIR)/src/code/sched.o: OPTFLAGS += -ffunction-sections
 endif
 ifeq ($(GCC_LIBULTRA),1)
 GCC_LIBULTRA_OBJS := $(BUILD_DIR)/src/libultra/os/%.o $(BUILD_DIR)/src/libultra/io/%.o $(BUILD_DIR)/src/libultra/gu/%.o
@@ -982,6 +985,9 @@ $(BUILD_DIR)/src/audio/%.o: OPTFLAGS := -$(GCC_OPT) -fno-strict-aliasing
 ifeq ($(FISHMOD_DEBUG),1)
 $(BUILD_DIR)/src/audio/%.o: OPTFLAGS += -g
 endif
+# the scheduler function by function too: the ones the audio work grew are linked with the driver, the rest where they
+# were (fishmod/data/sched_text_slots.txt, tools/mkspecrules.c)
+$(BUILD_DIR)/src/code/sched.o: OPTFLAGS += -ffunction-sections
 endif
 # fish-oot: CLANG_GAME=1: the game's own C code too (src/code, every overlay), every overlay's table marked
 ifeq ($(CLANG_GAME),1)
@@ -1135,7 +1141,7 @@ $(LDSCRIPT): $(BUILD_DIR)/spec
 # Generates a makefile containing rules for building .plf files
 # from overlay .o files for every overlay defined in the spec.
 # (and the audio driver's function order, which mkspecrules reads: fishmod/data/audio_text_order.txt)
-$(SEGMENTS_DIR)/Makefile: $(BUILD_DIR)/spec fishmod/data/audio_text_order.txt
+$(SEGMENTS_DIR)/Makefile: $(BUILD_DIR)/spec fishmod/data/audio_text_order.txt fishmod/data/audio_pin.txt fishmod/data/sched_text_slots.txt
 	$(MKSPECRULES) $< $(SEGMENTS_DIR) $@
 
 # Generates relocations for each overlay after partial linking so that the final
