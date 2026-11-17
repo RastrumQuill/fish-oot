@@ -214,7 +214,10 @@ def report(a):
                 t[j] += v[j] - p[j]
             if where:
                 cover[where[0]].add(where[1])
-        n = lambda pc: (cur.get(pc, (0,))[0] - prev.get(pc, (0,))[0]) if pc else 0
+        # (calls of a function: the median over its first five instructions. An interrupt taken at an instruction is
+        # counted there without the instruction running, so one address alone can read one too many)
+        one = lambda pc: cur.get(pc, (0,))[0] - prev.get(pc, (0,))[0]
+        n = lambda pc: sorted(one(pc + 4 * k) for k in range(5))[2] if pc else 0
         if leg < 0xFFFF:
             legs.append({"leg": leg, "name": leg_name(leg, names),
                          "frames": n(frame), "updates": n(upd),
