@@ -23,6 +23,7 @@ Usage:
   fishmod/sweep/worker.py --collect ZIP...  (no git login on the worker: it made zips with --no-push; this adds them)
 """
 import argparse
+import atexit
 import concurrent.futures
 import hashlib
 import json
@@ -294,8 +295,9 @@ def start_display():
     """A display of our own (nothing appears on your screen)."""
     for n in range(197, 207):
         if not os.path.exists("/tmp/.X11-unix/X%d" % n):
-            subprocess.Popen(["Xvfb", ":%d" % n, "-screen", "0", "1024x768x24"], stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
+            x = subprocess.Popen(["Xvfb", ":%d" % n, "-screen", "0", "1024x768x24"], stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+            atexit.register(x.terminate)
             time.sleep(2)
             return ":%d" % n
     sys.exit("no free display number")
