@@ -130,7 +130,10 @@ routine, file or system (`--match scatter --all` shows the props' code whether o
 ### Without a recording: every scene
 
 `--script prof_scenes` walks every scene in the entrance table (150 frames each, Link running, rolling, swinging;
-opening cutscenes play out) with no player. It's the path to profile until there's a recorded playthrough, and a
+opening cutscenes play out) with no player. **Not usable yet:** on 17 Nov it crashed at its 17th scene (the
+grottos, entrance 0x3F, play frame 2,553, the same in both emulator builds): an actor's update wrote through a null
+pointer (bad address 0x288, the code in an overlay at 0x80256468, called from z_actor.c at 0x80028384). Whether the
+audio sweep's own run of this route does the same hasn't been checked. It's the path to profile until there's a recorded playthrough, and a
 check that a change didn't cost some scene the playthrough spends little time in.
 
 ### A compiler's profile
