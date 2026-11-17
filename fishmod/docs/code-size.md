@@ -19,14 +19,15 @@ anything that runs once per item (fish, actor, prop, collision polygon, note).
 
 From the play bench's first 3,850 frames under ares's exact profiler. "Fills' share" is the path's instruction-cache
 fills at 48 cycles each against its time; it's a ceiling where helpers are shared (the trig routines count in every
-path that calls them).
+path that calls them). The readings below are from these numbers and the routines' shapes in the reports; the
+source of each hasn't been gone through line by line yet, so the fixes are proposals to check, not findings.
 
 **The mod's own code**
 
 | what | size | how often | time | fills' share | reading |
 |---|---:|---:|---:|---:|---|
 | `EnFishmod_FishAI` (one fish thinking) | 10.9 KB routine, 3.7 KB runs per call across 15 routines | 9.6 a frame | 0.70 ms | 72% | The clearest case. About 100 line fills per call: nearly all of its 3.7 KB is fetched again every time, because between two fish the actor framework, collision and the other fish's update run. Most of its time is fetching, not thinking. `EnFishmod_SwimTowardImpl` inside it is the same (87%). |
-| `EnFishmod_Update` (every fish, every frame) | 2.8 KB per call, 11 routines | 49.6 a frame | 1.92 ms | 18% | Over the per-item line but mostly staying cached: the far-follower path (`FollowFar`, 1 KB) is the bulk and runs back to back. Not urgent. |
+| `EnFishmod_Update` (every fish, every frame) | 2.8 KB per call, 11 routines | 49.6 a frame | 1.92 ms | 18% | Over the per-item line but mostly staying cached: `FollowFar` (1 KB) is the biggest piece of it. Not urgent. |
 | `EnFishmod_ScatterDraw` (props, drawing) | 14.4 KB routine; 8.3 KB runs per call; the per-prop loop 1.7 KB + trig | once a frame, 25.6 loop passes | 1.67 ms | 35% (the loop: 41%) | Nearly the whole cache for one routine. The loop itself is small enough; the cost is the 6.5 KB around it that runs once and evicts what the frame needs next, and is evicted itself by next frame. |
 | `Scatter_Build` (props, choosing the set) | 10.0 KB routine; 7.7 KB runs per call; the loop's body 4.4 KB | 0.2 calls a frame, 14.5 passes | 0.67 ms | 56% | The loop body alone is over twice the per-item line. Runs one frame in five since the reuse work, so its fetch cost is paid in full each time. |
 | the mod's whole draw (`EnFishmod_ManagerDraw` and below) | 23.6 KB across 40 routines | once a frame | 3.03 ms | 31% | Bigger than the cache by itself: props, rigs, billboards, particles and fog each push the others out within one frame. |
@@ -48,7 +49,7 @@ What these point at, in the order I'd try:
 
 | what | size | how often | fills' share | reading |
 |---|---:|---:|---:|---|
-| `BgCheck_RaycastDownImpl` (floor under an actor) | 3.3 KB per call, 2 routines | 14.7 a frame | 36% | One routine of 3.1 KB (the answer caches and the list walk inlined together). A per-item path worth splitting: cache hit as a small leaf, the walk behind it. |
+| `BgCheck_RaycastDownImpl` (floor under an actor) | 3.3 KB per call, 2 routines | 14.7 a frame | 36% | One routine of 3.1 KB running per call. A per-item path worth looking at for a split: the common answer as a small leaf, the rest behind it. |
 | `Actor_Draw` | 2.1 KB, 11 routines | 11.8 a frame | 55% | Small, but between two calls a whole actor's draw runs, so it's refetched each time. Inherent to the framework's shape; shrinking helps a little. |
 | `Actor_UpdateBgCheckInfo` | 14.6 KB across 36 routines | 5.9 a frame | 64% | Wall, floor, ceiling and water checks in one call: almost the cache. The vanilla structure; the collision work already took its data misses, this is what's left. |
 | `AudioSynth_ProcessNote` | 2.1 KB | 146 a frame | 12% | Over the line but runs back to back and stays cached: fine as it is. |
