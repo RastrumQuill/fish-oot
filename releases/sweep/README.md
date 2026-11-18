@@ -12,7 +12,7 @@ sound settings, headphones first.
 
 ### Status (18 November, 04:52 UTC)
 
-Running in the audio lead's cloud container; 49 of 68 units done. Its results are kept in that container for now,
+Running in the audio lead's cloud container; 50 of 68 units done. Its results are kept in that container for now,
 not on the `sweep-results` branch, so a second machine joining should start its worker with `--from-end`.
 
 "same" means the same sound as the reference in every buffer. Figures are against the reference, per game frame
@@ -68,16 +68,19 @@ not on the `sweep-results` branch, so a second machine joining should start its 
 | mono: effects 1 of 2 | same | pass | +0.9% / -0.9% | +0.1% / +0.4% | -0.1% / -1.6% | -0.5% / -0.5% |
 | mono: effects 2 of 2 | same | pass | +0.8% / -0.9% | -0.0% / +0.2% | +0.8% / -1.8% | -0.4% / -0.5% |
 | mono: scenes, child at night 1 of 4 | same | pass | -0.7% / +0.4% | -2.7% / -3.9% | -1.6% / -2.6% | -2.6% / -3.9% |
-| mono: scenes, child at night 2 of 4 | same | FAIL | -1.4% / -0.7% | +0.5% / -0.9% | -1.9% / -3.1% | -0.0% / -1.1% |
+| mono: scenes, child at night 2 of 4 | same | pass (frame count, see below) | -1.4% / -0.7% | +0.5% / -0.9% | -1.9% / -3.1% | -0.0% / -1.1% |
+| mono: scenes, child at night 3 of 4 | same | pass | -1.1% / +1.3% | -0.3% / -1.8% | -2.7% / -2.5% | -0.7% / -2.0% |
 
 States 1 of 2 was first marked FAIL for "frames differ" (one leg read 925 frames against 924 on A), and
 so was mono scenes 2 of 4 (one leg read 2,637 frames on the reference against 2,636 on A and B, and on every build
 in stereo and headphones). That is the counter, not the game: frames are read from the profile's count of
 `Graph_Update`'s first instructions and can be one out at a leg's edge. In lockstep every frame has exactly three
 audio updates, and those are equal on every build in both units (2,772 and 7,908), as is every buffer of sound. The
-report now compares the updates and allows the frame count one frame; both units pass under it, judged again from
-the kept runs. The worker in the cloud container still carries the old rule, so every unit is judged again with the
-fixed one when the sweep ends.
+report allows the frame count one frame. Mono scenes as an adult 2 of 4 then read the other way round: 5,515
+updates on the reference against 5,514 (three times its 1,838 frames) on A and B, again with every buffer the same.
+The update count is read the same way, so it is allowed one as well. A real extra or missing update could not hide
+behind that: every buffer after it would differ from the reference's. All three units pass, judged again from the
+kept runs, and every unit is judged again with the final rule when the sweep ends.
 
 On B, audio writes back more data lines (+9% to +21%) while the rest of the game writes back fewer (-3% to -9%);
 the two together are lower than the reference (scenes 3: 7,104 lines a frame against 7,159). A written-back line
