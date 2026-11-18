@@ -824,12 +824,17 @@ static void PcProf_Update(void) {
             Sc64_UsbText("FISHMOD-START\n"); // (for fishmod/tools/morning: the new ROM is running)
         }
         PcProf_Ranges();
+#ifndef FISHMOD_PCPROF_NOSAMPLE
         gFishmodTimerHook = PcProf_Hook;
         osSetTimer(&sPcTimer, PCPROF_INTERVAL, PCPROF_INTERVAL, NULL, NULL);
+#endif
+        // (FISHMOD_PCPROF_NOSAMPLE: the frame log and the USB link without the sampler. Its 4,000 interrupts a second
+        // slow the game it samples by a quarter and empty its caches: fishmod/docs/input-replay.md. A run that
+        // compares two builds' frame times on the console leaves it off.)
         sLastSave = now;
         return;
     }
-#ifdef FISHMOD_PCPROF_CALIB
+#if defined(FISHMOD_PCPROF_CALIB) && !defined(FISHMOD_PCPROF_NOSAMPLE)
     {
         // once, early (before the route counts anything): the calibration loops, the sampler running
         static s32 sCalibrated;
@@ -907,7 +912,9 @@ static void PcProf_Update(void) {
         // the route over (the bench's last lap): stop sampling, send what's counted, and mark the last packets
         // (user[3] = 1) so the reader knows the run ended there
         if (gFishmodBenchDone && !sPcStopped && (sPcSending == NULL)) {
+#ifndef FISHMOD_PCPROF_NOSAMPLE
             osStopTimer(&sPcTimer);
+#endif
             gFishmodTimerHook = NULL;
             sPcStopped = true;
             sPcSending = n64prof_swap(sPcSpare);
@@ -937,6 +944,20 @@ static void PcProf_Update(void) {
 #ifdef FISHMOD_FRAMELOG
                     PcProf_ActorReport();
 #endif
+                    {
+                        // the run's checks, for the PC to compare between builds of one route (fishmod/pc/hwsuite.py):
+                        // the props' sets (a running hash of every set made and how many), the frames played, and a
+                        // replay's counts (all zero: in step with its recording)
+                        char line[200];
+
+                        sprintf(line,
+                                "FISHMOD-CHECK frames %u sets %u sethash %08X replay %u/%u early %u late %u forced %u "
+                                "snaps %u rng %u\n",
+                                sPlayFrames, gFishmodScatterHash[1], gFishmodScatterHash[0], gFishmodReplay.frames,
+                                gFishmodReplay.syncs, gFishmodReplay.early, gFishmodReplay.late, gFishmodReplay.forced,
+                                gFishmodReplay.snaps, gFishmodReplay.rng);
+                        Sc64_UsbText(line);
+                    }
                     Sc64_UsbText("FISHMOD-DONE\n");
                 }
                 return;
