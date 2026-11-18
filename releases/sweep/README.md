@@ -10,10 +10,13 @@ Expansion Pak, B with `--expak`. `audio-1-R.bps` applies to the retail ROM; A an
 68 units: six legs (states in two parts, ocarina, scenes, sequences, effects, scenes as child at night) in four
 sound settings, headphones first.
 
-### Status (18 November, 11:08 UTC)
+### Status (18 November, 11:31 UTC)
 
-Running in the audio lead's cloud container; 68 of 68 units done. Its results are kept in that container for now,
-not on the `sweep-results` branch, so a second machine joining should start its worker with `--from-end`.
+**Finished: 68 of 68 units pass.** On A and B the sound is the same as the reference in every buffer of every
+unit, every run reached its end, and no thread stopped. Every unit was judged again from the kept runs with the
+final rules (below). Memory-bus traffic against the reference, worst over all units: audio +1.4% (stereo effects 1
+of 2), everything +0.3% (stereo scenes 2 of 4). The runs are kept in the audio lead's cloud container, not on the
+`sweep-results` branch.
 
 "same" means the same sound as the reference in every buffer. Figures are against the reference, per game frame
 (A / B).
@@ -98,12 +101,51 @@ report allows the frame count one frame. Mono scenes as an adult 2 of 4 then rea
 updates on the reference against 5,514 (three times its 1,838 frames) on A and B, again with every buffer the same.
 The update count is read the same way, so it is allowed one as well. A real extra or missing update could not hide
 behind that: every buffer after it would differ from the reference's. All three units pass, judged again from the
-kept runs, and every unit is judged again with the final rule when the sweep ends.
+kept runs, as do the other 65.
 
 On B, audio writes back more data lines (+9% to +21%) while the rest of the game writes back fewer (-3% to -9%);
 the two together are lower than the reference (scenes 3: 7,104 lines a frame against 7,159). A written-back line
 is charged to whoever evicts it, so this is a shift in who pays, from the different data placement, not more
 traffic.
+
+## audio-rt-1
+
+The same legs in real time (no lockstep), on the same tree with the real-time option: headphones for every leg,
+stereo for ocarina and states, 20 units, each on six builds: R, A, B as shipped, B with updates built ahead
+(`Bahead`), B with tasks sent early (`Blazy`), B with both (`Bboth`). `audio-rt-1-R.bps` applies on top of
+audio-1's R ROM; A and B on top of that. What is checked is in `fishmod/docs/audio-sweep.md`.
+
+**Finished: 20 of 20 units pass.** Totals over all units, from the emulator's count of the audio interface:
+
+| build | buffers taken | refused | ran dry | silent samples |
+|---|---|---|---|---|
+| R | 417,245 | 0 | 44 | 297,332 |
+| A | 417,237 | 0 | 44 | 296,912 |
+| B | 417,247 | 0 | 44 | 297,396 |
+| Bahead | 417,247 | 0 | 44 | 297,476 |
+| Blazy | 417,216 | 0 | 44 | 297,246 |
+| Bboth | 417,183 | 0 | 44 | 297,200 |
+
+The dry runs and the silence are the reference's own: two dry runs and about 510 silent samples at every start-up,
+and the reset call that ends the second states part (about 144,000 silent samples on every build). The second
+states part in headphones was first marked FAIL because silence was counted until the emulator was stopped, not
+until the script's end; counted to the last leg it passes.
+
+## Code the sweeps never ran
+
+Instructions on lines the audio work added or changed (against the reference), over both sweeps: A 203 of 553 never
+run, B 253 of 1,447. Of those, 152 on each are the debug command-list dump in `AudioMgr_ThreadEntry`. The rest on
+B, read instruction by instruction:
+
+- debug only: the build-ahead debug switches (`gFishmodAheadDbg`), `Fishmod_SampleStoreBusy`, the lockstep wait in
+  `AudioLoad_ProcessSamplePreloads`, the activity-level register's branches;
+- dead in the game: the `specUnk4` path and its return, the custom update call inside the build-ahead loop (only the
+  sweep sets a custom update), the out-of-line copy of `AudioSynth_LoadFilterSize`;
+- guards that never fired: the clamps at 255, a divide trap, the "no spare DMA buffer" fallback in
+  `AudioLoad_DmaSampleData`;
+- **a guard a console could reach**: in `AudioMgr_FishmodHandleRetrace`, the blocking wait for the task that was
+  due a refresh ago (10 instructions). In the emulator that task had always finished by the next refresh;
+- about 8 single instructions in `AudioThread_UpdateImpl` and the retrace handler not traced to a cause.
 
 ### Before rc2
 
