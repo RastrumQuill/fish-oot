@@ -582,6 +582,15 @@ def main():
     open(os.path.join(stamp_dir, "summary.txt"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print("\n".join(lines))
 
+    # the console test suite's runs (labels hw-...): its own report, in the morning's folder with the rest
+    if any(i["label"].startswith("hw-") for i in infos):
+        try:
+            r = subprocess.run([sys.executable, os.path.join(HERE, "hwsuite.py"), stamp_dir, "-o",
+                                os.path.join(stamp_dir, "hwsuite.txt")], capture_output=True, text=True, timeout=600)
+            print(r.stdout + r.stderr)
+        except Exception as e:
+            log("hwsuite.py failed: %s" % e)
+
     zip_path = os.path.join(HERE, "results", "morning_%s.zip" % stamp)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as z:
         for base, _, files in os.walk(stamp_dir):

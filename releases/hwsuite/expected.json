@@ -1,0 +1,26 @@
+{
+ "hw-base": {
+  "frames": 3765,
+  "sets": 798,
+  "sethash": "170B571B"
+ },
+ "hw-g10all": {
+  "frames": 3765,
+  "sets": 763,
+  "sethash": "75E204BA"
+ },
+ "hw-g14o2": {
+  "frames": 3765,
+  "sets": 745,
+  "sethash": "B57B3424"
+ },
+ "hw-g14os": {
+  "frames": 3765,
+  "sets": 798,
+  "sethash": "81201428"
+ },
+ "hw-replay-g14o2": {
+  "replay_frames": 5000,
+  "replay_checks": 214
+ }
+}
