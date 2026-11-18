@@ -10,7 +10,7 @@ Expansion Pak, B with `--expak`. `audio-1-R.bps` applies to the retail ROM; A an
 68 units: six legs (states in two parts, ocarina, scenes, sequences, effects, scenes as child at night) in four
 sound settings, headphones first.
 
-### Status (18 November, 01:19 UTC)
+### Status (18 November, 01:20 UTC)
 
 Running in the audio lead's cloud container; 39 of 68 units done. Its results are kept in that container for now,
 not on the `sweep-results` branch, so a second machine joining should start its worker with `--from-end`.
@@ -20,7 +20,7 @@ not on the `sweep-results` branch, so a second machine joining should start its 
 
 | unit | sound, A and B | check | audio cycles | rest cycles | bus, audio | bus, everything |
 |---|---|---|---|---|---|---|
-| headphones: states 1 of 2 | same | rerun (counter) | +0.5% / -0.4% | -0.4% / -0.3% | -0.2% / -1.1% | -0.3% / -0.5% |
+| headphones: states 1 of 2 | same | pass (frame count, see below) | +0.5% / -0.4% | -0.4% / -0.3% | -0.2% / -1.1% | -0.3% / -0.5% |
 | headphones: states 2 of 2 | same | pass | +1.1% / +1.2% | -0.2% / -0.7% | +0.7% / -1.9% | -0.3% / -2.4% |
 | headphones: ocarina | same | pass | +0.5% / -0.6% | -0.4% / -0.3% | -0.1% / -1.2% | -0.3% / -0.5% |
 | headphones: scenes 1 of 4 | same | pass | -0.7% / +0.4% | -2.7% / -3.9% | -1.8% / -2.5% | -2.5% / -3.9% |
@@ -58,11 +58,16 @@ not on the `sweep-results` branch, so a second machine joining should start its 
 | mono: states 2 of 2 | same | pass | +0.9% / +1.1% | -0.3% / -0.7% | -0.2% / -1.9% | -0.3% / -1.9% |
 | mono: ocarina | same | pass | +0.4% / -0.5% | -0.4% / -0.3% | -0.8% / -1.3% | -0.5% / -0.5% |
 | mono: scenes 1 of 4 | same | pass | -0.7% / +0.3% | -2.7% / -3.9% | -1.6% / -2.2% | -2.5% / -3.7% |
-| mono: scenes 2 of 4 | same | fail | -0.9% / -0.4% | +0.6% / -0.6% | -2.1% / -2.8% | +0.1% / -0.7% |
+| mono: scenes 2 of 4 | same | pass (frame count, see below) | -0.9% / -0.4% | +0.6% / -0.6% | -2.1% / -2.8% | +0.1% / -0.7% |
 
-States 1 of 2 was first marked FAIL for "frames differ" (one leg read 925 frames against 924 on A). That was the
-counter, not the game: an interrupt taken exactly at the counted instruction was counted as a call. The count is
-now the median over a function's first five instructions; the unit will be run again at the end.
+States 1 of 2 was first marked FAIL for "frames differ" (one leg read 925 frames against 924 on A), and
+so was mono scenes 2 of 4 (one leg read 2,637 frames on the reference against 2,636 on A and B, and on every build
+in stereo and headphones). That is the counter, not the game: frames are read from the profile's count of
+'s first instructions and can be one out at a leg's edge. In lockstep every frame has exactly three
+audio updates, and those are equal on every build in both units (2,772 and 7,908), as is every buffer of sound. The
+report now compares the updates and allows the frame count one frame; both units pass under it, judged again from
+the kept runs. The worker in the cloud container still carries the old rule, so every unit is judged again with the
+fixed one when the sweep ends.
 
 On B, audio writes back more data lines (+9% to +21%) while the rest of the game writes back fewer (-3% to -9%);
 the two together are lower than the reference (scenes 3: 7,104 lines a frame against 7,159). A written-back line
