@@ -63,7 +63,7 @@ not on the `sweep-results` branch, so a second machine joining should start its 
 States 1 of 2 was first marked FAIL for "frames differ" (one leg read 925 frames against 924 on A), and
 so was mono scenes 2 of 4 (one leg read 2,637 frames on the reference against 2,636 on A and B, and on every build
 in stereo and headphones). That is the counter, not the game: frames are read from the profile's count of
-'s first instructions and can be one out at a leg's edge. In lockstep every frame has exactly three
+`Graph_Update`'s first instructions and can be one out at a leg's edge. In lockstep every frame has exactly three
 audio updates, and those are equal on every build in both units (2,772 and 7,908), as is every buffer of sound. The
 report now compares the updates and allows the frame count one frame; both units pass under it, judged again from
 the kept runs. The worker in the cloud container still carries the old rule, so every unit is judged again with the
