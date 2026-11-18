@@ -194,6 +194,33 @@ and stores; the call is a routine and a loop), and the hot routines that got slo
 (`GCC_LIBULTRA_KEEP` and a like list for the game's files), which is the "hot code small, by hand; the rest for
 size" split the roadmap's rule describes.
 
+**Compiler and level, measured (17 Nov, the same three lake legs, against the `-O2` build with boot and libs on IDO)**
+
+| build (every C file on GCC) | working cycles | instructions | code fills | data fills |
+|---|---:|---:|---:|---:|
+| GCC 10 (Linux target) `-Os`, `memcpy` by words | +1.9% | +7.0% | +0.5% | -1.8% |
+| the same, copies in line, no divide checks, builtins on | +2.6% | +6.1% | +3.2% | -2.0% |
+| GCC 14.2 bare-metal (`mips64-elf`) `-Os`, the same options | +4.1% | +6.9% | +6.7% | -1.6% |
+| **GCC 14.2 bare-metal `-O2`**, the same options | **-1.6%** | -1.0% | -1.1% | -2.9% |
+
+`-Os` loses on the clock with either compiler: 6-7% more instructions run, and the code-fill saving in the overlays
+(-5 to -15%) is spent in the boot segment (+50%). The bare-metal compiler at `-O2` is the first all-GCC build that's
+faster than what we had: 1.6% fewer cycles, with fewer instructions, fewer code fills and fewer data fills.
+
+What the second row's profile showed: its extra cost was one pair of routines. With builtins on, every `bzero`
+became `memset`, and `memset` and the audio routine that calls it most (`Audio_ProcessNotes`, through
+`Audio_InitSampleState`, 190,000 calls) landed 16 KB apart: each call threw the other out of the cache (604,000
+code fills in `memset`, 630,000 in `Audio_ProcessNotes`, where the baseline had 37,000 and 122,000). `bzero` is kept
+as libultra's now, but the lesson is the roadmap's: at this level a build's layout moves the result by more than the
+change being tested, and layout has to be done on purpose, last.
+
+How to build with the bare-metal compiler: `fishmod/tools/build_n64_gcc.sh` (GCC 14.2 and binutils from the GNU
+sources, about 40 minutes), then
+`FISHMOD_GCC=/opt/n64gcc/bin/mips64-elf-gcc FISHMOD_GCC_AS_DIR=/opt/n64gcc/linuxas fishmod/build.sh --gcc O2
+--gcc-everything ...` (`linuxas/as` is a link to `mips-linux-gnu-as`: the bare-metal assembler's objects are a
+flavour the build's linker refuses). Checked for the `-Os` builds: the recorded opening replays with no repairs.
+The `-O2` bare-metal build reaches play; its replay hasn't been run yet.
+
 **The engine**
 
 | what | size | how often | fills' share | reading |
