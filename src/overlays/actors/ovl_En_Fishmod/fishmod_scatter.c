@@ -2865,6 +2865,23 @@ static void Scatter_Build(PlayState* play, Vec3f* eyeP, f32 lookX, f32 lookY, f3
             HASH(set->fogStep[q]);
         }
 #undef HASH
+        // (and each set by itself, for two builds' runs to be laid side by side: the frame it was made on, where the
+        // camera was, what it holds: fishmod/tools/settrace.py)
+        if (gFishmodScatterHash[1] < FISHMOD_SET_TRACE) {
+            FishmodSetTrace* t = &gFishmodSetTrace[gFishmodScatterHash[1]];
+            u32 own = 2166136261u;
+
+            for (q = 0; q < set->count; q++) {
+                own = (own ^ (u32)(set->prop[q] | (set->tier[q] << 16) | (set->hidden[q] << 20))) * 16777619u;
+            }
+            t->frame = play->gameplayFrames;
+            t->count = set->count;
+            t->eye[0] = (s16)eye.x;
+            t->eye[1] = (s16)eye.y;
+            t->eye[2] = (s16)eye.z;
+            t->look = Math_Atan2S(lookZ, lookX);
+            t->props = own;
+        }
         gFishmodScatterHash[0] = h;
         w = ++gFishmodScatterHash[1];
         if (((w & 15) == 0) && ((w >> 4) < 126)) {

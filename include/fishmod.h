@@ -551,7 +551,19 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 // audio under the fish's tag)
 extern u32 gFishmodPcTag;
 extern u32 gFishmodScatterDropped[4];
-extern u32 gFishmodScatterHash[128]; // (Scatter_Build's check: the running hash of every set it makes)
+extern u32 gFishmodScatterHash[128];
+// each set Scatter_Build made (the first FISHMOD_SET_TRACE), and Link every 8th frame of play
+#define FISHMOD_SET_TRACE 1024
+typedef struct FishmodSetTrace {
+    u32 frame;
+    u16 count;
+    s16 eye[3];
+    s16 look;  // the view's direction across the ground
+    u32 props; // a hash of the set's props, tiers and hidden flags alone
+} FishmodSetTrace;
+extern FishmodSetTrace gFishmodSetTrace[FISHMOD_SET_TRACE];
+#define FISHMOD_LINK_TRACE 1024
+extern s16 gFishmodLinkTrace[FISHMOD_LINK_TRACE][4]; // (Scatter_Build's check: the running hash of every set it makes)
 extern void* gFishmodScatterDbg[8]; // (the props' last set and what it was made from: fishmod/tools/popin_check.py)
 // The prop sweep (fishmod_debug_bench.inc.c, FISHMOD_PROP_SWEEP): one prop kind drawn another way for a lap
 typedef enum FishmodPropTestMode {

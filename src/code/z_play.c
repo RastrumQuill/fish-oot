@@ -339,6 +339,11 @@ void Play_Init(GameState* thisx) {
 #if FISHMOD_TESTMODE
     Fishmod_TestPlayInit();
 #endif
+#if FISHMOD_DEBUG && defined(FISHMOD_SCRIPT)
+    // (scripted runs: the game never sets its frame counter, so it starts from whatever the memory held, and that
+    // differs from one build to the next: a run meant to be repeated starts it at 0)
+    this->gameplayFrames = 0;
+#endif
     if (gSaveContext.save.entranceIndex == ENTR_LOAD_OPENING) {
         gSaveContext.save.entranceIndex = 0;
         this->state.running = false;

@@ -33,6 +33,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
 EXPECTED = os.path.join(ROOT, "releases", "hwsuite", "expected.json")
 SLOW_US = 52000
+# The bench's frames over which every build of the suite plays the same game: in ares the four builds' cameras and
+# sets of props are identical to frame 871, then one camera decision goes another way in the bare-metal builds and
+# Link (steered by the camera) ends up elsewhere, so later frames aren't the same work (fishmod/docs/hw-suite.md).
+SAME_FROM, SAME_TO = 60, 860
 
 
 def check_line(text):
@@ -65,7 +69,7 @@ def frame_records(folder):
                     if 16 + 4 * words * (i + 1) > len(d):
                         break
                     r = struct.unpack_from(">8I", d, 16 + 4 * words * i)
-                    out.append((r[1] & 1, r[2], r[3], r[4], r[5], r[6], r[7]))
+                    out.append((r[1] & 1, r[2], r[3], r[4], r[5], r[6], r[7], r[0]))
     return out
 
 
@@ -83,6 +87,11 @@ def read_run(folder):
     recs = frame_records(folder)
     counted = [r for r in recs if r[0]] or recs
     run["frames_logged"] = len(recs)
+    # the stretch every build plays alike (SAME_FROM..SAME_TO: see the report's note)
+    same = [r for r in recs if SAME_FROM <= r[7] < SAME_TO]
+    if same:
+        run["same_cpu"] = mean([r[2] + r[3] for r in same]) / 1000.0
+        run["same_n"] = len(same)
     if counted:
         run["period"] = mean([r[1] for r in counted]) / 1000.0
         run["fps"] = 1000.0 / run["period"] if run["period"] else 0.0
@@ -207,6 +216,21 @@ def main():
                                                                    s[2], 100 * (s[2] / b0[2] - 1) if b0[2] else 0))
     else:
         w("  (no run of %s with a frame log: nothing to compare with)" % a.base)
+    w("")
+    w("5. The same over frames %d to %d only, where every build plays the same game (the fair comparison: after" %
+      (SAME_FROM, SAME_TO))
+    w("   that the builds' cameras part and they aren't doing the same work)")
+    w("")
+    same = {}
+    for b, rs in builds.items():
+        xs = [r["same_cpu"] for r in rs if "same_cpu" in r]
+        if xs:
+            same[b] = (mean(xs), max(xs) - min(xs), len(xs))
+    if a.base in same:
+        b0 = same[a.base][0]
+        w("  %-22s %5s %9s %8s %9s" % ("build", "runs", "CPU ms", "spread", "vs base"))
+        for b, x in same.items():
+            w("  %-22s %5d %9.2f %8.2f %+8.1f%%" % (b, x[2], x[0], x[1], 100 * (x[0] / b0 - 1) if b0 else 0))
     w("")
     w("RESULT: %s" % ("all runs worked" if fails == 0 else "%d run(s) FAILED" % fails))
     text = "\n".join(out) + "\n"
