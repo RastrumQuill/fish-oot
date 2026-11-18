@@ -271,11 +271,13 @@ def compare(a):
         ar, an = r["audio"]["cycles"] / fr, n["audio"]["cycles"] / fn
         rr, rn = r["rest"]["cycles"] / fr, n["rest"]["cycles"] / fn
         flag = ""
-        # (the legs must be the same legs with the same number of audio updates, which lockstep ties to the game's
-        # frames. The frame count itself is read from the profile's count of Graph_Update's first instructions and
-        # can be one out at a leg's edge, on the reference as well: one frame's difference with equal updates is
-        # that, not the game.)
-        if r["leg"] != n["leg"] or r.get("updates") != n.get("updates") or abs(r["frames"] - n["frames"]) > 1:
+        # (the legs must be the same legs. Frames and audio updates are read from the profile's count of a function's
+        # first instructions, and either can read one out at a leg's edge, on the reference as well: seen as 2,637
+        # frames against 2,636 with 7,908 updates on every build, and as 5,515 updates against 5,514 = 3 x 1,838
+        # frames. One out is the counter. A real extra or missing update can't hide behind it: every buffer after it
+        # would differ from the reference's, and the sound comparison is the check that reads those.)
+        if (r["leg"] != n["leg"] or abs(r["frames"] - n["frames"]) > 1 or
+                abs(r.get("updates", 0) - n.get("updates", 0)) > 1):
             flag += " FRAMES-DIFFER"
         if rn > rr * 1.005:
             flag += " REST-SLOWER"
