@@ -10,9 +10,9 @@ Expansion Pak, B with `--expak`. `audio-1-R.bps` applies to the retail ROM; A an
 68 units: six legs (states in two parts, ocarina, scenes, sequences, effects, scenes as child at night) in four
 sound settings, headphones first.
 
-### Status (17 November, 22:49 UTC)
+### Status (18 November, 00:00 UTC)
 
-Running in the audio lead's cloud container; 34 of 68 units done. Its results are kept in that container for now,
+Running in the audio lead's cloud container; 36 of 68 units done. Its results are kept in that container for now,
 not on the `sweep-results` branch, so a second machine joining should start its worker with `--from-end`.
 
 "same" means the same sound as the reference in every buffer. Figures are against the reference, per game frame
@@ -54,6 +54,8 @@ not on the `sweep-results` branch, so a second machine joining should start its 
 | stereo: scenes, child at night 2 of 4 | same | pass | -1.1% / -0.2% | +0.5% / -0.9% | -1.8% / -2.5% | -0.0% / -1.0% |
 | stereo: scenes, child at night 3 of 4 | same | pass | -0.8% / +1.7% | -0.3% / -1.8% | -0.8% / -1.3% | -0.4% / -1.9% |
 | stereo: scenes, child at night 4 of 4 | same | pass | +0.0% / +2.1% | -0.2% / -1.6% | -1.2% / -1.3% | -0.4% / -1.7% |
+| mono: states 1 of 2 | same | pass | +0.4% / -0.4% | -0.4% / -0.3% | +0.0% / -0.8% | -0.3% / -0.4% |
+| mono: states 2 of 2 | same | pass | +0.9% / +1.1% | -0.3% / -0.7% | -0.2% / -1.9% | -0.3% / -1.9% |
 
 States 1 of 2 was first marked FAIL for "frames differ" (one leg read 925 frames against 924 on A). That was the
 counter, not the game: an interrupt taken exactly at the counted instruction was counted as a call. The count is
