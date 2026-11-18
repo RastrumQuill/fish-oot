@@ -271,7 +271,11 @@ def compare(a):
         ar, an = r["audio"]["cycles"] / fr, n["audio"]["cycles"] / fn
         rr, rn = r["rest"]["cycles"] / fr, n["rest"]["cycles"] / fn
         flag = ""
-        if r["leg"] != n["leg"] or r["frames"] != n["frames"]:
+        # (the legs must be the same legs with the same number of audio updates, which lockstep ties to the game's
+        # frames. The frame count itself is read from the profile's count of Graph_Update's first instructions and
+        # can be one out at a leg's edge, on the reference as well: one frame's difference with equal updates is
+        # that, not the game.)
+        if r["leg"] != n["leg"] or r.get("updates") != n.get("updates") or abs(r["frames"] - n["frames"]) > 1:
             flag += " FRAMES-DIFFER"
         if rn > rr * 1.005:
             flag += " REST-SLOWER"
