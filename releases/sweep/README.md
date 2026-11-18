@@ -10,9 +10,9 @@ Expansion Pak, B with `--expak`. `audio-1-R.bps` applies to the retail ROM; A an
 68 units: six legs (states in two parts, ocarina, scenes, sequences, effects, scenes as child at night) in four
 sound settings, headphones first.
 
-### Status (18 November, 06:45 UTC)
+### Status (18 November, 08:37 UTC)
 
-Running in the audio lead's cloud container; 54 of 68 units done. Its results are kept in that container for now,
+Running in the audio lead's cloud container; 59 of 68 units done. Its results are kept in that container for now,
 not on the `sweep-results` branch, so a second machine joining should start its worker with `--from-end`.
 
 "same" means the same sound as the reference in every buffer. Figures are against the reference, per game frame
@@ -74,6 +74,11 @@ not on the `sweep-results` branch, so a second machine joining should start its 
 | surround: states 1 of 2 | same | pass | +0.7% / -0.1% | -0.3% / -0.3% | +0.1% / -0.7% | -0.2% / -0.4% |
 | surround: states 2 of 2 | same | pass | +1.3% / +1.4% | -0.2% / -0.7% | +0.8% / -1.0% | -0.1% / -1.8% |
 | surround: ocarina | same | pass | +0.7% / -0.3% | -0.4% / -0.3% | -0.3% / -1.2% | -0.3% / -0.5% |
+| surround: scenes 1 of 4 | same | pass | -0.5% / +0.7% | -2.7% / -3.9% | -0.8% / -1.7% | -2.4% / -3.7% |
+| surround: scenes 2 of 4 | same | pass | -0.6% / -0.1% | +0.6% / -0.6% | -1.3% / -2.2% | +0.2% / -0.6% |
+| surround: scenes 3 of 4 | same | pass | -0.7% / +1.5% | -0.2% / -1.9% | -1.5% / -2.7% | -0.5% / -2.6% |
+| surround: scenes 4 of 4 | same | pass | +0.5% / +1.3% | +0.1% / -1.3% | -0.4% / -2.1% | -0.2% / -2.2% |
+| surround: sequences 1 of 4 | same | pass | +1.1% / +0.2% | -0.3% / -0.2% | +0.5% / -0.3% | -0.2% / -0.3% |
 
 States 1 of 2 was first marked FAIL for "frames differ" (one leg read 925 frames against 924 on A), and
 so was mono scenes 2 of 4 (one leg read 2,637 frames on the reference against 2,636 on A and B, and on every build
