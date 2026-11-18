@@ -8,6 +8,17 @@ Queue line (about 28 minutes on the console; 34 allowed):
 
     releases/fish-oot-audio-sched-ab.bps 34 audio-sched-ab
 
+**This patch was rebuilt on 18 November** from the default branch at `1df585c4` (ROM sha1
+`3eca9cb47995b5f437c8e71c35b30bd2090c8a6b`), the tree whose audio the two emulator sweeps passed on
+(`releases/sweep/README.md`): 68 lockstep units with the same sound as the reference in every buffer in stereo, mono,
+headphones and surround, and 20 real-time units on all four switch settings with no refused buffer and no more dry
+runs or silence than the reference. The audio sources are the swept ones exactly (`3c17d06a`); the rest of the game
+has other people's later commits. In the emulator this ROM boots, runs the bench and logs frames (5 minutes, 2,836
+frames).
+
+Two things only the console can show: whether either switch pays on screen (what this run is for), and the retrace
+handler's blocking wait for a task still running a refresh late, which the emulator never needed.
+
 ## What it tests
 
 audio-laps-every2 (releases/notes-audio-laps.md) showed that waking the driver half as often saves its time (14%) and
