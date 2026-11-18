@@ -919,6 +919,8 @@ u32 gFishmodPcTag; // the PC profile's tag for its samples now (FISHMOD_PCTAG_*)
 u32 gFishmodScatterDropped[4];
 void* gFishmodScatterDbg[8];
 u32 gFishmodScatterHash[128];
+FishmodSetTrace gFishmodSetTrace[FISHMOD_SET_TRACE];
+s16 gFishmodLinkTrace[FISHMOD_LINK_TRACE][4];
 FishmodPopTest gFishmodPop = { 0.0f, -1, 0, -1.0f, -1.0f };
 FishmodPropTest gFishmodPropTest; // props in view left out by the props' caps: budget, see-through, materials; and the most in view
 #ifndef FISHMOD_FLAT_TEST_INIT
@@ -1148,6 +1150,16 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     sPlayFrames++;
+#ifndef FISHMOD_NOTIMERS
+    if (((sPlayFrames & 7) == 0) && ((sPlayFrames >> 3) < FISHMOD_LINK_TRACE) && (player != NULL)) {
+        s16* t = gFishmodLinkTrace[sPlayFrames >> 3];
+
+        t[0] = (s16)player->actor.world.pos.x;
+        t[1] = (s16)player->actor.world.pos.y;
+        t[2] = (s16)player->actor.world.pos.z;
+        t[3] = player->actor.shape.rot.y;
+    }
+#endif
 #ifdef FISHMOD_SCRIPT
     StateHash_Update(play);
 #endif

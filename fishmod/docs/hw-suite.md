@@ -49,6 +49,30 @@ a new save, the opening cutscene, 5,000 frames, recorded in the emulator on an o
 The set hash is only comparable between runs of the same ROM: different compilers round floats differently, the
 camera ends a hair apart, and other sets get made (in ares: 798, 763, 745 and 798 sets over the same 3,765 frames).
 
+## The builds stop playing the same game at frame 875
+
+Laid side by side (`fishmod/tools/settrace.py`, from `gFishmodSetTrace` and `gFishmodLinkTrace`), `hw-base` and the
+bare-metal `-O2` build make the same sets of props from the same camera, to the unit, for the bench's first 871
+frames (237 sets). On frame 875 the camera is somewhere else in one of them (a decision of the game's camera that
+went the other way: which comparison, not found yet), Link is steered by the camera, and by frame 1056 he's in
+another place too. The route puts him back at each leg, so they meet again and part again. The same ROM run twice
+is identical throughout.
+
+So the prop-set hash can only be compared between runs of one ROM, and frame times over the whole run compare
+builds doing different work. The report's last table uses frames 60 to 860 only, where the work is the same (in
+ares all four builds draw 164.6 props a frame there):
+
+| build | CPU update + draw, frames 60-859, in ares | against `hw-base` |
+|---|---:|---:|
+| `hw-base` | 28.04 ms | |
+| `hw-g10all` | 27.91 ms | -0.5% |
+| `hw-g14o2` | 28.91 ms | +3.1% |
+| `hw-g14os` | 29.00 ms | +3.4% |
+
+(The game never sets its frame counter: in the all-GCC builds it started from 1,701,999,717, in the others from 0.
+Scripted builds now start it at 0. It wasn't the cause of the parting: with it fixed the builds still part on
+frame 875. The suite's committed patches are from before that change.)
+
 ## What the emulator said, and why the console is needed
 
 | build | ares's exact profile, working cycles against the old `-O2` build | this suite's dry run in ares, CPU update + draw against `hw-base` |
