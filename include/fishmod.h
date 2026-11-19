@@ -551,6 +551,7 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 // audio under the fish's tag)
 extern u32 gFishmodPcTag;
 extern u32 gFishmodScatterDropped[4];
+extern u8 gFishmodHudTest; // (a script: the rod's fight indicators drawn with made-up values while the bobber floats)
 extern u32 gFishmodScatterHash[128];
 // each set Scatter_Build made (the first FISHMOD_SET_TRACE), and Link every 8th frame of play
 #define FISHMOD_SET_TRACE 1024

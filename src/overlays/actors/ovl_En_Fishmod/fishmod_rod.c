@@ -154,6 +154,7 @@ void EnFishmod_RodNibble(EnFishmod* fish) {
     ROD->dip = 4.0f; // quick tick down
     ROD->dipTarget = 0.0f;
     Sfx_PlaySfxAtPos(&gFishmodRod->projectedPos, NA_SE_EV_LURE_MOVE_W);
+    Rumble_Override(0.0f, 45, 3, 20); // a tap in the hand too (the bite's is much stronger)
 }
 
 void EnFishmod_RodBite(EnFishmod* fish) {
@@ -410,7 +411,8 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     EnFishmod_Disturb(play, &fish->actor.world.pos, 220.0f, 120);
     Rumble_Override(0.0f, 180, 20, 10);
     Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
-    EnFishmod_RodMessage(1, "Hooked!", NULL);
+    EnFishmod_RodMessage(1, "FISH ON!", NULL);
+    Sfx_PlaySfxCentered(NA_SE_SY_CORRECT_CHIME);
     func_800F5ACC(NA_BGM_FISHMOD_FIGHT); // fish-on music in place of the area's, until the fight ends
 }
 
@@ -446,6 +448,20 @@ static f32 Rod_DistFromTip(Vec3f* pos) {
  * Tension rises when the fish pulls against a taut line and when reeling against it, and the reel's drag
  * pays out line above ~85. Holding the stick against the fish's run tires it faster and eases the tension.
  */
+// What the fight's indicators show (Rod_DrawHud) and sound: which way to hold the stick (the angle the stick has when
+// it's right against the fish's run, as Rod_UpdateFight reads the stick), whether it's held there, whether the fish is
+// in a run, and how much it has left.
+static s16 sPullAngle;
+static u8 sOpposing;
+static u8 sRunning;
+static f32 sFishLeft;
+// the fight's zones on the tension's 0-100 (Rod_UpdateFight's own numbers: the hook falls out under 6 held slack,
+// the drag pays out over 85, the line parts at 100)
+#define TENSION_SLACK 12.0f
+#define TENSION_LOW 25.0f
+#define TENSION_HIGH 70.0f
+#define TENSION_DRAG 85.0f
+
 static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, Input* input) {
     EnFishmod* fish = ROD->fish;
     const FishmodBehavior* b = &fish->species->behavior;
@@ -475,6 +491,21 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
 
         stickYaw = Math_Atan2S(input->rel.stick_y, -input->rel.stick_x) + Camera_GetInputDirYaw(cam) - 0x4000;
         opposing = ABS((s16)(stickYaw - fish->runYaw - 0x8000)) < 0x3000;
+    }
+    // the indicators: the stick's angle that makes the test above come out right in the middle, and the cues
+    {
+        s32 running = (fish->stateTimer > 0);
+
+        sPullAngle = (s16)(fish->runYaw + 0x8000 + 0x4000 - Camera_GetInputDirYaw(GET_ACTIVE_CAM(play)));
+        if (running && !sRunning) {
+            Sfx_PlaySfxCentered(NA_SE_SY_ATTENTION_ON); // it's off on a run: look at the arrow
+        }
+        if (opposing && !sOpposing) {
+            Sfx_PlaySfxCentered(NA_SE_SY_LOCK_ON); // the stick is against it
+        }
+        sRunning = running;
+        sOpposing = opposing;
+        sFishLeft = staminaFrac;
     }
 
     // where the fish wants to go
@@ -526,6 +557,21 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     ROD->lineOut = CLAMP(ROD->lineOut, LINE_MIN, LINE_MAX);
 
     EnFishmod_FishPullTo(fish, &next);
+
+    // heard as well as seen: a count that quickens as the line nears parting, a slow tick while it hangs slack
+    if (ROD->tension > TENSION_DRAG) {
+        if ((play->gameplayFrames % ((ROD->tension >= 100.0f) ? 3 : 6)) == 0) {
+            Sfx_PlaySfxCentered(NA_SE_SY_WARNING_COUNT_E);
+        }
+    } else if (ROD->tension > TENSION_HIGH) {
+        if ((play->gameplayFrames % 14) == 0) {
+            Sfx_PlaySfxCentered(NA_SE_SY_WARNING_COUNT_N);
+        }
+    } else if (ROD->tension < TENSION_SLACK) {
+        if ((play->gameplayFrames % 12) == 0) {
+            Sfx_PlaySfxCentered(NA_SE_SY_METRONOME);
+        }
+    }
 
     // snap
     if (ROD->tension >= 100.0f) {
@@ -1453,29 +1499,73 @@ static void Rod_DrawHud(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
 
     gfx = OVERLAY_DISP;
+    s32 fight = (ROD->state == ROD_STATE_FIGHT);
 
-    // tension gauge while fighting: green in the middle, red at the ends
-    if (ROD->state == ROD_STATE_FIGHT) {
+#if FISHMOD_DEBUG
+    if (gFishmodHudTest && (ROD->state == ROD_STATE_FLOAT)) {
+        // (a script's look at the fight's indicators with no fish on: the needle swept end to end, the arrow turned
+        // round, the run and the stick's cases each in turn: fishmod/scripts/hud_fight.inc.c)
+        s32 t = play->gameplayFrames;
+
+        fight = true;
+        ROD->tension = (f32)((t * 2) % 200 < 100 ? (t * 2) % 200 : 200 - (t * 2) % 200);
+        sPullAngle = (s16)(t * 0x200);
+        sRunning = ((t / 60) & 1);
+        sOpposing = ((t / 30) & 1);
+        sFishLeft = 1.0f - (f32)(t % 400) / 400.0f;
+    }
+#endif
+    // The fight. The tension as a needle over its zones (slack, low, good, high, the drag: red, amber, green, amber,
+    // red), the frame flashing in either red one; under it how much the fish has left; over it the stick: an arrow the
+    // way to hold it against the run, amber until it's held there and green once it is, bigger while the fish runs.
+    if (fight) {
+        static const u8 sZone[5][4] = {
+            { 0, 200, 50, 40 },   // (from, r, g, b)
+            { 12, 200, 170, 40 },
+            { 25, 60, 190, 70 },
+            { 70, 200, 170, 40 },
+            { 85, 200, 50, 40 },
+        };
         s32 x0 = 110;
         s32 x1 = 210;
         s32 y = 200;
-        s32 fill = x0 + (s32)(CLAMP(ROD->tension, 0.0f, 100.0f));
-        u8 r;
-        u8 g;
+        s32 needle = x0 + (s32)(CLAMP(ROD->tension, 0.0f, 100.0f));
+        s32 danger = (ROD->tension > TENSION_DRAG) || (ROD->tension < TENSION_SLACK);
+        s32 flash = danger && ((play->gameplayFrames & 2) != 0);
+        s32 z;
 
-        if ((ROD->tension > 85.0f) || (ROD->tension < 12.0f)) {
-            r = 240;
-            g = 60;
-        } else if ((ROD->tension > 70.0f) || (ROD->tension < 25.0f)) {
-            r = 240;
-            g = 200;
-        } else {
-            r = 80;
-            g = 230;
+        Rod_FillRect(&gfx, x0 - 2, y - 2, x1 + 2, y + 8, flash ? 255 : 20, flash ? 60 : 20, flash ? 40 : 30);
+        for (z = 0; z < 5; z++) {
+            Rod_FillRect(&gfx, x0 + sZone[z][0], y, x0 + ((z < 4) ? sZone[z + 1][0] : 100), y + 6, sZone[z][1],
+                         sZone[z][2], sZone[z][3]);
         }
-        Rod_FillRect(&gfx, x0 - 2, y - 2, x1 + 2, y + 8, 20, 20, 30);
-        Rod_FillRect(&gfx, x0 + 25, y - 2, x0 + 70, y - 1, 120, 230, 120); // sweet spot marker
-        Rod_FillRect(&gfx, x0, y, fill, y + 6, r, g, 40);
+        Rod_FillRect(&gfx, needle - 2, y - 3, needle + 2, y + 9, 10, 10, 10);
+        Rod_FillRect(&gfx, needle - 1, y - 3, needle + 1, y + 9, 255, 255, 255);
+        // the fish: what it has left
+        Rod_FillRect(&gfx, x0 - 2, y + 11, x1 + 2, y + 17, 20, 20, 30);
+        Rod_FillRect(&gfx, x0, y + 12, x0 + (s32)(CLAMP(sFishLeft, 0.0f, 1.0f) * 100.0f), y + 16, 90, 170, 255);
+        // the stick
+        {
+            s32 cx = 160;
+            s32 cy = 172;
+            f32 dx = -Math_SinS(sPullAngle);
+            f32 dy = -Math_CosS(sPullAngle);
+            s32 pulse = sRunning && !sOpposing && ((play->gameplayFrames & 4) != 0);
+            u8 r = sOpposing ? 70 : 255;
+            u8 g = sOpposing ? 235 : (pulse ? 255 : 190);
+            u8 bl = sOpposing ? 90 : (pulse ? 200 : 40);
+            s32 n;
+
+            Rod_FillRect(&gfx, cx - 17, cy - 17, cx + 17, cy + 17, 20, 20, 30);
+            Rod_FillRect(&gfx, cx - 2, cy - 2, cx + 2, cy + 2, 150, 150, 160);
+            for (n = 1; n <= 4; n++) {
+                s32 px = cx + (s32)(dx * (n * 3.5f));
+                s32 py = cy + (s32)(dy * (n * 3.5f));
+                s32 h = (n == 4) ? (sRunning ? 4 : 3) : 1; // (the last one the arrow's head)
+
+                Rod_FillRect(&gfx, px - h, py - h, px + h + 1, py + h + 1, r, g, bl);
+            }
+        }
     }
 
     // cast power while charging
@@ -1493,10 +1583,38 @@ static void Rod_DrawHud(PlayState* play) {
     if (true) {
         GfxPrint_Init(&printer);
         GfxPrint_Open(&printer, gfx);
-        if (ROD->state == ROD_STATE_FIGHT) {
-            GfxPrint_SetColor(&printer, 255, 255, 255, 255);
-            GfxPrint_SetPos(&printer, 13, 23);
-            GfxPrint_Printf(&printer, "TENSION");
+        if (fight) {
+            // the gauge's ends named, the one the needle is in lit; and what to do about it, in a word
+            const char* now = NULL;
+            s32 slack = (ROD->tension < TENSION_SLACK);
+            s32 drag = (ROD->tension > TENSION_DRAG);
+
+            GfxPrint_SetColor(&printer, 255, slack ? 90 : 255, slack ? 70 : 255, slack ? 255 : 150);
+            GfxPrint_SetPos(&printer, 8, 25); // (left of the gauge; the right end's goes above it, clear of the map)
+            GfxPrint_Printf(&printer, "SLACK");
+            GfxPrint_SetColor(&printer, 255, drag ? 90 : 255, drag ? 70 : 255, drag ? 255 : 150);
+            GfxPrint_SetPos(&printer, 23, 24);
+            GfxPrint_Printf(&printer, "SNAP");
+            GfxPrint_SetColor(&printer, 150, 200, 255, 200);
+            GfxPrint_SetPos(&printer, 9, 26);
+            GfxPrint_Printf(&printer, "FISH");
+            if (drag) {
+                now = "EASE OFF!";
+                GfxPrint_SetColor(&printer, 255, 90, 70, 255);
+            } else if (slack) {
+                now = "REEL!";
+                GfxPrint_SetColor(&printer, 255, 90, 70, 255);
+            } else if (sRunning && !sOpposing) {
+                now = "PULL!";
+                GfxPrint_SetColor(&printer, 255, 220, 80, 255);
+            } else if (sOpposing) {
+                now = "GOOD";
+                GfxPrint_SetColor(&printer, 110, 240, 120, 255);
+            }
+            if (now != NULL) {
+                GfxPrint_SetPos(&printer, 20 - strlen(now) / 2, 18);
+                GfxPrint_Printf(&printer, "%s", now);
+            }
         } else if (ROD->state == ROD_STATE_WINDUP) {
             GfxPrint_SetColor(&printer, 255, 255, 255, 255);
             GfxPrint_SetPos(&printer, 13, 23);
@@ -1519,7 +1637,7 @@ static void Rod_DrawHud(PlayState* play) {
                     hint = "A: Reel in";
                     break;
                 case ROD_STATE_FIGHT:
-                    hint = "A:Reel  Stick: pull against it";
+                    hint = "A:Reel  Stick: the way the arrow points";
                     break;
             }
             if ((ROD->state == ROD_STATE_HELD) || (ROD->state == ROD_STATE_FLOAT)) {
