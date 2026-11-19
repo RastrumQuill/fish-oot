@@ -51,7 +51,8 @@ FishmodRod gFishmodRodState;
 #define WINDUP_FRAMES 18
 #define LINE_MIN 28.0f
 #define BAIT_DEPTH_START 6.0f   // the bait as it lands, just under the bobber
-#define BAIT_ABOVE_BOTTOM 6.0f  // where the sink stops by itself
+#define BAIT_ABOVE_BOTTOM 6.0f  // the bait never hangs nearer the bed than this
+#define BAIT_DEPTH_FRACTION 0.35f // of the water's depth under the bobber: where the bait hangs
 // The most line under a bobber (about the rod's length, some 5 m): a float rig fishes the top of the water, not the
 // deep basin or the Water Temple's gate (that's for sinkers and lures)
 #define BAIT_DEPTH_MAX 180.0f
@@ -583,39 +584,42 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
 }
 
 /**
- * The float depth, set on every cast: the bait sinks under the bobber until A is pressed once (that press only
- * stops it; A reels as usual once it's let go), or it stops by itself a little above the bottom, so shallow water
- * isn't a race. The camera follows it down.
+ * The float depth, set by the water and not by the player: the bait hangs BAIT_DEPTH_FRACTION of the way down the
+ * water under the bobber, where most species hold (their depth bands, fishmod/data/species.json: six of the ten
+ * include it), no deeper than a float rig reaches (BAIT_DEPTH_MAX) and never within BAIT_ABOVE_BOTTOM of the bed. It
+ * sinks to that after the cast and follows the bed as the bobber is reeled in, so it never drags in the shallows. The
+ * bottom species (catfish, loach) and deep basins are for another rig (a sinker, a sinking lure), not for this one.
+ * (It used to sink until A was pressed, once a cast: test 5's "needs a more intuitive control".)
  */
 static void Rod_UpdateSink(PlayState* play, Input* input) {
     f32 surface;
     f32 floor;
-    f32 deepest;
+    f32 want;
 
-    if (ROD->reelLock && !CHECK_BTN_ALL(input->cur.button, BTN_A)) {
-        ROD->reelLock = false;
+    // (the water under the bobber: every 4th frame, and at once after a cast)
+    if (ROD->sinking || ((play->gameplayFrames & 3) == 0)) {
+        want = ROD->baitTarget;
+        if (EnFishmod_WaterFloor(play, ROD->bobberPos.x, ROD->bobberPos.z, &surface, &floor, false)) {
+            f32 depth = surface - floor;
+
+            want = CLAMP(depth * BAIT_DEPTH_FRACTION, BAIT_DEPTH_START, BAIT_DEPTH_MAX);
+            want = CLAMP_MAX(want, depth - BAIT_ABOVE_BOTTOM);
+            want = CLAMP_MIN(want, 2.0f);
+        }
+        ROD->baitTarget = want;
     }
-    if (!ROD->sinking) {
-        return;
-    }
-    if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
-        ROD->sinking = false;
-        ROD->reelLock = true;
-        Sfx_PlaySfxCentered(NA_SE_IT_FISHING_REEL_SLOW);
-        ROD->dip = 3.0f; // the bobber stands up as the line comes tight
-        return;
-    }
-    deepest = BAIT_DEPTH_MAX;
-    if (EnFishmod_WaterFloor(play, ROD->bobberPos.x, ROD->bobberPos.z, &surface, &floor, false)) {
-        deepest = CLAMP_MAX((surface - floor) - BAIT_ABOVE_BOTTOM, BAIT_DEPTH_MAX);
-    }
-    // sinking faster as the line pays out, like a weighted bait
-    ROD->baitDepth += CLAMP(0.8f + ROD->baitDepth * 0.012f, 0.8f, 3.0f);
-    if (ROD->baitDepth >= deepest) {
-        ROD->baitDepth = CLAMP_MIN(deepest, BAIT_DEPTH_START);
-        ROD->sinking = false;
-        ROD->dip = 3.0f;
-        Rumble_Override(0.0f, 60, 3, 10); // a small tug as the line comes tight near the bottom
+    if (ROD->sinking) {
+        // sinking faster as the line pays out, like a weighted bait
+        ROD->baitDepth += CLAMP(0.8f + ROD->baitDepth * 0.012f, 0.8f, 3.0f);
+        if (ROD->baitDepth >= ROD->baitTarget) {
+            ROD->baitDepth = ROD->baitTarget;
+            ROD->sinking = false;
+            ROD->dip = 3.0f; // the bobber stands up as the line comes tight
+            Rumble_Override(0.0f, 60, 3, 10);
+        }
+    } else {
+        // reeled in over shallower water (or out over deeper): the bait eases to its new depth
+        Math_ApproachF(&ROD->baitDepth, ROD->baitTarget, 0.2f, 2.0f);
     }
 }
 
@@ -628,7 +632,7 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
     Rod_UpdateSink(play, input);
 
     // reel
-    if (CHECK_BTN_ALL(input->cur.button, BTN_A) && !ROD->sinking && !ROD->reelLock) {
+    if (CHECK_BTN_ALL(input->cur.button, BTN_A)) {
         f32 reel = CHECK_BTN_ALL(input->cur.button, BTN_R) ? 3.5f : 1.6f;
 
         ROD->lineOut -= reel;
@@ -878,11 +882,10 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->dip = 6.0f;
                 ROD->splashed = true;
                 EnFishmod_Disturb(play, &ROD->bobberPos, 0.0f, 0);
-                // the bait starts sinking under the bobber: A stops it at a depth (once per cast), or it stops by
-                // itself a little above the bottom
+                // the bait sinks under the bobber to the depth the water gives it (Rod_UpdateSink)
                 ROD->baitDepth = BAIT_DEPTH_START;
+                ROD->baitTarget = BAIT_DEPTH_START;
                 ROD->sinking = true;
-                ROD->reelLock = false;
                 ROD->lineOut = Math_Vec3f_DistXZ(&ROD->tipPos, &ROD->bobberPos);
                 Actor_PlaySfx(&this->actor, NA_SE_EV_BOMB_DROP_WATER);
                 Rod_Splash(play, &ROD->bobberPos, true);

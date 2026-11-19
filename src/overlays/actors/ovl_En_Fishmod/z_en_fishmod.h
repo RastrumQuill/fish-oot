@@ -223,10 +223,11 @@ typedef struct FishmodRod {
     /* 0xC4 */ f32 lineFloor[17];    // lowest each point along the line can hang: the ground, or the water it rests on
     /* 0x108 */ f32 bendRoll;       // which way the rod bends around its own axis (radians), toward the pull
     /* 0x10C */ f32 bendPull;       // how much of the tension bends the rod: more when the pull is across it
-    /* 0x110 */ f32 baitDepth;      // how far under the water the bait hangs (set each cast: see Rod_UpdateSink)
+    /* 0x110 */ f32 baitDepth;      // how far under the water the bait hangs (by the water's depth: see Rod_UpdateSink)
     /* 0x114 */ u8 sinking;         // the bait is still sinking after the cast
-    /* 0x115 */ u8 reelLock;        // the A press that stopped the sink: no reeling until A is let go
+    /* 0x115 */ u8 reelLock;        // (unused: the sink was stopped by a press of A once)
     /* 0x116 */ u8 hookedBait;      // the bait the hooked fish took (it learns it if it breaks off)
+    /* 0x118 */ f32 baitTarget;     // the depth the water under the bobber gives the bait (Rod_UpdateSink)
 } FishmodRod;
 
 // The bait's height under the bobber
