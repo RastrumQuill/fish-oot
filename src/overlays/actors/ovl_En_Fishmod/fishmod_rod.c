@@ -476,6 +476,8 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     s32 opposing = false;
     s16 stickYaw;
     f32 stickMag = sqrtf(SQ((f32)input->rel.stick_x) + SQ((f32)input->rel.stick_y));
+    f32 pounds = fish->species->weightCoef * fish->lengthInches * fish->lengthInches * fish->lengthInches * 0.000001f;
+    f32 load = CLAMP(sqrtf(pounds * 0.5f), 0.35f, 1.8f);
 
     // reel
     if (CHECK_BTN_ALL(input->cur.button, BTN_A)) {
@@ -533,7 +535,12 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         toFish.z = next.z - ROD->tipPos.z;
         next.x = ROD->tipPos.x + toFish.x * (ROD->lineOut / dist);
         next.z = ROD->tipPos.z + toFish.z * (ROD->lineOut / dist);
-        tensionTarget = 30.0f + taut * 8.0f + b->strength * 0.35f * (0.3f + staminaFrac * 0.7f);
+        // The strain is this fish's own: its weight (the species' formula on its length) sets how much of its
+        // strength and of the tight line reaches the rod. `load` is 1 at 2 lbs, 0.35 for a few ounces, 1.8 from
+        // 6.5 lbs up: a minnow sits low on the gauge and comes straight in, a big pike has to be played. (It was
+        // 30 + 8 a unit of tight line + the species' strength, whatever the fish's size: a hair trigger.)
+        tensionTarget = 14.0f + CLAMP_MAX(taut, 5.0f) * 5.0f * load +
+                        b->strength * 0.35f * (0.3f + staminaFrac * 0.7f) * load;
         EnFishmod_FishTire(fish, (0.4f + b->strength * 0.01f) * (opposing ? 2.5f : 1.0f));
         if (opposing) {
             tensionTarget -= 12.0f;
@@ -546,7 +553,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         }
     }
 
-    Math_ApproachF(&ROD->tension, tensionTarget, 0.3f, 6.0f);
+    Math_ApproachF(&ROD->tension, tensionTarget, 0.25f, 4.0f); // (it was 0.3 and 6 a frame: too sudden to answer)
 
     // reel drag pays out line instead of snapping right away
     if ((ROD->tension > 85.0f) && (taut > 0.0f)) {

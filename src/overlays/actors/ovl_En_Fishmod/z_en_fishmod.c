@@ -1778,7 +1778,8 @@ static void Fish_Nibble(EnFishmod* this, PlayState* play, FishAI* ai) {
         this->nibblesLeft--;
         this->jawRot = 0;
         this->fishState = FISH_STATE_INSPECT;
-        this->stateTimer = 15 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 35.0f);
+        // (the species' own rhythm between taps, give or take a third: a bass raps at it, a carp takes its time)
+        this->stateTimer = (s16)(ai->b->nibbleGap * (0.67f + Fishmod_RandZeroFloat(gFishmodRngNow, 0.66f)));
     }
 }
 

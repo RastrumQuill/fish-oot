@@ -643,7 +643,11 @@ void Fishmod_ShowCatchMessage(PlayState* play, const char* name, const char* siz
     }
     if (canKeep) {
         p = Msg_PutString(p, end, "Keep it in a bottle?");
-        if (p + 2 < end) {
+        // (an empty line before the choices, as the game's own two-choice messages have: the choice arrow is drawn
+        // at a four-line box's third and fourth lines, and with three lines the box centres its text 4 pixels off
+        // them: test 5's misaligned Yes and No)
+        if (p + 3 < end) {
+            *p++ = MESSAGE_NEWLINE;
             *p++ = MESSAGE_NEWLINE;
             *p++ = MESSAGE_TWO_CHOICE;
         }

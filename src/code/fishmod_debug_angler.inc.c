@@ -61,7 +61,7 @@
                 button = BTN_A;
                 break;
             case 6: // fight: reel while the tension is comfortable
-#ifdef FISHMOD_ANGLER_BAIT
+#ifdef FISHMOD_ANGLER_SLOW_FIGHT
                 {
                     // (the fight drawn out, for looking at its indicators: only enough reeling to keep the line from
                     // going slack for the first 15 seconds of each)

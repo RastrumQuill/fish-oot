@@ -85,7 +85,7 @@ def gen_header(data):
         out.append(f"        {sp['weightCoef'] * 1000000:.0f}, /* weight = coef * length^3 / 1000000 lbs */")
         out.append(
             f"        {{ {b['curiosity']}, {b['aggression']}, {b['wariness']}, {b['strength']}, {b['stamina']}, "
-            f"{b['speed']}, {b['jumpiness']}, {b['nibbles']}, {b['biteWindow']} }},"
+            f"{b['speed']}, {b['jumpiness']}, {b['nibbles']}, {b['biteWindow']}, {b.get('nibbleGap', 25)} }},"
         )
         out.append(f"        {{ {bait} }},")
         look = sp.get("look", {})
@@ -198,6 +198,7 @@ def gen_species_page(sp, data):
     for k in ["curiosity", "aggression", "wariness", "strength", "stamina", "speed", "jumpiness"]:
         lines.append(f"{k:<11}{bar(b[k])}")
     lines.append(f"{'nibbles':<11}{b['nibbles']} before the real bite")
+    lines.append(f"{'tap rhythm':<11}{b.get('nibbleGap', 25) / 20:.1f} s between taps, give or take a third")
     lines.append(f"{'bite window':<11}{b['biteWindow']} frames ({b['biteWindow'] / 20:.2f} s) to set the hook")
     lines.append("```")
     lines.append("")
