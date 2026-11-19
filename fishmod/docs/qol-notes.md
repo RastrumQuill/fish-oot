@@ -21,15 +21,17 @@ Gathered from the roadmap (fishmod/docs/roadmap.md, its quality-of-life lists), 
   and Hylian Shield as an adult). (Asked 12 Nov.)
 - **The time of day**: a small arc under the overworld minimap, the sun or moon riding it, fading with the minimap,
   hidden where time is frozen (fishmod_items.c).
+- **Hold B to fill a text box**: holding B fills the box at once, not only a press (moving on still takes a press;
+  z_message.c, 8 Nov).
 - **Blocks pushed and pulled faster with each strength upgrade**: 1.35, 1.7, 2 times as fast with the Goron's
   Bracelet, Silver and Golden Gauntlets (fishmod.c Fishmod_PushSpeedScale; first numbers, to be tuned by feel).
 
 ## Open (from the roadmap)
 
-- **Faster text**: text printing at twice the speed, as in Majora's Mask and Ocarina of Time 3D; hold B to fill a box
-  at once; skip text already read (item gets, repeated owl talk). In z_message.c: the print speed doubled; B held
-  fills the box (as A does after its delay); a "read" bit per message id (a small bitfield in the mod's save block) to
-  offer the skip.
+- **The rest of faster text**: text printing at twice the speed, as in Majora's Mask and Ocarina of Time 3D; and a
+  skip for text already read (item gets, repeated owl talk): a "read" bit per message id (a small bitfield in the
+  mod's save block).
+
 
 - **Movement that feels more responsive**: mostly how Link answers the stick, partly the delay before the picture
   shows it.
