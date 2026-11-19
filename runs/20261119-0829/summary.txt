@@ -1,0 +1,11 @@
+Morning runs 20261119-0829
+
+ 1. hw-base-1                    done        130 packets    0.9 MB   210 s  
+ 2. hw-g10all-1                  done        130 packets    0.9 MB   212 s  
+ 3. hw-g14o2-1                   done        130 packets    0.9 MB   211 s  
+ 4. hw-g14os-1                   done        130 packets    0.9 MB   213 s  
+ 5. hw-base-2                    done        130 packets    0.9 MB   211 s  
+ 6. hw-g10all-2                  done        130 packets    0.9 MB   222 s  
+ 7. hw-g14o2-2                   done        130 packets    0.9 MB   211 s  
+ 8. hw-g14os-2                   done        130 packets    0.9 MB   213 s  
+ 9. hw-replay-g14o2              failed        0 packets    0.0 MB       s  upload failed

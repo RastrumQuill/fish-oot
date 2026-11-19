@@ -1,0 +1,33 @@
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe upload C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\morning.z64
+Uploading ROM [morning.z64]... done
+Save type set to [None]
+Boot mode set to [Bootloader -> ROM]
+
+(exit 0)
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe dump 0 0x4000000 C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\readback.bin
+Dumping from [0x00000000] length [0x4000000] to [readback.bin]... done
+
+(exit 0)
+read back: DIFFERENT: 32 of 16384 4 KB blocks differ; first at 0x3FE0000 (sent FF, read F0); blocks 0x3FE0000, 0x3FE1000, 0x3FE2000, 0x3FE3000, 0x3FE4000, 0x3FE5000, 0x3FE6000, 0x3FE7000, 0x3FE8000, 0x3FE9000, 0x3FEA000, 0x3FEB000, 0x3FEC000, 0x3FED000, 0x3FEE000, 0x3FEF000, 0x3FF0000, 0x3FF1000, 0x3FF2000, 0x3FF3000, 0x3FF4000, 0x3FF5000, 0x3FF6000, 0x3FF7000, 0x3FF8000, 0x3FF9000, 0x3FFA000, 0x3FFB000, 0x3FFC000, 0x3FFD000, 0x3FFE000, 0x3FFF000
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe upload C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\morning.z64
+Uploading ROM [morning.z64]... done
+Save type set to [None]
+Boot mode set to [Bootloader -> ROM]
+
+(exit 0)
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe dump 0 0x4000000 C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\readback.bin
+Dumping from [0x00000000] length [0x4000000] to [readback.bin]... done
+
+(exit 0)
+read back: DIFFERENT: 32 of 16384 4 KB blocks differ; first at 0x3FE0000 (sent FF, read F0); blocks 0x3FE0000, 0x3FE1000, 0x3FE2000, 0x3FE3000, 0x3FE4000, 0x3FE5000, 0x3FE6000, 0x3FE7000, 0x3FE8000, 0x3FE9000, 0x3FEA000, 0x3FEB000, 0x3FEC000, 0x3FED000, 0x3FEE000, 0x3FEF000, 0x3FF0000, 0x3FF1000, 0x3FF2000, 0x3FF3000, 0x3FF4000, 0x3FF5000, 0x3FF6000, 0x3FF7000, 0x3FF8000, 0x3FF9000, 0x3FFA000, 0x3FFB000, 0x3FFC000, 0x3FFD000, 0x3FFE000, 0x3FFF000
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe upload C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\morning.z64
+Uploading ROM [morning.z64]... done
+Save type set to [None]
+Boot mode set to [Bootloader -> ROM]
+
+(exit 0)
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe dump 0 0x4000000 C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\readback.bin
+Dumping from [0x00000000] length [0x4000000] to [readback.bin]... done
+
+(exit 0)
+read back: DIFFERENT: 32 of 16384 4 KB blocks differ; first at 0x3FE0000 (sent FF, read F0); blocks 0x3FE0000, 0x3FE1000, 0x3FE2000, 0x3FE3000, 0x3FE4000, 0x3FE5000, 0x3FE6000, 0x3FE7000, 0x3FE8000, 0x3FE9000, 0x3FEA000, 0x3FEB000, 0x3FEC000, 0x3FED000, 0x3FEE000, 0x3FEF000, 0x3FF0000, 0x3FF1000, 0x3FF2000, 0x3FF3000, 0x3FF4000, 0x3FF5000, 0x3FF6000, 0x3FF7000, 0x3FF8000, 0x3FF9000, 0x3FFA000, 0x3FFB000, 0x3FFC000, 0x3FFD000, 0x3FFE000, 0x3FFF000

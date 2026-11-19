@@ -1,0 +1,51 @@
+Console test suite: 20261119-0829
+
+1. Did each run work
+
+  ok   hw-base-1              frames 3757, sets 798, hash 170B571B; differs from the emulator (frames 3765, sets 798, hash 170B571B)
+  ok   hw-g10all-1            frames 3757, sets 763, hash 75E204BA; differs from the emulator (frames 3765, sets 763, hash 75E204BA)
+  ok   hw-g14o2-1             frames 3757, sets 745, hash B57B3424; differs from the emulator (frames 3765, sets 745, hash B57B3424)
+  ok   hw-g14os-1             frames 3757, sets 798, hash 81201428; differs from the emulator (frames 3765, sets 798, hash 81201428)
+  ok   hw-base-2              frames 3757, sets 798, hash 170B571B; differs from the emulator (frames 3765, sets 798, hash 170B571B)
+  ok   hw-g10all-2            frames 3757, sets 763, hash 75E204BA; differs from the emulator (frames 3765, sets 763, hash 75E204BA)
+  ok   hw-g14o2-2             frames 3757, sets 745, hash B57B3424; differs from the emulator (frames 3765, sets 745, hash B57B3424)
+  ok   hw-g14os-2             frames 3757, sets 798, hash 81201428; differs from the emulator (frames 3765, sets 798, hash 81201428)
+
+2. Do a build's own runs agree (the same ROM twice must do the same thing)
+
+  ok   hw-base                2 runs agree
+  ok   hw-g10all              2 runs agree
+  ok   hw-g14o2               2 runs agree
+  ok   hw-g14os               2 runs agree
+
+3. How fast (the frames the bench counts; ms a frame)
+
+  run                       fps   period   update     draw      RSP      RDP  slow %
+  hw-base-1               19.48    51.33    12.46    13.51    32.03    38.80    15.0
+  hw-g10all-1             19.47    51.36    12.23    13.75    32.12    38.82    14.4
+  hw-g14o2-1              19.45    51.41    12.75    14.33    31.94    38.74    15.4
+  hw-g14os-1              19.47    51.36    13.34    14.11    32.24    39.22    14.0
+  hw-base-2               19.50    51.29    12.36    13.49    31.74    38.62    14.2
+  hw-g10all-2             19.47    51.35    12.30    13.79    32.34    38.96    14.5
+  hw-g14o2-2              19.43    51.46    12.85    14.31    32.18    38.92    15.3
+  hw-g14os-2              19.44    51.43    13.40    14.16    32.46    39.41    14.5
+
+4. Each build against hw-base (CPU = update + draw; the spread is between a build's own runs: a difference
+   smaller than the spreads is noise)
+
+  build                   runs    CPU ms   spread   vs base  period ms  vs base
+  hw-base                    2     25.91     0.13     +0.0%      51.31    +0.0%
+  hw-g10all                  2     26.04     0.12     +0.5%      51.36    +0.1%
+  hw-g14o2                   2     27.12     0.09     +4.7%      51.43    +0.2%
+  hw-g14os                   2     27.51     0.12     +6.2%      51.39    +0.2%
+
+5. The same over frames 60 to 860 only, where every build plays the same game (the fair comparison: after
+   that the builds' cameras part and they aren't doing the same work)
+
+  build                   runs    CPU ms   spread   vs base
+  hw-base                    2     26.00     0.09     +0.0%
+  hw-g10all                  2     25.79     0.28     -0.8%
+  hw-g14o2                   2     27.83     0.09     +7.0%
+  hw-g14os                   2     27.68     0.56     +6.4%
+
+RESULT: all runs worked
