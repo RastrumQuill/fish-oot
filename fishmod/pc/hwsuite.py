@@ -118,11 +118,14 @@ def main():
     a = ap.parse_args()
     expected = json.load(open(EXPECTED)) if os.path.isfile(EXPECTED) else {}
     runs = []
+    never = []
     for d in sorted(glob.glob(os.path.join(a.folder, "*"))):
         if os.path.isdir(d) and os.path.isfile(os.path.join(d, "debug.log")):
             r = read_run(d)
             r["name"], r["build"] = label_of(r["folder"])
             runs.append(r)
+        elif os.path.isdir(d) and os.path.isfile(os.path.join(d, "upload.log")):
+            never.append(label_of(os.path.basename(d))[0])  # (uploaded, or tried to, and never ran)
     if not runs:
         sys.exit(f"{a.folder}: no runs (folders with a debug.log)")
     out = []
@@ -171,12 +174,18 @@ def main():
             else:
                 notes.append("frames %d, sets %d, hash %s" % (c["frames"], c["sets"], c["sethash"]))
                 if e:
-                    same = all(c[k] == e[k] for k in ("frames", "sets", "sethash") if k in e)
-                    notes.append("same as the emulator" if same else
-                                 "differs from the emulator (frames %s, sets %s, hash %s)" %
-                                 (e.get("frames"), e.get("sets"), e.get("sethash")))
+                    # (the sets and their hash are what the game did; the frame count is where the end was noticed,
+                    # which can fall a few frames apart on the console)
+                    same = all(c[k] == e[k] for k in ("sets", "sethash") if k in e)
+                    notes.append("the same sets as in the emulator" if same else
+                                 "NOT the emulator's sets (%s, hash %s)" % (e.get("sets"), e.get("sethash")))
+                    if "frames" in e and c["frames"] != e["frames"]:
+                        notes.append("%+d frames at the end" % (c["frames"] - e["frames"]))
         fails += 0 if ok else 1
         w("  %-4s %-22s %s" % ("ok" if ok else "FAIL", r["name"], "; ".join(notes)))
+    for name in never:
+        fails += 1
+        w("  %-4s %-22s never ran (no debug.log: see its upload.log)" % ("FAIL", name))
     w("")
     w("2. Do a build's own runs agree (the same ROM twice must do the same thing)")
     w("")
