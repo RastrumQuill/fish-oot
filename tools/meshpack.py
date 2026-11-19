@@ -50,11 +50,8 @@ CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_room_0",
 WATER_Y = -1313
 CAUSTIC_FROM, CAUSTIC_TO = 150, 550   # depths (units) where the fade starts and where it's sand only
 CAUSTIC_STEPS = 4                      # steps of the fade (the lists in segment 0x0A: CAUSTIC_STEPS - 1 of them)
-# The fade is off by default (MESHPACK_CAUSTIC_FADE=1 for it): a whole triangle takes one step, so the caustics jump
-# along the edges between triangles of different steps (seams on the shallow bed, 19 Nov), and a per-vertex fade would
-# need the vertices' alpha, which the bed's fog uses. The water fog hides the deep caustics instead, as vanilla's
-# single blend everywhere.
-CAUSTIC_FADE = bool(os.environ.get("MESHPACK_CAUSTIC_FADE"))
+# MESHPACK_NO_CAUSTIC_FADE=1: no fade (vanilla's one blend everywhere). The grey caustics below stay either way.
+CAUSTIC_FADE = not os.environ.get("MESHPACK_NO_CAUSTIC_FADE")
 # ... and the caustic texture itself made light alone: their brightness (i8), no colour (the water's colour is
 # the fog's; the rocks' caustics are the same light: fishmod_scatter.c). Half the size to load.
 GREY_CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_scene", ["spot06_scene_000170B8_Tex"])]
@@ -79,6 +76,9 @@ if os.environ.get("MESHPACK_FOG_BANDS"):
 # console's frames28 set, 8 cut bands 54% hitches and 17.2 fps, uncut 32% and 18.2 fps, no bed fog at all 30-31%.
 # MESHPACK_FOG_CUT=1 cuts again)
 FOG_NOCUT = not os.environ.get("MESHPACK_FOG_CUT")
+# ... but a triangle crossing the surface is cut at it (MESHPACK_NO_SURFACE_CUT=1: not): a few, along the shore
+FOG_CUT_SURFACE = not os.environ.get("MESHPACK_NO_SURFACE_CUT")
+SURFACE_CUTS = [0]
 
 
 def game_band(k):
@@ -144,12 +144,26 @@ def clip_poly(poly, y0, lit):
 def band_split(tri, lit):
     """the triangle's parts by band: [(band (-1: over the surface), triangle)]"""
     if FOG_NOCUT:
-        d = WATER_Y - sum(int(v[1], 0) for v in tri) / 3.0
-        b = -1
-        for k, top in enumerate(WATER_BANDS):
-            if d > top:
-                b = k
-        return [(b, tuple(tri))]
+        def band_of(t):
+            d = WATER_Y - sum(int(v[1], 0) for v in t) / 3.0
+            b = -1
+            for k, top in enumerate(WATER_BANDS):
+                if d > top:
+                    b = k
+            return b
+
+        ys = [int(v[1], 0) for v in tri]
+        if FOG_CUT_SURFACE and min(ys) < WATER_Y < max(ys):
+            # crossing the surface: cut there only (else the whole triangle takes one side's fog, and the shore shows
+            # a straight edge where it changes), the part over it unfogged, the part under it by its own middle
+            above, below = clip_poly(list(tri), WATER_Y, lit)
+            out = [(-1, (above[0], above[i], above[i + 1])) for i in range(1, len(above) - 1)]
+            for i in range(1, len(below) - 1):
+                t = (below[0], below[i], below[i + 1])
+                out.append((max(band_of(t), 0), t))
+            SURFACE_CUTS[0] += 1
+            return out
+        return [(band_of(tri), tuple(tri))]
     out = []
     poly = list(tri)
     for k, d in enumerate(WATER_BANDS):
@@ -932,7 +946,8 @@ def main():
                 areas[name] = cmds
                 area_arrays[vname] = vtx
             if report:
-                print("meshpack: %s: %d triangles in %d areas, %d area lists" % (dl, ntri, nareas, len(area_dls)))
+                print("meshpack: %s: %d triangles in %d areas, %d area lists (%d cut at the surface so far)" %
+                      (dl, ntri, nareas, len(area_dls), SURFACE_CUTS[0]))
         table = None
         if room in RELIGHT:
             # every piece of the room (cut or not) relit
