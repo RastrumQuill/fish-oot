@@ -28,6 +28,7 @@ stamina    █████░░░░░ 50
 speed      ████░░░░░░ 35
 jumpiness  ██░░░░░░░░ 15
 nibbles    3 before the real bite
+tap rhythm 2.2 s between taps, give or take a third
 bite window16 frames (0.80 s) to set the hook
 ```
 

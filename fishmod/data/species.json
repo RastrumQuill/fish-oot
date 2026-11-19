@@ -47,7 +47,7 @@
         "stamina": 30,
         "speed": 45,
         "jumpiness": 10,
-        "nibbles": 2,
+        "nibbles": 2, "nibbleGap": 14,
         "biteWindow": 18
       },
       "bait": {
@@ -256,7 +256,7 @@
         "stamina": 15,
         "speed": 70,
         "jumpiness": 20,
-        "nibbles": 3,
+        "nibbles": 3, "nibbleGap": 10,
         "biteWindow": 12
       },
       "bait": {
@@ -341,7 +341,7 @@
         "stamina": 55,
         "speed": 65,
         "jumpiness": 45,
-        "nibbles": 1,
+        "nibbles": 1, "nibbleGap": 12,
         "biteWindow": 14
       },
       "bait": {
@@ -487,7 +487,7 @@
         "stamina": 80,
         "speed": 30,
         "jumpiness": 0,
-        "nibbles": 3,
+        "nibbles": 3, "nibbleGap": 34,
         "biteWindow": 22
       },
       "bait": {
@@ -720,7 +720,7 @@
         "stamina": 90,
         "speed": 55,
         "jumpiness": 5,
-        "nibbles": 4,
+        "nibbles": 4, "nibbleGap": 50,
         "biteWindow": 10
       },
       "bait": {
@@ -791,7 +791,7 @@
         "stamina": 50,
         "speed": 35,
         "jumpiness": 15,
-        "nibbles": 3,
+        "nibbles": 3, "nibbleGap": 44,
         "biteWindow": 16
       },
       "bait": {
@@ -1047,7 +1047,7 @@
         "stamina": 55,
         "speed": 85,
         "jumpiness": 80,
-        "nibbles": 0,
+        "nibbles": 0, "nibbleGap": 16,
         "biteWindow": 12
       },
       "bait": {
@@ -1117,7 +1117,7 @@
         "stamina": 60,
         "speed": 60,
         "jumpiness": 35,
-        "nibbles": 2,
+        "nibbles": 2, "nibbleGap": 26,
         "biteWindow": 14
       },
       "bait": {
@@ -1187,7 +1187,7 @@
         "stamina": 70,
         "speed": 60,
         "jumpiness": 40,
-        "nibbles": 1,
+        "nibbles": 1, "nibbleGap": 16,
         "biteWindow": 14
       },
       "bait": {
@@ -1256,7 +1256,7 @@
         "stamina": 70,
         "speed": 25,
         "jumpiness": 0,
-        "nibbles": 3,
+        "nibbles": 3, "nibbleGap": 22,
         "biteWindow": 20
       },
       "bait": {

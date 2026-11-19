@@ -35,6 +35,12 @@
                 }
                 break;
             case 1: // held: cast every so often
+#ifdef FISHMOD_ANGLER_BAIT
+                // (a test of the bite and the fight: a bait on the hook every cast, as a bait bottle puts it)
+                if (gFishmodRodInfo.bait == FISHMOD_BAIT_NONE) {
+                    gFishmodRodInfo.baitRequest = FISHMOD_ANGLER_BAIT;
+                }
+#endif
                 if ((sAnglerTimer % 60) == 0) {
                     button = BTN_CLEFT;
                 }
@@ -55,6 +61,23 @@
                 button = BTN_A;
                 break;
             case 6: // fight: reel while the tension is comfortable
+#ifdef FISHMOD_ANGLER_SLOW_FIGHT
+                {
+                    // (the fight drawn out, for looking at its indicators: only enough reeling to keep the line from
+                    // going slack for the first 15 seconds of each)
+                    static s32 sFightFrames;
+                    static s32 sFightLastTimer;
+
+                    sFightFrames = (sAnglerTimer == sFightLastTimer + 1) ? sFightFrames + 1 : 0;
+                    sFightLastTimer = sAnglerTimer;
+                    if (sFightFrames < 300) {
+                        if (gFishmodRodInfo.tension < 30.0f) {
+                            button = BTN_A;
+                        }
+                        break;
+                    }
+                }
+#endif
                 if (gFishmodRodInfo.tension < 60.0f) {
                     button = BTN_A;
                 }

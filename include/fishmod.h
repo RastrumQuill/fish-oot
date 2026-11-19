@@ -64,7 +64,8 @@ typedef struct FishmodBehavior {
     /* 0x06 */ u8 jumpiness;  // chance to leap when hooked
     /* 0x07 */ u8 nibbles;    // nibbles before the real bite
     /* 0x08 */ u8 biteWindow; // frames the bobber stays under for the hookset
-} FishmodBehavior; // size = 0x09
+    /* 0x09 */ u8 nibbleGap;  // frames between its taps at the bait (give or take a third): bass quick, carp slow
+} FishmodBehavior; // size = 0x0A
 
 typedef enum FishmodPart {
     /* 0 */ FISHMOD_PART_HEAD,
@@ -98,18 +99,18 @@ typedef struct FishmodSpecies {
     /* 0x13 */ u8 lengthMax;
     /* 0x14 */ u16 weightCoef; // weight (lbs) = weightCoef * length^3 / 1000000
     /* 0x16 */ FishmodBehavior behavior;
-    /* 0x1F */ u8 bait[FISHMOD_BAIT_MAX]; // interest multiplier percent per bait
-    /* 0x2A */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
-    /* 0x3F */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
-    /* 0x54 */ u8 lookFlags;                       // FISHMOD_LOOK_*
-    /* 0x55 */ u8 activity;    // 0-3 per FishmodTimeOfDay, 2 bits each (dawn in the low bits)
-    /* 0x56 */ u8 depthTop;    // the band of the water column it keeps to: 0 = surface, 255 = floor
-    /* 0x57 */ u8 depthBottom;
-    /* 0x58 */ u8 rise;        // how far up the band moves when it's active and the light is low (feeding)
-    /* 0x59 */ u8 lightShy;    // how much bright light pushes it deeper
-    /* 0x5A */ u8 chronotype;  // each fish's clock is shifted by up to this many hours
-    /* 0x5B */ u8 schoolMin;   // lives in schools of this many to schoolMax (0: on its own)
-    /* 0x5C */ u8 schoolMax;
+    /* 0x20 */ u8 bait[FISHMOD_BAIT_MAX]; // interest multiplier percent per bait
+    /* 0x2B */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
+    /* 0x40 */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
+    /* 0x55 */ u8 lookFlags;                       // FISHMOD_LOOK_*
+    /* 0x56 */ u8 activity;    // 0-3 per FishmodTimeOfDay, 2 bits each (dawn in the low bits)
+    /* 0x57 */ u8 depthTop;    // the band of the water column it keeps to: 0 = surface, 255 = floor
+    /* 0x58 */ u8 depthBottom;
+    /* 0x59 */ u8 rise;        // how far up the band moves when it's active and the light is low (feeding)
+    /* 0x5A */ u8 lightShy;    // how much bright light pushes it deeper
+    /* 0x5B */ u8 chronotype;  // each fish's clock is shifted by up to this many hours
+    /* 0x5C */ u8 schoolMin;   // lives in schools of this many to schoolMax (0: on its own)
+    /* 0x5D */ u8 schoolMax;
 } FishmodSpecies;
 
 #define FISHMOD_ACTIVITY(species, tod) (((species)->activity >> (2 * (tod))) & 3)
@@ -551,6 +552,7 @@ extern OSTime gFishmodProf[FISHMOD_PROF_MAX];
 // audio under the fish's tag)
 extern u32 gFishmodPcTag;
 extern u32 gFishmodScatterDropped[4];
+extern u8 gFishmodHudTest; // (a script: the rod's fight indicators drawn with made-up values while the bobber floats)
 extern u32 gFishmodScatterHash[128];
 // each set Scatter_Build made (the first FISHMOD_SET_TRACE), and Link every 8th frame of play
 #define FISHMOD_SET_TRACE 1024

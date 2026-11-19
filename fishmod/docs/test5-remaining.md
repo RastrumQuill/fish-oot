@@ -162,6 +162,25 @@ Only if the budget allows after 1-7:
 - **Benches:** the full set against the test4 release and against this start of the test5 work.
 - **Release lake-test5:** the patch, notes, and a test-mode variant; the tour stays as a separate feedback build.
 
+**State, 19 November** (what's built of the above, and of test 5's feedback on the rod):
+
+- **Nibble rhythm + rumble: built.** A light rumble on each tap (the bite's is much stronger), and each species its
+  own time between taps (`nibbleGap` in species.json, give or take a third): minnow 0.5 s, bass 0.6, greengill 0.7,
+  hearty bass and pike 0.8, Jabu-Jabu fry 1.1, reekfish 1.3, catfish 1.7, carp 2.2, loach 2.5.
+- **"FISH ON!": the words and a chime**, in the rod's message line. Not the popping banner.
+- **Tension by weight: built, untuned.** The strain scales with the fish's own weight (1 at 2 lbs, 0.35 for a few
+  ounces, 1.8 from 6.5 lbs), and the gauge moves more slowly. Numbers chosen by reasoning, never played.
+- **The fight's indicators** (not in the plan; asked for after test 5): the zoned gauge, the stick's arrow, the
+  fish's bar, the cues to hear. fishmod/docs/fight-hud.png.
+- **The hook's depth is the water's** (feedback 1): 0.35 of the depth under the bobber, following the bed. No
+  press of A.
+- **"Keep it in a bottle?"** (feedback 2): an empty line before Yes and No, as the game's own two-choice messages
+  have; the choice arrow is drawn at a four-line box's third and fourth lines.
+- **The sound that kept going** (feedback 4): it was the press of A that stopped the sink. It asked once for the
+  reel's sound by the id that plays until it ends, and the reel's sample is a loop. That press is gone with the
+  depth change; the reel's other requests are the every-frame kind, which stop when they stop being asked for.
+- **Not built:** the deep-bait test (the float rig no longer reaches deep on purpose), other rigs.
+
 ## Order (updated)
 
 1 (collision) and 3 (the dock) come before anything else: the lake isn't finished as a place until you can walk the

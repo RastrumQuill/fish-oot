@@ -919,6 +919,11 @@ u32 gFishmodPcTag; // the PC profile's tag for its samples now (FISHMOD_PCTAG_*)
 u32 gFishmodScatterDropped[4];
 void* gFishmodScatterDbg[8];
 u32 gFishmodScatterHash[128];
+#ifdef FISHMOD_HUD_TEST
+u8 gFishmodHudTest = 1;
+#else
+u8 gFishmodHudTest = 0;
+#endif
 FishmodSetTrace gFishmodSetTrace[FISHMOD_SET_TRACE];
 s16 gFishmodLinkTrace[FISHMOD_LINK_TRACE][4];
 FishmodPopTest gFishmodPop = { 0.0f, -1, 0, -1.0f, -1.0f };
