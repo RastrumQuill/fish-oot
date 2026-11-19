@@ -4,7 +4,7 @@
   inputrec.py join DIR [DIR...] -o REC.finp     the packets a recording build sent (`sc64deployer debug`'s or the
                                                 patched ares's binaryout-*.bin files) joined into one recording
   inputrec.py info REC.finp [-v]                what's in a recording: its length, each game state and scene
-  inputrec.py attach ROM.z64 REC.finp OUT.z64   a replay build's ROM with the recording attached (64 MB)
+  inputrec.py attach ROM.z64 REC.finp OUT.z64   a replay build's ROM with the recording attached (49 MB)
   inputrec.py cut REC.finp OUT.finp --states N  the recording's first N game states (or --frames N: its first N frames)
 
 A recording: 'FINP', 1, the save memory's bytes, the stream's words, the save context's words, three spare words; the
@@ -195,7 +195,9 @@ def cmd_attach(args):
         sys.exit("the recording doesn't fit in a 64 MB ROM")
     rom += b"\xFF" * (ROM_AT - len(rom))
     rom += rec
-    rom += b"\xFF" * (ROM_SIZE - len(rom))
+    # (to the next megabyte, not to 64 MB: the SummerCart64 keeps the last 128 KB of a 64 MB image for itself, and the
+    # morning runner's read-back check then refuses the upload)
+    rom += b"\xFF" * (-len(rom) % 0x100000)
     open(args.out, "wb").write(rom)
     print(f"{args.out}: {len(rec) / 1024:.0f} KB of recording at {ROM_AT:#x}")
 
