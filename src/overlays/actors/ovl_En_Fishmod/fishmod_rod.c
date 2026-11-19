@@ -539,8 +539,15 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         // strength and of the tight line reaches the rod. `load` is 1 at 2 lbs, 0.35 for a few ounces, 1.8 from
         // 6.5 lbs up: a minnow sits low on the gauge and comes straight in, a big pike has to be played. (It was
         // 30 + 8 a unit of tight line + the species' strength, whatever the fish's size: a hair trigger.)
-        tensionTarget = 14.0f + CLAMP_MAX(taut, 5.0f) * 5.0f * load +
-                        b->strength * 0.35f * (0.3f + staminaFrac * 0.7f) * load;
+        // Balanced on Lake Hylia's fish (species.json's sizes): a typical one, fresh, on a tight line sits between
+        // 23 (greengill) and 66 (hearty bass) with the reel still, in the green or just under it, and the reel adds
+        // 22; the biggest of the heavy species sit at 72 and go over the drag's 85 if reeled against; a run adds up
+        // to 18 more, which holding the stick against it takes back.
+        tensionTarget = 14.0f + CLAMP_MAX(taut, 5.0f) * 3.0f * load +
+                        b->strength * 0.25f * (0.3f + staminaFrac * 0.7f) * load;
+        if (fish->stateTimer > 0) {
+            tensionTarget += 10.0f * load; // (a run is felt on the line)
+        }
         EnFishmod_FishTire(fish, (0.4f + b->strength * 0.01f) * (opposing ? 2.5f : 1.0f));
         if (opposing) {
             tensionTarget -= 12.0f;
