@@ -163,6 +163,10 @@ Also:
 4. **Fishing-related bottle quests.**
 5. **Ways to get the other lures and sinkers.**
 6. **Bait in the Fishing Pond's quest.**
+7. **When the quests' text is written: the dialogue about the tunics.** Young Link can wear the Goron and Zora
+   tunics (qol-notes.md), but the game's own lines still say he can't (the Goron shop, the King Zora's gift, the tunic
+   descriptions in the pause menu, any text that says the tunic is too big for him). Rewrite them in the same pass as
+   the quests' new dialogue, so all the changed text is written and checked at once.
 
 ## Planned
 

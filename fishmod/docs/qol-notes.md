@@ -26,9 +26,10 @@ Gathered from the roadmap (fishmod/docs/roadmap.md, its quality-of-life lists), 
 
 ## Open (from the roadmap)
 
-- **Faster text**: hold B to fill a box at once; skip text already read (item gets, repeated owl talk). In
-  z_message.c: B held fills the box (as A does after its delay); a "read" bit per message id (a small bitfield in the
-  mod's save block) to offer the skip.
+- **Faster text**: text printing at twice the speed, as in Majora's Mask and Ocarina of Time 3D; hold B to fill a box
+  at once; skip text already read (item gets, repeated owl talk). In z_message.c: the print speed doubled; B held
+  fills the box (as A does after its delay); a "read" bit per message id (a small bitfield in the mod's save block) to
+  offer the skip.
 
 - **Movement that feels more responsive**: mostly how Link answers the stick, partly the delay before the picture
   shows it.
@@ -48,3 +49,24 @@ Gathered from the roadmap (fishmod/docs/roadmap.md, its quality-of-life lists), 
 - **The Lens of Truth under water**: the game turns the lens off when Link is under the surface (z_parameter.c:
   vanilla, so it can't be used to see through the water's own fog). Letting it stay on under water, and clearing the
   underwater haze while it's on, would make it the way to see the lake's deep bed.
+
+## From another romhack's list (19 Nov: these fit)
+
+- **The pause menu's delay**: the subscreen opens and closes without its wait (with the responsiveness work).
+- **Gold Skulltula tokens don't freeze Link**: he keeps moving as the token is collected, as in Majora's Mask's
+  spider houses.
+- **The rupee counter coloured by wallet**: its colour shows which wallet Link has.
+- **The Stone of Agony without a Rumble Pak**: an icon by the rupee counter when a hidden grotto is near.
+- **"Navi" centred on the C-Up button.**
+- **The Burning Kakariko cutscene from any entrance**, not only the main one.
+- **The lab's diving heart piece at any time** (it can't be missed).
+- **Graves as in the later releases** (their behaviour fixed).
+- **No Song of Storms cooldown** (where it can be played stays as it is).
+- **The Bunny Hood as in Majora's Mask**: Link runs faster while he wears it.
+- **The Goron and Zora tunics for young Link** (with the equipment swaps). The dialogue that says he can't wear them
+  changes with the quests' text (roadmap.md, Quests).
+
+Not taken: guaranteed fish bites (the fishing is this mod's design), extended draw distance (a performance cost),
+new Link models, the bridge needing every medallion, warps in the Gerudo Training Ground and Ganon's Castle,
+Farore's Wind across time, Biggoron in two days, the text revamp, Bombchu Bowling's prizes in a fixed order, Z
+targeting on Hold by default.
