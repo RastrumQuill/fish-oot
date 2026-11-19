@@ -624,6 +624,7 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NODEPTHSHADE (1 << 19) // no depth darkening (Fishmod_DepthShade): the A/B of it
 #define FISHMOD_BENCH_SKYLAST (1 << 18)     // the sky drawn after the opaque scene, only where nothing is (a test)
 #define FISHMOD_BENCH_NOHUD (1 << 25)     // no HUD or minimap (the RDP sweep: fishmod/scripts/rdp_sweep.inc.c)
+#define FISHMOD_BENCH_NOFOG (1 << 26)     // no scene fog at all (Play_SetFog): to look at the terrain as it is
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;
 extern struct Actor* gFishmodDrawingActor; // debug builds: the actor Actor_Draw is drawing (the crash record says which)
