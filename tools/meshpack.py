@@ -50,12 +50,15 @@ CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_room_0",
 WATER_Y = -1313
 CAUSTIC_FROM, CAUSTIC_TO = 150, 550   # depths (units) where the fade starts and where it's sand only
 CAUSTIC_STEPS = 4                      # steps of the fade (the lists in segment 0x0A: CAUSTIC_STEPS - 1 of them)
-if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
-    CAUSTICS = []
+# The fade is off by default (MESHPACK_CAUSTIC_FADE=1 for it): a whole triangle takes one step, so the caustics jump
+# along the edges between triangles of different steps (seams on the shallow bed, 19 Nov), and a per-vertex fade would
+# need the vertices' alpha, which the bed's fog uses. The water fog hides the deep caustics instead, as vanilla's
+# single blend everywhere.
+CAUSTIC_FADE = bool(os.environ.get("MESHPACK_CAUSTIC_FADE"))
 # ... and the caustic texture itself made light alone: their brightness (i8), no colour (the water's colour is
 # the fog's; the rocks' caustics are the same light: fishmod_scatter.c). Half the size to load.
 GREY_CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_scene", ["spot06_scene_000170B8_Tex"])]
-if os.environ.get("MESHPACK_NO_CAUSTIC_FADE"):
+if os.environ.get("MESHPACK_NO_GREY_CAUSTICS"):
     GREY_CAUSTICS = []
 # Water fog (fishmod.c Fishmod_WaterFogBands): the camera-under-water fog seen from above, done by the RSP's own fog.
 # The cut pieces' triangles under the surface are split at these depths into bands (the first: the surface itself;
@@ -902,7 +905,7 @@ def main():
         if report:
             print("meshpack: %s: %d caustic textures made light alone (i8), %d loads" % (scene, len(texs), n))
     fade_arrays = collections.defaultdict(dict)  # room -> {vertex array: vertices} (caustic_fade's)
-    for scene_dir, room, dls in CAUSTICS:
+    for scene_dir, room, dls in (CAUSTICS if CAUSTIC_FADE else []):
         d = os.path.join(out, scene_dir)
         for dl in dls:
             arrs, moved = caustic_fade(d, dl)

@@ -264,6 +264,9 @@ void func_800BC88C(PlayState* this) {
 Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
     // fishmod: under water the fog is complete well before the far plane (about 900 units out), so what's past it
     // (the far habitat props, distant fish) comes and goes inside solid fog instead of popping in
+    if (FISHMOD_BENCH_SKIP(FISHMOD_BENCH_NOFOG)) {
+        return Gfx_SetFog2(gfx, 0, 0, 0, 0, 1000, 1000); // (debug: no fog, to see the terrain as it is)
+    }
     return Gfx_SetFog2(gfx, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2], 0,
                        this->lightCtx.fogNear, 1000 - (s32)((1000 - FISHMOD_HAZE_FOG_FAR) * gFishmodHaze));
 }
