@@ -1,26 +1,8 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# 19 November: the eight bench runs are done (releases/hwsuite/results-20261119.md). Left: the replay, which didn't
-# upload as a 64 MB image (the cart keeps its last 128 KB) and is 49 MB now.
-# The console test suite (fishmod/docs/hw-suite.md): does each compiler's build of today's code run right on the
-# console, and which is fastest there. The bench's short lap with the sampler off, each build twice (A B C D, A B C D),
-# then a recorded opening replayed on the build the emulator liked best. About an hour. No Expansion Pak needed.
-# The report is hwsuite.txt in the morning's folder (fishmod/pc/hwsuite.py). The replay writes the recording's (empty)
-# save over the cart's save memory: back the save up first if it matters.
-#   hw-base    the build as it's made today: GCC 10, -O2, boot code and C libraries on the old compiler
-#   hw-g10all  GCC 10, -O2, every C file on GCC
-#   hw-g14o2   GCC 14.2 for bare metal, -O2, every C file on GCC
-#   hw-g14os   the same at -Os
-# (run 19 November) releases/hwsuite/hw-base.bps 10 hw-base-1
-# (run 19 November) releases/hwsuite/hw-g10all.bps 10 hw-g10all-1
-# (run 19 November) releases/hwsuite/hw-g14o2.bps 10 hw-g14o2-1
-# (run 19 November) releases/hwsuite/hw-g14os.bps 10 hw-g14os-1
-# (run 19 November) releases/hwsuite/hw-base.bps 10 hw-base-2
-# (run 19 November) releases/hwsuite/hw-g10all.bps 10 hw-g10all-2
-# (run 19 November) releases/hwsuite/hw-g14o2.bps 10 hw-g14o2-2
-# (run 19 November) releases/hwsuite/hw-g14os.bps 10 hw-g14os-2
-releases/hwsuite/hw-replay-g14o2.bps 12 hw-replay-g14o2
-# (the queue before this one, 17 November: rc2's bench against --expak)
-# releases/fish-oot-rc2-bench.bps 12 rc2-base-1
-# releases/fish-oot-rc2-expak-bench.bps 12 rc2-expak-1
-# releases/fish-oot-rc2-bench.bps 12 rc2-base-2
-# releases/fish-oot-rc2-expak-bench.bps 12 rc2-expak-2
+# The lake bed remeshed along its depth lines (releases/notes-remesh.md): bed-uncut is the same tree with each whole
+# triangle in one fog band (as rc2); bed-remesh has the fog and caustics changing along depth lines. A B A B, Expansion
+# Pak in.
+releases/fish-oot-remesh-off-bench.bps 12 bed-uncut-1
+releases/fish-oot-remesh-bench.bps 12 bed-remesh-1
+releases/fish-oot-remesh-off-bench.bps 12 bed-uncut-2
+releases/fish-oot-remesh-bench.bps 12 bed-remesh-2
