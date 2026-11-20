@@ -1809,7 +1809,7 @@ s32 Fishmod_LakeDrained(PlayState* play) {
  * (fishmod_scatter.c). Then the scene's fog again. Nothing above the water changes. Off with the camera under water
  * (the game's own fog is the water's then), with the lake drained, and for the bench's A/B (FISHMOD_BENCH_NOWATERFOG).
  */
-static const s16 sWaterBandMid[FISHMOD_WATER_BANDS] = { 6, 21, 45, 80, 130, 205, 325, 520 }; // (meshpack's bands)
+static const s16 sWaterBandMid[FISHMOD_WATER_BANDS] = { 10, 35, 75, 150, 250, 350, 450, 600 }; // (meshpack's bands)
 
 void Fishmod_WaterFogSetup(PlayState* play) {
     static u8 sWater[3] = { 30, 70, 70 };

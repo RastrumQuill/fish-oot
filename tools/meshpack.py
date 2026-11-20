@@ -30,6 +30,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meshpack_merge  # noqa: E402
+import meshpack_remesh  # noqa: E402
 
 # the pieces to cut: (scene directory, room file stem, display lists); the area size
 TARGETS = [
@@ -73,9 +74,12 @@ if os.environ.get("MESHPACK_NO_GREY_CAUSTICS"):
 # scene's fog back. Scene_DrawConfigLakeHylia makes the lists each frame (empty with the camera under water, the lake
 # drained, or the bench's NOWATERFOG).
 WATER_FOG = not os.environ.get("MESHPACK_NO_WATER_FOG")
-WATER_BANDS = [0, 12, 30, 60, 100, 160, 250, 400]   # each band's top, by depth under the surface
+# each band's top, by depth under the surface. Since the remesh (20 Nov) the deep bands' tops are the caustics' steps'
+# edges (200, 300, 400, 500), so the bed has 8 depth lines, not 11 (each line costs triangles: 1,139 for the bed's main
+# piece, against 1,579 with the old bands)
+WATER_BANDS = [0, 20, 50, 100, 200, 300, 400, 500]
 # (the game's band lists: these 8, by their middles' depths, fishmod.c sWaterBandMid)
-GAME_BAND_MID = [6, 21, 45, 80, 130, 205, 325, 520]
+GAME_BAND_MID = [10, 35, 75, 150, 250, 350, 450, 600]
 # tests: MESHPACK_FOG_BANDS="0,30,100,250" cuts at fewer depths (each band's fog the game's list nearest its middle);
 # uncut (the default): each whole triangle in the band of its middle's depth
 if os.environ.get("MESHPACK_FOG_BANDS"):
@@ -89,6 +93,10 @@ if os.environ.get("MESHPACK_FOG_BANDS"):
 # bed's main piece against 649). The default stays uncut (each whole triangle by its middle, as rc1);
 # MESHPACK_FOG_CUT=1: cut, not merged (frames28's).
 DEPTH_MERGE = bool(os.environ.get("MESHPACK_DEPTH_MERGE"))
+# The bed remeshed (tools/meshpack_remesh.py, 20 Nov: the default): cut at every depth (the bands' tops, the caustics'
+# steps' edges) and decimated with its texture coordinates projected straight down, so the fog and the caustics change
+# along depth lines with about the triangles it had. MESHPACK_NO_REMESH=1: not (each whole triangle by its middle).
+REMESH = not (os.environ.get("MESHPACK_NO_REMESH") or DEPTH_MERGE or os.environ.get("MESHPACK_FOG_CUT"))
 FOG_NOCUT = not (os.environ.get("MESHPACK_FOG_CUT") or DEPTH_MERGE)
 # ... but a triangle crossing the surface is cut at it (MESHPACK_NO_SURFACE_CUT=1: not): a few, along the shore
 FOG_CUT_SURFACE = not os.environ.get("MESHPACK_NO_SURFACE_CUT")
@@ -670,6 +678,74 @@ def relight(lists, arrays_of, entry_lit=None):
     return table, None
 
 
+def remesh_dl(dirpath, dl):
+    """the list's runs (its vertex loads and triangles between two state commands) with triangles under the water
+    remeshed (meshpack_remesh.py): their loads and triangles written again from new arrays. Returns ({vertex array:
+    vertices}, the bed's triangles cut, after)"""
+    path = os.path.join(dirpath, dl + ".inc.c")
+    items = split_items(open(path).read())
+    depths = sorted(set(WATER_BANDS + CAUSTIC_EDGES))
+    arrays, slots = {}, [None] * 64
+    out, run, new_arrays = [], [], {}
+    lit = [None]
+    totals = [0, 0]
+
+    def end_run():
+        if not run:
+            return
+        tris = [t for kind, t in run if kind == "tri"]
+        if not tris or not any(min(int(v[1], 0) for v in t) < WATER_Y for t in tris) or lit[0] is None:
+            out.extend(c for kind, c in run if kind == "cmd")
+            run.clear()
+            return
+        new, a, b = meshpack_remesh.remesh_run(tris, lit[0], WATER_Y, depths, clip_poly, ORIGIN)
+        totals[0] += a
+        totals[1] += b
+        vname = "%s_rm%d_Vtx" % (dl, len(new_arrays))
+        vtx = []
+        emit_tris([(None, t) for t in new], vname, vtx, out)
+        new_arrays[vname] = vtx
+        run.clear()
+
+    for it in items:
+        n = name_of(it)
+        if n == "gsSPVertex":
+            a = args_of(it)
+            m = VTX_REF.fullmatch(a[0].strip())
+            arr, base = m.group(1), int(m.group(2) or 0)
+            if arr not in arrays:
+                arrays[arr] = load_vtx(dirpath, arr)
+            cnt, v0 = int(a[1], 0), int(a[2], 0)
+            for k in range(cnt):
+                slots[v0 + k] = arrays[arr][base + k]
+            run.append(("cmd", it))
+            continue
+        if n in ("gsSP1Triangle", "gsSP2Triangles"):
+            a = [int(x, 0) for x in args_of(it)]
+            for g in ([a[0:3]] if n == "gsSP1Triangle" else [a[0:3], a[4:7]]):
+                run.append(("tri", tuple(slots[i] for i in g)))
+            run.append(("cmd", it))
+            continue
+        if n == "gsSPCullDisplayList":
+            run.append(("cmd", it))
+            out.extend(c for kind, c in run if kind == "cmd")
+            run.clear()
+            continue
+        end_run()
+        if n in ("gsSPSetGeometryMode", "gsSPClearGeometryMode") and \
+                "G_LIGHTING" in [x.strip() for x in args_of(it)[0].split("|")]:
+            lit[0] = n == "gsSPSetGeometryMode"
+        out.append(it)
+    end_run()
+    if not new_arrays:
+        return {}, 0, 0
+    os.remove(path)
+    open(path, "w").write("".join("    %s,\n" % c for c in out))
+    for vname, vtx in new_arrays.items():
+        open(os.path.join(dirpath, vname + ".inc.c"), "w").write("".join("VTX(%s),\n" % ", ".join(v) for v in vtx))
+    return new_arrays, totals[0], totals[1]
+
+
 ADDED = "\x00"  # (caustic_fade: a command it added, marked for its check)
 
 
@@ -995,6 +1071,15 @@ def main():
         if report:
             print("meshpack: %s: %d caustic textures made light alone (i8), %d loads" % (scene, len(texs), n))
     fade_arrays = collections.defaultdict(dict)  # room -> {vertex array: vertices} (caustic_fade's)
+    for scene_dir, room, dls in (TARGETS if REMESH else []):
+        d = os.path.join(out, scene_dir)
+        for dl in dls:
+            arrs, ncut, nnow = remesh_dl(d, dl)
+            if arrs:
+                fade_arrays[room].update(arrs)
+                unsize(d, room, dl)
+            if report and arrs:
+                print("meshpack: %s: the bed remeshed: %d triangles cut at the depths, %d after" % (dl, ncut, nnow))
     for scene_dir, room, dls in (CAUSTICS if CAUSTIC_FADE else []):
         d = os.path.join(out, scene_dir)
         for dl in dls:
