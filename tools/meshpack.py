@@ -52,7 +52,8 @@ TARGETS = [
 CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_room_0",
              ["gSpot06DL_00A400_03003270_DL", "gSpot06DL_00A400_03008858_DL", "gSpot06DL_00A400_03008ED0_DL"])]
 WATER_Y = -1313
-CAUSTIC_FROM, CAUSTIC_TO = 150, 550   # depths (units) where the fade starts and where it's sand only
+CAUSTIC_FROM, CAUSTIC_TO = 250, 690   # depths (units) where the fade starts and where it's sand only (20 Nov:
+#                                        was 150-550; deeper, so the gradient shows through the water's fog)
 CAUSTIC_STEPS = 4                      # steps of the fade (the lists in segment 0x0A: CAUSTIC_STEPS - 1 of them)
 # MESHPACK_NO_CAUSTIC_FADE=1: no fade (vanilla's one blend everywhere). The grey caustics below stay either way.
 CAUSTIC_FADE = not os.environ.get("MESHPACK_NO_CAUSTIC_FADE")
@@ -75,11 +76,11 @@ if os.environ.get("MESHPACK_NO_GREY_CAUSTICS"):
 # drained, or the bench's NOWATERFOG).
 WATER_FOG = not os.environ.get("MESHPACK_NO_WATER_FOG")
 # each band's top, by depth under the surface. Since the remesh (20 Nov) the deep bands' tops are the caustics' steps'
-# edges (200, 300, 400, 500), so the bed has 8 depth lines, not 11 (each line costs triangles: 1,139 for the bed's main
+# edges (305, 415, 525, 635: the fade from 250 to 690), so the bed has 9 depth lines, not 13 (each line costs triangles: 1,139 for the bed's main
 # piece, against 1,579 with the old bands)
-WATER_BANDS = [0, 20, 50, 100, 200, 300, 400, 500]
+WATER_BANDS = [0, 20, 50, 100, 180, 305, 415, 525, 635]
 # (the game's band lists: these 8, by their middles' depths, fishmod.c sWaterBandMid)
-GAME_BAND_MID = [10, 35, 75, 150, 250, 350, 450, 600]
+GAME_BAND_MID = [10, 35, 75, 140, 242, 360, 470, 620]
 # tests: MESHPACK_FOG_BANDS="0,30,100,250" cuts at fewer depths (each band's fog the game's list nearest its middle);
 # uncut (the default): each whole triangle in the band of its middle's depth
 if os.environ.get("MESHPACK_FOG_BANDS"):

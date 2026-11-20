@@ -9,9 +9,10 @@ texture coordinates projected straight down (the same density and direction as b
 within 3 units of the result (the collision, which the plants and fish stand on, is unchanged). Steep faces under the
 water (pillars, the pit's walls) are cut and kept as they are; everything over the water is unchanged.
 
-- 8 depth lines: the fog's bands' tops at 0, 20, 50, 100, 200, 300, 400, 500; the deep ones are the caustics' steps'
-  edges (the fade from 150 to 550 units in 4 steps, as before), so both change along the same lines.
-- The bed's lists: 1,633 triangles (609 uncut, 2,101 cut as in frames28).
+- 9 depth lines: the fog's bands' tops at 0, 20, 50, 100, 180, 305, 415, 525, 635; the deep ones are the caustics'
+  steps' edges (the fade now from 250 to 690 units in 4 steps, deeper than before so its gradient shows through the
+  water's fog), so both change along the same lines.
+- The bed's lists: 1,723 triangles (609 uncut, 2,101 cut as in frames28).
 
 ## Patches
 
