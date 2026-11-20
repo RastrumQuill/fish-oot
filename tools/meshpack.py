@@ -28,6 +28,9 @@ import re
 import shutil
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import meshpack_merge  # noqa: E402
+
 # the pieces to cut: (scene directory, room file stem, display lists); the area size
 TARGETS = [
     ("assets/scenes/overworld/spot06", "spot06_room_0",
@@ -52,6 +55,11 @@ CAUSTIC_FROM, CAUSTIC_TO = 150, 550   # depths (units) where the fade starts and
 CAUSTIC_STEPS = 4                      # steps of the fade (the lists in segment 0x0A: CAUSTIC_STEPS - 1 of them)
 # MESHPACK_NO_CAUSTIC_FADE=1: no fade (vanilla's one blend everywhere). The grey caustics below stay either way.
 CAUSTIC_FADE = not os.environ.get("MESHPACK_NO_CAUSTIC_FADE")
+# the steps' edges (where a depth's step changes: between f = 1/8, 3/8, 5/8, 7/8 of the way): the triangles cut along
+# them (as the fog's bands), so a step changes along a depth line, not a triangle's edge (with MESHPACK_DEPTH_MERGE)
+CAUSTIC_EDGES = [CAUSTIC_FROM + (CAUSTIC_TO - CAUSTIC_FROM) * (2 * i + 1) / (2.0 * CAUSTIC_STEPS)
+                 for i in range(CAUSTIC_STEPS)]
+CAUSTIC_CUT = bool(os.environ.get("MESHPACK_DEPTH_MERGE"))
 # ... and the caustic texture itself made light alone: their brightness (i8), no colour (the water's colour is
 # the fog's; the rocks' caustics are the same light: fishmod_scatter.c). Half the size to load.
 GREY_CAUSTICS = [("assets/scenes/overworld/spot06", "spot06_scene", ["spot06_scene_000170B8_Tex"])]
@@ -75,10 +83,17 @@ if os.environ.get("MESHPACK_FOG_BANDS"):
 # (the default since rc1: the cuts made long thin slivers, each scanline of each a triangle setup for the RDP: the
 # console's frames28 set, 8 cut bands 54% hitches and 17.2 fps, uncut 32% and 18.2 fps, no bed fog at all 30-31%.
 # MESHPACK_FOG_CUT=1 cuts again)
-FOG_NOCUT = not os.environ.get("MESHPACK_FOG_CUT")
+# MESHPACK_DEPTH_MERGE=1 (a test, 20 Nov): the bed cut along every depth line (the fog's bands and the caustics'
+# steps) and the pieces merged back where the surface allows (tools/meshpack_merge.py). It merges little: the bed
+# isn't flat and its texture coordinates don't run on from one triangle to the next (2,475 triangles drawn for the
+# bed's main piece against 649). The default stays uncut (each whole triangle by its middle, as rc1);
+# MESHPACK_FOG_CUT=1: cut, not merged (frames28's).
+DEPTH_MERGE = bool(os.environ.get("MESHPACK_DEPTH_MERGE"))
+FOG_NOCUT = not (os.environ.get("MESHPACK_FOG_CUT") or DEPTH_MERGE)
 # ... but a triangle crossing the surface is cut at it (MESHPACK_NO_SURFACE_CUT=1: not): a few, along the shore
 FOG_CUT_SURFACE = not os.environ.get("MESHPACK_NO_SURFACE_CUT")
 SURFACE_CUTS = [0]
+MERGED = [0]  # (triangles the merge took away)
 
 
 def game_band(k):
@@ -503,19 +518,41 @@ def cut_by_material(dl, stream, tris, cells, order):
             lit = name_of(c) == "gsSPSetGeometryMode"
     sub_dls, sub_vtx, new_dl = [], [], []
     sub_state = []  # (each area list, the state point it's drawn at)
-    emitted = 0
+    # each state point's areas' triangles by band (-1: dry, or no water fog), first for all of them
+    parts_of = collections.OrderedDict()
     for mi, (k, areas) in enumerate(by_state.items()):
-        new_dl.extend(stream[emitted:k])
-        emitted = k
         for ai in sorted(areas):
             if WATER_FOG and any(min(int(v[1], 0) for v in t[1]) < WATER_Y for t in areas[ai]):
                 by_band = collections.defaultdict(list)
                 for t in areas[ai]:
                     for b, piece in band_split(t[1], lit_at[t[0]]):
                         by_band[b].append((t[0], piece, t[2], t[3]))
-                parts = [(by_band[b], b, "" if b < 0 else "b%d" % b) for b in sorted(by_band)]
             else:
-                parts = [(areas[ai], -1, "")]
+                by_band = {-1: list(areas[ai])}
+            parts_of[(mi, k, ai)] = by_band
+    # ... merged back into as few triangles as the surface allows (meshpack_merge.py), each band of each area and
+    # state point a group of its own: the depth lines and the areas' edges stay where they are
+    if DEPTH_MERGE and WATER_FOG and not FOG_NOCUT:
+        items = []
+        for (mi, k, ai), by_band in parts_of.items():
+            for b, ts in by_band.items():
+                for t in ts:
+                    items.append(((mi, k, ai, b), t[1], (t[0], t[2], t[3])))
+        merged, gone = meshpack_merge.merge(items, lambda g: bool(lit_at[g[1]]))
+        MERGED[0] += gone
+        for key in parts_of:
+            parts_of[key] = collections.defaultdict(list)
+        for (mi, k, ai, b), t, pay in merged:
+            parts_of[(mi, k, ai)][b].append((pay[0], t, pay[1], pay[2]))
+    emitted = 0
+    last_mi = None
+    for (mi, k, ai), by_band in parts_of.items():
+        if mi != last_mi:
+            new_dl.extend(stream[emitted:k])
+            emitted = k
+            last_mi = mi
+        if True:
+            parts = [(by_band[b], b, "" if b < 0 else "b%d" % b) for b in sorted(by_band) if by_band[b]]
             wet = False
             for ts, band, suffix in parts:
                 name = "%s_mp%d_%d%s" % (dl, ai, mi, suffix)
@@ -648,17 +685,45 @@ def caustic_fade(dirpath, dl):
     caustic = False
     env_src = None      # the command that set the environment colour last (a literal or a segment's list)
     out, run, new_arrays, moved = [], [], {}, 0
+    lit_now = [None]   # (G_LIGHTING where the list is: a cut vertex's normal or colour)
 
     def tier(vs):
         depth = WATER_Y - sum(int(v[1]) for v in vs) / 3.0
         f = min(max((depth - CAUSTIC_FROM) / float(CAUSTIC_TO - CAUSTIC_FROM), 0.0), 1.0)
         return int(round(f * CAUSTIC_STEPS))
 
+    def cut_tiers(tris):
+        """each triangle cut where its step changes (the step edges' depths), into its pieces"""
+        out_ = []
+        for t in tris:
+            ys = [int(v[1]) for v in t]
+            poly = list(t)
+            pieces = []
+            for d in CAUSTIC_EDGES:
+                y0 = WATER_Y - d
+                if min(int(v[1]) for v in poly) < y0 <= max(int(v[1]) for v in poly):
+                    above, below = clip_poly(poly, y0, lit_now[0])
+                    if len(above) >= 3:
+                        pieces.append(above)
+                    poly = below
+                    if len(poly) < 3:
+                        break
+            if len(poly) >= 3:
+                pieces.append(poly)
+            if len(pieces) == 1:
+                out_.append(t)
+                continue
+            for pc in pieces:
+                out_ += [(pc[0], pc[i], pc[i + 1]) for i in range(1, len(pc) - 1)]
+        return out_
+
     def end_run():
         nonlocal moved
         if not run:
             return
         tris = [t for kind, t in run if kind == "tri"]
+        if CAUSTIC_CUT and caustic:
+            tris = cut_tiers(tris)
         tiers = [tier(t) for t in tris]
         if not caustic or not any(tiers) or env_src is None:
             out.extend(c for kind, c in run if kind == "cmd")
@@ -711,6 +776,9 @@ def caustic_fade(dirpath, dl):
             end_run()
             continue
         end_run()
+        if n in ("gsSPSetGeometryMode", "gsSPClearGeometryMode") and \
+                "G_LIGHTING" in [x.strip() for x in args_of(it)[0].split("|")]:
+            lit_now[0] = n == "gsSPSetGeometryMode"
         if n == "gsDPSetCombineLERP":
             caustic = "ENV_ALPHA" in args_of(it)[:4]
         elif n == "gsDPSetEnvColor" or (n == "gsSPDisplayList" and args_of(it)[0] in ("0x08000000", "0x09000000")):
@@ -741,8 +809,16 @@ def caustic_fade(dirpath, dl):
             elif nm != "gsSPCullDisplayList":
                 k += 1
         return got
-    if tris_of(out, new_arrays) != tris_of(items, {}):
-        sys.exit("meshpack: caustic_fade check failed for %s" % dl)
+    got_, want_ = tris_of(out, new_arrays), tris_of(items, {})
+    if got_ != want_:
+        # (cut at the steps' edges: the same surface after each state point, in its pieces)
+        ga, wa = collections.defaultdict(float), collections.defaultdict(float)
+        for (k, t), c in got_.items():
+            ga[k] += tri_area(tuple(tuple(str(x) for x in v) for v in t)) * c
+        for (k, t), c in want_.items():
+            wa[k] += tri_area(tuple(tuple(str(x) for x in v) for v in t)) * c
+        if not CAUSTIC_CUT or any(abs(ga[k] - wa[k]) > 0.002 * wa[k] + 4 for k in set(ga) | set(wa)):
+            sys.exit("meshpack: caustic_fade check failed for %s" % dl)
     out = [c[len(ADDED):] if c.startswith(ADDED) else c for c in out]
     os.remove(path)
     open(path, "w").write("".join("    %s,\n" % c for c in out))
@@ -946,8 +1022,10 @@ def main():
                 areas[name] = cmds
                 area_arrays[vname] = vtx
             if report:
-                print("meshpack: %s: %d triangles in %d areas, %d area lists (%d cut at the surface so far)" %
-                      (dl, ntri, nareas, len(area_dls), SURFACE_CUTS[0]))
+                nout = sum(sum(1 for c in cmds if "Triangle" in c and "gsSP2" in c) * 2 +
+                           sum(1 for c in cmds if "gsSP1Triangle" in c) for _, cmds in area_dls)
+                print("meshpack: %s: %d triangles in %d areas, %d area lists; %d drawn (%d merged away so far)" %
+                      (dl, ntri, nareas, len(area_dls), nout, MERGED[0]))
         table = None
         if room in RELIGHT:
             # every piece of the room (cut or not) relit
