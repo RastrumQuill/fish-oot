@@ -6,3 +6,6 @@ releases/fish-oot-remesh-off-bench.bps 12 bed-uncut-1
 releases/fish-oot-remesh-bench.bps 12 bed-remesh-1
 releases/fish-oot-remesh-off-bench.bps 12 bed-uncut-2
 releases/fish-oot-remesh-bench.bps 12 bed-remesh-2
+# The collision lead's replay (releases/hwsuite/results-20261119.md: a recorded opening replayed on the build the
+# emulator liked best; re-padded so it uploads), still to run. No Expansion Pak needed.
+releases/hwsuite/hw-replay-g14o2.bps 12 hw-replay-g14o2
