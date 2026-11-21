@@ -6,8 +6,12 @@ SummerCart64, then you switch the console off and on.
   2. Test mode at Lake Hylia: a new file starts there as adult Link, the lake full (releases/fish-oot-test-lake.bps)
   3. Test mode in Kokiri Forest: a new file starts there as child Link (releases/fish-oot-test-kokiri.bps)
 
-Test mode: new files skip the intro and start with the rod, lures, bottles, the slingshot and the Goron's Bracelet;
-loading a test file goes back to its place. Hold L and press D-pad Up (Kokiri Forest) or Down (Lake Hylia) to warp.
+Test mode: new files skip the intro and start with the rod (on C-Down), bugs (C-Right), lures, bottles, the slingshot and
+the Goron's Bracelet; loading a test file goes back to its place. Hold L and press the D-pad:
+  Up / Down      warp to Kokiri Forest (child) / Lake Hylia (adult)
+  Right          with the rod out of the water: pick which fish to call (each species in turn, or the nearest);
+                 with the bobber in the water: that fish comes straight to the bait (its own nibbles, bite and fight)
+  Left           the frame-time readout's detail
 
 Usage (play.bat does this): python fishmod/pc/play.py [1|2|3|PATCH.bps] [--rom ROM] [--deployer sc64deployer.exe]
   [--no-pull]
