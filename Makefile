@@ -268,6 +268,10 @@ ifeq ($(FISHMOD_TESTMODE),1)
   CPP_DEFINES += -DFISHMOD_TESTMODE=1
   COMPARE := 0
 endif
+# FISHMOD_TEST_START (test mode): where a test file starts and goes back to on loading: 0 Link's house (as a new
+# game), 1 Kokiri Forest as child, 2 Lake Hylia as adult (the lake full)
+FISHMOD_TEST_START ?= 0
+CPP_DEFINES += -DFISHMOD_TEST_START=$(FISHMOD_TEST_START)
 
 FISHMOD_DEBUG ?= 0
 FISHMOD_SCRIPT ?=

@@ -868,6 +868,20 @@ void Fishmod_InitTestSave(void) {
     Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_DEKU);
     gSaveContext.save.info.equips.buttonItems[1] = ITEM_SLINGSHOT;
     gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_SLINGSHOT;
+    Fishmod_TestStart();
+}
+
+/** Test mode's starting place (FISHMOD_TEST_START): a new test file, and a test file loaded (Sram_OpenSave). */
+void Fishmod_TestStart(void) {
+#if FISHMOD_TEST_START == 1
+    gSaveContext.save.entranceIndex = ENTR_KOKIRI_FOREST_0;
+    gSaveContext.save.linkAge = LINK_AGE_CHILD;
+    Fishmod_TestSetAge(false);
+#elif FISHMOD_TEST_START == 2
+    gSaveContext.save.entranceIndex = ENTR_LAKE_HYLIA_0;
+    gSaveContext.save.linkAge = LINK_AGE_ADULT;
+    Fishmod_TestSetAge(true);
+#endif
 }
 #endif
 

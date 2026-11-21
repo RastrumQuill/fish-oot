@@ -1,12 +1,12 @@
 # The console test suite
 
-A queue for the morning runner (`fishmod/pc/morning.bat`, `fishmod/pc/MORNING.md`) that answers two questions on
+A queue for the morning runner (`fishmod/pc/run_queue.bat`, `fishmod/pc/RUN_QUEUE.md`) that answers two questions on
 the real console: does each build of today's code run right, and which is fastest. The emulator's numbers on the
 second question disagree with each other (below), so the console decides.
 
 ## Running it
 
-It is the morning queue as committed (`fishmod/pc/morning_queue.txt`): switch the console on, run `morning.bat`,
+It is the morning queue as committed (`fishmod/pc/queue.txt`): switch the console on, run `run_queue.bat`,
 press RESET if it asks. Nine runs, about an hour, nobody needed after the first minute. No Expansion Pak. The last
 run (the replay) writes the recording's empty save over the cart's save memory: back it up first if it matters.
 

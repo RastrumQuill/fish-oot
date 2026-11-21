@@ -534,6 +534,9 @@ void Sram_OpenSave(SramContext* sramCtx) {
             break;
     }
 
+#if FISHMOD_TESTMODE && FISHMOD_TEST_START
+    Fishmod_TestStart(); // (a test build that starts at the lake or in the forest goes back there)
+#endif
     PRINTF("scene_no = %d\n", gSaveContext.save.entranceIndex);
     PRINTF_RST();
 

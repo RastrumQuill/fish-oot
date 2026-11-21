@@ -9,6 +9,8 @@
 #                  -f3dex3 suffix
 #   --opt N        ignored (the performance levels it chose are now the only game; kept so old commands still work)
 #   --testmode     new files skip the intro and start with testing items; outputs get a -test suffix
+#   --test-start N (test mode) where a test file starts and loads: 0 Link's house, 1 Kokiri Forest as child, 2 Lake
+#                  Hylia as adult; outputs get -kokiri / -lake
 #   --expak        the ROM needs the Expansion Pak: its code can count on the 8 MB (#if FISHMOD_EXPAK), and without the
 #                  pak the game says so at power-on instead of starting; outputs get an -expak suffix. Without the
 #                  flag the game runs either way and uses the pak when it's there
@@ -71,6 +73,7 @@ MODOPT=""
 SCRIPT=""
 F3DEX3=0
 TESTMODE=0
+TEST_START=0
 EXPAK=0
 PROFILE=emu
 GCC="O2"
@@ -82,6 +85,7 @@ while [ $# -gt 0 ]; do
         --f3dex3) F3DEX3=1 ;;
         --opt) shift ;; # (ignored)
         --testmode) TESTMODE=1 ;;
+        --test-start) TEST_START="$2"; shift ;;
         --expak) EXPAK=1 ;;
         --hw) PROFILE=hw ;;
         --profile) PROFILE="$2"; shift ;;
@@ -185,7 +189,7 @@ if [ "$MESHPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$MP_OUT")
 fi
-MODE="cc=${FISHMOD_GCC:-} gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+MODE="cc=${FISHMOD_GCC:-} gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE teststart=$TEST_START expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -241,7 +245,7 @@ elif [ "$CLANG" = 1 ]; then
     echo "error: --clang goes with the GCC build (not --ido)" >&2
     exit 1
 fi
-make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} ${TEXPACK_ARGS[@]+"${TEXPACK_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_EXPAK=$EXPAK FISHMOD_MESHPACK=$MESHPACK FISHMOD_SCRIPT="$SCRIPT" FISHMOD_NOTIMERS=$NOTIMERS FISHMOD_MOD_OPT=$MODOPT F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC F3DEX3_PROF=${F3DEX3_PROF:-} FISHMOD_TESTMODE=$TESTMODE \
+make VERSION=$VERSION REGION=$REGION NON_MATCHING=1 ${GCC_ARGS[@]+"${GCC_ARGS[@]}"} ${TEXPACK_ARGS[@]+"${TEXPACK_ARGS[@]}"} FISHMOD_DEBUG=$DEBUG FISHMOD_EXPAK=$EXPAK FISHMOD_MESHPACK=$MESHPACK FISHMOD_SCRIPT="$SCRIPT" FISHMOD_NOTIMERS=$NOTIMERS FISHMOD_MOD_OPT=$MODOPT F3DEX3=$F3DEX3 F3DEX3_OCC=$F3DEX3_OCC F3DEX3_PROF=${F3DEX3_PROF:-} FISHMOD_TESTMODE=$TESTMODE FISHMOD_TEST_START=$TEST_START \
     compress -j"$(nproc)" ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"}
 
 mkdir -p "build/$VERSION"
@@ -253,6 +257,8 @@ if [ "$F3DEX3" = 1 ]; then
 fi
 if [ "$TESTMODE" = 1 ]; then
     SUFFIX="$SUFFIX-test"
+    if [ "$TEST_START" = 1 ]; then SUFFIX="$SUFFIX-kokiri"; fi
+    if [ "$TEST_START" = 2 ]; then SUFFIX="$SUFFIX-lake"; fi
 fi
 if [ "$EXPAK" = 1 ]; then
     SUFFIX="$SUFFIX-expak"

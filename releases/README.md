@@ -34,6 +34,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-frames28-audiocol.bps`, `-nocut.bps`, `-bands4.bps`, `-all.bps` | frames28 with the audio and collision leads' work; the bed's fog bands uncut; cut at 4 depths; all of them | [notes](notes-frames28-set.md) |
 | `fish-oot-audio-laps.bps`, `-every2.bps` | the audio lead's laps bench (claude/sleepy-faraday-ve9g2u, their patches): the audio driver woken every refresh against every second one, three laps each | [notes](notes-audio-laps.md) |
 | `fish-oot-rc1.bps`, `-test.bps`, `-bench.bps` | **rc1, the release candidate**: frames28 with the bed's water fog uncut, the collision and audio leads' work merged; to play, test mode, and the bench later builds are measured against | [notes](notes-rc1.md) |
+| `fish-oot-play.bps`, `fish-oot-test-lake.bps`, `fish-oot-test-kokiri.bps` | **to play** (as of 21 November; `fishmod\pc\play.bat` loads them): the game; test mode starting at Lake Hylia as adult with the lake full; test mode starting in Kokiri Forest as child. A test file goes back to its place on loading | |
 | `fish-oot-current-test.bps` | **to play**: everything as of 20 November in test mode: the collision lead's fight indicators and fishing feel (a tap rhythm per species, the strain by the fish's weight, Yes/No lined up), the lake bed remeshed (the fog and caustics along depth lines, the caustics to 690 units), vanilla-coloured water | (commits 784c4c4, 173dda8; notes-remesh.md) |
 | `fish-oot-remesh-bench.bps`, `-off-bench.bps` | the lake bed remeshed along its depth lines (the fog and the caustics change along them, not triangle edges), and the same tree without it | [notes](notes-remesh.md) |
 | `fish-oot-rc2.bps`, `-test.bps`, `-bench.bps`, `-expak-bench.bps` | **rc2, the new base**: everything merged as of 17 November (the water, the collision lead's pop-in work, the audio lead's driver work); to play, test mode, the bench, and the bench with `--expak` | [notes](notes-rc2.md) |
@@ -51,7 +52,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-rsp-ab.bps` | The RSP test: frames13's bench for 4 laps (about 16 minutes), the audio's RSP work on, off, on, off | (rsp_ab script) |
 | `fish-oot-frames13.bps`, `-prof`, `-audio2`, `-reverb2`, `-27k` | frames12 without the wall clearance bound (frames11's CPU slowdown, found by the bisection), and two audio memory changes; -prof: F3DEX3's profiling counters (where the RSP's time goes); -audio2: the audio mixed every two refreshes (half the RSP audio tasks); -reverb2: every reverb at half rate or less; -27k: the sound mixed at 26.8 kHz (both change the sound: RSP tests) | [notes](notes-frames13.md) |
 
-The bench patches are run by `fishmod\pc\morning.bat` (see `fishmod/pc/MORNING.md`).
+The bench patches are run by `fishmod\pc\run_queue.bat` (see `fishmod/pc/RUN_QUEUE.md`); `fishmod\pc\play.bat` loads a copy to play or test.
 
 `-testmode` patches: a **new file** skips the intro and starts with testing items (existing files aren't changed).
 

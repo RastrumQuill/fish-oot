@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The morning runner: bench ROMs on the console, one after another, with nobody there.
+"""The queue runner (was the morning runner): bench ROMs on the console, one after another, with nobody there.
 
-For each line of the queue (fishmod/pc/morning_queue.txt, or patches given on the command line) it patches your ROM
+For each line of the queue (fishmod/pc/queue.txt, or patches given on the command line) it patches your ROM
 (where it is: nothing is moved; the patched copy is made in fishmod/pc/work/ and deleted after its run), loads it
 into the SummerCart64 with `sc64deployer upload --reboot` (the running game restarts into it: fish-oot's bench builds
 answer the reboot request), records `sc64deployer debug` until the game says the route is done, and moves on. At the
@@ -11,8 +11,8 @@ branch and pushed, so they can be read from the repository; a results zip is mad
 The first run: if the console isn't running a fish-oot bench build, nothing answers the reboot request, so it beeps
 and asks you to press RESET (or switch the console on). After that it needs nobody.
 
-Usage (in the fishoot conda env; morning.bat does this):
-  python fishmod/pc/morning.py [PATCH.bps ...] [--rom ROM] [--deployer sc64deployer.exe] [--minutes N] [--no-pull]
+Usage (in the fishoot conda env; run_queue.bat does this):
+  python fishmod/pc/run_queue.py [PATCH.bps ...] [--rom ROM] [--deployer sc64deployer.exe] [--minutes N] [--no-pull]
          [--no-push]
 The ROM's path is remembered (fishmod/pc/rom_path.txt, as run_all.py does), and the deployer's
 (fishmod/pc/sc64deployer_path.txt).
@@ -35,7 +35,7 @@ ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
 import bps  # noqa: E402
 
-QUEUE = os.path.join(HERE, "morning_queue.txt")
+QUEUE = os.path.join(HERE, "queue.txt")
 ROM_PATH_FILE = os.path.join(HERE, "rom_path.txt")
 DEPLOYER_PATH_FILE = os.path.join(HERE, "sc64deployer_path.txt")
 WORK = os.path.join(HERE, "work")
@@ -153,7 +153,7 @@ def find_deployer(given):
 
 
 def read_queue(paths, minutes):
-    """[(patch path, minutes, label)]: from the command line, or morning_queue.txt (patch [minutes] [label] a line)."""
+    """[(patch path, minutes, label)]: from the command line, or queue.txt (patch [minutes] [label] a line)."""
     runs = []
     if paths:
         for p in paths:
@@ -508,7 +508,7 @@ def publish(stamp, stamp_dir, push):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("patches", nargs="*", help="patches to run (default: morning_queue.txt)")
+    ap.add_argument("patches", nargs="*", help="patches to run (default: queue.txt)")
     ap.add_argument("--rom")
     ap.add_argument("--deployer")
     ap.add_argument("--minutes", type=float, default=DEFAULT_MINUTES, help="the longest a run may take")

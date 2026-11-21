@@ -457,6 +457,12 @@ void Fishmod_InitTestSave(void);
 // A small frames-per-second readout in the top right corner
 void Fishmod_DrawFps(Gfx** gfxP);
 void Fishmod_TestPlayInit(void);
+// where a test file starts and goes back to on loading (FISHMOD_TEST_START: 0 Link's house, 1 Kokiri Forest, 2 Lake
+// Hylia as adult)
+void Fishmod_TestStart(void);
+#endif
+#ifndef FISHMOD_TEST_START
+#define FISHMOD_TEST_START 0
 #endif
 // The catch textbox: the reused vanilla text id it shows under, and the call that opens it
 #define FISHMOD_CATCH_TEXT_ID 0x4083

@@ -2,7 +2,7 @@
 """The lab: the console's runs ordered through git, with nobody there.
 
 It runs until stopped (Ctrl+C, or close the window). Every few minutes it fetches the lab branch and reads its queue
-(fishmod/pc/lab_queue.txt there): each line not run yet is run as the morning runner runs a line (the patch applied to
+(fishmod/pc/lab_queue.txt there): each line not run yet is run as the queue runner (run_queue.py) runs a line (the patch applied to
 your ROM, uploaded, checked byte for byte, the frame log recorded), with the console switched off and on by a smart
 plug to start it, and each run's results are pushed to the morning-results branch as soon as it ends (lab/<id> there).
 Nobody needs to be at the console: a run that hangs is stopped after a few quiet minutes, and the next one starts from
@@ -39,7 +39,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import bps  # noqa: E402
-import morning  # noqa: E402
+import run_queue as morning  # noqa: E402  (the queue runner)
 
 CONFIG = os.path.join(HERE, "lab.json")
 LAB_RESULTS = os.path.join(morning.RESULTS, "lab")

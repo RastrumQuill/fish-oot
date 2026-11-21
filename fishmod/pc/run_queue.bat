@@ -1,7 +1,7 @@
 @echo off
-rem fish-oot's morning runner: double-click it (or drop .bps patches on it). It patches your ROM for each queued
-rem patch (fishmod\pc\morning_queue.txt), runs each on the console through the SummerCart64, and pushes the results to
-rem the morning-results branch. See fishmod\pc\MORNING.md.
+rem fish-oot's queue runner: double-click it (or drop .bps patches on it). It patches your ROM for each queued
+rem patch (fishmod\pc\queue.txt), runs each on the console through the SummerCart64, and pushes the results to
+rem the morning-results branch. See fishmod\pc\RUN_QUEUE.md.
 setlocal
 set "PY="
 for %%D in ("%USERPROFILE%\miniconda3" "%USERPROFILE%\anaconda3" "%LOCALAPPDATA%\miniconda3" "%LOCALAPPDATA%\anaconda3" "%ProgramData%\miniconda3" "%ProgramData%\anaconda3" "C:\miniconda3" "C:\anaconda3") do (
@@ -18,7 +18,7 @@ if not defined PY (
     pause
     exit /b 1
 )
-%PY% "%~dp0morning.py" %*
+%PY% "%~dp0run_queue.py" %*
 echo.
 echo Finished. This window can be closed.
 pause

@@ -1,6 +1,6 @@
-# The morning runner
+# The queue runner
 
-`morning.bat` runs bench ROMs on the console one after another and sends the results back, with nobody there after
+`run_queue.bat` (it was `morning.bat`) runs bench ROMs on the console one after another and sends the results back, with nobody there after
 the first minute.
 
 ## Once
@@ -14,16 +14,16 @@ the first minute.
 
 ## Each time
 
-1. Switch the console on, then double-click `fishmod\pc\morning.bat`.
+1. Switch the console on, then double-click `fishmod\pc\run_queue.bat`.
 2. On the first run it asks for your ROM's path (OoT NTSC 1.2, any byte order) and remembers it. The ROM stays where
    it is: each patched copy is made in `fishmod\pc\work\` and deleted after its run.
 3. If the console isn't already running a bench build that answers the reboot request (`frames7` or later), the
    runner beeps and asks you to **press RESET** once. After that it needs nobody: each run ends with the game saying
    it's done, and the next ROM is loaded with `sc64deployer upload --reboot`.
 
-The queue is `fishmod\pc\morning_queue.txt` (now: the RDP calibration bench, then frames7, frames7 without the cache
+The queue is `fishmod\pc\queue.txt` (now: the RDP calibration bench, then frames7, frames7 without the cache
 claiming, and frames8, twice round: about 90 minutes), one run a line (patch, most minutes, label). You can also drop .bps
-files onto `morning.bat` to run just those.
+files onto `run_queue.bat` to run just those.
 
 ## The results
 
