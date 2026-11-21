@@ -15,6 +15,7 @@
  */
 
 #include "z_en_fishmod.h"
+#include "fishmod_feel.h"
 
 #include "libc64/math64.h"
 #include "libc64/sprintf.h"
@@ -164,7 +165,7 @@ void EnFishmod_RodBite(EnFishmod* fish) {
     ROD->fish = fish;
     ROD->biting = true;
     ROD->dipTarget = 14.0f;
-    ROD->biteTimer = fish->species->behavior.biteWindow + 4; // + the frames it takes to pull the bobber down
+    ROD->biteTimer = (s16)(fish->species->behavior.biteWindow * FEEL(FEEL_BITE_WINDOW)) + 4; // + the bobber going down
     Sfx_PlaySfxAtPos(&gFishmodRod->projectedPos, NA_SE_EV_DIVE_WATER);
     Rumble_Override(0.0f, 100, 6, 20);
 }
@@ -460,7 +461,7 @@ static f32 sFishLeft;
 #define TENSION_SLACK 12.0f
 #define TENSION_LOW 25.0f
 #define TENSION_HIGH 70.0f
-#define TENSION_DRAG 85.0f
+#define TENSION_DRAG FEEL(FEEL_DRAG_AT) // (the drag: include/fishmod_feel.h)
 
 static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, Input* input) {
     EnFishmod* fish = ROD->fish;
@@ -477,11 +478,11 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     s16 stickYaw;
     f32 stickMag = sqrtf(SQ((f32)input->rel.stick_x) + SQ((f32)input->rel.stick_y));
     f32 pounds = fish->species->weightCoef * fish->lengthInches * fish->lengthInches * fish->lengthInches * 0.000001f;
-    f32 load = CLAMP(sqrtf(pounds * 0.5f), 0.35f, 1.8f);
+    f32 load = CLAMP(sqrtf(pounds * FEEL(FEEL_LOAD_PER_LB)), FEEL(FEEL_LOAD_MIN), FEEL(FEEL_LOAD_MAX));
 
     // reel
     if (CHECK_BTN_ALL(input->cur.button, BTN_A)) {
-        reel = CHECK_BTN_ALL(input->cur.button, BTN_R) ? 2.2f : 1.2f;
+        reel = CHECK_BTN_ALL(input->cur.button, BTN_R) ? FEEL(FEEL_REEL_FAST) : FEEL(FEEL_REEL_SPEED);
         ROD->lineOut -= reel;
         Sfx_PlaySfxCentered(CHECK_BTN_ALL(input->cur.button, BTN_R) ? NA_SE_IT_FISHING_REEL_HIGH - SFX_FLAG
                                                                        : NA_SE_IT_FISHING_REEL_SLOW - SFX_FLAG);
@@ -515,7 +516,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     // harder: faster than the reel, so the line goes tight and the drag pays out.
     pullSpeed = (0.7f + b->strength * 0.02f + fish->lengthInches * 0.02f) * (0.35f + staminaFrac * 0.65f);
     if (fish->stateTimer > 0) {
-        pullSpeed *= 2.2f;
+        pullSpeed *= FEEL(FEEL_RUN_PULL);
     }
     if (fish->jumping) {
         pullSpeed *= 0.3f;
@@ -543,27 +544,28 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         // 23 (greengill) and 66 (hearty bass) with the reel still, in the green or just under it, and the reel adds
         // 22; the biggest of the heavy species sit at 72 and go over the drag's 85 if reeled against; a run adds up
         // to 18 more, which holding the stick against it takes back.
-        tensionTarget = 14.0f + CLAMP_MAX(taut, 5.0f) * 3.0f * load +
-                        b->strength * 0.25f * (0.3f + staminaFrac * 0.7f) * load;
+        // (the numbers: include/fishmod_feel.h, tuned live from the desktop in test builds)
+        tensionTarget = FEEL(FEEL_TENSION_BASE) + CLAMP_MAX(taut, FEEL(FEEL_TAUT_CAP)) * FEEL(FEEL_TAUT_GAIN) * load +
+                        b->strength * FEEL(FEEL_STRENGTH_GAIN) * (0.3f + staminaFrac * 0.7f) * load;
         if (fish->stateTimer > 0) {
-            tensionTarget += 10.0f * load; // (a run is felt on the line)
+            tensionTarget += FEEL(FEEL_RUN_ADD) * load; // (a run is felt on the line)
         }
-        EnFishmod_FishTire(fish, (0.4f + b->strength * 0.01f) * (opposing ? 2.5f : 1.0f));
+        EnFishmod_FishTire(fish, (0.4f + b->strength * 0.01f) * (opposing ? FEEL(FEEL_TIRE_OPPOSE) : 1.0f));
         if (opposing) {
-            tensionTarget -= 12.0f;
+            tensionTarget -= FEEL(FEEL_OPPOSE_RELIEF);
         }
     }
     if (reel > 0.0f) {
-        tensionTarget += (taut > -6.0f) ? reel * 18.0f : 0.0f;
+        tensionTarget += (taut > -6.0f) ? reel * FEEL(FEEL_REEL_GAIN) : 0.0f;
         if (fish->jumping) {
             tensionTarget += 30.0f; // reeling while it leaps: very likely to tear the hook out
         }
     }
 
-    Math_ApproachF(&ROD->tension, tensionTarget, 0.25f, 4.0f); // (it was 0.3 and 6 a frame: too sudden to answer)
+    Math_ApproachF(&ROD->tension, tensionTarget, FEEL(FEEL_GAUGE_RATE), FEEL(FEEL_GAUGE_STEP)); // (was 0.3, 6: too sudden)
 
     // reel drag pays out line instead of snapping right away
-    if ((ROD->tension > 85.0f) && (taut > 0.0f)) {
+    if ((ROD->tension > FEEL(FEEL_DRAG_AT)) && (taut > 0.0f)) {
         ROD->lineOut += pullSpeed * 0.8f; // the fish takes line, but against the drag
         Sfx_PlaySfxCentered(NA_SE_IT_FISHING_REEL_HIGH - SFX_FLAG);
     }
@@ -589,7 +591,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
 
     // snap
     if (ROD->tension >= 100.0f) {
-        if (++ROD->overTimer > 12) {
+        if (++ROD->overTimer > (s16)FEEL(FEEL_SNAP_FRAMES)) {
             Rumble_Override(0.0f, 255, 30, 10);
             Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
             Rod_LoseFish(play, player, "The line snapped!");
@@ -601,7 +603,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
 
     // slack: the hook can fall out
     if (ROD->tension < 6.0f) {
-        if (++ROD->slackTimer > 90) {
+        if (++ROD->slackTimer > (s16)FEEL(FEEL_SLACK_FRAMES)) {
             Rod_LoseFish(play, player, "It shook the hook...");
             return;
         }

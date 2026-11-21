@@ -1,7 +1,9 @@
 # Running test jobs on your PC
 
-**On the console:** `play.bat` loads a copy to play (the game, or test mode at Lake Hylia or in Kokiri Forest), and
-`run_queue.bat` runs the queued benches (`queue.txt`; see `RUN_QUEUE.md`).
+**On the console:** `play.bat` loads a copy to play (the game, or test mode at Lake Hylia or in Kokiri Forest);
+`feel.bat`, with a test build running, opens sliders for the fishing's feel that change it on the console as you
+play (Save writes `feel_saved.txt`: commit or send it and it becomes the defaults); `run_queue.bat` runs the queued
+benches (`queue.txt`; see `RUN_QUEUE.md`).
 
 Your PC runs the long emulator jobs, so the cloud container isn't the bottleneck. These include the draw-distance
 sweep, the rotation check and the calibrations. A Ryzen 7 5700X3D (16 threads) runs several ares windows at once, and

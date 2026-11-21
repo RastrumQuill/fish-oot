@@ -12,6 +12,7 @@ the Goron's Bracelet; loading a test file goes back to its place. Hold L and pre
   Right          with the rod out of the water: pick which fish to call (each species in turn, or the nearest);
                  with the bobber in the water: that fish comes straight to the bait (its own nibbles, bite and fight)
   Left           the frame-time readout's detail
+With a test build running, feel.bat opens the fishing feel tuner (sliders that change the fight's numbers live).
 
 Usage (play.bat does this): python fishmod/pc/play.py [1|2|3|PATCH.bps] [--rom ROM] [--deployer sc64deployer.exe]
   [--no-pull]

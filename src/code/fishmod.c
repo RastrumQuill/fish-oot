@@ -5,6 +5,7 @@
  */
 
 #include "fishmod.h"
+#include "fishmod_feel.h"
 #include "fishmod_bedcard.h"
 #if FISHMOD_WATER_SURFACE
 #include "assets/objects/object_spot06_objects/fishmod_water_colours.h"
@@ -299,6 +300,9 @@ void Fishmod_PlayUpdate(PlayState* play) {
     Actor* rod;
 
     Fishmod_TimeUpdate(play);
+#if FISHMOD_TESTMODE
+    Fishmod_FeelUpdate(); // (the desktop tuner's lines: fishmod_feel.inc.c)
+#endif
 
     // the rain's sound (the nature ambience's rain channel, as vanilla's rain weather plays it), once the scene's
     // own music has started
@@ -2091,3 +2095,5 @@ void Fishmod_NeedsExpansionPak(void) {
     osViBlack(false);
     for (;;) {}
 }
+
+#include "fishmod_feel.inc.c" // the fishing's feel tuned from the desktop (test builds)

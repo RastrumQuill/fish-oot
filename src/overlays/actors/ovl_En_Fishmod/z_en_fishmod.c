@@ -7,6 +7,7 @@
  */
 
 #include "z_en_fishmod.h"
+#include "fishmod_feel.h"
 #include "sys_math.h"
 #include "assets/objects/gameplay_field_keep/gameplay_field_keep.h"
 
@@ -1779,7 +1780,8 @@ static void Fish_Nibble(EnFishmod* this, PlayState* play, FishAI* ai) {
         this->jawRot = 0;
         this->fishState = FISH_STATE_INSPECT;
         // (the species' own rhythm between taps, give or take a third: a bass raps at it, a carp takes its time)
-        this->stateTimer = (s16)(ai->b->nibbleGap * (0.67f + Fishmod_RandZeroFloat(gFishmodRngNow, 0.66f)));
+        this->stateTimer = (s16)(ai->b->nibbleGap * FEEL(FEEL_NIBBLE_GAP) *
+                                 (0.67f + Fishmod_RandZeroFloat(gFishmodRngNow, 0.66f)));
     }
 }
 
