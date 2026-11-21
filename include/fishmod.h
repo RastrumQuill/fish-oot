@@ -635,6 +635,8 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOFOG (1 << 26)     // no scene fog at all (Play_SetFog): to look at the terrain as it is
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;
+extern s32 gFishmodTestCallFish; // debug: set from outside, as test mode's L + D-pad Right (fishmod_rod.c)
+extern void* gFishmodDebugRod;    // debug: the rod's state (the overlay's gFishmodRodState), for the emulator
 extern struct Actor* gFishmodDrawingActor; // debug builds: the actor Actor_Draw is drawing (the crash record says which)
 // the benches and the profile: leave out debug-only work that the shipped game doesn't do
 extern s32 gFishmodTimingAsShipped;

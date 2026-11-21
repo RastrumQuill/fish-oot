@@ -868,6 +868,11 @@ void Fishmod_InitTestSave(void) {
     Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_DEKU);
     gSaveContext.save.info.equips.buttonItems[1] = ITEM_SLINGSHOT;
     gSaveContext.save.info.equips.cButtonSlots[0] = SLOT_SLINGSHOT;
+    // the rod and the bugs ready on C-Down and C-Right: cast straight away (L + D-pad Right calls a fish to the bait)
+    gSaveContext.save.info.equips.buttonItems[2] = ITEM_FISHING_POLE;
+    gSaveContext.save.info.equips.cButtonSlots[1] = SLOT_FISHING_ROD;
+    gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_BUG;
+    gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_BOTTLE_4;
     Fishmod_TestStart();
 }
 

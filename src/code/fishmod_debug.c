@@ -8,6 +8,9 @@
 
 #include "dma.h"
 #include "fishmod.h"
+
+s32 gFishmodTestCallFish;
+void* gFishmodDebugRod;
 #include "fishmod_sram.h"
 #include "src/fishmod_data/fishmod_profile.h"
 

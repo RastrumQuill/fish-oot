@@ -790,6 +790,89 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
     (void)groundY;
 }
 
+#if FISHMOD_TESTMODE
+/*
+ * Test mode, for trying the fishing's feel without waiting: L + D-pad Right.
+ * - With the line out of the water: picks which fish to call (each species in turn, then "any": the nearest).
+ * - With the bobber in the water and no fish at it: the nearest fish of that kind (in the scene's water, not caught)
+ *   is put a few body lengths from the bobber at the bait's depth and comes to it. From there it's the fish's own:
+ *   its nibbles at its species' rhythm, its bite, its fight.
+ */
+static s8 sTestFishSpecies = -1; // -1: any (the nearest)
+
+static void Rod_TestCallFish(PlayState* play, Input* input) {
+    Actor* a;
+    EnFishmod* best = NULL;
+    f32 bestDist = 1e9f;
+    s32 i;
+
+    s32 pressed = CHECK_BTN_ALL(input->cur.button, BTN_L) && CHECK_BTN_ALL(input->press.button, BTN_DRIGHT);
+
+#if FISHMOD_DEBUG
+    if (gFishmodTestCallFish) {
+        gFishmodTestCallFish = 0;
+        pressed = true;
+    }
+#endif
+    if (!pressed) {
+        return;
+    }
+    if (ROD->state != ROD_STATE_FLOAT) {
+        for (i = 0; i < FISHMOD_SPECIES_MAX + 1; i++) {
+            sTestFishSpecies++;
+            if (sTestFishSpecies >= FISHMOD_SPECIES_MAX) {
+                sTestFishSpecies = -1;
+                break;
+            }
+            if (gFishmodSpecies[sTestFishSpecies].name != NULL) {
+                break;
+            }
+        }
+        EnFishmod_RodMessage(1, "Test: L+Right calls",
+                             (sTestFishSpecies < 0) ? "the nearest fish" : gFishmodSpecies[sTestFishSpecies].name);
+        Sfx_PlaySfxCentered(NA_SE_SY_CURSOR);
+        return;
+    }
+    if (ROD->fish != NULL) {
+        return;
+    }
+    for (a = play->actorCtx.actorLists[ACTORCAT_FISH].head; a != NULL; a = a->next) {
+        EnFishmod* f = (EnFishmod*)a;
+        f32 d;
+
+        if ((a->id != ACTOR_EN_FISHMOD) || (f->species == NULL) ||
+            ((sTestFishSpecies >= 0) && (f->species != &gFishmodSpecies[sTestFishSpecies])) ||
+            ((f->fishState != FISH_STATE_WANDER) && (f->fishState != FISH_STATE_APPROACH))) {
+            continue;
+        }
+        d = Math_Vec3f_DistXYZ(&a->world.pos, &ROD->bobberPos);
+        if (d < bestDist) {
+            bestDist = d;
+            best = f;
+        }
+    }
+    if (best == NULL) {
+        EnFishmod_RodMessage(2, "Test: none of those here",
+                             (sTestFishSpecies < 0) ? NULL : gFishmodSpecies[sTestFishSpecies].name);
+        return;
+    }
+    {
+        // a few body lengths out from the bobber, away from Link, at the bait's depth
+        s16 yaw = Math_Vec3f_Yaw(&GET_PLAYER(play)->actor.world.pos, &ROD->bobberPos);
+        f32 r = 30.0f + best->halfLength * 4.0f;
+
+        best->actor.world.pos.x = ROD->bobberPos.x + Math_SinS(yaw) * r;
+        best->actor.world.pos.z = ROD->bobberPos.z + Math_CosS(yaw) * r;
+        best->actor.world.pos.y = FISHMOD_ROD_BAIT_Y(ROD) - 4.0f;
+        best->actor.prevPos = best->actor.world.pos;
+        best->actor.shape.rot.y = best->actor.world.rot.y = yaw + 0x8000;
+    }
+    EnFishmod_FishSetState(best, FISH_STATE_APPROACH);
+    best->stateTimer = 400;
+    EnFishmod_RodMessage(1, "Test: here comes", best->species->name);
+}
+#endif
+
 void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
     sRodScene = play->sceneId;
     Player* player = GET_PLAYER(play);
@@ -804,6 +887,14 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
     if (ROD->messageTimer > 0) {
         ROD->messageTimer--;
     }
+#if FISHMOD_TESTMODE
+    if (holding) {
+        Rod_TestCallFish(play, input);
+    }
+#endif
+#if FISHMOD_DEBUG
+    gFishmodDebugRod = ROD; // (where the rod's state is, for the emulator: the overlay moves)
+#endif
 
 
     // stop everything if the rod was put away (or Link got hit, entered water...)
