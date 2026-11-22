@@ -24,6 +24,7 @@
     FEEL(FEEL_REEL_GAIN, "reel_gain", 18.0f, 0.0f, 40.0f, "what reeling adds to the gauge, per unit of reel speed")   \
     FEEL(FEEL_REEL_SPEED, "reel_speed", 1.2f, 0.2f, 5.0f, "line reeled a frame with A")                               \
     FEEL(FEEL_REEL_FAST, "reel_fast", 2.2f, 0.2f, 8.0f, "line reeled a frame with A and R")                           \
+    FEEL(FEEL_REEL_LIGHT, "reel_light", 2.0f, 1.0f, 4.0f, "the lightest fish reel in this many times faster")        \
     FEEL(FEEL_RUN_PULL, "run_pull", 2.2f, 1.0f, 5.0f, "how much harder the fish pulls on a run")                      \
     FEEL(FEEL_TIRE_OPPOSE, "tire_oppose", 2.5f, 1.0f, 6.0f, "how much faster the fish tires with the stick against") \
     FEEL(FEEL_DRAG_AT, "drag_at", 85.0f, 50.0f, 99.0f, "the gauge where the drag pays out line")                      \

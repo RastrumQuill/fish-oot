@@ -512,8 +512,13 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
 
     // reel
     if (CHECK_BTN_ALL(input->cur.button, BTN_A)) {
+        // a light fish can't hold against the reel: the lighter, the more line each turn takes in (up to reel_light
+        // times at the lightest load, none at a load of 1, a 2 lb fish), so a small one comes in without fast-reeling
+        // to keep its line from going slack. The tension that reeling adds stays the reel's own.
+        f32 light = CLAMP((1.0f - load) / MAX(1.0f - FEEL(FEEL_LOAD_MIN), 0.01f), 0.0f, 1.0f);
+
         reel = CHECK_BTN_ALL(input->cur.button, BTN_R) ? FEEL(FEEL_REEL_FAST) : FEEL(FEEL_REEL_SPEED);
-        ROD->lineOut -= reel;
+        ROD->lineOut -= reel * (1.0f + (FEEL(FEEL_REEL_LIGHT) - 1.0f) * light);
         Sfx_PlaySfxCentered(CHECK_BTN_ALL(input->cur.button, BTN_R) ? NA_SE_IT_FISHING_REEL_HIGH - SFX_FLAG
                                                                        : NA_SE_IT_FISHING_REEL_SLOW - SFX_FLAG);
     }
