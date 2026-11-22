@@ -35,6 +35,9 @@
                 }
                 break;
             case 1: // held: cast every so often
+#ifdef FISHMOD_ANGLER_RIG
+                FISHMOD_SET_RIG(FISHMOD_ANGLER_RIG); // (the tackle on the line: a lure, the sinker)
+#endif
 #ifdef FISHMOD_ANGLER_BAIT
                 // (a test of the bite and the fight: a bait on the hook every cast, as a bait bottle puts it)
                 if (gFishmodRodInfo.bait == FISHMOD_BAIT_NONE) {
@@ -46,7 +49,10 @@
                 }
                 break;
             case 2: // wind-up: hold the rod button to about 37% power (the old 60% cast, before casts got longer)
-                if (gFishmodRodInfo.castPower < 0.33f) {
+#ifndef FISHMOD_ANGLER_POWER
+#define FISHMOD_ANGLER_POWER 0.33f
+#endif
+                if (gFishmodRodInfo.castPower < FISHMOD_ANGLER_POWER) {
                     button = BTN_CLEFT;
                 }
                 break;
@@ -56,6 +62,12 @@
                 } else if (sAnglerFloatTimer > 500) {
                     button = BTN_A;
                 }
+#if defined(FISHMOD_ANGLER_RIG) && (FISHMOD_ANGLER_RIG != 0) && (FISHMOD_ANGLER_RIG != 3)
+                // a lure worked stop-and-go: a second's reeling, then three still
+                else if ((sAnglerFloatTimer > 120) && ((sAnglerFloatTimer % 80) < 20)) {
+                    button = BTN_A;
+                }
+#endif
                 break;
             case 5: // on the ground: reel back
                 button = BTN_A;

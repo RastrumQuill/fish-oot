@@ -57,10 +57,7 @@
         "bee_larva": 1.6,
         "bug": 1.4,
         "worm": 1.5,
-        "lure_spinner": 1.1,
-        "lure_crankbait": 0.7,
-        "lure_popper": 0.9,
-        "lure_frog": 0.5,
+        "lure_pond": 1.1,
         "lure_sinking": 0.8
       },
       "scenes": {
@@ -268,10 +265,7 @@
         "bee_larva": 1.4,
         "bug": 1.2,
         "worm": 1.3,
-        "lure_spinner": 0.3,
-        "lure_crankbait": 0.2,
-        "lure_popper": 0.2,
-        "lure_frog": 0.1,
+        "lure_pond": 0.3,
         "lure_sinking": 0.3
       },
       "scenes": {
@@ -355,10 +349,7 @@
         "bee_larva": 1.3,
         "bug": 1.6,
         "worm": 1.4,
-        "lure_spinner": 1.5,
-        "lure_crankbait": 1.4,
-        "lure_popper": 1.3,
-        "lure_frog": 1.3,
+        "lure_pond": 1.5,
         "lure_sinking": 1.5
       },
       "scenes": {
@@ -503,10 +494,7 @@
         "bee_larva": 1.0,
         "bug": 0.8,
         "worm": 1.8,
-        "lure_spinner": 0.5,
-        "lure_crankbait": 0.7,
-        "lure_popper": 0.3,
-        "lure_frog": 0.6,
+        "lure_pond": 0.7,
         "lure_sinking": 1.2
       },
       "scenes": {
@@ -738,10 +726,7 @@
         "bee_larva": 0.8,
         "bug": 1.2,
         "worm": 1.0,
-        "lure_spinner": 0.6,
-        "lure_crankbait": 0.8,
-        "lure_popper": 0.7,
-        "lure_frog": 1.8,
+        "lure_pond": 0.8,
         "lure_sinking": 1.8
       },
       "scenes": {
@@ -811,10 +796,7 @@
         "bee_larva": 1.8,
         "bug": 0.7,
         "worm": 0.9,
-        "lure_spinner": 0.3,
-        "lure_crankbait": 0.3,
-        "lure_popper": 0.2,
-        "lure_frog": 0.2,
+        "lure_pond": 0.3,
         "lure_sinking": 0.5
       },
       "scenes": {
@@ -1069,10 +1051,7 @@
         "bee_larva": 0.8,
         "bug": 1.3,
         "worm": 1.0,
-        "lure_spinner": 1.7,
-        "lure_crankbait": 1.6,
-        "lure_popper": 1.1,
-        "lure_frog": 1.2,
+        "lure_pond": 1.7,
         "lure_sinking": 1.4
       },
       "scenes": {
@@ -1142,10 +1121,7 @@
         "bug": 0.0,
         "worm": 0.0,
         "coral_earring": 1.0,
-        "lure_spinner": 0.0,
-        "lure_crankbait": 0.0,
-        "lure_popper": 0.0,
-        "lure_frog": 0.0,
+        "lure_pond": 0.0,
         "lure_sinking": 0.0
       },
       "scenes": {
@@ -1213,10 +1189,7 @@
         "bee_larva": 1.0,
         "bug": 1.5,
         "worm": 1.3,
-        "lure_spinner": 1.5,
-        "lure_crankbait": 1.5,
-        "lure_popper": 1.4,
-        "lure_frog": 1.4,
+        "lure_pond": 1.5,
         "lure_sinking": 1.6
       },
       "scenes": {
@@ -1285,10 +1258,7 @@
         "bug": 0.8,
         "worm": 0.8,
         "fish": 2.0,
-        "lure_spinner": 0.8,
-        "lure_crankbait": 0.5,
-        "lure_popper": 0.6,
-        "lure_frog": 0.4,
+        "lure_pond": 0.8,
         "lure_sinking": 0.6
       },
       "scenes": {

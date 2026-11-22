@@ -45,13 +45,10 @@ typedef enum FishmodBait {
     /* 3 */ FISHMOD_BAIT_WORM,
     /* 4 */ FISHMOD_BAIT_CORAL_EARRING,
     /* 5 */ FISHMOD_BAIT_FISH,
-    // lures (how they're fished comes later)
-    /* 6 */ FISHMOD_BAIT_LURE_SPINNER,
-    /* 7 */ FISHMOD_BAIT_LURE_CRANKBAIT,
-    /* 8 */ FISHMOD_BAIT_LURE_POPPER,
-    /* 9 */ FISHMOD_BAIT_LURE_FROG,
-    /* 10 */ FISHMOD_BAIT_LURE_SINKING,
-    /* 11 */ FISHMOD_BAIT_MAX
+    // the lures (vanilla's Fishing Pond's two): what's on the hook while one is the rig (FishmodRig)
+    /* 6 */ FISHMOD_BAIT_LURE_POND,    // the pond's own lure: floats, dives as it's reeled
+    /* 7 */ FISHMOD_BAIT_LURE_SINKING, // the sinking lure: down to the bed, worked along it
+    /* 8 */ FISHMOD_BAIT_MAX // (the fish's learned baits are a byte of bits: 8 at most)
 } FishmodBait;
 
 typedef struct FishmodBehavior {
@@ -104,17 +101,17 @@ typedef struct FishmodSpecies {
     /* 0x14 */ u16 weightCoef; // weight (lbs) = weightCoef * length^3 / 1000000
     /* 0x16 */ FishmodBehavior behavior;
     /* 0x22 */ u8 bait[FISHMOD_BAIT_MAX]; // interest multiplier percent per bait
-    /* 0x2D */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
-    /* 0x42 */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
-    /* 0x57 */ u8 lookFlags;                       // FISHMOD_LOOK_*
-    /* 0x58 */ u8 activity;    // 0-3 per FishmodTimeOfDay, 2 bits each (dawn in the low bits)
-    /* 0x59 */ u8 depthTop;    // the band of the water column it keeps to: 0 = surface, 255 = floor
-    /* 0x5A */ u8 depthBottom;
-    /* 0x5B */ u8 rise;        // how far up the band moves when it's active and the light is low (feeding)
-    /* 0x5C */ u8 lightShy;    // how much bright light pushes it deeper
-    /* 0x5D */ u8 chronotype;  // each fish's clock is shifted by up to this many hours
-    /* 0x5E */ u8 schoolMin;   // lives in schools of this many to schoolMax (0: on its own)
-    /* 0x5F */ u8 schoolMax;
+    /* 0x2A */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
+    /* 0x3F */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
+    /* 0x54 */ u8 lookFlags;                       // FISHMOD_LOOK_*
+    /* 0x55 */ u8 activity;    // 0-3 per FishmodTimeOfDay, 2 bits each (dawn in the low bits)
+    /* 0x56 */ u8 depthTop;    // the band of the water column it keeps to: 0 = surface, 255 = floor
+    /* 0x57 */ u8 depthBottom;
+    /* 0x58 */ u8 rise;        // how far up the band moves when it's active and the light is low (feeding)
+    /* 0x59 */ u8 lightShy;    // how much bright light pushes it deeper
+    /* 0x5A */ u8 chronotype;  // each fish's clock is shifted by up to this many hours
+    /* 0x5B */ u8 schoolMin;   // lives in schools of this many to schoolMax (0: on its own)
+    /* 0x5C */ u8 schoolMax;
 } FishmodSpecies;
 
 #define FISHMOD_ACTIVITY(species, tod) (((species)->activity >> (2 * (tod))) & 3)
@@ -392,11 +389,25 @@ void Fishmod_ClockDraw(struct PlayState* play, s32 centerX, s32 top, s16 alpha);
     ((((slot) >= SLOT_BOTTLE_1) && ((slot) <= SLOT_BOTTLE_4)) || (((slot) >= SLOT_BOTTLE_5) && ((slot) <= SLOT_BOTTLE_6)))
 #define FISHMOD_BOTTLE_INDEX(slot) (((slot) >= SLOT_BOTTLE_5) ? ((slot) - SLOT_BOTTLE_5 + 4) : ((slot) - SLOT_BOTTLE_1))
 
-// Lures: items of their own (placeholders for now: they go on a C button, but using one does nothing yet)
-#define ITEM_LURE_CRANKBAIT ITEM_INVALID_4
-#define ITEM_LURE_FROG ITEM_INVALID_5
-#define ITEM_LURE_SINKING ITEM_INVALID_6
-#define FISHMOD_IS_LURE_ITEM(item) (((item) >= ITEM_LURE_CRANKBAIT) && ((item) <= ITEM_LURE_SINKING))
+// The tackle: items of their own (the item page's lure slots), used from a button with the rod in hand to change its
+// rig (FishmodRig); used again, back to the bobber. (The same ids as the placeholder crankbait, frog and sinking lure
+// they replaced, so a save's slots carry over.)
+#define ITEM_LURE_POND ITEM_INVALID_4
+#define ITEM_LURE_SINKING ITEM_INVALID_5
+#define ITEM_SINKER ITEM_INVALID_6
+#define FISHMOD_IS_LURE_ITEM(item) (((item) >= ITEM_LURE_POND) && ((item) <= ITEM_SINKER))
+
+// What's on the end of the line (FishmodSaveData.flags bits 4-5, kept with the save)
+typedef enum FishmodRig {
+    /* 0 */ FISHMOD_RIG_BOBBER,       // a float, the bait hanging under it (the bait from a bottle)
+    /* 1 */ FISHMOD_RIG_LURE_POND,    // the pond's lure: floats, dives and wobbles while reeled, rises when stopped
+    /* 2 */ FISHMOD_RIG_LURE_SINKING, // the sinking lure: sinks to the bed, hops up off it as it's reeled
+    /* 3 */ FISHMOD_RIG_SINKER        // a weight on the bed, the bait floating up from it on a leader
+} FishmodRig;
+#define FISHMOD_SAVE_RIG_SHIFT 4
+#define FISHMOD_RIG() ((FISHMOD_SAVE->flags >> FISHMOD_SAVE_RIG_SHIFT) & 3)
+#define FISHMOD_SET_RIG(rig) \
+    (FISHMOD_SAVE->flags = (FISHMOD_SAVE->flags & ~(3 << FISHMOD_SAVE_RIG_SHIFT)) | ((rig) << FISHMOD_SAVE_RIG_SHIFT))
 
 // The mod's items (fishmod_items.c): what Link does with one from a button; whether an item is a bottle
 s32 Fishmod_ItemAction(s32 item);

@@ -18,6 +18,13 @@
 #define gFishingLureHookTex sFishmodLureHookTex
 #define gFishingLureHookVtx sFishmodLureHookVtx
 #define gFishingLureHookDL gFishmodLureHookDL
+#define gFishingLureFloatTex sFishmodLureFloatTex
+#define gFishingLureFloatVtx sFishmodLureFloatVtx
+#define gFishingLureFloatDL gFishmodLureFloatDL
+#define gFishingSinkingLureSegmentTex sFishmodSinkingLureSegmentTex
+#define gFishingSinkingLureSegmentModelVtx sFishmodSinkingLureSegmentModelVtx
+#define gFishingSinkingLureSegmentMaterialDL gFishmodSinkingLureSegmentMaterialDL
+#define gFishingSinkingLureSegmentModelDL gFishmodSinkingLureSegmentModelDL
 
 u64 gFishingRodSegmentStripTex[TEX_LEN(u64, gFishingRodSegmentStripTex_WIDTH, gFishingRodSegmentStripTex_HEIGHT, 16)] = {
 #include "assets/objects/object_fish/gFishingRodSegmentStripTex.rgba16.inc.c"
@@ -61,4 +68,46 @@ static Vtx gFishingLureHookVtx[] = {
 
 Gfx gFishingLureHookDL[] = {
 #include "assets/objects/object_fish/gFishingLureHookDL.inc.c"
+};
+
+// the tackle: the pond's lure (its float body; its hooks are the hook above) and the sinking lure's segment
+// (texture-packed builds have it as a palette's texture: the list then loads that, with the palette)
+#if __has_include("assets/objects/object_fish/gFishingLureFloatTex.ci8.png")
+#define gFishingLureFloatTex_TPal sFishmodLureFloatTexTPal
+static u64 gFishingLureFloatTex_TPal[] = {
+#include "assets/objects/object_fish/gFishingLureFloatTex.tlut.rgba16.inc.c"
+};
+
+static u64 gFishingLureFloatTex[TEX_LEN(u64, gFishingLureFloatTex_WIDTH, gFishingLureFloatTex_HEIGHT, 8)] = {
+#include "assets/objects/object_fish/gFishingLureFloatTex.ci8.inc.c"
+};
+#else
+static u64 gFishingLureFloatTex[TEX_LEN(u64, gFishingLureFloatTex_WIDTH, gFishingLureFloatTex_HEIGHT, 16)] = {
+#include "assets/objects/object_fish/gFishingLureFloatTex.rgba16.inc.c"
+};
+#endif
+
+static Vtx gFishingLureFloatVtx[] = {
+#include "assets/objects/object_fish/gFishingLureFloatVtx.inc.c"
+};
+
+Gfx gFishingLureFloatDL[] = {
+#include "assets/objects/object_fish/gFishingLureFloatDL.inc.c"
+};
+
+static u64 gFishingSinkingLureSegmentTex[TEX_LEN(u64, gFishingSinkingLureSegmentTex_WIDTH,
+                                                 gFishingSinkingLureSegmentTex_HEIGHT, 8)] = {
+#include "assets/objects/object_fish/gFishingSinkingLureSegmentTex.ia8.inc.c"
+};
+
+static Vtx gFishingSinkingLureSegmentModelVtx[] = {
+#include "assets/objects/object_fish/gFishingSinkingLureSegmentModelVtx.inc.c"
+};
+
+Gfx gFishingSinkingLureSegmentMaterialDL[] = {
+#include "assets/objects/object_fish/gFishingSinkingLureSegmentMaterialDL.inc.c"
+};
+
+Gfx gFishingSinkingLureSegmentModelDL[] = {
+#include "assets/objects/object_fish/gFishingSinkingLureSegmentModelDL.inc.c"
 };

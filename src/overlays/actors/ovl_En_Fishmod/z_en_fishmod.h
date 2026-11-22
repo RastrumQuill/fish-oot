@@ -232,6 +232,10 @@ typedef struct FishmodRod {
     /* 0x11C */ u8 reeling;         // this frame: 0 still, 1 reeled slowly (A), 2 fast (A and R)
     /* 0x11D */ u8 twitchHeat;      // twitches lately (each adds one, one lost every 40 frames): overworked past 3
     /* 0x11E */ s16 stillFrames;    // frames since the bait last moved (a twitch or the reel); large: not since the cast
+    /* 0x120 */ u8 rig;             // FishmodRig on the line (the save's, FISHMOD_RIG(); 0xFF: not looked at yet)
+    /* 0x121 */ u8 underCam;        // the camera has gone under after the tackle (Rod_CameraUpdate)
+    /* 0x122 */ u8 anchored;        // the sinker (or the sinking lure) has reached the bed
+    /* 0x124 */ f32 floorY;         // the bed under the tackle
 } FishmodRod;
 
 // The bait's height under the bobber
@@ -247,6 +251,9 @@ extern Gfx gFishmodRodMaterialDL[];
 extern Gfx gFishmodRodSegmentDL[];
 extern Gfx gFishmodLineModelDL[];
 extern Gfx gFishmodLureHookDL[];
+extern Gfx gFishmodLureFloatDL[]; // the tackle (fishmod_rod_gfx.c): the pond lure, the sinking lure's segment
+extern Gfx gFishmodSinkingLureSegmentMaterialDL[];
+extern Gfx gFishmodSinkingLureSegmentModelDL[];
 // what the rod does to a fish (z_en_fishmod.c)
 void EnFishmod_FishHook(struct EnFishmod* this);
 void EnFishmod_FishTire(struct EnFishmod* this, f32 amount);

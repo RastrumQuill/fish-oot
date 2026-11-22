@@ -51,7 +51,7 @@ TEXTURE_ITEMS = {
     "bottle_milk": "gItemIconBottleMilkFullTex.rgba32.png",
     "bottle_larva": os.path.join(ROOT, "src/fishmod_data/art/bottle_larva_3.png"),
 }
-NAMES = {"rod": "Fishing Rod", "lure_crank": "Crankbait", "lure_frog": "Frog Lure", "lure_sink": "Sinking Lure"}
+NAMES = {"rod": "Fishing Rod", "lure_pond": "Pond Lure", "lure_sink": "Sinking Lure", "sinker": "Sinker"}
 
 
 def load(p):
@@ -213,45 +213,45 @@ def lure_icon(kind):
         d.arc((x - r, y - r, x + r, y + r), 20, 200, fill=out, width=14)
         d.arc((x - r, y - r, x + r, y + r), 20, 200, fill=(200, 205, 215, 255), width=7)
 
-    if kind == "lure_crank":  # a fat yellow-green crankbait with a red lip and a treble hook under its belly
-        d.line((60, 150, 30, 190), fill=out, width=12)
-        d.line((112, 170, 112, 205), fill=out, width=10)
-        hook(112, 215, 22)
-        d.ellipse((40, 70, 220, 175), fill=out)
-        d.ellipse((48, 78, 212, 167), fill=(170, 200, 40, 255))
-        d.ellipse((60, 84, 190, 128), fill=(235, 240, 120, 255))
-        for i in range(5):
-            d.arc((70 + i * 24, 100, 110 + i * 24, 150), 200, 340, fill=(60, 110, 30, 255), width=6)
-        d.polygon([(46, 120), (6, 150), (22, 104)], fill=out)
-        d.polygon([(42, 120), (14, 140), (26, 110)], fill=(220, 40, 30, 255))
-        d.ellipse((168, 92, 200, 124), fill=out)
-        d.ellipse((172, 96, 196, 120), fill=(255, 255, 255, 255))
-        d.ellipse((179, 102, 192, 115), fill=(10, 10, 10, 255))
-        d.polygon([(212, 110), (248, 96), (250, 120), (214, 132)], fill=out)  # tail ring
-    elif kind == "lure_frog":  # a green popper frog with orange belly and two hooks
-        for sx in (-1, 1):
-            d.line((128, 150, 128 + sx * 70, 200), fill=out, width=26)
-            d.line((128, 150, 128 + sx * 70, 200), fill=(70, 150, 40, 255), width=14)
-            d.ellipse((128 + sx * 70 - 18, 188, 128 + sx * 70 + 18, 214), fill=out)
-        d.ellipse((58, 60, 198, 196), fill=out)
-        d.ellipse((66, 68, 190, 188), fill=(80, 170, 50, 255))
-        d.ellipse((92, 120, 164, 184), fill=(240, 150, 50, 255))
-        d.ellipse((80, 76, 140, 120), fill=(140, 220, 90, 255))
-        for ex in (88, 168):
-            d.ellipse((ex - 24, 40, ex + 24, 88), fill=out)
-            d.ellipse((ex - 18, 46, ex + 18, 82), fill=(255, 230, 60, 255))
-            d.ellipse((ex - 8, 56, ex + 8, 74), fill=(10, 10, 10, 255))
-        hook(96, 222, 20)
-        hook(160, 222, 20)
-    else:  # sinking lure: a silver-pink spoon with a red bead and a hook
-        d.line((128, 18, 128, 60), fill=out, width=10)
-        d.ellipse((112, 50, 144, 82), fill=out)
-        d.ellipse((118, 56, 138, 76), fill=(220, 40, 60, 255))
-        d.polygon([(128, 70), (196, 140), (170, 206), (128, 222), (86, 206), (60, 140)], fill=out)
-        d.polygon([(128, 82), (186, 142), (164, 198), (128, 212), (92, 198), (70, 142)], fill=(205, 210, 225, 255))
-        d.polygon([(128, 92), (170, 142), (150, 186), (128, 196)], fill=(250, 170, 200, 255))
-        d.polygon([(100, 120), (118, 104), (112, 170), (96, 160)], fill=(255, 255, 255, 230))
-        hook(128, 228, 22)
+    if kind == "lure_pond":  # the Fishing Pond's lure: a little minnow plug, its lip down front, two hooks under it
+        d.line((92, 150, 92, 190), fill=out, width=10)
+        hook(92, 200, 22)
+        d.line((170, 146, 170, 186), fill=out, width=10)
+        hook(170, 196, 22)
+        d.polygon([(20, 112), (60, 84), (190, 80), (236, 104), (190, 150), (60, 148)], fill=out)
+        d.polygon([(30, 112), (64, 92), (188, 88), (224, 104), (188, 142), (64, 140)], fill=(235, 120, 40, 255))
+        d.polygon([(64, 92), (188, 88), (210, 100), (70, 108)], fill=(250, 215, 120, 255))  # a light back
+        d.polygon([(64, 128), (188, 124), (188, 142), (64, 140)], fill=(250, 245, 230, 255))  # a pale belly
+        d.polygon([(28, 114), (2, 142), (14, 150), (42, 124)], fill=out)  # the diving lip
+        d.polygon([(28, 118), (8, 142), (16, 146), (38, 124)], fill=(200, 225, 240, 255))
+        d.ellipse((184, 92, 214, 122), fill=out)
+        d.ellipse((188, 96, 210, 118), fill=(255, 255, 255, 255))
+        d.ellipse((195, 102, 207, 114), fill=(10, 10, 10, 255))
+        d.polygon([(236, 104), (254, 88), (254, 120)], fill=out)  # the tail's eye for the line
+    elif kind == "lure_sink":  # the sinking lure: a soft pink worm curled on a jig head and hook
+        pts = [(40, 70), (80, 50), (130, 60), (170, 90), (190, 135), (175, 180), (135, 200), (95, 190), (80, 160)]
+        for w, c in ((46, out), (32, (235, 120, 170, 255))):
+            d.line(pts, fill=c, width=w, joint="curve")
+            for x, y in (pts[0], pts[-1]):
+                d.ellipse((x - w // 2, y - w // 2, x + w // 2, y + w // 2), fill=c)
+        for k in range(1, len(pts) - 1, 2):  # its rings
+            x, y = pts[k]
+            d.ellipse((x - 9, y - 9, x + 9, y + 9), fill=(250, 170, 205, 255))
+        d.ellipse((14, 44, 66, 96), fill=out)  # the jig head
+        d.ellipse((20, 50, 60, 90), fill=(150, 155, 170, 255))
+        d.ellipse((30, 58, 44, 72), fill=(230, 235, 245, 255))
+        hook(60, 120, 26)
+    else:  # sinker: a lead teardrop with its ring on top, a swivel and a leader to a hook
+        d.line((128, 10, 128, 44), fill=out, width=10)
+        d.ellipse((112, 30, 144, 62), fill=out)
+        d.ellipse((119, 37, 137, 55), fill=(0, 0, 0, 0))
+        d.polygon([(128, 52), (176, 132), (182, 170), (160, 204), (128, 214), (96, 204), (74, 170), (80, 132)],
+                  fill=out)
+        d.polygon([(128, 64), (168, 134), (172, 166), (154, 194), (128, 202), (102, 194), (84, 166), (88, 134)],
+                  fill=(120, 125, 135, 255))
+        d.polygon([(110, 110), (124, 90), (120, 170), (104, 160)], fill=(190, 195, 205, 255))  # its shine
+        d.line((180, 196, 224, 150), fill=out, width=8)  # the leader
+        hook(226, 134, 20)
     im = im.filter(ImageFilter.GaussianBlur(1.2))
     im = im.crop(im.getbbox())  # fill the icon as the game's icons do
     f = 30.0 / max(im.size)
@@ -380,12 +380,12 @@ LAYOUTS = {
     "A_seven_columns": {
         "grid": [
             ["stick", "nut", "bomb", "bow", "arrow_fire", "dins", "rod"],
-            ["slingshot", "ocarina", "bombchu", "hookshot", "arrow_ice", "farores", "lure_crank"],
-            ["boomerang", "lens", "beans", "hammer", "arrow_light", "nayrus", "lure_sink"],
+            ["slingshot", "ocarina", "bombchu", "hookshot", "arrow_ice", "farores", "lure_pond"],
+            ["boomerang", "lens", "beans", "hammer", "arrow_light", "nayrus", "sinker"],
             ["bottle_fish", "bottle_larva", "bottle_empty", "bottle_bug", "bottle_fairy", "trade_adult", "trade_child"],
         ],
         "chains": [["bow", "arrow_fire", "arrow_ice", "arrow_light"], ["dins", "farores", "nayrus"],
-                   ["rod", "lure_crank", "lure_sink"]],
+                   ["rod", "lure_pond", "sinker"]],
         "shelves": [["bottle_fish", "bottle_fairy"]],
         "c_items": ["rod", "bottle_fish", "bottle_larva"],
         "cursor": "rod",
@@ -394,13 +394,13 @@ LAYOUTS = {
     # step under the rod and the whole bottom row is one long bottle shelf.
     "B_eight_columns": {
         "grid": [
-            ["stick", "nut", "bomb", "bow", "arrow_fire", "dins", "rod", "lure_crank"],
-            ["slingshot", "ocarina", "bombchu", "hookshot", "arrow_ice", "farores", "trade_adult", "lure_frog"],
-            ["boomerang", "lens", "beans", "hammer", "arrow_light", "nayrus", "trade_child", "lure_sink"],
+            ["stick", "nut", "bomb", "bow", "arrow_fire", "dins", "rod", "lure_pond"],
+            ["slingshot", "ocarina", "bombchu", "hookshot", "arrow_ice", "farores", "trade_adult", "lure_sink"],
+            ["boomerang", "lens", "beans", "hammer", "arrow_light", "nayrus", "trade_child", "sinker"],
             BOTTLES,
         ],
         "chains": [["bow", "arrow_fire", "arrow_ice", "arrow_light"], ["dins", "farores", "nayrus"],
-                   ["rod", "lure_crank", "lure_frog", "lure_sink"]],
+                   ["rod", "lure_pond", "lure_sink", "sinker"]],
         "shelves": [["bottle_fish", "bottle_milk"]],
         "c_items": ["rod", "bottle_fish", "bottle_larva"],
         "cursor": "rod",
@@ -412,11 +412,11 @@ LAYOUTS = {
             ["stick", "nut", "bomb", "bow", "arrow_fire", "dins"],
             ["slingshot", "ocarina", "bombchu", "hookshot", "arrow_ice", "farores"],
             ["boomerang", "lens", "beans", "hammer", "arrow_light", "nayrus"],
-            ["rod", "lure_crank", "lure_frog", "lure_sink", "trade_adult", "trade_child"],
+            ["rod", "lure_pond", "lure_sink", "sinker", "trade_adult", "trade_child"],
             BOTTLES[:6],
         ],
         "chains": [["bow", "arrow_fire", "arrow_ice", "arrow_light"], ["dins", "farores", "nayrus"],
-                   ["rod", "lure_crank", "lure_frog", "lure_sink"]],
+                   ["rod", "lure_pond", "lure_sink", "sinker"]],
         "shelves": [["bottle_fish", "bottle_red"]],
         "c_items": ["rod", "bottle_fish", "bottle_larva"],
         "cursor": "rod",

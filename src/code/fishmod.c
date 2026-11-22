@@ -375,8 +375,7 @@ u8 gFishmodSpawnLook;
 static FishmodBottleFish sFloppingFish;
 
 static const char* sBaitNames[FISHMOD_BAIT_MAX] = {
-    "None", "Bee larva", "Bug", "Worm", "Coral earring", "Fish", "Spinner", "Crankbait", "Popper", "Frog lure",
-    "Sinking lure",
+    "None", "Bee larva", "Bug", "Worm", "Coral earring", "Fish", "Pond lure", "Sinking lure",
 };
 
 const char* Fishmod_BaitName(s32 bait) {
@@ -414,8 +413,16 @@ s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
     s32 next;
 
     if (FISHMOD_IS_LURE_ITEM(item)) {
-        // placeholder: lures can be put on a C button, but don't go on the line yet
-        Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+        // tackle: onto the line with the rod in hand and not cast (the rod says what's on: fishmod_rod.c); the same
+        // again takes it off, back to the bobber
+        s32 rig = FISHMOD_RIG_LURE_POND + (item - ITEM_LURE_POND);
+
+        if (!Fishmod_RodHeld(play) || (gFishmodRodInfo.state != 1)) {
+            Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+            return true;
+        }
+        FISHMOD_SET_RIG((FISHMOD_RIG() == rig) ? FISHMOD_RIG_BOBBER : rig);
+        Sfx_PlaySfxCentered(NA_SE_PL_PUT_OUT_ITEM);
         return true;
     }
     if (FISHMOD_IS_BAIT_ITEM(item)) {
@@ -427,7 +434,13 @@ s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
     } else {
         return false;
     }
-    // only onto a bare hook, with the rod held and not cast
+    // only onto a bare hook, with the rod held and not cast (a lure on the line comes off for the bobber: a lure
+    // takes no bait; the sinker's hook does)
+    if (Fishmod_RodHeld(play) && (gFishmodRodInfo.state == 1) &&
+        ((FISHMOD_RIG() == FISHMOD_RIG_LURE_POND) || (FISHMOD_RIG() == FISHMOD_RIG_LURE_SINKING))) {
+        FISHMOD_SET_RIG(FISHMOD_RIG_BOBBER);
+        gFishmodRodInfo.bait = FISHMOD_BAIT_NONE;
+    }
     if (!Fishmod_RodHeld(play) || (gFishmodRodInfo.state != 1) || (gFishmodRodInfo.bait != FISHMOD_BAIT_NONE) ||
         (gFishmodRodInfo.baitRequest != FISHMOD_BAIT_NONE)) {
         Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
@@ -838,9 +851,9 @@ void Fishmod_InitTestSave(void) {
     inv->items[SLOT_BOTTLE_4] = ITEM_BOTTLE_BUG;
     // the rod, and the lures (placeholders)
     INV_SLOT(SLOT_FISHING_ROD) = ITEM_FISHING_POLE;
-    INV_SLOT(SLOT_LURE_1) = ITEM_LURE_CRANKBAIT;
-    INV_SLOT(SLOT_LURE_2) = ITEM_LURE_FROG;
-    INV_SLOT(SLOT_LURE_3) = ITEM_LURE_SINKING;
+    INV_SLOT(SLOT_LURE_1) = ITEM_LURE_POND;
+    INV_SLOT(SLOT_LURE_2) = ITEM_LURE_SINKING;
+    INV_SLOT(SLOT_LURE_3) = ITEM_SINKER;
 
     // the slingshot knocks down beehives for larvae
     inv->items[SLOT_SLINGSHOT] = ITEM_SLINGSHOT;

@@ -35,9 +35,9 @@ typedef struct FishmodItemDef {
 static const FishmodItemDef sItems[] = {
     // item                  action                     bottle  lure icon      name           name as             RAM icon
     { ITEM_FISHING_POLE, PLAYER_IA_FISHING_POLE, false, NO_PAGE_INDEX, 0, ITEM_FISHING_POLE, NULL },
-    { ITEM_LURE_CRANKBAIT, PLAYER_IA_NONE, false, 0, 1, ITEM_LURE_CRANKBAIT, NULL },
-    { ITEM_LURE_FROG, PLAYER_IA_NONE, false, 1, 2, ITEM_LURE_FROG, NULL },
-    { ITEM_LURE_SINKING, PLAYER_IA_NONE, false, 2, 3, ITEM_LURE_SINKING, NULL },
+    { ITEM_LURE_POND, PLAYER_IA_NONE, false, 0, 1, ITEM_LURE_POND, NULL },
+    { ITEM_LURE_SINKING, PLAYER_IA_NONE, false, 1, 2, ITEM_LURE_SINKING, NULL },
+    { ITEM_SINKER, PLAYER_IA_NONE, false, 2, 3, ITEM_SINKER, NULL },
     // bait bottles: Link holds them as bottles (using one is fishmod's); until they have name graphics of their own,
     // they go by the bottle's name
     { ITEM_BOTTLE_LARVA_3, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, NO_PAGE_INDEX, ITEM_BOTTLE_EMPTY,

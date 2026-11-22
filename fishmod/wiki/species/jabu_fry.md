@@ -42,10 +42,7 @@ bite window20 frames (1.00 s) to set the hook
 | Bug | ×0.8 |
 | Worm | ×0.8 |
 | fish | ×2.0 |
-| Spinner | ×0.8 |
-| Crankbait | ×0.5 |
-| Popper | ×0.6 |
-| Frog Lure | ×0.4 |
+| lure_pond | ×0.8 |
 | Sinking Lure | ×0.6 |
 
 ## Tips

@@ -57,6 +57,17 @@ FishmodRod gFishmodRodState;
 // The most line under a bobber (about the rod's length, some 5 m): a float rig fishes the top of the water, not the
 // deep basin or the Water Temple's gate (that's for sinkers and lures)
 #define BAIT_DEPTH_MAX 180.0f
+// the other rigs (FishmodRig): how deep each goes and how fast (Rod_UpdateRigDepth)
+#define POND_DIVE_SLOW 18.0f   // the pond lure's dive while reeled (A), and fast (A and R)
+#define POND_DIVE_FAST 30.0f
+#define SINK_RATE 1.2f         // the sinking lure going down, units a frame
+#define SINK_LIFT_SLOW 12.0f   // how far the reel lifts it off the bed (A), and fast
+#define SINK_LIFT_FAST 26.0f
+#define SINKER_LEADER 18.0f    // the sinker's leader: the bait floats this far above the weight on the bed
+#define SINKER_RATE 1.6f
+#define UNDER_CAM_IN 45.0f     // the camera follows the tackle under once the bait's this deep, and back up at...
+#define UNDER_CAM_OUT 28.0f    // ...this (apart, so it doesn't flicker between the two)
+#define RIG_UNDERWATER() ((ROD->rig == FISHMOD_RIG_LURE_SINKING) || (ROD->rig == FISHMOD_RIG_SINKER))
 #define LINE_MAX_BASE 460.0f
 // Strength upgrades (Goron's Bracelet, Silver and Golden Gauntlets) let Link cast further and play out more line
 // (+35% each: about twice as far with the Golden Gauntlets), scaled to the scene's water (Fishmod_CastSceneScale)
@@ -114,6 +125,29 @@ static Gfx sBobberDL[] = {
     gsSP2Triangles(9, 13, 12, 0, 9, 14, 13, 0),
     gsSP2Triangles(9, 15, 14, 0, 9, 16, 15, 0),
     gsSP2Triangles(9, 17, 16, 0, 9, 10, 17, 0),
+    gsSPSetGeometryMode(G_LIGHTING),
+    gsSPEndDisplayList(),
+};
+
+// the sinker: a lead teardrop (its ring on top), grey, shaded by its vertex colours
+static Vtx sSinkerVtx[] = {
+    VTX(0, 100, 0, 0, 0, 150, 155, 165, 255),  // the ring's end
+    VTX(45, 20, 0, 0, 0, 120, 125, 135, 255),  // the belly, round
+    VTX(0, 20, 45, 0, 0, 105, 110, 120, 255),
+    VTX(-45, 20, 0, 0, 0, 85, 90, 100, 255),
+    VTX(0, 20, -45, 0, 0, 100, 105, 115, 255),
+    VTX(0, -45, 0, 0, 0, 70, 72, 80, 255),     // the bottom
+};
+
+static Gfx sSinkerDL[] = {
+    gsDPPipeSync(),
+    gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE),
+    gsSPClearGeometryMode(G_LIGHTING | G_CULL_BACK),
+    gsSPVertex(sSinkerVtx, 6, 0),
+    gsSP2Triangles(0, 1, 2, 0, 0, 2, 3, 0),
+    gsSP2Triangles(0, 3, 4, 0, 0, 4, 1, 0),
+    gsSP2Triangles(5, 2, 1, 0, 5, 3, 2, 0),
+    gsSP2Triangles(5, 4, 3, 0, 5, 1, 4, 0),
     gsSPSetGeometryMode(G_LIGHTING),
     gsSPEndDisplayList(),
 };
@@ -315,9 +349,52 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
         return;
     }
 
-    // zooming moves the eye along the line toward the focus
-    zoom = (ROD->state == ROD_STATE_FIGHT) ? 0.0f : sZoomFactors[ROD->zoom];
-    if ((ROD->state == ROD_STATE_FLOAT) && ROD->biting) {
+    // under the water after the tackle (the sinking lure, the sinker, any bait down deep), as the Fishing Pond's
+    // camera follows its lure down: behind the bait from the rod's side, a little above it, inside the water
+    if (ROD->state == ROD_STATE_FLOAT) {
+        if (!ROD->underCam && (ROD->baitDepth > UNDER_CAM_IN)) {
+            ROD->underCam = true;
+            ROD->camBlend = 0.2f;
+        } else if (ROD->underCam && (ROD->baitDepth < UNDER_CAM_OUT)) {
+            ROD->underCam = false;
+            ROD->camBlend = 0.2f;
+        }
+    } else {
+        ROD->underCam = false;
+    }
+    if (ROD->underCam) {
+        static Vec3f sUnderFocus;
+        f32 dx = ROD->tipPos.x - ROD->bobberPos.x;
+        f32 dz = ROD->tipPos.z - ROD->bobberPos.z;
+        f32 len = CLAMP_MIN(sqrtf(SQ(dx) + SQ(dz)), 1.0f);
+        f32 eyeSurface = ROD->waterY;
+        f32 eyeFloor = ROD->floorY;
+        s32 k;
+
+        sUnderFocus.x = ROD->bobberPos.x;
+        sUnderFocus.y = FISHMOD_ROD_BAIT_Y(ROD);
+        sUnderFocus.z = ROD->bobberPos.z;
+        dx /= len;
+        dz /= len;
+        for (k = 0; k < 3; k++) {
+            // back toward the rod, nearer if that's out of the water (a bank, the shallows)
+            f32 back = 55.0f - k * 15.0f;
+
+            eyeTarget.x = sUnderFocus.x + dx * back + dz * 12.0f;
+            eyeTarget.z = sUnderFocus.z + dz * back - dx * 12.0f;
+            if (EnFishmod_WaterFloor(play, eyeTarget.x, eyeTarget.z, &eyeSurface, &eyeFloor, false) &&
+                (eyeSurface - eyeFloor > 30.0f)) {
+                break;
+            }
+        }
+        eyeTarget.y = CLAMP(sUnderFocus.y + 12.0f, eyeFloor + 10.0f, ROD->waterY - 10.0f);
+        focus = &sUnderFocus;
+        zoom = 0.0f;
+    } else {
+        // zooming moves the eye along the line toward the focus
+        zoom = (ROD->state == ROD_STATE_FIGHT) ? 0.0f : sZoomFactors[ROD->zoom];
+    }
+    if ((ROD->state == ROD_STATE_FLOAT) && ROD->biting && !ROD->underCam) {
         zoom += 0.1f; // lean in on a bite
     }
     if (zoom > 0.0f) {
@@ -342,7 +419,7 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
     }
 
     // never under the surface: look down into the water from above it (the bobber stays in view)
-    if ((ROD->state == ROD_STATE_FLOAT) && (eyeTarget.y < ROD->waterY + 20.0f)) {
+    if ((ROD->state == ROD_STATE_FLOAT) && !ROD->underCam && (eyeTarget.y < ROD->waterY + 20.0f)) {
         eyeTarget.y = ROD->waterY + 20.0f;
     }
 
@@ -367,6 +444,7 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     ROD->state = ROD_STATE_NONE;
     ROD->bait = FISHMOD_BAIT_NONE;
     ROD->baitDepth = BAIT_DEPTH_START;
+    ROD->rig = 0xFF; // (the save's rig taken up quietly the first frame the rod's held)
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     EnFishmod_WaterGridAcquire(play);
 
@@ -423,6 +501,8 @@ static void Rod_EndCast(PlayState* play, Player* player) {
     ROD->fish = NULL;
     ROD->dip = ROD->dipTarget = 0.0f;
     ROD->tension = 0.0f;
+    ROD->underCam = false;
+    ROD->anchored = false;
     player->unk_860 = 0; // Link goes back to standing with the rod
     Rod_CameraStop(play);
 }
@@ -736,13 +816,76 @@ static void Rod_UpdateSink(PlayState* play, Input* input) {
     }
 }
 
+/*
+ * The other rigs' depths (FishmodRig): baitDepth stays the bait's depth under the surface, where the fish go for it,
+ * whatever's on the line; bobberPos the tackle itself (Rod_UpdateFloat's end), where the line goes.
+ *   pond lure      floats; reeled, it dives (deeper reeled fast) and a twitch ducks it; stopped, it rises again
+ *   sinking lure   sinks to just over the bed; reeled, it lifts off it (more reeled fast), stopped, it sinks back
+ *   sinker         the weight sinks to the bed and anchors there; the bait floats above it on its leader
+ */
+static void Rod_UpdateRigDepth(PlayState* play, Input* input) {
+    f32 surface;
+    f32 floor;
+    f32 depth;
+    f32 want;
+    f32 rate;
+
+    if (!EnFishmod_WaterFloor(play, ROD->bobberPos.x, ROD->bobberPos.z, &surface, &floor, false)) {
+        floor = ROD->waterY - 30.0f;
+    }
+    ROD->floorY = floor;
+    depth = CLAMP_MIN(ROD->waterY - floor, 2.0f);
+    switch (ROD->rig) {
+        case FISHMOD_RIG_LURE_POND:
+            want = (ROD->reeling == 2) ? POND_DIVE_FAST : (ROD->reeling == 1) ? POND_DIVE_SLOW : 0.0f;
+            if (ROD->twitchTimer > 12) {
+                want = CLAMP_MIN(want, 12.0f);
+            }
+            want = CLAMP_MAX(want, depth - 6.0f);
+            rate = (want > ROD->baitDepth) ? 1.6f : 0.7f; // (dives quickly, floats up slowly)
+            break;
+        case FISHMOD_RIG_LURE_SINKING: {
+            f32 lift = (ROD->reeling == 2) ? SINK_LIFT_FAST : (ROD->reeling == 1) ? SINK_LIFT_SLOW : 0.0f;
+
+            if (ROD->twitchTimer > 10) {
+                lift = CLAMP_MIN(lift, 14.0f);
+            }
+            want = depth - 3.0f - lift;
+            rate = (want > ROD->baitDepth) ? SINK_RATE : 2.0f;
+            break;
+        }
+        default: // the sinker
+            want = depth - 1.0f - SINKER_LEADER;
+            rate = SINKER_RATE;
+            break;
+    }
+    want = CLAMP(want, 0.0f, CLAMP_MIN(depth - 2.0f, 0.0f));
+    Math_StepToF(&ROD->baitDepth, want, rate);
+    ROD->sinking = (ROD->rig != FISHMOD_RIG_LURE_POND) && (ROD->baitDepth < want - 1.0f);
+    // reaching the bed: a tick through the line (the sinker anchors; the lure settles)
+    if ((ROD->rig != FISHMOD_RIG_LURE_POND) && !ROD->anchored && !ROD->sinking && (ROD->baitDepth > 4.0f)) {
+        ROD->anchored = true;
+        ROD->dip = 3.0f;
+        Rod_Rumble(FEEL(FEEL_RUMBLE_NIBBLE), 200.0f, 2.0f, 100, 1);
+    }
+}
+
+/** Where the sinker is (the bait's on its leader above it): on the bed, or on its way down under the bait. */
+static f32 Rod_SinkerY(void) {
+    return CLAMP_MIN(ROD->waterY - ROD->baitDepth - SINKER_LEADER, ROD->floorY + 1.0f);
+}
+
 static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, Input* input) {
     f32 waterY;
     f32 groundY;
     f32 dist;
     Vec3f toTip;
 
-    Rod_UpdateSink(play, input);
+    if (ROD->rig == FISHMOD_RIG_BOBBER) {
+        Rod_UpdateSink(play, input);
+    } else {
+        Rod_UpdateRigDepth(play, input);
+    }
 
     // the bait's action, for the fish: reeled (slowly or fast), how long since it last moved, twitches lately
     ROD->reeling = !CHECK_BTN_ALL(input->cur.button, BTN_A) ? 0 : CHECK_BTN_ALL(input->cur.button, BTN_R) ? 2 : 1;
@@ -762,7 +905,7 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
         ROD->lineOut -= reel;
         Sfx_PlaySfxCentered(CHECK_BTN_ALL(input->cur.button, BTN_R) ? NA_SE_IT_FISHING_REEL_HIGH - SFX_FLAG
                                                                        : NA_SE_IT_FISHING_REEL_SLOW - SFX_FLAG);
-        if ((play->gameplayFrames % 6) == 0) {
+        if (((play->gameplayFrames % 6) == 0) && (ROD->rig == FISHMOD_RIG_BOBBER || ROD->baitDepth < 8.0f)) {
             Vec3f ripple = ROD->bobberPos;
 
             ripple.y = ROD->waterY;
@@ -782,7 +925,9 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
         ROD->dip = 2.0f;
         ROD->lineOut -= 3.0f;
         Actor_PlaySfx(&this->actor, NA_SE_EV_LURE_MOVE_W);
-        Rod_Splash(play, &ROD->bobberPos, false);
+        if ((ROD->rig == FISHMOD_RIG_BOBBER) || (ROD->baitDepth < 8.0f)) {
+            Rod_Splash(play, &ROD->bobberPos, false);
+        }
     }
 
     // hookset
@@ -852,7 +997,20 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
     }
 
     Math_ApproachF(&ROD->dip, ROD->dipTarget, 0.35f, 3.0f);
-    ROD->bobberPos.y = ROD->waterY - ROD->dip + Math_SinS(play->gameplayFrames * 0x500) * 0.6f;
+    switch (ROD->rig) {
+        case FISHMOD_RIG_BOBBER:
+            ROD->bobberPos.y = ROD->waterY - ROD->dip + Math_SinS(play->gameplayFrames * 0x500) * 0.6f;
+            break;
+        case FISHMOD_RIG_SINKER:
+            // the weight (a tug at the bait shows as the bait pulled down toward it: Rod_DrawBobber)
+            ROD->bobberPos.y = Rod_SinkerY();
+            break;
+        default:
+            // the lure itself, where its bait is: a bite pulls it under (dip); at the surface it rides the ripples
+            ROD->bobberPos.y = ROD->waterY - ROD->baitDepth - ROD->dip * 0.6f +
+                               ((ROD->baitDepth < 1.0f) ? Math_SinS(play->gameplayFrames * 0x500) * 0.4f : 0.0f);
+            break;
+    }
     (void)groundY;
 }
 
@@ -999,6 +1157,30 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
         case ROD_STATE_HELD:
             Math_ApproachZeroF(&player->unk_85C, 1.0f, 0.1f);
             Math_ApproachZeroF(&player->unk_858, 1.0f, 0.1f);
+            // the tackle (Fishmod_UseItem changes the save's rig): a lure is its own bait; off, the hook's bare
+            if (FISHMOD_RIG() != ROD->rig) {
+                s32 quiet = (ROD->rig == 0xFF);
+
+                ROD->rig = FISHMOD_RIG();
+                if (ROD->rig == FISHMOD_RIG_LURE_POND) {
+                    ROD->bait = FISHMOD_BAIT_LURE_POND;
+                } else if (ROD->rig == FISHMOD_RIG_LURE_SINKING) {
+                    ROD->bait = FISHMOD_BAIT_LURE_SINKING;
+                } else if (ROD->bait >= FISHMOD_BAIT_LURE_POND) {
+                    ROD->bait = FISHMOD_BAIT_NONE;
+                }
+                if (!quiet) {
+                    static const char* sRigNames[] = { "Bobber on", "Pond lure on", "Sinking lure on", "Sinker on" };
+                    static const char* sRigHints[] = {
+                        "Bait it from a bottle",
+                        "Reel to dive it, stop to let it rise",
+                        "It sinks to the bottom: reel to hop it",
+                        "It rests on the bed, the bait above it",
+                    };
+
+                    EnFishmod_RodMessage(1, sRigNames[ROD->rig], sRigHints[ROD->rig]);
+                }
+            }
             // a bait bottle used from a C button (Fishmod_UseItem) asks for bait on the hook
             if (gFishmodRodInfo.baitRequest != FISHMOD_BAIT_NONE) {
                 ROD->bait = gFishmodRodInfo.baitRequest;
@@ -1102,9 +1284,10 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->stillFrames = 0x7FFF; // (still since it landed: no stop-and-go yet)
                 EnFishmod_Disturb(play, &ROD->bobberPos, 0.0f, 0);
                 // the bait sinks under the bobber to the depth the water gives it (Rod_UpdateSink)
-                ROD->baitDepth = BAIT_DEPTH_START;
-                ROD->baitTarget = BAIT_DEPTH_START;
+                ROD->baitDepth = (ROD->rig == FISHMOD_RIG_BOBBER) ? BAIT_DEPTH_START : 0.0f;
+                ROD->baitTarget = ROD->baitDepth;
                 ROD->sinking = true;
+                ROD->anchored = false;
                 ROD->lineOut = Math_Vec3f_DistXZ(&ROD->tipPos, &ROD->bobberPos);
                 Actor_PlaySfx(&this->actor, NA_SE_EV_BOMB_DROP_WATER);
                 Rod_Splash(play, &ROD->bobberPos, true);
@@ -1171,7 +1354,8 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 // look at the bait, part way down the line (all the way down would lose the bobber)
                 Vec3f focus = ROD->bobberPos;
 
-                focus.y -= ROD->baitDepth * 0.6f;
+                // the bobber's bait partway down (all the way would lose the bobber); the other rigs' tackle itself
+                focus.y = (ROD->rig == FISHMOD_RIG_BOBBER) ? (focus.y - ROD->baitDepth * 0.6f) : FISHMOD_ROD_BAIT_Y(ROD);
                 Rod_CameraUpdate(play, player, &focus);
             }
             break;
@@ -1511,6 +1695,8 @@ static void Rod_LineShape(Vec3f* end, f32* sag) {
         *sag *= CLAMP(1.0f - ROD->tension / 40.0f, 0.0f, 1.0f);
     } else if (ROD->state == ROD_STATE_FLYING) {
         *sag *= 0.3f;
+    } else if ((ROD->state == ROD_STATE_FLOAT) && (ROD->rig != FISHMOD_RIG_BOBBER)) {
+        *sag *= 0.4f; // (down through the water to the tackle, near enough straight)
     }
 }
 
@@ -1533,8 +1719,9 @@ static void Rod_UpdateLineFloor(PlayState* play) {
         Rod_LinePoint(&end, sag, (f32)i / LINE_SEGMENTS, &point);
         if (EnFishmod_WaterFloor(play, point.x, point.z, &waterY, &floorY, false)) {
             floorY += 0.8f;
-            if (waterY > floorY) {
-                floorY = waterY + 0.3f; // a slack line floats
+            if ((waterY > floorY) && !((ROD->state == ROD_STATE_FLOAT) && (ROD->rig != FISHMOD_RIG_BOBBER) &&
+                                       (ROD->baitDepth > 2.0f))) {
+                floorY = waterY + 0.3f; // a slack line floats (not one going down to a lure or a sinker)
             }
         } else {
             CollisionPoly* poly;
@@ -1614,15 +1801,145 @@ static void Rod_DrawLine(PlayState* play) {
         (void)prev;
     }
 
-    // leader from the bobber down to the hook
-    if ((ROD->state == ROD_STATE_FLOAT) || (ROD->state == ROD_STATE_GROUND) || (ROD->state == ROD_STATE_FLYING)) {
+    // the leader: from the bobber down to the hook, or from the sinker up to it
+    if ((ROD->rig == FISHMOD_RIG_BOBBER) &&
+        ((ROD->state == ROD_STATE_FLOAT) || (ROD->state == ROD_STATE_GROUND) || (ROD->state == ROD_STATE_FLYING))) {
         Vec3f hook = ROD->bobberPos;
 
         hook.y -= (ROD->state == ROD_STATE_FLOAT) ? ROD->baitDepth : 4.0f;
         Rod_DrawLineSegment(play, &ROD->bobberPos, &hook, 0.001f);
+    } else if ((ROD->rig == FISHMOD_RIG_SINKER) && (ROD->state == ROD_STATE_FLOAT)) {
+        Vec3f hook = ROD->bobberPos;
+
+        hook.y = FISHMOD_ROD_BAIT_Y(ROD) - ROD->dip;
+        Rod_DrawLineSegment(play, &ROD->bobberPos, &hook, 0.001f);
     }
 
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+}
+
+/** A hook (the pond's: two plates crossed) at pos, its eye toward yaw. */
+static void Rod_DrawHook(PlayState* play, Vec3f* pos, f32 yaw) {
+    OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    Matrix_Translate(pos->x, pos->y, pos->z, MTXMODE_NEW);
+    Matrix_RotateY(yaw, MTXMODE_APPLY);
+    Matrix_Scale(0.004f, 0.004f, 0.005f, MTXMODE_APPLY);
+    Matrix_RotateY(M_PI, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    gSPDisplayList(POLY_OPA_DISP++, gFishmodLureHookDL);
+    Matrix_RotateZ(M_PI / 2, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    gSPDisplayList(POLY_OPA_DISP++, gFishmodLureHookDL);
+    CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+}
+
+/**
+ * The pond's lure (the Fishing Pond's own model): nose toward the rod (it's drawn along the line), dipping its nose as
+ * it's reeled under, wagging side to side while it swims; its two hooks hang under it as the pond's do.
+ */
+static void Rod_DrawPondLure(PlayState* play) {
+    static f32 sPitch;
+    Vec3f hookAt;
+    Vec3f hookPos[2];
+    s32 swimming = (ROD->state == ROD_STATE_FLOAT) && (ROD->reeling != 0);
+    f32 yaw = Math_FAtan2F(ROD->tipPos.x - ROD->bobberPos.x, ROD->tipPos.z - ROD->bobberPos.z);
+    s32 i;
+
+    Math_ApproachF(&sPitch, swimming ? -0.5f : 0.0f, 0.2f, 0.1f);
+    if (swimming) {
+        yaw += Math_SinS(play->gameplayFrames * 0x2400) * ((ROD->reeling == 2) ? 0.35f : 0.22f);
+    }
+    OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    Matrix_Translate(ROD->bobberPos.x, ROD->bobberPos.y, ROD->bobberPos.z, MTXMODE_NEW);
+    Matrix_RotateY(yaw, MTXMODE_APPLY);
+    Matrix_RotateX(sPitch, MTXMODE_APPLY);
+    Matrix_Scale(0.004f, 0.004f, 0.004f, MTXMODE_APPLY);
+    Matrix_RotateZ(M_PI / 2, MTXMODE_APPLY);
+    Matrix_RotateY(M_PI / 2, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    gSPDisplayList(POLY_OPA_DISP++, gFishmodLureFloatDL);
+    // (where the pond hangs its two hooks, in the lure's own space)
+    hookAt.x = 500.0f;
+    hookAt.y = 0.0f;
+    hookAt.z = -300.0f;
+    Matrix_MultVec3f(&hookAt, &hookPos[0]);
+    hookAt.x = 2100.0f;
+    hookAt.z = -50.0f;
+    Matrix_MultVec3f(&hookAt, &hookPos[1]);
+    CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    for (i = 0; i < 2; i++) {
+        Rod_DrawHook(play, &hookPos[i], yaw);
+    }
+}
+
+/**
+ * The sinking lure (the Fishing Pond's): a soft body of segments, each drawn facing the camera, the tail following the
+ * head 0.85 units behind each other and lifting a little in the water, as the pond's does.
+ */
+#define SINK_SEGS 20
+static Vec3f sSinkSeg[SINK_SEGS];
+
+static void Rod_DrawSinkingLure(PlayState* play) {
+    static f32 sSizes[SINK_SEGS] = {
+        1.0f, 1.5f, 1.8f, 2.0f, 1.8f, 1.6f, 1.4f, 1.2f, 1.0f, 1.0f,
+        0.9f, 0.85f, 0.8f, 0.7f, 0.8f, 1.0f, 1.2f, 1.1f, 1.0f, 0.8f,
+    };
+    f32 lift = (ROD->bobberPos.y < ROD->waterY) ? 0.5f : -5.0f;
+    s32 i;
+
+    if (Math_Vec3f_DistXYZ(&sSinkSeg[0], &ROD->bobberPos) > 30.0f) {
+        for (i = 0; i < SINK_SEGS; i++) {
+            sSinkSeg[i] = ROD->bobberPos; // (cast anew: gathered at the head)
+        }
+    }
+    sSinkSeg[0] = ROD->bobberPos;
+    for (i = 1; i < SINK_SEGS; i++) {
+        Vec3f d;
+        f32 len;
+
+        d.x = sSinkSeg[i].x - sSinkSeg[i - 1].x;
+        d.y = sSinkSeg[i].y + lift - sSinkSeg[i - 1].y;
+        d.z = sSinkSeg[i].z - sSinkSeg[i - 1].z;
+        len = sqrtf(SQ(d.x) + SQ(d.y) + SQ(d.z));
+        if (len < 0.01f) {
+            d.x = 0.0f;
+            d.y = 1.0f;
+            d.z = 0.0f;
+            len = 1.0f;
+        }
+        sSinkSeg[i].x = sSinkSeg[i - 1].x + d.x * (0.85f / len);
+        sSinkSeg[i].y = sSinkSeg[i - 1].y + d.y * (0.85f / len);
+        sSinkSeg[i].z = sSinkSeg[i - 1].z + d.z * (0.85f / len);
+    }
+
+    OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, gFishmodSinkingLureSegmentMaterialDL);
+    for (i = SINK_SEGS - 1; i >= 0; i--) {
+        Matrix_Translate(sSinkSeg[i].x, sSinkSeg[i].y, sSinkSeg[i].z, MTXMODE_NEW);
+        Matrix_Scale(sSizes[i] * 0.04f, sSizes[i] * 0.04f, sSizes[i] * 0.04f, MTXMODE_APPLY);
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+        gSPDisplayList(POLY_OPA_DISP++, gFishmodSinkingLureSegmentModelDL);
+    }
+    CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    Rod_DrawHook(play, &sSinkSeg[0], Math_FAtan2F(ROD->tipPos.x - ROD->bobberPos.x, ROD->tipPos.z - ROD->bobberPos.z));
+}
+
+/** The sinker on the bed (or falling), and the baited hook up its leader. */
+static void Rod_DrawSinker(PlayState* play) {
+    Vec3f hook = ROD->bobberPos;
+
+    OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    Matrix_Translate(ROD->bobberPos.x, ROD->bobberPos.y, ROD->bobberPos.z, MTXMODE_NEW);
+    Matrix_Scale(0.03f, 0.03f, 0.03f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    gSPDisplayList(POLY_OPA_DISP++, sSinkerDL);
+    CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    hook.y = (ROD->state == ROD_STATE_FLOAT) ? (FISHMOD_ROD_BAIT_Y(ROD) - ROD->dip) : (hook.y + 3.0f);
+    Rod_DrawHook(play, &hook, Math_FAtan2F(ROD->tipPos.x - ROD->bobberPos.x, ROD->tipPos.z - ROD->bobberPos.z));
 }
 
 static void Rod_DrawBobber(PlayState* play) {
@@ -1630,6 +1947,18 @@ static void Rod_DrawBobber(PlayState* play) {
 
     if (ROD->state == ROD_STATE_FIGHT || ROD->state == ROD_STATE_LANDING) {
         return; // it's on the fish
+    }
+    if (ROD->rig == FISHMOD_RIG_LURE_POND) {
+        Rod_DrawPondLure(play);
+        return;
+    }
+    if (ROD->rig == FISHMOD_RIG_LURE_SINKING) {
+        Rod_DrawSinkingLure(play);
+        return;
+    }
+    if (ROD->rig == FISHMOD_RIG_SINKER) {
+        Rod_DrawSinker(play);
+        return;
     }
 
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);

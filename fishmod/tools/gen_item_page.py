@@ -5,7 +5,7 @@
   column and the bottle shelf) erased and drawn again, from pieces cut out of the same tiles, for the 6 x 5 grid
   (fishmod/docs/roadmap.md, mockup C): the same bracket and column on the shorter rows, a line from the rod through
   the three lures, and a shelf under six bottles.
-- Placeholder icons for the three lures (drawn here; fishmod/tools/item_grid_mockups.py has the same drawings).
+- Icons for the tackle (the pond lure, the sinking lure, the sinker) (drawn here; fishmod/tools/item_grid_mockups.py has the same drawings).
 - Item names for the rod and the lures in the game's message font, in the item-name format (128 x 16 IA4).
 
 Writes src/fishmod_data/fishmod_item_page.c (a ROM file the pause menu loads next to its own graphics) and, with
@@ -33,8 +33,8 @@ ROW_Y = [80 - (44 - 25 * r) for r in range(5)]  # FISHMOD_ITEM_ROW0_Y 44, FISHMO
 SCALE = 0.8  # pipes shrink with the icons
 INTERIOR = (0, 187)  # the page window's colour (intensity, alpha)
 
-LURES = ["lure_crank", "lure_frog", "lure_sink"]
-NAMES = ["Fishing Rod", "Crankbait", "Frog Lure", "Sinking Lure"]
+LURES = ["lure_pond", "lure_sink", "sinker"]
+NAMES = ["Fishing Rod", "Pond Lure", "Sinking Lure", "Sinker"]
 # the page tiles the new pipes change (the others are drawn from the game's own); fishmod_item_page.h has the same
 CHANGED_TILES = ["03", "04", "11", "13", "14", "21", "22", "23", "24"]
 
