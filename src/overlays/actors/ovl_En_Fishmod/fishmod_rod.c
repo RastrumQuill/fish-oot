@@ -219,6 +219,9 @@ static void Rod_CameraStart(PlayState* play) {
     ROD->camEye = mainCam->eye;
     ROD->camAt = mainCam->at;
     ROD->camBlend = 0.0f;
+    // placed now: a new sub camera sits at the world's origin, and Rod_CameraUpdate first runs next frame (the cast
+    // starts it from the windup), so this frame was drawn from (0, 0, 0): a one-frame flash of sky at a wrong angle
+    Play_SetCameraAtEye(play, ROD->camId, &ROD->camAt, &ROD->camEye);
 }
 
 static void Rod_CameraStop(PlayState* play) {
