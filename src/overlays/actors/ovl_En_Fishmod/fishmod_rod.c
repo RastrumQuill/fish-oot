@@ -1885,7 +1885,11 @@ static void Rod_DrawSinkingLure(PlayState* play) {
         1.0f, 1.5f, 1.8f, 2.0f, 1.8f, 1.6f, 1.4f, 1.2f, 1.0f, 1.0f,
         0.9f, 0.85f, 0.8f, 0.7f, 0.8f, 1.0f, 1.2f, 1.1f, 1.0f, 0.8f,
     };
-    f32 lift = (ROD->bobberPos.y < ROD->waterY) ? 0.5f : -5.0f;
+    // the tail: lifting a little as it swims, lying down on the bed once it's settled there (as the pond's does when
+    // it's found the bottom), hanging in the air
+    f32 lift = (ROD->bobberPos.y >= ROD->waterY)                            ? -5.0f
+               : (ROD->anchored && (ROD->reeling == 0) && (ROD->stillFrames > 10)) ? -1.0f
+                                                                                 : 0.5f;
     s32 i;
 
     if (Math_Vec3f_DistXYZ(&sSinkSeg[0], &ROD->bobberPos) > 30.0f) {
@@ -1911,6 +1915,9 @@ static void Rod_DrawSinkingLure(PlayState* play) {
         sSinkSeg[i].x = sSinkSeg[i - 1].x + d.x * (0.85f / len);
         sSinkSeg[i].y = sSinkSeg[i - 1].y + d.y * (0.85f / len);
         sSinkSeg[i].z = sSinkSeg[i - 1].z + d.z * (0.85f / len);
+        if ((ROD->state == ROD_STATE_FLOAT) && (sSinkSeg[i].y < ROD->floorY + 0.5f)) {
+            sSinkSeg[i].y = ROD->floorY + 0.5f; // (on the bed, not through it)
+        }
     }
 
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
