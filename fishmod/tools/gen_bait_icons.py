@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Generates the bait bottle icons (32x32 RGBA32, like the vanilla bottle icons) from the vanilla empty bottle: bee
-larvae suspended in honey, as in Twilight Princess, with the honey at 3/3, 2/3 and 1/3 for the three uses left.
+"""Generates the bait bottle icons (32x32 RGBA32, like the vanilla bottle icons): bee larvae suspended in honey, as in
+Twilight Princess, with the honey at 3/3, 2/3 and 1/3 for the three uses left. Made from the vanilla red potion's icon
+(its liquid, its glass and its highlights, the liquid made honey) and the empty bottle's (the glass above a lower
+honey), the larvae rendered at 8x and set into the honey.
 Made from the game's own icon, so generated at build time, never committed: writes the PNGs and an asset manifest
 to src/fishmod_data/ (4x previews to fishmod/out/), and the build turns them into C with fishmod/tools/assets.py
 (src/fishmod_data/fishmod_bait_icons.inc.c). Needs the extracted assets and Pillow."""
@@ -8,6 +10,8 @@ import json
 import math
 import os
 import random
+
+import numpy as np
 
 from PIL import Image
 
@@ -18,108 +22,132 @@ OUT_ART = os.path.join(ROOT, "src", "fishmod_data", "art")
 MANIFEST = os.path.join(ROOT, "src", "fishmod_data", "bait_manifest.json")
 OUT_C = "src/fishmod_data/fishmod_bait_icons.inc.c"
 
-# The inside of the bottle's body: rows 12-25 (the glass base starts at 26). The honey's surface for each level.
-BODY_TOP = 12
-BODY_BOTTOM = 25
-SURFACE = {3: 13.0, 2: 17.6, 1: 21.6}
+POTION = os.path.join(os.path.dirname(BOTTLE), "gItemIconBottlePotionRedTex.rgba32.png")
 
-HONEY_TOP = (255, 196, 60)     # light amber near the surface
-HONEY_DEEP = (196, 112, 18)    # darker toward the bottom
-HONEY_SURFACE = (255, 232, 140)
-LARVA = (250, 242, 214)
-LARVA_SHADE = (222, 196, 140)
+# The red potion's liquid spans rows 11-26 of its icon (a full bottle); the honey's surface for each level
+LIQ_TOP, LIQ_BOTTOM = 11, 26
+SURFACE = {3: 11.0, 2: 16.3, 1: 21.4}
+HONEY_DARK = np.array([112.0, 44.0, 0.0])     # the honey in shadow (the potion's darkest red)
+HONEY_MID = np.array([214.0, 128.0, 16.0])    # its body: amber
+HONEY_LIGHT = np.array([250.0, 196.0, 74.0])  # and where the light comes through it
+MENISCUS = np.array([255.0, 236.0, 160.0])
+LARVA = np.array([252.0, 244.0, 214.0])       # TP's bee larvae: fat, pale, cream
+LARVA_DARK = np.array([196.0, 150.0, 86.0])
+# the grubs in the honey: (x, y, size, curl angle, depth 0 near the glass - 1 deep), filled bottle first
+LARVAE = [
+    (12.6, 22.2, 1.30, 0.4, 0.10), (19.6, 20.6, 1.25, 2.6, 0.22), (16.0, 16.8, 1.10, 4.4, 0.40),
+    (10.8, 17.4, 0.95, 1.5, 0.55), (20.6, 24.4, 1.00, 3.6, 0.50),
+]
 
 
-def inside_mask(base):
-    """The see-through pixels between the bottle's walls, per row of the body."""
-    w, h = base.size
-    mask = set()
-    for y in range(BODY_TOP, BODY_BOTTOM + 1):
-        row = [base.getpixel((x, y))[3] for x in range(w)]
-        solid = [x for x in range(w) if row[x] > 200]
-        if not solid:
+def liquid_mask(potion):
+    """The potion's liquid: its red pixels (the glass round it is grey), within the body's rows."""
+    a = potion.astype(float)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    m = (r > g * 1.35 + 8) & (a[..., 3] > 0)
+    m[:LIQ_TOP] = False
+    m[LIQ_BOTTOM + 1:] = False
+    return m
+
+
+def honey(potion, mask):
+    """The potion's liquid made honey: its brightness (its red) mapped dark amber to light gold, its glass sheen (the
+    white in it, the least of green and blue) kept on top."""
+    out = potion.astype(float).copy()
+    r = out[..., 0]
+    sheen = np.minimum(out[..., 1], out[..., 2])
+    # (the potion's own range of red: its darkest to its brightest, so the honey keeps all of its depth)
+    lo, hi = np.percentile(r[mask], 3), np.percentile(r[mask], 97)
+    t = np.clip((r - lo) / max(hi - lo, 1.0), 0.0, 1.0)
+    t2 = t[..., None]
+    col = np.where(t2 < 0.6, HONEY_DARK + (HONEY_MID - HONEY_DARK) * (t2 / 0.6),
+                   HONEY_MID + (HONEY_LIGHT - HONEY_MID) * ((t2 - 0.6) / 0.4))
+    col = col + sheen[..., None] * np.array([1.0, 0.95, 0.8])[None, None]
+    out[..., :3] = np.where(mask[..., None], np.clip(col, 0, 255), out[..., :3])
+    return out
+
+
+def grub_layer(level):
+    """The larvae at 8x, each a curled chain of round segments (fat at the head, thinning to the tail), lit from the
+    upper left; returned 32x32 with each pixel's depth (how much honey is in front of it)."""
+    S = 8
+    n = {3: 5, 2: 4, 1: 2}[level]
+    col = np.zeros((32 * S, 32 * S, 3))
+    cov = np.zeros((32 * S, 32 * S))
+    dep = np.zeros((32 * S, 32 * S))
+    yy, xx = np.mgrid[0:32 * S, 0:32 * S]
+    surface = SURFACE[level]
+    for gx, gy, size, ang, depth in LARVAE[:n]:
+        if gy - 1.5 < surface + 0.8:
             continue
-        # the left wall is the first solid run, the right wall the last solid run on the far side of the middle
-        left = solid[0]
-        while left + 1 < w and row[left + 1] > 200:
-            left += 1
-        right = [x for x in solid if x > 16][0] if [x for x in solid if x > 16] else w - 1
-        for x in range(left + 1, right):
-            if 0 < row[x] <= 200:
-                mask.add((x, y))
-    return mask
-
-
-def larvae_layer(level, seed):
-    """Pale larvae suspended in the honey, drawn soft at 4x and scaled down: a vague mass, not individual grubs."""
-    s = 4
-    layer = Image.new("RGBA", (32 * s, 32 * s), (0, 0, 0, 0))
-    px = layer.load()
-    rnd = random.Random(seed)
-    top = SURFACE[level] + 1.2
-    count = {3: 13, 2: 9, 1: 5}[level]
-    for _ in range(count):
-        # mostly in the lower part of the honey, curled ovals of a couple of pixels
-        cx = rnd.uniform(10.5, 21.0)
-        cy = rnd.uniform(top, BODY_BOTTOM - 0.3) if rnd.random() < 0.5 else rnd.uniform((top + BODY_BOTTOM) / 2,
-                                                                                        BODY_BOTTOM - 0.3)
-        rx = rnd.uniform(0.9, 1.4)
-        ry = rx * rnd.uniform(0.55, 0.75)
-        ang = rnd.uniform(0, math.pi)
-        depth = rnd.uniform(0.6, 0.95)  # deeper in the honey = fainter
-        ca, sa = math.cos(ang), math.sin(ang)
-        for yy in range(int((cy - 2) * s), int((cy + 2) * s)):
-            for xx in range(int((cx - 2) * s), int((cx + 2) * s)):
-                dx = (xx + 0.5) / s - cx
-                dy = (yy + 0.5) / s - cy
-                u = (dx * ca + dy * sa) / rx
-                v = (-dx * sa + dy * ca) / ry
-                d = u * u + v * v
-                if d < 1.0 and 0 <= xx < 32 * s and 0 <= yy < 32 * s:
-                    shade = LARVA if v < 0.2 else LARVA_SHADE
-                    a = int(255 * depth * min(1.0, (1.0 - d) * 2.5))
-                    old = px[xx, yy]
-                    if a > old[3]:
-                        px[xx, yy] = shade + (a,)
-    return layer.resize((32, 32), Image.LANCZOS)
+        segs = 5
+        for k in range(segs):  # (drawn tail first, head over it)
+            kk = segs - 1 - k
+            a = ang + kk * 0.5  # the curl: a fat C, a kidney bean
+            rad = 0.8 * size
+            cx = (gx + math.cos(a) * rad) * S
+            cy = (gy + math.sin(a) * rad * 0.85) * S
+            rr = (1.0 - 0.08 * kk) * size * S
+            d2 = ((xx + 0.5 - cx) ** 2 + (yy + 0.5 - cy) ** 2) / (rr * rr)
+            inside = d2 < 1.0
+            nz = np.sqrt(np.clip(1.0 - d2, 0, 1))
+            nx = (xx + 0.5 - cx) / rr
+            ny = (yy + 0.5 - cy) / rr
+            lam = np.clip(-0.55 * nx - 0.6 * ny + 0.58 * nz, 0, 1)
+            spec = np.clip(lam, 0, 1) ** 12 * 0.35
+            c = LARVA_DARK[None, None] + (LARVA - LARVA_DARK)[None, None] * (0.25 + 0.75 * lam)[..., None]
+            c = c + spec[..., None] * 255
+            # a darker crease between segments
+            c = c * (0.86 + 0.14 * np.clip(nz * 1.6, 0, 1))[..., None]
+            col[inside] = c[inside]
+            cov[inside] = 1.0
+            dep[inside] = depth
+    # down to 32x32 (coverage-weighted)
+    def down(x):
+        return x.reshape(32, S, 32, S, *x.shape[2:]).mean(axis=(1, 3))
+    c32 = down(col * cov[..., None])
+    a32 = down(cov)
+    d32 = down(dep * cov)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        c32 = np.where(a32[..., None] > 0, c32 / a32[..., None], 0)
+        d32 = np.where(a32 > 0, d32 / a32, 0)
+    return c32, a32, d32
 
 
 def icon(level):
-    base = Image.open(BOTTLE).convert("RGBA")
-    out = base.copy()
-    px = out.load()
+    potion = np.asarray(Image.open(POTION).convert("RGBA"))
+    empty = np.asarray(Image.open(BOTTLE).convert("RGBA")).astype(float)
+    mask = liquid_mask(potion)
+    out = honey(potion, mask)
     surface = SURFACE[level]
-    larvae = larvae_layer(level, 1000 + level).load()
-    inside = inside_mask(base)
-
-    for y in range(int(surface), BODY_BOTTOM + 3):
-        for x in range(32):
-            r, g, b, a = base.getpixel((x, y))
-            if a == 0:
-                continue
-            lum = (r * 299 + g * 587 + b * 114) / 1000
-            if (x, y) in inside and y + 1 > surface:
-                # the honey: translucent amber, deeper colour lower down, a light line at the surface
-                t = (y - surface) / max(1.0, BODY_BOTTOM - surface)
-                hc = [HONEY_TOP[i] + (HONEY_DEEP[i] - HONEY_TOP[i]) * t for i in range(3)]
-                if y < surface + 1.0:
-                    edge = 1.0 - min(1.0, abs(x - 15.5) / 7.0)  # brighter in the middle, like a meniscus
-                    hc = [hc[i] + (HONEY_SURFACE[i] - hc[i]) * (0.4 + 0.6 * edge) for i in range(3)]
-                lr, lg, lb, la = larvae[x, y]
-                k = la / 255.0
-                hc = [hc[i] * (1 - k) + (lr, lg, lb)[i] * k for i in range(3)]
-                # see the glass's shading through it, and keep its highlights on top
-                mix = 0.8
-                col = [hc[i] * mix + (r, g, b)[i] * (1 - mix) for i in range(3)]
-                hl = max(0.0, (lum - 120) / 135.0)
-                col = [col[i] * (1 - hl) + (r, g, b)[i] * hl for i in range(3)]
-                px[x, y] = tuple(int(min(255, c)) for c in col) + (max(a, 236),)
-            elif (y + 1 > surface) and (y <= BODY_BOTTOM + 2) and lum < 150:
-                # the glass walls and base around the honey pick up its colour
-                tint = (1.0, 0.72, 0.32)
-                col = [(r, g, b)[i] * (0.55 + 0.45 * tint[i] * 1.35) for i in range(3)]
-                px[x, y] = tuple(int(min(255, c)) for c in col) + (a,)
-    return out
+    rows = np.arange(32)[:, None] + 0.5
+    # above the honey's surface: the empty bottle's glass inside
+    above = mask & (rows < surface)
+    out[above] = empty[above]
+    # the meniscus: a light line along the surface, brightest in the middle, the honey's curve up at the walls
+    if level < 3:
+        cols = np.arange(32)[None, :] + 0.5
+        xs = np.where(mask.any(axis=0))[0]
+        mid = (xs.min() + xs.max() + 1) / 2.0
+        half = (xs.max() + 1 - xs.min()) / 2.0
+        rise = 0.6 * ((cols - mid) / half) ** 2  # (higher at the walls)
+        line = mask & (np.abs(rows - (surface + 0.5 - rise)) < 0.75)
+        k = 0.55 * (1.0 - 0.5 * np.abs((cols - mid) / half))
+        k = np.broadcast_to(k, line.shape)
+        out[..., :3] = np.where(line[..., None], out[..., :3] * (1 - k[..., None]) + MENISCUS * k[..., None],
+                                out[..., :3])
+    # the larvae, seen through the honey: tinted by it, more so deeper
+    c32, a32, d32 = grub_layer(level)
+    inl = mask & (rows >= surface + 0.7)
+    tint = out[..., :3]
+    lar = c32 * (1.0 - 0.5 * d32[..., None]) + tint * (0.5 * d32[..., None])
+    # (the honey's own shading still darkens them where it's dark: multiply in a little of it)
+    shade = np.clip(tint.mean(axis=2, keepdims=True) / 200.0, 0.55, 1.1)
+    lar = lar * (0.82 + 0.18 * shade)
+    k = np.clip(a32 * 1.3, 0, 1)[..., None] * inl[..., None] * 0.95
+    out[..., :3] = out[..., :3] * (1 - k) + lar * k
+    out[..., 3] = np.where(mask, np.maximum(out[..., 3], 240), out[..., 3])
+    return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), "RGBA")
 
 
 def main():

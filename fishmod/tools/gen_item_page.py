@@ -5,7 +5,7 @@
   column and the bottle shelf) erased and drawn again, from pieces cut out of the same tiles, for the 6 x 5 grid
   (fishmod/docs/roadmap.md, mockup C): the same bracket and column on the shorter rows, a line from the rod through
   the three lures, and a shelf under six bottles.
-- Icons for the tackle (the pond lure, the sinking lure, the sinker) (drawn here; fishmod/tools/item_grid_mockups.py has the same drawings).
+- Icons for the tackle (the pond lure, the sinking lure, the sinker, the bobber): rendered by tackle_icons.py (drawn here; fishmod/tools/item_grid_mockups.py has the same drawings).
 - Item names for the rod and the lures in the game's message font, in the item-name format (128 x 16 IA4).
 
 Writes src/fishmod_data/fishmod_item_page.c (a ROM file the pause menu loads next to its own graphics) and, with
@@ -194,7 +194,9 @@ def main():
     if names_kept != CHANGED_TILES:
         sys.exit(f"gen_item_page: the changed tiles are {names_kept}, not {CHANGED_TILES}: update CHANGED_TILES "
                  "and FISHMOD_ITEM_PAGE_TILE_INDEX (fishmod_item_page.h) to match")
-    lures = [np.asarray(mock.lure_icon(k).convert("RGBA"), np.uint8) for k in LURES]
+    # (the tackle rendered as the game's icons are: fishmod/tools/tackle_icons.py, from the Fishing Pond's own models)
+    import tackle_icons
+    lures = [np.asarray(tackle_icons.icon(k).convert("RGBA"), np.uint8) for k in LURES]
     fnt = mock.font()
     names = [make_name(t, fnt) for t in NAMES]
 
