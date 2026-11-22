@@ -30,7 +30,10 @@
     FEEL(FEEL_SNAP_FRAMES, "snap_frames", 12.0f, 1.0f, 60.0f, "frames at 100 before the line snaps")                  \
     FEEL(FEEL_SLACK_FRAMES, "slack_frames", 90.0f, 10.0f, 300.0f, "frames slack before the hook falls out")           \
     FEEL(FEEL_NIBBLE_GAP, "nibble_gap", 1.0f, 0.2f, 4.0f, "every species' time between taps, times this")             \
-    FEEL(FEEL_BITE_WINDOW, "bite_window", 1.0f, 0.2f, 4.0f, "every species' time to set the hook, times this")
+    FEEL(FEEL_BITE_WINDOW, "bite_window", 1.0f, 0.2f, 4.0f, "every species' time to set the hook, times this")  \
+    FEEL(FEEL_RUMBLE_NIBBLE, "rumble_nibble", 1.0f, 0.0f, 2.0f, "the rumble of a nibble's tap, times this (0 off)") \
+    FEEL(FEEL_RUMBLE_BITE, "rumble_bite", 1.0f, 0.0f, 2.0f, "the bite's, the hook's and a snap's jolts, times this") \
+    FEEL(FEEL_RUMBLE_FIGHT, "rumble_fight", 1.0f, 0.0f, 2.0f, "the fight's rumble (the line, runs, leaps), times this")
 
 #define FISHMOD_FEEL_ENUM(id, name, def, lo, hi, what) id,
 typedef enum FishmodFeelId {

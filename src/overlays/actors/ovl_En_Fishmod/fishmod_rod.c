@@ -147,6 +147,32 @@ s32 EnFishmod_RodClaim(EnFishmod* fish) {
     return false;
 }
 
+/*
+ * Rumble (the Rumble Pak), felt like Twilight Princess's fishing: a tap for each nibble, a hard jolt when it takes the
+ * bait and a harder one when the hook goes in, then the fight through the line: a steady rumble that follows the
+ * tension (none on a slack line), a jolt when the fish starts a run or leaps, a strong buzz while the drag pays out.
+ * The motor is pulsed: each retrace (60 a second) the strength is added to a counter and the motor gets a pulse when it
+ * overflows 255 (sys_rumble.c), so 255 is on every retrace and 60 about one in four; durations are in retraces (3 to a
+ * game frame). Strengths are scaled by the feel tuner's rumble_* (include/fishmod_feel.h).
+ */
+static s16 sRumbleJolt;
+static u8 sRumbleRunning; // (the fight's last frame: a run, a leap)
+static u8 sRumbleLeaping; // game frames a jolt still has the motor (the fight's steady rumble waits for it)
+
+static void Rod_Rumble(f32 scale, f32 strength, f32 duration, s32 decay, s32 joltFrames) {
+    if (scale <= 0.0f) {
+        return;
+    }
+    strength *= scale;
+    if (scale > 1.0f) {
+        duration *= scale; // (past full strength, longer)
+    }
+    Rumble_Override(0.0f, (u8)CLAMP(strength, 1.0f, 255.0f), (u8)CLAMP(duration, 1.0f, 255.0f), decay);
+    if (joltFrames > sRumbleJolt) {
+        sRumbleJolt = joltFrames;
+    }
+}
+
 void EnFishmod_RodNibble(EnFishmod* fish) {
     if (ROD->state != ROD_STATE_FLOAT) {
         return;
@@ -155,7 +181,7 @@ void EnFishmod_RodNibble(EnFishmod* fish) {
     ROD->dip = 4.0f; // quick tick down
     ROD->dipTarget = 0.0f;
     Sfx_PlaySfxAtPos(&gFishmodRod->projectedPos, NA_SE_EV_LURE_MOVE_W);
-    Rumble_Override(0.0f, 45, 3, 20); // a tap in the hand too (the bite's is much stronger)
+    Rod_Rumble(FEEL(FEEL_RUMBLE_NIBBLE), 255.0f, 3.0f, 85, 2); // a sharp tap in the hand for each peck
 }
 
 void EnFishmod_RodBite(EnFishmod* fish) {
@@ -167,7 +193,7 @@ void EnFishmod_RodBite(EnFishmod* fish) {
     ROD->dipTarget = 14.0f;
     ROD->biteTimer = (s16)(fish->species->behavior.biteWindow * FEEL(FEEL_BITE_WINDOW)) + 4; // + the bobber going down
     Sfx_PlaySfxAtPos(&gFishmodRod->projectedPos, NA_SE_EV_DIVE_WATER);
-    Rumble_Override(0.0f, 100, 6, 20);
+    Rod_Rumble(FEEL(FEEL_RUMBLE_BITE), 255.0f, 18.0f, 20, 10); // it takes it: a hard jolt
 }
 
 void EnFishmod_RodRelease(EnFishmod* fish) {
@@ -413,7 +439,8 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     EnFishmod_FishHook(fish);
     // its thrashing scares the fish round about
     EnFishmod_Disturb(play, &fish->actor.world.pos, 220.0f, 120);
-    Rumble_Override(0.0f, 180, 20, 10);
+    Rod_Rumble(FEEL(FEEL_RUMBLE_BITE), 255.0f, 24.0f, 12, 14); // the hook goes in: the hardest
+    sRumbleRunning = sRumbleLeaping = false;
     Sfx_PlaySfxCentered(NA_SE_IT_SWORD_SWING_HARD);
     EnFishmod_RodMessage(1, "FISH ON!", NULL);
     Sfx_PlaySfxCentered(NA_SE_SY_CORRECT_CHIME);
@@ -595,7 +622,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     // snap
     if (ROD->tension >= 100.0f) {
         if (++ROD->overTimer > (s16)FEEL(FEEL_SNAP_FRAMES)) {
-            Rumble_Override(0.0f, 255, 30, 10);
+            Rod_Rumble(FEEL(FEEL_RUMBLE_BITE), 255.0f, 30.0f, 10, 15);
             Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
             Rod_LoseFish(play, player, "The line snapped!");
             return;
@@ -614,8 +641,24 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         ROD->slackTimer = 0;
     }
 
-    if ((play->gameplayFrames % 8) == 0) {
-        Rumble_Override(0.0f, (u8)CLAMP(ROD->tension * 1.5f, 20.0f, 200.0f), 4, 4);
+    // felt through the line: a jolt as a run starts or the fish leaps, else a steady rumble that follows the tension
+    // (renewed each frame, fading within a few retraces when it stops: none on a slack line), a strong buzz while the
+    // drag pays out
+    if ((fish->stateTimer > 0) && !sRumbleRunning) {
+        Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 255.0f, 9.0f, 40, 4);
+    }
+    if (fish->jumping && !sRumbleLeaping) {
+        Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 255.0f, 6.0f, 60, 3);
+    }
+    sRumbleRunning = (fish->stateTimer > 0);
+    sRumbleLeaping = fish->jumping;
+    if (sRumbleJolt > 0) {
+        sRumbleJolt--;
+    } else if ((ROD->tension > FEEL(FEEL_DRAG_AT)) && (taut > 0.0f)) {
+        Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 235.0f, 3.0f, 60, 0);
+    } else if (ROD->tension >= TENSION_SLACK) {
+        Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 40.0f + ROD->tension * 1.6f + (sRumbleRunning ? 50.0f : 0.0f), 3.0f, 60,
+                   0);
     }
 
     // landed
@@ -632,7 +675,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         gFishmodRodInfo.caught++;
         player->unk_860 = 3; // catch animation
         EnFishmod_FishSetState(fish, FISH_STATE_CAUGHT);
-        Rumble_Override(0.0f, 120, 10, 5);
+        Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 200.0f, 12.0f, 15, 6); // landed
         Sfx_PlaySfxCentered(NA_SE_EV_JUMP_OUT_WATER);
         Rod_StopFightMusic();
         Audio_PlayFanfare(NA_BGM_ITEM_GET | 0x900);
@@ -680,7 +723,7 @@ static void Rod_UpdateSink(PlayState* play, Input* input) {
             ROD->baitDepth = ROD->baitTarget;
             ROD->sinking = false;
             ROD->dip = 3.0f; // the bobber stands up as the line comes tight
-            Rumble_Override(0.0f, 60, 3, 10);
+            Rod_Rumble(FEEL(FEEL_RUMBLE_NIBBLE), 200.0f, 2.0f, 100, 1); // the line comes tight: a small tick
         }
     } else {
         // reeled in over shallower water (or out over deeper): the bait eases to its new depth
