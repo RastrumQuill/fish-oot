@@ -33,8 +33,8 @@ ROW_Y = [80 - (44 - 25 * r) for r in range(5)]  # FISHMOD_ITEM_ROW0_Y 44, FISHMO
 SCALE = 0.8  # pipes shrink with the icons
 INTERIOR = (0, 187)  # the page window's colour (intensity, alpha)
 
-LURES = ["lure_pond", "lure_sink", "sinker"]
-NAMES = ["Fishing Rod", "Pond Lure", "Sinking Lure", "Sinker"]
+LURES = ["lure_pond", "lure_sink", "sinker", "bobber"]  # (the bobber: the sinker item's while the sinker is on)
+NAMES = ["Fishing Rod", "Pond Lure", "Sinking Lure", "Sinker", "Bobber"]
 # the page tiles the new pipes change (the others are drawn from the game's own); fishmod_item_page.h has the same
 CHANGED_TILES = ["03", "04", "11", "13", "14", "21", "22", "23", "24"]
 

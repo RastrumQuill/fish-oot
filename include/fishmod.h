@@ -404,6 +404,7 @@ typedef enum FishmodRig {
     /* 2 */ FISHMOD_RIG_LURE_SINKING, // the sinking lure: sinks to the bed, hops up off it as it's reeled
     /* 3 */ FISHMOD_RIG_SINKER        // a weight on the bed, the bait floating up from it on a leader
 } FishmodRig;
+void Fishmod_SetRig(struct PlayState* play, s32 rig); // (fishmod.c: the save's, and the sinker item's icon redrawn)
 #define FISHMOD_SAVE_RIG_SHIFT 4
 #define FISHMOD_RIG() ((FISHMOD_SAVE->flags >> FISHMOD_SAVE_RIG_SHIFT) & 3)
 #define FISHMOD_SET_RIG(rig) \

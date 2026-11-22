@@ -241,6 +241,14 @@ def lure_icon(kind):
         d.ellipse((20, 50, 60, 90), fill=(150, 155, 170, 255))
         d.ellipse((30, 58, 44, 72), fill=(230, 235, 245, 255))
         hook(60, 120, 26)
+    elif kind == "bobber":  # a float: red cap, white belly, its stick through it
+        d.line((128, 8, 128, 248), fill=out, width=16)
+        d.line((128, 12, 128, 244), fill=(240, 235, 220, 255), width=6)
+        d.ellipse((52, 64, 204, 216), fill=out)
+        d.pieslice((60, 72, 196, 208), 180, 360, fill=(220, 40, 35, 255))
+        d.pieslice((60, 72, 196, 208), 0, 180, fill=(245, 245, 235, 255))
+        d.line((60, 140, 196, 140), fill=out, width=8)
+        d.ellipse((84, 88, 124, 120), fill=(255, 140, 130, 255))  # its shine
     else:  # sinker: a lead teardrop with its ring on top, a swivel and a leader to a hook
         d.line((128, 10, 128, 44), fill=out, width=10)
         d.ellipse((112, 30, 144, 62), fill=out)

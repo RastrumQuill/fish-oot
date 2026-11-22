@@ -114,6 +114,19 @@ void Fishmod_LoadItemPage(PlayState* play, void* dst) {
                      __LINE__);
 }
 
+/*
+ * The sinker item shows what pressing it does: the sinker while the bobber's on (or a lure), the bobber while the
+ * sinker's on (it takes the sinker off). Its icon and name in the item page's graphics, by the rig on the line.
+ */
+#define TACKLE_BOBBER_ICON 3
+#define TACKLE_BOBBER_NAME 4
+static s32 Fishmod_TackleShown(const FishmodItemDef* def, s32 item, s32 name) {
+    if ((item == ITEM_SINKER) && (FISHMOD_RIG() == FISHMOD_RIG_SINKER)) {
+        return name ? TACKLE_BOBBER_NAME : TACKLE_BOBBER_ICON;
+    }
+    return name ? def->name : def->lureIcon;
+}
+
 /** An item's icon while paused (the item page, the icon flying to a C button). */
 void* Fishmod_PauseItemIcon(s32 item) {
     const FishmodItemDef* def = Fishmod_ItemDef(item);
@@ -123,7 +136,7 @@ void* Fishmod_PauseItemIcon(s32 item) {
             return def->ramIcon;
         }
         if ((def->lureIcon != NO_PAGE_INDEX) && (gFishmodItemPageData != NULL)) {
-            return gFishmodItemPageData->lureIcons[def->lureIcon];
+            return gFishmodItemPageData->lureIcons[Fishmod_TackleShown(def, item, false)];
         }
     }
     return gItemIcons[item];
@@ -137,7 +150,7 @@ uintptr_t Fishmod_ItemIconVrom(s32 item) {
         return 0;
     }
     return (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, lureIcons) +
-           def->lureIcon * sizeof(gFishmodItemPageData->lureIcons[0]);
+           Fishmod_TackleShown(def, item, false) * sizeof(gFishmodItemPageData->lureIcons[0]);
 }
 
 /** Where the pause menu loads one of the mod's name graphics from in ROM, or 0 (the game's own). */
@@ -148,7 +161,7 @@ uintptr_t Fishmod_ItemNameVrom(s32 item) {
         return 0;
     }
     return (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, names) +
-           def->name * sizeof(gFishmodItemPageData->names[0]);
+           Fishmod_TackleShown(def, item, true) * sizeof(gFishmodItemPageData->names[0]);
 }
 
 /*
@@ -466,7 +479,8 @@ Gfx* Gfx_TextureIA8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 t
                     s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy); // (z_parameter.c)
 
 static u64 sDpadIcons[4][ITEM_ICON_SIZE / sizeof(u64)];
-static u16 sDpadIconItem[4]; // the item each holds, + 1 (0: none loaded)
+static u16 sDpadIconItem[4]; // the item each holds, + 1 (0: none loaded); + 0x100 for the sinker showing the bobber
+#define DPAD_ICON_KEY(item) ((item) + 1 + (((item) == ITEM_SINKER) && (FISHMOD_RIG() == FISHMOD_RIG_SINKER) ? 0x100 : 0))
 
 static void Fishmod_DpadLoadIcon(s32 d, s32 item) {
     if (Fishmod_ItemIcon(item) != NULL) {
@@ -476,7 +490,7 @@ static void Fishmod_DpadLoadIcon(s32 d, s32 item) {
                            (Fishmod_ItemIconVrom(item) != 0) ? Fishmod_ItemIconVrom(item) : GET_ITEM_ICON_VROM(item),
                            ITEM_ICON_SIZE);
     }
-    sDpadIconItem[d] = item + 1;
+    sDpadIconItem[d] = DPAD_ICON_KEY(item);
 }
 
 /** An item's ammo count as Interface_DrawAmmoCount shows it (-1: none shown); *full set when at its capacity. */
@@ -541,7 +555,7 @@ void Fishmod_DpadDraw(PlayState* play) {
         if ((item == ITEM_NONE) || (item >= ITEM_NONE_FE)) {
             continue;
         }
-        if (sDpadIconItem[d] != item + 1) {
+        if (sDpadIconItem[d] != DPAD_ICON_KEY(item)) {
             Fishmod_DpadLoadIcon(d, item);
         }
         a = Fishmod_DpadOn(play, item) ? alpha : MIN(alpha, 70);

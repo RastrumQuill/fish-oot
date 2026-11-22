@@ -402,6 +402,19 @@ static s32 Fishmod_RodHeld(PlayState* play) {
     return (gFishmodRod != NULL) && (player != NULL) && (player->heldItemAction == PLAYER_IA_FISHING_POLE);
 }
 
+/** The rig on the line changed: kept in the save, and the sinker item's icon on a C button redrawn (it shows the
+ * bobber while the sinker's on: Fishmod_TackleShown; the D-pad's notices by itself). */
+void Fishmod_SetRig(PlayState* play, s32 rig) {
+    s32 i;
+
+    FISHMOD_SET_RIG(rig);
+    for (i = 1; i <= 3; i++) {
+        if (gSaveContext.save.info.equips.buttonItems[i] == ITEM_SINKER) {
+            Interface_LoadItemIcon1(play, i);
+        }
+    }
+}
+
 /**
  * A bottle of bait (or bugs) used from a button while Link holds the rod, before casting: one goes on the hook
  * and the bottle that was pressed has one less. Anything else about these bottles does nothing for now (there's no
@@ -421,7 +434,7 @@ s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
             Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
             return true;
         }
-        FISHMOD_SET_RIG((FISHMOD_RIG() == rig) ? FISHMOD_RIG_BOBBER : rig);
+        Fishmod_SetRig(play, (FISHMOD_RIG() == rig) ? FISHMOD_RIG_BOBBER : rig);
         Sfx_PlaySfxCentered(NA_SE_PL_PUT_OUT_ITEM);
         return true;
     }
@@ -438,7 +451,7 @@ s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
     // takes no bait; the sinker's hook does)
     if (Fishmod_RodHeld(play) && (gFishmodRodInfo.state == 1) &&
         ((FISHMOD_RIG() == FISHMOD_RIG_LURE_POND) || (FISHMOD_RIG() == FISHMOD_RIG_LURE_SINKING))) {
-        FISHMOD_SET_RIG(FISHMOD_RIG_BOBBER);
+        Fishmod_SetRig(play, FISHMOD_RIG_BOBBER);
         gFishmodRodInfo.bait = FISHMOD_BAIT_NONE;
     }
     if (!Fishmod_RodHeld(play) || (gFishmodRodInfo.state != 1) || (gFishmodRodInfo.bait != FISHMOD_BAIT_NONE) ||
