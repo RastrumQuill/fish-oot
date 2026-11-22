@@ -171,6 +171,25 @@ static void Manager_PlanDays(PlayState* play, FishmodRng* rng);
 static void Manager_FindSchools(void);
 static s32 sSchoolCount;
 
+/*
+ * The water's levels in one number (any water box risen or fallen). A scene's actors start once their objects are in,
+ * which can be frames after the manager's: Lake Hylia's water plane lowers the lake (adult, before the Water Temple)
+ * in its init, so a roster made before that had its fish's homes and feeding places in the full lake, above the water
+ * that's there. When the levels change, the roster is made again (the same fish, in the water there is now).
+ */
+static s32 sRosterLevels;
+
+static s32 Roster_WaterLevels(PlayState* play) {
+    WaterBox* boxes = SEGMENTED_TO_VIRTUAL(play->colCtx.colHeader->waterBoxes);
+    s32 sum = 0;
+    s32 i;
+
+    for (i = 0; i < play->colCtx.colHeader->numWaterBoxes; i++) {
+        sum = sum * 31 + boxes[i].ySurface + boxes[i].zMin * 7 + ((boxes[i].properties & WATERBOX_IS_DISABLED) ? 3 : 0);
+    }
+    return sum;
+}
+
 static void Manager_BuildRoster(PlayState* play) {
     FishmodRng rng;
     const FishmodSceneSpawns* spawns = Fishmod_GetSceneSpawns(play->sceneId);
@@ -181,6 +200,7 @@ static void Manager_BuildRoster(PlayState* play) {
     s32 i;
     s32 n;
 
+    sRosterLevels = Roster_WaterLevels(play);
     sRosterCount = 0;
     sSchoolCount = 0; // (none until this roster's are found: a scene without fish keeps none)
     if ((spawns == NULL) || (numBoxes == 0) || FISHMOD_PHOTO_ON) {
@@ -365,8 +385,9 @@ static void Roster_Travel(PlayState* play, FishmodRosterFish* rec) {
     rec->pos.z += (s16)(dz * step / dist);
 }
 
-/** Where an unspawned fish appears: where it got to, if that's water deep enough; else at its place. */
-static void Roster_SpawnSpot(PlayState* play, FishmodRosterFish* rec) {
+/** Where an unspawned fish appears: where it got to, if that's water deep enough; else at its place. False if neither
+ * is in water now (its place made before the water fell: it stays unspawned). */
+static s32 Roster_SpawnSpot(PlayState* play, FishmodRosterFish* rec) {
     f32 surface;
     f32 floor;
 
@@ -377,10 +398,16 @@ static void Roster_SpawnSpot(PlayState* play, FishmodRosterFish* rec) {
         rec->pos.x = place.x;
         rec->pos.y = place.y;
         rec->pos.z = place.z;
-    } else {
-        rec->pos.y = CLAMP(rec->pos.y, floor + 8.0f, surface - 8.0f);
+        if (!EnFishmod_WaterFloor(play, rec->pos.x, rec->pos.z, &surface, &floor, true) ||
+            (surface - floor < 16.0f)) {
+            return false;
+        }
     }
+    rec->pos.y = CLAMP(rec->pos.y, floor + 8.0f, surface - 8.0f);
+    return true;
 }
+
+
 
 /**
  * Each school's leader this frame: the first of its fish that's spawned and free (cruising, or bolting with the
@@ -624,6 +651,19 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
     s32 checks = MIN(sRosterCount, ROSTER_CHECKS_PER_FRAME);
     s32 spawns = ROSTER_SPAWNS_PER_FRAME;
     s32 n;
+
+    if (Roster_WaterLevels(play) != sRosterLevels) {
+        // the water rose or fell since the roster was made: made again (its fish in the water there is now)
+        for (n = 0; n < sRosterCount; n++) {
+            if ((sRoster[n].fish != NULL) && (gFishmodRodState.fish != sRoster[n].fish)) {
+                Actor_Kill(&sRoster[n].fish->actor);
+            }
+            sRoster[n].fish = NULL;
+        }
+        Manager_BuildRoster(play);
+        sNext = 0;
+        return;
+    }
 #if FISHMOD_DEBUG
     s32 awake = 0; // (the fish stress bench caps the fish in the water at its step's count)
 
@@ -674,7 +714,9 @@ static void Manager_UpdateRoster(EnFishmod* this, PlayState* play) {
             // the record's index rides in the spawn roll (the params only have room for 31)
             Actor* fish;
 
-            Roster_SpawnSpot(play, rec);
+            if (!Roster_SpawnSpot(play, rec)) {
+                continue;
+            }
             fish = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_FISHMOD, rec->pos.x, rec->pos.y, rec->pos.z,
                                       0, rec->yaw, i + 1, FISHMOD_PARAMS(FISHMOD_TYPE_FISH, rec->species));
 

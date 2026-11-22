@@ -16,6 +16,7 @@
 #include "segmented_address.h"
 #include "stddef.h"
 #include "fishmod.h"
+#include "fishmod_feel.h"
 #include "fishmod_scatter.h"
 #include "fishmod_lod_pop.h"
 
@@ -398,8 +399,10 @@ static void* sBedShadedRoom; // the room whose bed was shaded (a room loaded aga
 // (Scatter_Touch's: the props making way for Link)
 #define TOUCH_MAX 32
 #define TOUCH_NONE 0xFF
-#define TOUCH_LEAN 0.6f      // the most a plant's top moves sideways, per unit of its height (held up by the water)
-#define TOUCH_PUSH 32.0f     // the furthest a floating plant drifts
+// the most a plant's top moves sideways, per unit of its height (held up by the water), and the furthest a floating
+// plant drifts: include/fishmod_feel.h's plant_lean and plant_drift (was 0.6 and 32: too much)
+#define TOUCH_LEAN FEEL(FEEL_PLANT_LEAN)
+#define TOUCH_PUSH FEEL(FEEL_PLANT_DRIFT)
 #define TOUCH_FLOAT_R 46.0f  // how near a floating plant's middle Link pushes it (at scale 1; plus TOUCH_FLOAT_R0)
 #define TOUCH_FLOAT_R0 18.0f
 #define TOUCH_HANG 90.0f     // how far a hanging plant (the vine curtain) reaches down from the surface, at scale 1
@@ -1181,6 +1184,60 @@ static s32 Scatter_WaterLevels(PlayState* play) {
     return sum;
 }
 
+/*
+ * The rocks out of the water (the drained lake): no moss. Each rock's colours are rock_mesh.py's
+ *     r = 0.62 s - 0.15 M,  g = 0.62 s + 0.10 M,  b = 0.58 s - 0.20 M    (s its shade, M = s x its moss)
+ * so g - r = 0.25 M gives the moss back, and the stone's own colour is (0.62 s, 0.62 s, 0.58 s). The rocks' vertices
+ * are the scene's scatter file in RAM (loaded again with each visit, so a lake refilled has its moss back); the change
+ * gives the same colours done twice (a rock's vertices are its own, but it'd be harmless if they were shared). A rock
+ * is dry when the water where it stands is below its base and a little (or there's none).
+ */
+static void Scatter_DryRocks(PlayState* play) {
+    s32 i;
+    s32 changed = false;
+
+    if (sRockList == NULL) {
+        return;
+    }
+    for (i = 0; i < sScatter->count; i++) {
+        FishmodProp* prop = &sProps[i];
+        WaterBox* box;
+        f32 surface;
+        u32* w;
+
+        if (!SCATTER_IS_ROCK(prop->kind)) {
+            continue;
+        }
+        if (BgCheck_GetWaterSurface(play, &play->colCtx, prop->x, prop->z, &surface, &box) &&
+            (surface > prop->y + 8.0f)) {
+            continue; // (still under, or mostly: its moss stays)
+        }
+        for (w = (u32*)sRockList[prop->yaw]; (w[0] >> 24) != G_ENDDL; w += 2) {
+            if ((w[0] >> 24) == G_VTX) {
+                Vtx* v = (Vtx*)w[1];
+                s32 n = (w[0] >> 12) & 0xFF;
+                s32 k;
+
+                for (k = 0; k < n; k++) {
+                    u8* cn = v[k].v.cn;
+                    f32 moss = (cn[1] - cn[0]) * 4.0f;
+                    f32 shade = (cn[0] + 0.15f * MAX(moss, 0.0f)) * (1.0f / 0.62f);
+
+                    if (moss <= 0.0f) {
+                        continue; // (none: already bare)
+                    }
+                    cn[0] = cn[1] = (u8)CLAMP_MAX(0.62f * shade + 0.5f, 255.0f);
+                    cn[2] = (u8)CLAMP_MAX(0.58f * shade + 0.5f, 255.0f);
+                }
+                changed = true;
+            }
+        }
+    }
+    if (changed) {
+        osWritebackDCache((u8*)sScatter + sScatter->rockDataOffset, sScatter->rockDataWords * sizeof(u32));
+    }
+}
+
 static void Scatter_UpdateDry(PlayState* play) {
     s32 levels = Scatter_WaterLevels(play);
     s32 c;
@@ -1206,6 +1263,7 @@ static void Scatter_UpdateDry(PlayState* play) {
             }
         }
     }
+    Scatter_DryRocks(play);
 }
 
 /** A kind's material, at the start of its props in a band. */

@@ -34,7 +34,9 @@
     FEEL(FEEL_BITE_WINDOW, "bite_window", 1.0f, 0.2f, 4.0f, "every species' time to set the hook, times this")  \
     FEEL(FEEL_RUMBLE_NIBBLE, "rumble_nibble", 1.0f, 0.0f, 2.0f, "the rumble of a nibble's tap, times this (0 off)") \
     FEEL(FEEL_RUMBLE_BITE, "rumble_bite", 1.0f, 0.0f, 2.0f, "the bite's, the hook's and a snap's jolts, times this") \
-    FEEL(FEEL_RUMBLE_FIGHT, "rumble_fight", 1.0f, 0.0f, 2.0f, "the fight's rumble (the line, runs, leaps), times this")
+    FEEL(FEEL_RUMBLE_FIGHT, "rumble_fight", 1.0f, 0.0f, 2.0f, "the fight's rumble (the line, runs, leaps), times this")  \
+    FEEL(FEEL_PLANT_LEAN, "plant_lean", 0.35f, 0.0f, 1.0f, "how far a plant bends when pushed through (top, x height)") \
+    FEEL(FEEL_PLANT_DRIFT, "plant_drift", 20.0f, 0.0f, 60.0f, "how far a floating plant drifts when pushed")
 
 #define FISHMOD_FEEL_ENUM(id, name, def, lo, hi, what) id,
 typedef enum FishmodFeelId {
