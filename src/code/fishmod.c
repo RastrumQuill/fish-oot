@@ -890,6 +890,17 @@ void Fishmod_TestStart(void) {
     gSaveContext.save.entranceIndex = ENTR_LAKE_HYLIA_0;
     gSaveContext.save.linkAge = LINK_AGE_ADULT;
     Fishmod_TestSetAge(true);
+#elif FISHMOD_TEST_START == 3
+    // Lake Hylia as child (the lake is full for him whatever the flag)
+    gSaveContext.save.entranceIndex = ENTR_LAKE_HYLIA_0;
+    gSaveContext.save.linkAge = LINK_AGE_CHILD;
+    Fishmod_TestSetAge(false);
+#elif FISHMOD_TEST_START == 4
+    // Lake Hylia drained: adult, the Water Temple not cleared (Fishmod_LakeDrained)
+    gSaveContext.save.entranceIndex = ENTR_LAKE_HYLIA_0;
+    gSaveContext.save.linkAge = LINK_AGE_ADULT;
+    Fishmod_TestSetAge(true);
+    CLEAR_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
 #endif
 }
 #endif

@@ -5,6 +5,8 @@ SummerCart64, then you switch the console off and on.
   1. The game, to play (releases/fish-oot-play.bps)
   2. Test mode at Lake Hylia: a new file starts there as adult Link, the lake full (releases/fish-oot-test-lake.bps)
   3. Test mode in Kokiri Forest: a new file starts there as child Link (releases/fish-oot-test-kokiri.bps)
+  4. Test mode at Lake Hylia as child Link (releases/fish-oot-test-lakechild.bps)
+  5. Test mode at Lake Hylia drained: adult Link, the Water Temple not cleared (releases/fish-oot-test-lakedrained.bps)
 
 Test mode: new files skip the intro and start with the rod (on C-Down), bugs (C-Right), lures, bottles, the slingshot and
 the Goron's Bracelet; loading a test file goes back to its place. Hold L and press the D-pad:
@@ -14,7 +16,7 @@ the Goron's Bracelet; loading a test file goes back to its place. Hold L and pre
   Left           the frame-time readout's detail
 With a test build running, feel.bat opens the fishing feel tuner (sliders that change the fight's numbers live).
 
-Usage (play.bat does this): python fishmod/pc/play.py [1|2|3|PATCH.bps] [--rom ROM] [--deployer sc64deployer.exe]
+Usage (play.bat does this): python fishmod/pc/play.py [1-5|PATCH.bps] [--rom ROM] [--deployer sc64deployer.exe]
   [--no-pull]
 The ROM's and the deployer's paths are the ones the queue runner remembers (rom_path.txt, sc64deployer_path.txt).
 """
@@ -31,12 +33,14 @@ CHOICES = [
     ("The game, to play", "releases/fish-oot-play.bps"),
     ("Test mode at Lake Hylia (adult, the lake full)", "releases/fish-oot-test-lake.bps"),
     ("Test mode in Kokiri Forest (child)", "releases/fish-oot-test-kokiri.bps"),
+    ("Test mode at Lake Hylia as child", "releases/fish-oot-test-lakechild.bps"),
+    ("Test mode at Lake Hylia drained (adult, before the Water Temple)", "releases/fish-oot-test-lakedrained.bps"),
 ]
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("which", nargs="?", help="1, 2, 3 or a patch")
+    ap.add_argument("which", nargs="?", help="1-5 or a patch")
     ap.add_argument("--rom")
     ap.add_argument("--deployer")
     ap.add_argument("--no-pull", action="store_true")

@@ -1,6 +1,6 @@
 @echo off
-rem fish-oot: load a copy onto the console to play. Double-click it and pick: the game, test mode at Lake Hylia, or
-rem test mode in Kokiri Forest (or give 1, 2 or 3). It patches your ROM, sends it to the SummerCart64, and then you
+rem fish-oot: load a copy onto the console to play. Double-click it and pick: the game, or test mode at Lake Hylia
+rem (adult, child or drained) or in Kokiri Forest (or give 1-5). It patches your ROM, sends it to the SummerCart64, and then you
 rem switch the console off and on. See the top of fishmod\pc\play.py.
 setlocal
 set "PY="

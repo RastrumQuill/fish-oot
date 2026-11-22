@@ -458,7 +458,7 @@ void Fishmod_InitTestSave(void);
 void Fishmod_DrawFps(Gfx** gfxP);
 void Fishmod_TestPlayInit(void);
 // where a test file starts and goes back to on loading (FISHMOD_TEST_START: 0 Link's house, 1 Kokiri Forest, 2 Lake
-// Hylia as adult)
+// Hylia as adult, 3 Lake Hylia as child, 4 Lake Hylia drained (adult))
 void Fishmod_TestStart(void);
 #endif
 #ifndef FISHMOD_TEST_START

@@ -10,7 +10,8 @@
 #   --opt N        ignored (the performance levels it chose are now the only game; kept so old commands still work)
 #   --testmode     new files skip the intro and start with testing items; outputs get a -test suffix
 #   --test-start N (test mode) where a test file starts and loads: 0 Link's house, 1 Kokiri Forest as child, 2 Lake
-#                  Hylia as adult; outputs get -kokiri / -lake
+#                  Hylia as adult, 3 Lake Hylia as child, 4 Lake Hylia drained; outputs get -kokiri / -lake /
+#                  -lakechild / -lakedrained
 #   --expak        the ROM needs the Expansion Pak: its code can count on the 8 MB (#if FISHMOD_EXPAK), and without the
 #                  pak the game says so at power-on instead of starting; outputs get an -expak suffix. Without the
 #                  flag the game runs either way and uses the pak when it's there
@@ -259,6 +260,8 @@ if [ "$TESTMODE" = 1 ]; then
     SUFFIX="$SUFFIX-test"
     if [ "$TEST_START" = 1 ]; then SUFFIX="$SUFFIX-kokiri"; fi
     if [ "$TEST_START" = 2 ]; then SUFFIX="$SUFFIX-lake"; fi
+    if [ "$TEST_START" = 3 ]; then SUFFIX="$SUFFIX-lakechild"; fi
+    if [ "$TEST_START" = 4 ]; then SUFFIX="$SUFFIX-lakedrained"; fi
 fi
 if [ "$EXPAK" = 1 ]; then
     SUFFIX="$SUFFIX-expak"
