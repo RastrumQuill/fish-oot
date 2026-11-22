@@ -242,6 +242,12 @@ def rom_grass_card():
     return ia_card("objects/gameplay_keep/gUnusedGrassBladesTex.rgba16.png")
 
 
+def uv_inside(obj):
+    """Whether an .obj's texture coordinates all lie inside the texture (it's used once, not tiled)."""
+    vt = [tuple(map(float, l.split()[1:3])) for l in open(obj) if l.startswith("vt ")]
+    return bool(vt) and all(-0.001 <= u <= 1.001 and -0.001 <= v <= 1.001 for u, v in vt)
+
+
 def rom_ribbon_card():
     # the pond's reeds squeezed narrow and stretched tall: long ribbons
     return ia_card("scenes/misc/turibori/turibori_scene_00003CE0_Tex.rgba16.png", None, (32, 64))
@@ -1277,8 +1283,11 @@ def write_props_manifest():
                            "texture": texname, "out": out, "separateMaterial": True, "clamp": True})
             tri_kinds_built.append(kind)
             continue
+        # clamped when the mesh uses the texture once (its UVs inside it): wrapped, the filter's edge texels came
+        # from the far side, a dark line of the stems' row along the top of the tall weeds' cards
+        once = uv_inside(mesh)
         models.append({"name": "gFishmodProp_" + kind + "DL", "src": os.path.relpath(mesh, ROOT),
-                       "texture": texname, "out": out, "separateMaterial": True})
+                       "texture": texname, "out": out, "separateMaterial": True, "clamp": once})
         # (the console's comparison: the same cut split low; the near model where nothing is cut)
         low = os.path.join(MESH_LOW, kind + ".obj")
         if os.path.exists(low) and os.path.exists(os.path.join(MESH_TRIM, kind + ".obj")):
@@ -1287,15 +1296,16 @@ def write_props_manifest():
         else:
             low = mesh
         models.append({"name": "gFishmodProp_" + kind + "DLLow", "src": os.path.relpath(low, ROOT),
-                       "texture": texname, "out": out, "separateMaterial": True})
+                       "texture": texname, "out": out, "separateMaterial": True, "clamp": uv_inside(low)})
         # far away: the whole cards, uncut. The same picture (the cut only drops texels that never show) in a third
         # of the triangles, and far props are few pixels each, so their cost is per triangle (hwbench-2)
         models.append({"name": "gFishmodProp_" + kind + "DLFar", "src": os.path.relpath(far, ROOT),
-                       "texture": texname, "out": out, "separateMaterial": True})
+                       "texture": texname, "out": out, "separateMaterial": True, "clamp": uv_inside(far)})
         if halfname:
             # and from where a texel is under half a pixel, with the texture at half size (its own UVs)
             models.append({"name": "gFishmodProp_" + kind + "DLFarH", "src": os.path.relpath(far, ROOT),
-                           "texture": halfname, "out": out, "separateMaterial": True})
+                           "texture": halfname, "out": out, "separateMaterial": True,
+                           "clamp": uv_inside(far)})
     # the rocks with vertex colours (they stay the vanilla kind ROCK; fishmod_scatter.c draws them with these)
     rv = rock_vc()
     if rv is not None:
