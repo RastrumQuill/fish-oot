@@ -120,6 +120,9 @@ def gen_header(data):
         if sp["status"] != "in-game":
             continue
         for sc, w in sp["scenes"].items():
+            # (only the scenes with fishing: a species in the game is still only planned for some places)
+            if data["scenes"].get(sc, {}).get("status", "planned") == "planned":
+                continue
             scenes.setdefault(sc, []).append((sp["id"], w))
     for sc, entries in scenes.items():
         out.append(f"static const FishmodSpawnEntry sFishmodSpawns_{sc}[] = {{")

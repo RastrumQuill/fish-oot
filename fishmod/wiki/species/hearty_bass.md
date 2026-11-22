@@ -1,8 +1,7 @@
 # Hearty Bass
 
-*Very rare · from Breath of the Wild · Planned (not in the game yet)*
+*Very rare · from Breath of the Wild · In game*
 
-*(not in the game yet)*
 
 > A heavy, rosy bass said to give strength to whoever eats it. The biggest ones live in the deep water of Lake Hylia.
 

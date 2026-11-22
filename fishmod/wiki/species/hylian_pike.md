@@ -1,8 +1,7 @@
 # Hylian Pike
 
-*Rare · from Twilight Princess · Planned (not in the game yet)*
+*Rare · from Twilight Princess · In game*
 
-*(not in the game yet)*
 
 > A lean ambush hunter of open water, famous as the star of jumping fish. It hits fast and spends half the fight in the air.
 

@@ -183,6 +183,8 @@ static const FishmodSpawnEntry sFishmodSpawns_LAKE_HYLIA[] = {
     { FISHMOD_SPECIES_ORDON_CATFISH, 15 },
     { FISHMOD_SPECIES_HYLIAN_LOACH, 5 },
     { FISHMOD_SPECIES_SANKE_CARP, 15 },
+    { FISHMOD_SPECIES_HYLIAN_PIKE, 25 },
+    { FISHMOD_SPECIES_HEARTY_BASS, 8 },
 };
 
 const FishmodSceneSpawns gFishmodSceneSpawns[] = {

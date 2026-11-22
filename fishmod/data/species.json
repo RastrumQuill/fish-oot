@@ -1000,7 +1000,7 @@
       "saveId": 6,
       "name": "Hylian Pike",
       "origin": "Twilight Princess",
-      "status": "planned",
+      "status": "in-game",
       "base": "loach",
       "shape": [
         1.15,
@@ -1138,7 +1138,7 @@
       "saveId": 8,
       "name": "Hearty Bass",
       "origin": "Breath of the Wild",
-      "status": "planned",
+      "status": "in-game",
       "base": "bass",
       "shape": [
         1.05,
