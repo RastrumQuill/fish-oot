@@ -374,6 +374,7 @@ s32 Fishmod_EquipItem(struct PlayState* play, s32 item);
 void Fishmod_EquipButtons(struct PlayState* play, struct Input* input); // every frame (z_player.c)
 void Fishmod_DpadUpdateBottle(struct PlayState* play, u8 item, s32 button);
 s32 Fishmod_DpadAssign(u16 press, s32 slot);
+void Fishmod_DpadRemoveSlot(s32 slot);
 void Fishmod_DpadDraw(struct PlayState* play);
 // The HUD clock under the overworld minimap (fishmod_items.c)
 extern s16 gFishmodMinimapLift;

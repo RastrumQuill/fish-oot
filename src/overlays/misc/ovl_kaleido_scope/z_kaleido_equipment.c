@@ -612,6 +612,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                     }
                 }
                 gSaveContext.save.info.equips.cButtonSlots[c] = slot;
+                Fishmod_DpadRemoveSlot(slot);
                 gSaveContext.save.info.equips.buttonItems[c + 1] = Fishmod_SlotItem(slot);
                 if (slot != SLOT_NONE) {
                     Interface_LoadItemIcon1(play, c + 1);

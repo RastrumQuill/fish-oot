@@ -420,8 +420,30 @@ s32 Fishmod_DpadAssign(u16 press, s32 slot) {
             dpad[i] = SLOT_NONE;
         }
     }
+    // (and off the C buttons: a slot is on one button of either set)
+    for (i = 0; i < 3; i++) {
+        if (gSaveContext.save.info.equips.cButtonSlots[i] == slot) {
+            gSaveContext.save.info.equips.cButtonSlots[i] = SLOT_NONE;
+            gSaveContext.save.info.equips.buttonItems[i + 1] = ITEM_NONE;
+        }
+    }
     dpad[d] = slot;
     return true;
+}
+
+/** The pause menu put a slot on a C button: off the D-pad (a slot is on one button of either set). */
+void Fishmod_DpadRemoveSlot(s32 slot) {
+    u8* dpad = FISHMOD_SAVE->dpad[DPAD_AGE()];
+    s32 i;
+
+    if (slot == SLOT_NONE) {
+        return;
+    }
+    for (i = 0; i < 4; i++) {
+        if (dpad[i] == slot) {
+            dpad[i] = SLOT_NONE;
+        }
+    }
 }
 
 /*

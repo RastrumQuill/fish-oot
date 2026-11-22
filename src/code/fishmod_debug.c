@@ -1154,10 +1154,22 @@ static void StateHash_Update(PlayState* play) {
 
 #include "fishmod_debug_animcheck.inc.c" // the animation check (FISHMOD_ANIMCHECK)
 
+f32 gFishmodDebugCam[10]; // the last frame's view (eye, at), the active camera, the buttons held: for the emulator
+
 void Fishmod_DebugPlayUpdate(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     sPlayFrames++;
+    gFishmodDebugCam[0] = play->view.eye.x;
+    gFishmodDebugCam[1] = play->view.eye.y;
+    gFishmodDebugCam[2] = play->view.eye.z;
+    gFishmodDebugCam[3] = play->view.at.x;
+    gFishmodDebugCam[4] = play->view.at.y;
+    gFishmodDebugCam[5] = play->view.at.z;
+    gFishmodDebugCam[6] = play->activeCamId;
+    gFishmodDebugCam[7] = play->state.input[0].cur.button;
+    gFishmodDebugCam[8] = (player != NULL) ? player->unk_860 : 0;
+    gFishmodDebugCam[9] = (player != NULL) ? (f32)(u32)player->actionFunc : 0;
 #ifndef FISHMOD_NOTIMERS
     if (((sPlayFrames & 7) == 0) && ((sPlayFrames >> 3) < FISHMOD_LINK_TRACE) && (player != NULL)) {
         s16* t = gFishmodLinkTrace[sPlayFrames >> 3];

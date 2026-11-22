@@ -1310,6 +1310,12 @@ void Fishmod_AdvanceTime(PlayState* play) {
     u16 speed = gTimeSpeed;
     s32 day = IS_DAY;
 
+    if (gSaveContext.gameMode != GAMEMODE_NORMAL) {
+        // the title screen and the credits: vanilla's clock (their scenes are timed to it)
+        gSaveContext.save.dayTime += gTimeSpeed;
+        return;
+    }
+
     if (play->sceneId == SCENE_FISHING_POND) {
         speed = TIME_FIELD_SPEED;
     }
@@ -1437,8 +1443,8 @@ void Fishmod_OnEnvironmentInit(PlayState* play) {
     sWeather = FISHMOD_WEATHER_CLEAR;
     sRainSoundPending = false;
     if ((Fishmod_GetSceneSpawns(play->sceneId) == NULL) || (play->skyboxId != SKYBOX_NORMAL_SKY) ||
-        (gWeatherMode != WEATHER_MODE_CLEAR)) {
-        return;
+        (gWeatherMode != WEATHER_MODE_CLEAR) || (gSaveContext.gameMode != GAMEMODE_NORMAL)) {
+        return; // (and the title screen and the credits: as vanilla's, no weather of ours)
     }
     sWeather = Fishmod_WeatherRoll(play->sceneId, gSaveContext.save.totalDays);
     if (sWeather == FISHMOD_WEATHER_CLEAR) {

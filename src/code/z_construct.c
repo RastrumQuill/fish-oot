@@ -9,6 +9,7 @@
 #include "interface.h"
 #include "ocarina.h"
 #include "play_state.h"
+#include "fishmod.h"
 #include "save.h"
 
 #include "assets/textures/do_action_static/do_action_static.h"
@@ -24,6 +25,8 @@ void Interface_Init(PlayState* play) {
     u32 parameterSize;
     u16 doActionOffset;
     u8 timerId;
+    s32 i;
+    s32 fishmodIcon = 0;
 
     gSaveContext.sunsSongState = SUNSSONG_INACTIVE;
     gSaveContext.nextHudVisibilityMode = gSaveContext.hudVisibilityMode = HUD_VISIBILITY_NO_CHANGE;
@@ -113,31 +116,42 @@ void Interface_Init(PlayState* play) {
            gSaveContext.save.info.equips.buttonItems[1], gSaveContext.save.info.equips.buttonItems[2],
            gSaveContext.save.info.equips.buttonItems[3]);
 
-    if (gSaveContext.save.info.equips.buttonItems[0] < 0xF0) {
+    // fishmod: the mod's items (the bait bottles' icons in RAM, the lures' in their own file) through
+    // Interface_LoadItemIcon1, which knows where they are; vanilla's below read icon_item_static at their number
+    for (i = 0; i < 4; i++) {
+        if ((gSaveContext.save.info.equips.buttonItems[i] != ITEM_NONE) &&
+            ((Fishmod_ItemIcon(gSaveContext.save.info.equips.buttonItems[i]) != NULL) ||
+             (Fishmod_ItemIconVrom(gSaveContext.save.info.equips.buttonItems[i]) != 0))) {
+            Interface_LoadItemIcon1(play, i);
+            fishmodIcon |= 1 << i;
+        }
+    }
+
+    if (!(fishmodIcon & (1 << 0)) && (gSaveContext.save.info.equips.buttonItems[0] < 0xF0)) {
         DMA_REQUEST_SYNC(interfaceCtx->iconItemSegment + (0 * ITEM_ICON_SIZE),
 
                          GET_ITEM_ICON_VROM(gSaveContext.save.info.equips.buttonItems[0]), ITEM_ICON_SIZE,
                          "../z_construct.c", 198);
-    } else if (gSaveContext.save.info.equips.buttonItems[0] != 0xFF) {
+    } else if (!(fishmodIcon & 1) && (gSaveContext.save.info.equips.buttonItems[0] != 0xFF)) {
         DMA_REQUEST_SYNC(interfaceCtx->iconItemSegment + (0 * ITEM_ICON_SIZE),
 
                          GET_ITEM_ICON_VROM(gSaveContext.save.info.equips.buttonItems[0]), ITEM_ICON_SIZE,
                          "../z_construct.c", 203);
     }
 
-    if (gSaveContext.save.info.equips.buttonItems[1] < 0xF0) {
+    if (!(fishmodIcon & (1 << 1)) && (gSaveContext.save.info.equips.buttonItems[1] < 0xF0)) {
         DMA_REQUEST_SYNC(interfaceCtx->iconItemSegment + (1 * ITEM_ICON_SIZE),
                          GET_ITEM_ICON_VROM(gSaveContext.save.info.equips.buttonItems[1]), ITEM_ICON_SIZE,
                          "../z_construct.c", 209);
     }
 
-    if (gSaveContext.save.info.equips.buttonItems[2] < 0xF0) {
+    if (!(fishmodIcon & (1 << 2)) && (gSaveContext.save.info.equips.buttonItems[2] < 0xF0)) {
         DMA_REQUEST_SYNC(interfaceCtx->iconItemSegment + (2 * ITEM_ICON_SIZE),
                          GET_ITEM_ICON_VROM(gSaveContext.save.info.equips.buttonItems[2]), ITEM_ICON_SIZE,
                          "../z_construct.c", 214);
     }
 
-    if (gSaveContext.save.info.equips.buttonItems[3] < 0xF0) {
+    if (!(fishmodIcon & (1 << 3)) && (gSaveContext.save.info.equips.buttonItems[3] < 0xF0)) {
         DMA_REQUEST_SYNC(interfaceCtx->iconItemSegment + (3 * ITEM_ICON_SIZE),
                          GET_ITEM_ICON_VROM(gSaveContext.save.info.equips.buttonItems[3]), ITEM_ICON_SIZE,
                          "../z_construct.c", 219);

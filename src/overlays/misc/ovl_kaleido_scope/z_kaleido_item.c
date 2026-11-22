@@ -714,6 +714,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
 
                 gSaveContext.save.info.equips.buttonItems[1] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[0] = pauseCtx->equipTargetSlot;
+                Fishmod_DpadRemoveSlot(pauseCtx->equipTargetSlot); // fishmod
                 Interface_LoadItemIcon1(play, 1);
 
                 PRINTF(T("Ｃ左sl_item_no=%d (1)=%d (2)=%d (3)=%d\n", "C left sl_item_no=%d (1)=%d (2)=%d (3)=%d\n"),
@@ -789,6 +790,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
 
                 gSaveContext.save.info.equips.buttonItems[2] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[1] = pauseCtx->equipTargetSlot;
+                Fishmod_DpadRemoveSlot(pauseCtx->equipTargetSlot); // fishmod
                 Interface_LoadItemIcon1(play, 2);
 
                 PRINTF(T("Ｃ下sl_item_no=%d (1)=%d (2)=%d (3)=%d\n", "C down sl_item_no=%d (1)=%d (2)=%d (3)=%d\n"),
@@ -864,6 +866,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
 
                 gSaveContext.save.info.equips.buttonItems[3] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[2] = pauseCtx->equipTargetSlot;
+                Fishmod_DpadRemoveSlot(pauseCtx->equipTargetSlot); // fishmod
                 Interface_LoadItemIcon1(play, 3);
 
                 PRINTF(T("Ｃ右sl_item_no=%d (1)=%d (2)=%d (3)=%d\n", "C right sl_item_no=%d (1)=%d (2)=%d (3)=%d\n"),
