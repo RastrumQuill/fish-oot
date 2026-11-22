@@ -48,7 +48,9 @@
         "speed": 45,
         "jumpiness": 10,
         "nibbles": 2, "nibbleGap": 14,
-        "biteWindow": 18
+        "biteWindow": 18,
+        "action": 55,
+        "chase": 45
       },
       "bait": {
         "none": 1.0,
@@ -257,7 +259,9 @@
         "speed": 70,
         "jumpiness": 20,
         "nibbles": 3, "nibbleGap": 10,
-        "biteWindow": 12
+        "biteWindow": 12,
+        "action": 60,
+        "chase": 70
       },
       "bait": {
         "none": 1.2,
@@ -342,7 +346,9 @@
         "speed": 65,
         "jumpiness": 45,
         "nibbles": 1, "nibbleGap": 12,
-        "biteWindow": 14
+        "biteWindow": 14,
+        "action": 85,
+        "chase": 70
       },
       "bait": {
         "none": 0.8,
@@ -488,7 +494,9 @@
         "speed": 30,
         "jumpiness": 0,
         "nibbles": 3, "nibbleGap": 34,
-        "biteWindow": 22
+        "biteWindow": 22,
+        "action": 15,
+        "chase": 10
       },
       "bait": {
         "none": 0.4,
@@ -721,7 +729,9 @@
         "speed": 55,
         "jumpiness": 5,
         "nibbles": 4, "nibbleGap": 50,
-        "biteWindow": 10
+        "biteWindow": 10,
+        "action": 5,
+        "chase": 5
       },
       "bait": {
         "none": 0.2,
@@ -792,7 +802,9 @@
         "speed": 35,
         "jumpiness": 15,
         "nibbles": 3, "nibbleGap": 44,
-        "biteWindow": 16
+        "biteWindow": 16,
+        "action": 10,
+        "chase": 15
       },
       "bait": {
         "none": 0.3,
@@ -1048,7 +1060,9 @@
         "speed": 85,
         "jumpiness": 80,
         "nibbles": 0, "nibbleGap": 16,
-        "biteWindow": 12
+        "biteWindow": 12,
+        "action": 90,
+        "chase": 95
       },
       "bait": {
         "none": 0.6,
@@ -1118,7 +1132,9 @@
         "speed": 60,
         "jumpiness": 35,
         "nibbles": 2, "nibbleGap": 26,
-        "biteWindow": 14
+        "biteWindow": 14,
+        "action": 45,
+        "chase": 40
       },
       "bait": {
         "none": 0.0,
@@ -1188,7 +1204,9 @@
         "speed": 60,
         "jumpiness": 40,
         "nibbles": 1, "nibbleGap": 16,
-        "biteWindow": 14
+        "biteWindow": 14,
+        "action": 75,
+        "chase": 60
       },
       "bait": {
         "none": 0.6,
@@ -1257,7 +1275,9 @@
         "speed": 25,
         "jumpiness": 0,
         "nibbles": 3, "nibbleGap": 22,
-        "biteWindow": 20
+        "biteWindow": 20,
+        "action": 30,
+        "chase": 20
       },
       "bait": {
         "none": 0.2,

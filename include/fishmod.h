@@ -65,7 +65,11 @@ typedef struct FishmodBehavior {
     /* 0x07 */ u8 nibbles;    // nibbles before the real bite
     /* 0x08 */ u8 biteWindow; // frames the bobber stays under for the hookset
     /* 0x09 */ u8 nibbleGap;  // frames between its taps at the bait (give or take a third): bass quick, carp slow
-} FishmodBehavior; // size = 0x0A
+    // the bait's action (as Sega Bass Fishing's and TP's fish): predators strike at a twitched, moving bait, bottom
+    // feeders want it still (EnFishmod_BaitAppeal, the inspect state)
+    /* 0x0A */ u8 action;     // how it takes to a twitched bait: 0 put off, 50 as most fish, 100 can't resist
+    /* 0x0B */ u8 chase;      // how readily it follows a reeled bait and strikes when it stops (stop-and-go)
+} FishmodBehavior; // size = 0x0C
 
 typedef enum FishmodPart {
     /* 0 */ FISHMOD_PART_HEAD,
@@ -99,18 +103,18 @@ typedef struct FishmodSpecies {
     /* 0x13 */ u8 lengthMax;
     /* 0x14 */ u16 weightCoef; // weight (lbs) = weightCoef * length^3 / 1000000
     /* 0x16 */ FishmodBehavior behavior;
-    /* 0x20 */ u8 bait[FISHMOD_BAIT_MAX]; // interest multiplier percent per bait
-    /* 0x2B */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
-    /* 0x40 */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
-    /* 0x55 */ u8 lookFlags;                       // FISHMOD_LOOK_*
-    /* 0x56 */ u8 activity;    // 0-3 per FishmodTimeOfDay, 2 bits each (dawn in the low bits)
-    /* 0x57 */ u8 depthTop;    // the band of the water column it keeps to: 0 = surface, 255 = floor
-    /* 0x58 */ u8 depthBottom;
-    /* 0x59 */ u8 rise;        // how far up the band moves when it's active and the light is low (feeding)
-    /* 0x5A */ u8 lightShy;    // how much bright light pushes it deeper
-    /* 0x5B */ u8 chronotype;  // each fish's clock is shifted by up to this many hours
-    /* 0x5C */ u8 schoolMin;   // lives in schools of this many to schoolMax (0: on its own)
-    /* 0x5D */ u8 schoolMax;
+    /* 0x22 */ u8 bait[FISHMOD_BAIT_MAX]; // interest multiplier percent per bait
+    /* 0x2D */ u8 partTint[FISHMOD_PART_MAX][3];  // RGB per part
+    /* 0x42 */ u8 partScale[FISHMOD_PART_MAX][3]; // percent per part: length, height, width
+    /* 0x57 */ u8 lookFlags;                       // FISHMOD_LOOK_*
+    /* 0x58 */ u8 activity;    // 0-3 per FishmodTimeOfDay, 2 bits each (dawn in the low bits)
+    /* 0x59 */ u8 depthTop;    // the band of the water column it keeps to: 0 = surface, 255 = floor
+    /* 0x5A */ u8 depthBottom;
+    /* 0x5B */ u8 rise;        // how far up the band moves when it's active and the light is low (feeding)
+    /* 0x5C */ u8 lightShy;    // how much bright light pushes it deeper
+    /* 0x5D */ u8 chronotype;  // each fish's clock is shifted by up to this many hours
+    /* 0x5E */ u8 schoolMin;   // lives in schools of this many to schoolMax (0: on its own)
+    /* 0x5F */ u8 schoolMax;
 } FishmodSpecies;
 
 #define FISHMOD_ACTIVITY(species, tod) (((species)->activity >> (2 * (tod))) & 3)

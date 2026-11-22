@@ -228,6 +228,10 @@ typedef struct FishmodRod {
     /* 0x115 */ u8 reelLock;        // (unused: the sink was stopped by a press of A once)
     /* 0x116 */ u8 hookedBait;      // the bait the hooked fish took (it learns it if it breaks off)
     /* 0x118 */ f32 baitTarget;     // the depth the water under the bobber gives the bait (Rod_UpdateSink)
+    // the bait's action this cast, for the fish (FishmodBehavior's action and chase)
+    /* 0x11C */ u8 reeling;         // this frame: 0 still, 1 reeled slowly (A), 2 fast (A and R)
+    /* 0x11D */ u8 twitchHeat;      // twitches lately (each adds one, one lost every 40 frames): overworked past 3
+    /* 0x11E */ s16 stillFrames;    // frames since the bait last moved (a twitch or the reel); large: not since the cast
 } FishmodRod;
 
 // The bait's height under the bobber

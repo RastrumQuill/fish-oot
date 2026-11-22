@@ -744,6 +744,17 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
 
     Rod_UpdateSink(play, input);
 
+    // the bait's action, for the fish: reeled (slowly or fast), how long since it last moved, twitches lately
+    ROD->reeling = !CHECK_BTN_ALL(input->cur.button, BTN_A) ? 0 : CHECK_BTN_ALL(input->cur.button, BTN_R) ? 2 : 1;
+    if (ROD->reeling != 0) {
+        ROD->stillFrames = 0;
+    } else if (ROD->stillFrames < 0x7FFF) {
+        ROD->stillFrames++;
+    }
+    if ((ROD->twitchHeat > 0) && ((play->gameplayFrames % 40) == 0)) {
+        ROD->twitchHeat--;
+    }
+
     // reel
     if (CHECK_BTN_ALL(input->cur.button, BTN_A)) {
         f32 reel = CHECK_BTN_ALL(input->cur.button, BTN_R) ? 3.5f : 1.6f;
@@ -766,6 +777,8 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
     if ((ROD->twitchTimer == 0) && ((ABS(input->press.stick_x) > 35) || (ABS(input->press.stick_y) > 35)) &&
         !ROD->biting) {
         ROD->twitchTimer = 20;
+        ROD->stillFrames = 0;
+        ROD->twitchHeat = MIN(ROD->twitchHeat + 1, 10);
         ROD->dip = 2.0f;
         ROD->lineOut -= 3.0f;
         Actor_PlaySfx(&this->actor, NA_SE_EV_LURE_MOVE_W);
@@ -1085,6 +1098,8 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->bobberPos.y = waterY;
                 ROD->dip = 6.0f;
                 ROD->splashed = true;
+                ROD->reeling = ROD->twitchHeat = 0;
+                ROD->stillFrames = 0x7FFF; // (still since it landed: no stop-and-go yet)
                 EnFishmod_Disturb(play, &ROD->bobberPos, 0.0f, 0);
                 // the bait sinks under the bobber to the depth the water gives it (Rod_UpdateSink)
                 ROD->baitDepth = BAIT_DEPTH_START;

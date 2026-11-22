@@ -85,7 +85,8 @@ def gen_header(data):
         out.append(f"        {sp['weightCoef'] * 1000000:.0f}, /* weight = coef * length^3 / 1000000 lbs */")
         out.append(
             f"        {{ {b['curiosity']}, {b['aggression']}, {b['wariness']}, {b['strength']}, {b['stamina']}, "
-            f"{b['speed']}, {b['jumpiness']}, {b['nibbles']}, {b['biteWindow']}, {b.get('nibbleGap', 25)} }},"
+            f"{b['speed']}, {b['jumpiness']}, {b['nibbles']}, {b['biteWindow']}, {b.get('nibbleGap', 25)}, "
+            f"{b.get('action', 50)}, {b.get('chase', 30)} }},"
         )
         out.append(f"        {{ {bait} }},")
         look = sp.get("look", {})

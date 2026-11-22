@@ -833,8 +833,14 @@ static f32 EnFishmod_BaitAppeal(EnFishmod* this) {
         appeal *= sActivityAppeal[EnFishmod_Activity(this)];
     }
     (void)tod;
+    // the bait's action, each species its own way (Sega Bass Fishing's bass, TP's pike): a twitch is a draw to the
+    // predators (x2.5 at action 100) and puts the bottom feeders off (x0.5 at 0); 50 is the old x1.5 for all. Worked
+    // too often (more than three twitches lately), the wary see through it.
     if (gFishmodRodState.twitchTimer > 0) {
-        appeal *= 1.5f;
+        appeal *= 0.5f + this->species->behavior.action * 0.02f;
+    }
+    if (gFishmodRodState.twitchHeat > 3) {
+        appeal *= 1.0f - this->species->behavior.wariness * 0.006f;
     }
     return appeal;
 }
@@ -1630,8 +1636,11 @@ static void Fish_Wander(EnFishmod* this, PlayState* play, FishAI* ai) {
             notice += 40.0f;
             keen *= 1.5f;
         } else if (rod->twitchTimer > 0) {
-            // a twitch is felt all round too
-            notice += 30.0f;
+            // a twitch is felt all round too: the more the more it likes action (30 at 50)
+            notice += b->action * 0.6f;
+        } else if ((rod->reeling == 1) && (b->chase > 30)) {
+            // a bait drawn slowly through the water: the chasers come after it, seen or not
+            notice += (b->chase - 30) * 0.8f;
         } else if (!EnFishmod_CanSee(this, play, &rod->bobberPos, notice + 20.0f) &&
                    (bobberDist > this->halfLength + 25.0f)) {
             // otherwise it has to see it (or have it right beside it)
@@ -1725,10 +1734,17 @@ static void Fish_Inspect(EnFishmod* this, PlayState* play, FishAI* ai) {
     }
 
     this->interest += 0.01f * EnFishmod_BaitAppeal(this);
-    // reeling the bobber away too fast is suspicious to wary fish
-    // (the bobber has moved away from the spot the fish is holding)
+    // the bait moving: a chaser follows a slow reel keener for it, the rest lose interest (a still bait is what they
+    // want)
+    if (rod->reeling == 1) {
+        this->interest += (b->chase - 40) * 0.0002f;
+        this->interest = CLAMP_MIN(this->interest, 0.0f);
+    }
+    // reeling the bobber away too fast is suspicious to wary fish (the bobber has moved away from the spot the fish
+    // is holding); a chaser follows a slow reel, and is put off less by a fast one
     if ((Math_Vec3f_DistXZ(&this->actor.world.pos, &hover) > 12.0f) &&
-        (Fishmod_RandZeroOne(gFishmodRngNow) < b->wariness * 0.002f)) {
+        (Fishmod_RandZeroOne(gFishmodRngNow) <
+         b->wariness * 0.002f * ((rod->reeling == 1) ? (100 - b->chase) * 0.01f : (1.5f - b->chase * 0.01f)))) {
         this->cooldown = 200;
         EnFishmod_FishSetState(this, FISH_STATE_WANDER);
         return;
@@ -1737,7 +1753,10 @@ static void Fish_Inspect(EnFishmod* this, PlayState* play, FishAI* ai) {
         if (this->nibblesLeft > 0) {
             EnFishmod_FishSetState(this, FISH_STATE_NIBBLE);
         } else if (Fishmod_RandZeroOne(gFishmodRngNow) <
-                   (b->aggression * 0.012f * (0.6f + this->interest) * (0.5f + MOOD_HUNGER(this)))) {
+                   (b->aggression * 0.012f * (0.6f + this->interest) * (0.5f + MOOD_HUNGER(this)) *
+                    // stop-and-go: the bait stopping just after it moved (a twitch, the reel) is when a chaser
+                    // strikes (up to x3.4 for the pike's 95)
+                    (((rod->stillFrames > 0) && (rod->stillFrames <= 30)) ? (1.0f + b->chase / 40.0f) : 1.0f))) {
             this->fishState = FISH_STATE_BITE;
             // a wind-up first: it draws back, then strikes (the bite comes when it reaches the bait)
             this->stateTimer = 14;
