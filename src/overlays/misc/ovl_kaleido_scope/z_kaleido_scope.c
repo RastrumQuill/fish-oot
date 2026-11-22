@@ -941,6 +941,7 @@ char gItemAgeReqs[] = {
     AGE_REQ_NONE,  // ITEM_INVALID_4 (fishmod: ITEM_LURE_POND)
     AGE_REQ_NONE,  // ITEM_INVALID_5 (fishmod: ITEM_LURE_SINKING)
     AGE_REQ_NONE,  // ITEM_INVALID_6 (fishmod: ITEM_SINKER)
+    AGE_REQ_NONE,  // ITEM_INVALID_7 (fishmod: ITEM_BOTTLE_WORM)
 };
 
 u8 gAreaGsFlags[] = {

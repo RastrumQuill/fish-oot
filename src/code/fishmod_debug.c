@@ -789,6 +789,12 @@ void Fishmod_DebugBoot(void) {
     gSaveContext.save.info.equips.cButtonSlots[1] = SLOT_BOTTLE_1;
     gSaveContext.save.info.equips.buttonItems[3] = ITEM_BOTTLE_EMPTY;
     gSaveContext.save.info.equips.cButtonSlots[2] = SLOT_BOTTLE_2;
+#ifdef FISHMOD_SCRIPT_WORMS
+    // a bottle of worms on C-Down (bottle 1), full
+    INV_SLOT(SLOT_BOTTLE_1) = ITEM_BOTTLE_WORM;
+    gSaveContext.save.info.equips.buttonItems[2] = ITEM_BOTTLE_WORM;
+    FISHMOD_SAVE->bottleFish[0].lengthTenths = FISHMOD_WORMS_PER_BOTTLE;
+#endif
     if (sScript.flags & FISHMOD_SCRIPT_F_BUGS) {
         // the slingshot on C-Down (switching to it puts the rod away), bugs in the C-Right bottle
         gSaveContext.save.info.inventory.items[SLOT_SLINGSHOT] = ITEM_SLINGSHOT;

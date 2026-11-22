@@ -438,6 +438,11 @@ uintptr_t Fishmod_ItemNameVrom(s32 item);
 #define ITEM_BOTTLE_LARVA_2 ITEM_INVALID_2
 #define ITEM_BOTTLE_LARVA_1 ITEM_INVALID_3
 #define FISHMOD_IS_BAIT_ITEM(item) (((item) >= ITEM_BOTTLE_LARVA_3) && ((item) <= ITEM_BOTTLE_LARVA_1))
+// A bottle of worms: three baits, counted in the bottle's FishmodBottleFish (lengthTenths: the worms left; a bottle
+// of worms holds no fish), one item (the game has only two spare item numbers left, not three for its levels)
+#define ITEM_BOTTLE_WORM ITEM_INVALID_7
+#define FISHMOD_WORMS_PER_BOTTLE 3
+extern u64 gFishmodBottleWormTex[];
 extern u64 gFishmodBottleLarva3Tex[];
 extern u64 gFishmodBottleLarva2Tex[];
 extern u64 gFishmodBottleLarva1Tex[];

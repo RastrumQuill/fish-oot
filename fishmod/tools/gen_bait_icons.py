@@ -150,6 +150,87 @@ def icon(level):
     return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), "RGBA")
 
 
+SOIL_DARK = np.array([34.0, 20.0, 10.0])
+SOIL_MID = np.array([86.0, 56.0, 30.0])
+SOIL_LIGHT = np.array([140.0, 102.0, 62.0])
+WORM = np.array([236.0, 128.0, 134.0])
+WORM_DARK = np.array([150.0, 60.0, 70.0])
+SOIL_TOP = 14.6
+# the worms: paths in icon pixels (against the glass, one over the top of the soil)
+WORMS = [
+    [(9.5, 23.5), (11.5, 21.8), (13.8, 22.6), (15.6, 24.4), (17.8, 24.0)],
+    [(14.0, 14.2), (15.6, 12.6), (17.6, 12.9), (18.8, 14.6), (20.6, 15.6), (22.2, 15.0)],
+    [(19.0, 19.0), (20.8, 20.6), (21.4, 22.8), (20.0, 24.4)],
+]
+
+
+def worm_layer():
+    """The worms at 8x: round, ringed, lit from the upper left; 32x32 colour and coverage."""
+    S = 8
+    col = np.zeros((32 * S, 32 * S, 3))
+    cov = np.zeros((32 * S, 32 * S))
+    yy, xx = np.mgrid[0:32 * S, 0:32 * S] + 0.5
+    for path in WORMS:
+        pts = np.array(path) * S
+        # dense points along it
+        dense = []
+        for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
+            for t in np.linspace(0, 1, 12, endpoint=False):
+                dense.append((x0 + (x1 - x0) * t, y0 + (y1 - y0) * t))
+        dense.append(tuple(pts[-1]))
+        n = len(dense)
+        for k, (cx, cy) in enumerate(dense):
+            t = k / (n - 1)
+            rr = (0.95 - 0.25 * abs(t - 0.35)) * S  # (thickest a third along: its saddle)
+            d2 = ((xx - cx) ** 2 + (yy - cy) ** 2) / (rr * rr)
+            inside = d2 < 1.0
+            nz = np.sqrt(np.clip(1.0 - d2, 0, 1))
+            lam = np.clip(-0.5 * (xx - cx) / rr - 0.55 * (yy - cy) / rr + 0.65 * nz, 0, 1)
+            ring = 0.88 + 0.12 * math.cos(k * 1.6)  # (its rings)
+            c = WORM_DARK + (WORM - WORM_DARK) * (0.2 + 0.8 * lam)[..., None]
+            c = c * ring + (np.clip(lam, 0, 1) ** 14 * 70)[..., None]
+            col[inside] = c[inside]
+            cov[inside] = 1.0
+
+    def down(x):
+        return x.reshape(32, S, 32, S, *x.shape[2:]).mean(axis=(1, 3))
+    c32, a32 = down(col * cov[..., None]), down(cov)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        c32 = np.where(a32[..., None] > 0, c32 / a32[..., None], 0)
+    return c32, a32
+
+
+def worm_icon():
+    """A bottle of worms: soil to two thirds up (the potion's liquid made earth, grainy), pink worms against the glass
+    and one over the top."""
+    potion = np.asarray(Image.open(POTION).convert("RGBA"))
+    empty = np.asarray(Image.open(BOTTLE).convert("RGBA")).astype(float)
+    mask = liquid_mask(potion)
+    out = potion.astype(float).copy()
+    r = out[..., 0]
+    sheen = np.minimum(out[..., 1], out[..., 2])
+    lo, hi = np.percentile(r[mask], 3), np.percentile(r[mask], 97)
+    t = np.clip((r - lo) / max(hi - lo, 1.0), 0.0, 1.0)[..., None]
+    rnd = np.random.RandomState(7)
+    grain = rnd.uniform(-1, 1, (32, 32, 1))
+    col = np.where(t < 0.6, SOIL_DARK + (SOIL_MID - SOIL_DARK) * (t / 0.6),
+                   SOIL_MID + (SOIL_LIGHT - SOIL_MID) * ((t - 0.6) / 0.4))
+    col = col * (1 + 0.22 * grain) + sheen[..., None] * np.array([0.8, 0.8, 0.85]) * 0.8
+    out[..., :3] = np.where(mask[..., None], np.clip(col, 0, 255), out[..., :3])
+    rows = np.arange(32)[:, None] + 0.5
+    above = mask & (rows < SOIL_TOP)
+    out[above] = empty[above]
+    # the soil's crumbly top
+    top = mask & (np.abs(rows - (SOIL_TOP + 0.5)) < 0.75)
+    out[..., :3] = np.where(top[..., None], out[..., :3] * 0.5 + SOIL_LIGHT * 0.5 * (1 + 0.3 * grain), out[..., :3])
+    c32, a32 = worm_layer()
+    inside = (mask | above)[..., None]
+    k = np.clip(a32 * 1.3, 0, 1)[..., None] * inside * 0.95
+    out[..., :3] = out[..., :3] * (1 - k) + c32 * k
+    out[..., 3] = np.where(mask, np.maximum(out[..., 3], 240), out[..., 3])
+    return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), "RGBA")
+
+
 def main():
     os.makedirs(OUT_ART, exist_ok=True)
     for count in (3, 2, 1):
@@ -157,8 +238,11 @@ def main():
         img.save(os.path.join(OUT_ART, f"bottle_larva_{count}.png"))
         os.makedirs(os.path.join(ROOT, "fishmod", "out"), exist_ok=True)
         img.resize((128, 128), Image.NEAREST).save(os.path.join(ROOT, "fishmod", "out", f"bottle_larva_{count}_x4.png"))
+    worm_icon().save(os.path.join(OUT_ART, "bottle_worm.png"))
     entries = [{"name": f"gFishmodBottleLarva{c}Tex", "src": f"src/fishmod_data/art/bottle_larva_{c}.png",
                 "format": "rgba32", "out": OUT_C} for c in (3, 2, 1)]
+    entries.append({"name": "gFishmodBottleWormTex", "src": "src/fishmod_data/art/bottle_worm.png", "format": "rgba32",
+                    "out": OUT_C})
     with open(MANIFEST, "w") as f:
         json.dump({"textures": entries, "models": []}, f, indent=2)
 

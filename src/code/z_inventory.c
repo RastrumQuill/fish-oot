@@ -287,6 +287,7 @@ u8 gItemSlots[] = {
     [ITEM_BOTTLE_LARVA_3] = SLOT_BOTTLE_1, // (like the game's bottles: the first bottle slot)
     [ITEM_BOTTLE_LARVA_2] = SLOT_BOTTLE_1,
     [ITEM_BOTTLE_LARVA_1] = SLOT_BOTTLE_1,
+    [ITEM_BOTTLE_WORM] = SLOT_BOTTLE_1,
     [ITEM_LURE_POND] = SLOT_LURE_1,
     [ITEM_LURE_SINKING] = SLOT_LURE_2,
     [ITEM_SINKER] = SLOT_LURE_3,

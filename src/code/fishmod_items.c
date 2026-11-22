@@ -46,6 +46,7 @@ static const FishmodItemDef sItems[] = {
       gFishmodBottleLarva2Tex },
     { ITEM_BOTTLE_LARVA_1, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, NO_PAGE_INDEX, ITEM_BOTTLE_EMPTY,
       gFishmodBottleLarva1Tex },
+    { ITEM_BOTTLE_WORM, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, NO_PAGE_INDEX, ITEM_BOTTLE_EMPTY, gFishmodBottleWormTex },
 };
 
 static const FishmodItemDef* Fishmod_ItemDef(s32 item) {

@@ -441,6 +441,9 @@ s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
     if (FISHMOD_IS_BAIT_ITEM(item)) {
         bait = FISHMOD_BAIT_BEE_LARVA;
         next = sNextLarva[item - ITEM_BOTTLE_LARVA_3];
+    } else if (item == ITEM_BOTTLE_WORM) {
+        bait = FISHMOD_BAIT_WORM;
+        next = ITEM_BOTTLE_WORM; // (one fewer worm in it: counted below, empty after the last)
     } else if ((item == ITEM_BOTTLE_BUG) && Fishmod_RodHeld(play)) {
         bait = FISHMOD_BAIT_BUG;
         next = ITEM_BOTTLE_EMPTY;
@@ -460,6 +463,32 @@ s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
         return true;
     }
     gFishmodRodInfo.baitRequest = bait;
+    if (item == ITEM_BOTTLE_WORM) {
+        // the bottle pressed (else the first of worms): one worm fewer, empty after the last
+        s32 slot = ((button >= 1) && (button < FISHMOD_BUTTON_MAX)) ? Fishmod_ButtonSlot(button) : SLOT_NONE;
+        s32 i;
+
+        if (!FISHMOD_IS_BOTTLE_SLOT(slot) || (INV_SLOT(slot) != ITEM_BOTTLE_WORM)) {
+            for (i = 0; i < FISHMOD_BOTTLES; i++) {
+                if (INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) == ITEM_BOTTLE_WORM) {
+                    slot = FISHMOD_BOTTLE_SLOT(i);
+                    break;
+                }
+            }
+        }
+        if (FISHMOD_IS_BOTTLE_SLOT(slot)) {
+            FishmodBottleFish* rec = &FISHMOD_SAVE->bottleFish[FISHMOD_BOTTLE_INDEX(slot)];
+
+            if ((rec->lengthTenths == 0) || (rec->lengthTenths > FISHMOD_WORMS_PER_BOTTLE)) {
+                rec->lengthTenths = FISHMOD_WORMS_PER_BOTTLE; // (a bottle of worms come by some other way: full)
+            }
+            rec->lengthTenths--;
+            if (rec->lengthTenths == 0) {
+                next = ITEM_BOTTLE_EMPTY;
+                rec->species = rec->look = 0;
+            }
+        }
+    }
     if ((button >= 1) && (button < FISHMOD_BUTTON_MAX)) {
         Inventory_UpdateBottleItem(play, next, button); // the bottle on the button that was pressed
     } else {
@@ -856,7 +885,7 @@ void Fishmod_InitTestSave(void) {
                                                          INFTABLE_MASK(INFTABLE_SARIA_WAS_TOLD_ABOUT_MIDO) |
                                                          INFTABLE_MASK(INFTABLE_0C) | INFTABLE_MASK(INFTABLE_0E);
 
-    // bait to test with in all but one bottle (the bottled baits there are: bee larvae, three uses each, and bugs),
+    // bait to test with in all but one bottle (bee larvae and worms, three uses each, and bugs),
     // the last empty for a catch; bottle 4's bugs are on C-Right
     Fishmod_InitSaveExtras();
     for (i = 0; i < FISHMOD_BOTTLES; i++) {
@@ -864,7 +893,8 @@ void Fishmod_InitTestSave(void) {
     }
     INV_SLOT(FISHMOD_BOTTLE_SLOT(0)) = ITEM_BOTTLE_LARVA_3;
     INV_SLOT(FISHMOD_BOTTLE_SLOT(1)) = ITEM_BOTTLE_LARVA_3;
-    INV_SLOT(FISHMOD_BOTTLE_SLOT(2)) = ITEM_BOTTLE_BUG;
+    INV_SLOT(FISHMOD_BOTTLE_SLOT(2)) = ITEM_BOTTLE_WORM;
+    FISHMOD_SAVE->bottleFish[2].lengthTenths = FISHMOD_WORMS_PER_BOTTLE;
     INV_SLOT(FISHMOD_BOTTLE_SLOT(3)) = ITEM_BOTTLE_BUG;
     INV_SLOT(FISHMOD_BOTTLE_SLOT(4)) = ITEM_BOTTLE_LARVA_3;
     // the rod, and the tackle (the pond lure, the sinking lure, the sinker)
