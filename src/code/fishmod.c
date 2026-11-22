@@ -856,13 +856,18 @@ void Fishmod_InitTestSave(void) {
                                                          INFTABLE_MASK(INFTABLE_SARIA_WAS_TOLD_ABOUT_MIDO) |
                                                          INFTABLE_MASK(INFTABLE_0C) | INFTABLE_MASK(INFTABLE_0E);
 
-    // five empty bottles and one with bugs, for bait and catches
+    // bait to test with in all but one bottle (the bottled baits there are: bee larvae, three uses each, and bugs),
+    // the last empty for a catch; bottle 4's bugs are on C-Right
     Fishmod_InitSaveExtras();
     for (i = 0; i < FISHMOD_BOTTLES; i++) {
         INV_SLOT(FISHMOD_BOTTLE_SLOT(i)) = ITEM_BOTTLE_EMPTY;
     }
-    inv->items[SLOT_BOTTLE_4] = ITEM_BOTTLE_BUG;
-    // the rod, and the lures (placeholders)
+    INV_SLOT(FISHMOD_BOTTLE_SLOT(0)) = ITEM_BOTTLE_LARVA_3;
+    INV_SLOT(FISHMOD_BOTTLE_SLOT(1)) = ITEM_BOTTLE_LARVA_3;
+    INV_SLOT(FISHMOD_BOTTLE_SLOT(2)) = ITEM_BOTTLE_BUG;
+    INV_SLOT(FISHMOD_BOTTLE_SLOT(3)) = ITEM_BOTTLE_BUG;
+    INV_SLOT(FISHMOD_BOTTLE_SLOT(4)) = ITEM_BOTTLE_LARVA_3;
+    // the rod, and the tackle (the pond lure, the sinking lure, the sinker)
     INV_SLOT(SLOT_FISHING_ROD) = ITEM_FISHING_POLE;
     INV_SLOT(SLOT_LURE_1) = ITEM_LURE_POND;
     INV_SLOT(SLOT_LURE_2) = ITEM_LURE_SINKING;
