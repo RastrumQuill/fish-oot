@@ -38,15 +38,11 @@ static const FishmodItemDef sItems[] = {
     { ITEM_LURE_POND, PLAYER_IA_NONE, false, 0, 1, ITEM_LURE_POND, NULL },
     { ITEM_LURE_SINKING, PLAYER_IA_NONE, false, 1, 2, ITEM_LURE_SINKING, NULL },
     { ITEM_SINKER, PLAYER_IA_NONE, false, 2, 3, ITEM_SINKER, NULL },
-    // bait bottles: Link holds them as bottles (using one is fishmod's); until they have name graphics of their own,
-    // they go by the bottle's name
-    { ITEM_BOTTLE_LARVA_3, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, NO_PAGE_INDEX, ITEM_BOTTLE_EMPTY,
-      gFishmodBottleLarva3Tex },
-    { ITEM_BOTTLE_LARVA_2, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, NO_PAGE_INDEX, ITEM_BOTTLE_EMPTY,
-      gFishmodBottleLarva2Tex },
-    { ITEM_BOTTLE_LARVA_1, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, NO_PAGE_INDEX, ITEM_BOTTLE_EMPTY,
-      gFishmodBottleLarva1Tex },
-    { ITEM_BOTTLE_WORM, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, NO_PAGE_INDEX, ITEM_BOTTLE_EMPTY, gFishmodBottleWormTex },
+    // bait bottles: Link holds them as bottles (using one is fishmod's); their names in the item page's graphics
+    { ITEM_BOTTLE_LARVA_3, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, 5, ITEM_BOTTLE_EMPTY, gFishmodBottleLarva3Tex },
+    { ITEM_BOTTLE_LARVA_2, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, 5, ITEM_BOTTLE_EMPTY, gFishmodBottleLarva2Tex },
+    { ITEM_BOTTLE_LARVA_1, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, 5, ITEM_BOTTLE_EMPTY, gFishmodBottleLarva1Tex },
+    { ITEM_BOTTLE_WORM, PLAYER_IA_BOTTLE, true, NO_PAGE_INDEX, 6, ITEM_BOTTLE_EMPTY, gFishmodBottleWormTex },
 };
 
 static const FishmodItemDef* Fishmod_ItemDef(s32 item) {

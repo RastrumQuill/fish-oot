@@ -12,7 +12,7 @@
 #define FISHMOD_ITEM_PAGE_TILE_INDEX { -1, -1, 0, 1, 2, -1, 3, 4, 5, 6, 7, 8 }
 #define FISHMOD_LURE_COUNT 4 // the pond lure, the sinking lure, the sinker, and the bobber (the sinker item while the
                              // sinker is on: Fishmod_TackleShown)
-#define FISHMOD_ITEM_NAMES 5 // the rod, then the tackle as above
+#define FISHMOD_ITEM_NAMES 7 // the rod, then the tackle as above, then the bait bottles (bee larvae, worms)
 
 typedef struct FishmodItemPage {
     u64 pageTex[FISHMOD_ITEM_PAGE_TILES][80 * 32 / 8];   // IA8 80 x 32
