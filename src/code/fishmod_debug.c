@@ -838,6 +838,11 @@ void Fishmod_DebugBoot(void) {
         Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HYLIAN);
         SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA); // the lake full, as the test build has it
     }
+#ifdef FISHMOD_SCRIPT_DRAINED
+    // the lake drained: the Water Temple not beaten (and vanilla's rain over the lake with it)
+    CLEAR_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
+    CLEAR_EVENTCHKINF(EVENTCHKINF_4A);
+#endif
     if (sScript.flags & FISHMOD_SCRIPT_F_EMPTY_ITEMS) {
         // nothing on the item page (the pause-menu mockups draw their own icons on it)
         memset(gSaveContext.save.info.inventory.items, ITEM_NONE, sizeof(gSaveContext.save.info.inventory.items));

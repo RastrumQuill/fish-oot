@@ -24,6 +24,8 @@
 void EnWeatherTag_Init(Actor* thisx, PlayState* play);
 void EnWeatherTag_Destroy(Actor* thisx, PlayState* play);
 void EnWeatherTag_Update(Actor* thisx, PlayState* play);
+void EnWeatherTag_RainAllOverLakeHylia(EnWeatherTag* this, PlayState* play);
+static u8 sLakeRainSoundOn; // fishmod
 
 void EnWeatherTag_DisabledCloudyHyruleMarket(EnWeatherTag* this, PlayState* play);
 void EnWeatherTag_EnabledCloudyHyruleMarket(EnWeatherTag* this, PlayState* play);
@@ -101,7 +103,15 @@ void EnWeatherTag_Init(Actor* thisx, PlayState* play) {
             if (GET_EVENTCHKINF(EVENTCHKINF_4A)) {
                 Actor_Kill(&this->actor);
             }
-            EnWeatherTag_SetupAction(this, EnWeatherTag_DisabledRainLakeHylia);
+            // fishmod: the drained lake's rain is over the whole lake from the moment Link arrives (it was a zone by
+            // the water: walking toward the lake clouded the sky over and brought the rain)
+            gWeatherMode = WEATHER_MODE_RAIN;
+            play->envCtx.skyboxConfig = play->envCtx.changeSkyboxNextConfig = 1;
+            play->envCtx.lightConfig = play->envCtx.changeLightNextConfig = 2;
+            gLightConfigAfterUnderwater = 2;
+            play->envCtx.precipitation[PRECIP_RAIN_MAX] = play->envCtx.precipitation[PRECIP_RAIN_CUR] = 25;
+            sLakeRainSoundOn = false;
+            EnWeatherTag_SetupAction(this, EnWeatherTag_RainAllOverLakeHylia);
             break;
         case EN_WEATHER_TAG_TYPE_CLOUDY_DEATH_MOUNTAIN:
             PRINTF("\n\n");
@@ -286,6 +296,14 @@ void EnWeatherTag_DisabledRainLakeHylia(EnWeatherTag* this, PlayState* play) {
         Environment_PlayStormNatureAmbience(play);
         play->envCtx.precipitation[PRECIP_RAIN_MAX] = 25;
         EnWeatherTag_SetupAction(this, EnWeatherTag_EnabledRainLakeHylia);
+    }
+}
+
+/** fishmod: the drained lake's rain, all over the lake: its sound started once the scene's running, then nothing. */
+void EnWeatherTag_RainAllOverLakeHylia(EnWeatherTag* this, PlayState* play) {
+    if (!sLakeRainSoundOn) {
+        Environment_PlayStormNatureAmbience(play);
+        sLakeRainSoundOn = true;
     }
 }
 

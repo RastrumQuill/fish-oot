@@ -936,6 +936,9 @@ void Fishmod_InitTestSave(void) {
                       OWN_EQUIP(EQUIP_TYPE_SHIELD, EQUIP_INV_SHIELD_HYLIAN) |
                       OWN_EQUIP(EQUIP_TYPE_TUNIC, EQUIP_INV_TUNIC_ZORA) | OWN_EQUIP(EQUIP_TYPE_BOOTS, EQUIP_INV_BOOTS_IRON);
     SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
+    // and the Water Temple beaten, as it is when the lake's full (vanilla's rain over the drained lake goes with it:
+    // without it, walking toward the full lake clouded the sky over and brought the rain)
+    SET_EVENTCHKINF(EVENTCHKINF_4A);
     SET_EVENTCHKINF(EVENTCHKINF_B1); // Lake Hylia's intro cutscene seen (it took the camera on the first warp there)
     gSaveContext.save.info.equips.buttonItems[0] = ITEM_SWORD_KOKIRI;
     Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI);
@@ -971,6 +974,7 @@ void Fishmod_TestStart(void) {
     gSaveContext.save.linkAge = LINK_AGE_ADULT;
     Fishmod_TestSetAge(true);
     CLEAR_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
+    CLEAR_EVENTCHKINF(EVENTCHKINF_4A); // (vanilla's rain over the drained lake, as it should be)
 #endif
 }
 #endif
@@ -1097,7 +1101,7 @@ static_assert((FISHMOD_SAVE_SCENE - FISHMOD_SAVE_OLD_SCENE) * sizeof(SavedSceneF
 static_assert(FISHMOD_SAVE_SCENE * sizeof(SavedSceneFlags) + sizeof(FishmodSaveData) <=
                   sizeof(gSaveContext.save.info.sceneFlags),
               "the save block doesn't fit in the scene flags");
-static_assert(sizeof(FishmodSaveData) == 0xB2, "the save block's layout changed: bump FISHMOD_SAVE_VERSION");
+static_assert(sizeof(FishmodSaveData) == 0xB4, "the save block's layout changed: bump FISHMOD_SAVE_VERSION");
 static_assert(FISHMOD_SPECIES_MAX <= FISHMOD_SAVE_SPECIES_MAX, "more species than the save keeps records for");
 
 /**
@@ -1518,6 +1522,9 @@ void Fishmod_OnEnvironmentInit(PlayState* play) {
         return; // (under the open sky only; and the title screen and the credits: as vanilla's, no weather of ours)
     }
     sWeather = Fishmod_WeatherRoll(0, gSaveContext.save.totalDays); // (the day's, everywhere)
+    if (FISHMOD_SAVE->clearDay == (u16)(gSaveContext.save.totalDays + 1)) {
+        sWeather = FISHMOD_WEATHER_CLEAR; // (the morning the lake came back: clear all that day)
+    }
     if (sWeather == FISHMOD_WEATHER_CLEAR) {
         return;
     }
@@ -1532,6 +1539,12 @@ void Fishmod_OnEnvironmentInit(PlayState* play) {
         envCtx->stormState = STORM_STATE_ON;
         sRainSoundPending = true;
     }
+}
+
+/** The rest of today clear, everywhere (the Water Temple beaten: vanilla brings the morning and clears the sky). */
+void Fishmod_WeatherClearToday(void) {
+    FISHMOD_SAVE->clearDay = (u16)(gSaveContext.save.totalDays + 1);
+    sWeather = FISHMOD_WEATHER_CLEAR;
 }
 
 /** The day's weather as rolled for this scene (the Song of Storms not counted): vanilla's weather zones go back to it. */

@@ -260,7 +260,7 @@ extern FishmodRodInfo gFishmodRodInfo;
 #define FISHMOD_SAVE_SCENE 110
 #define FISHMOD_SAVE_OLD_SCENE 101 // where builds before the move kept it
 #define FISHMOD_SAVE_MAGIC 0x464D  // 'FM': the block has been set up (moved, or begun) by this build or a later one
-#define FISHMOD_SAVE_VERSION 2 // 2: the D-pad's buttons
+#define FISHMOD_SAVE_VERSION 3 // 2: the D-pad's buttons; 3: the clear day
 #define FISHMOD_SAVE_SPECIES_MAX 32
 
 typedef struct FishmodSpeciesRecord {
@@ -288,7 +288,9 @@ typedef struct FishmodSaveData {
     /* 0xAA */ u8 dpad[2][4]; // the D-pad's buttons (up, down, left, right) for each age (LINK_AGE_ADULT, _CHILD, as
                               // the C buttons have one set each): a slot as the C buttons keep one, an equipment
                               // mark (FISHMOD_SLOT_EQUIP), or SLOT_NONE
-} FishmodSaveData; // size = 0xB2
+    /* 0xB2 */ u16 clearDay;  // a day kept clear (the lake restored that morning, as vanilla has it): totalDays + 1,
+                              // 0 for none (zeros in saves from before it)
+} FishmodSaveData; // size = 0xB4
 
 // FishmodSaveData.flags
 #define FISHMOD_SAVE_FLAG_ITEMS (1 << 0) // items[] set up (a save from before has zeros there, the Deku Stick's id)
@@ -770,6 +772,7 @@ s32 Fishmod_WeatherRoll(s16 sceneId, s32 day);
 void Fishmod_OnEnvironmentInit(struct PlayState* play);
 s32 Fishmod_Weather(struct PlayState* play);
 s32 Fishmod_WeatherRolled(void);
+void Fishmod_WeatherClearToday(void);
 f32 Fishmod_Light(struct PlayState* play);
 // Underwater haze, 0 (camera above water) to 1 (under)
 extern f32 gFishmodHaze;

@@ -29,6 +29,7 @@
 #include "printf.h"
 #include "quake.h"
 #include "regs.h"
+#include "fishmod.h"
 #include "rumble.h"
 #include "save.h"
 #include "scene.h"
@@ -449,6 +450,7 @@ void CutsceneCmd_Misc(PlayState* play, CutsceneContext* csCtx, CsCmdMisc* cmd) {
 
         case CS_MISC_SET_FLAG_RESTORED_LAKE_HYLIA:
             SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
+            Fishmod_WeatherClearToday(); // fishmod: the morning it came back stays clear (no rolled clouds or rain)
             break;
 
         case CS_MISC_VISMONO_BLACK_AND_WHITE:
