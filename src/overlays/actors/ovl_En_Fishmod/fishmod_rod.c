@@ -66,8 +66,12 @@ FishmodRod gFishmodRodState;
 #define SINK_RATE 1.2f         // the sinking lure going down, units a frame
 #define SINK_LIFT_SLOW 12.0f   // how far the reel lifts it off the bed (A), and fast
 #define SINK_LIFT_FAST 26.0f
-#define SINKER_LEADER 18.0f    // the sinker's leader: the bait floats this far above the weight on the bed
-#define SINKER_RATE 1.6f
+#define SINKER_LEADER 18.0f    // the sinker's leader: the bait floats up to this far from the weight (a string, not a rod)
+#define SINKER_RATE 1.6f       // the weight sinking, units a frame
+#define SINKER_LIFT_SLOW 0.9f  // the weight drawn up by the reel (A), and fast (A and R), units a frame
+#define SINKER_LIFT_FAST 1.8f
+#define SINKER_FLOAT 0.12f     // the bait's float, rising on its leader (units a frame a frame)
+#define SINKER_DRAG 0.86f      // the water slowing the bait (it trails behind the weight when it's drawn along)
 #define UNDER_CAM_IN 45.0f     // the camera follows the tackle under once the bait's this deep, and back up at...
 #define UNDER_CAM_OUT 28.0f    // ...this (apart, so it doesn't flicker between the two)
 #define RIG_UNDERWATER() ((ROD->rig == FISHMOD_RIG_LURE_SINKING) || (ROD->rig == FISHMOD_RIG_SINKER))
@@ -981,6 +985,85 @@ static void Rod_UpdateSink(PlayState* play, Input* input) {
  *   sinking lure   sinks to just over the bed; reeled, it lifts off it (more reeled fast), stopped, it sinks back
  *   sinker         the weight sinks to the bed and anchors there; the bait floats above it on its leader
  */
+/*
+ * The sinker rig as two bodies on a string: the weight (its height sSinkerY, where the line runs: bobberPos) and the
+ * baited hook (sSinkerHook) floating up on the leader. Reeled, the weight's drawn up and along, the hook trailing it
+ * on the string; let go, the weight sinks back to the bed and the hook floats up over it again.
+ */
+static u8 sSinkerLive; // (set up for this cast)
+static f32 sSinkerY;
+static Vec3f sSinkerHook;
+static Vec3f sSinkerHookVel;
+
+static void Rod_UpdateSinker(f32 floor) {
+    f32 top = ROD->waterY - 3.0f;
+    f32 lift;
+    Vec3f d;
+    f32 len;
+
+    if (!sSinkerLive) {
+        sSinkerLive = true;
+        sSinkerY = ROD->bobberPos.y;
+        sSinkerHook = ROD->bobberPos;
+        sSinkerHookVel.x = sSinkerHookVel.y = sSinkerHookVel.z = 0.0f;
+    }
+    // the weight: drawn up while reeled (more reeled fast), else sinking to the bed
+    lift = (ROD->reeling == 2) ? SINKER_LIFT_FAST : (ROD->reeling == 1) ? SINKER_LIFT_SLOW : 0.0f;
+    if (lift > 0.0f) {
+        sSinkerY = CLAMP_MAX(sSinkerY + lift, CLAMP_MIN(top, floor + 1.0f));
+    } else {
+        sSinkerY -= SINKER_RATE;
+    }
+    sSinkerY = CLAMP_MIN(sSinkerY, floor + 1.0f);
+    // the hook: floats up, slowed by the water, held by the string (only when it's taut)
+    sSinkerHookVel.y += SINKER_FLOAT;
+    sSinkerHookVel.x *= SINKER_DRAG;
+    sSinkerHookVel.y *= SINKER_DRAG;
+    sSinkerHookVel.z *= SINKER_DRAG;
+    sSinkerHook.x += sSinkerHookVel.x;
+    sSinkerHook.y += sSinkerHookVel.y;
+    sSinkerHook.z += sSinkerHookVel.z;
+    d.x = sSinkerHook.x - ROD->bobberPos.x;
+    d.y = sSinkerHook.y - sSinkerY;
+    d.z = sSinkerHook.z - ROD->bobberPos.z;
+    len = sqrtf(SQ(d.x) + SQ(d.y) + SQ(d.z));
+    if (len > SINKER_LEADER) {
+        f32 k = SINKER_LEADER / len;
+        f32 out;
+
+        sSinkerHook.x = ROD->bobberPos.x + d.x * k;
+        sSinkerHook.y = sSinkerY + d.y * k;
+        sSinkerHook.z = ROD->bobberPos.z + d.z * k;
+        // (the string pulls it along: its speed away from the weight goes)
+        out = (sSinkerHookVel.x * d.x + sSinkerHookVel.y * d.y + sSinkerHookVel.z * d.z) / len;
+        if (out > 0.0f) {
+            sSinkerHookVel.x -= d.x / len * out;
+            sSinkerHookVel.y -= d.y / len * out;
+            sSinkerHookVel.z -= d.z / len * out;
+        }
+    }
+    // under the surface, over the bed
+    if (sSinkerHook.y > ROD->waterY - 1.5f) {
+        sSinkerHook.y = ROD->waterY - 1.5f;
+        sSinkerHookVel.y = CLAMP_MAX(sSinkerHookVel.y, 0.0f);
+    }
+    if (sSinkerHook.y < floor + 1.0f) {
+        sSinkerHook.y = floor + 1.0f;
+        sSinkerHookVel.y = CLAMP_MIN(sSinkerHookVel.y, 0.0f);
+    }
+    // the bait's depth, as the fish go for it
+    ROD->baitDepth = CLAMP_MIN(ROD->waterY - sSinkerHook.y, 0.0f);
+    ROD->sinking = (lift == 0.0f) && (sSinkerY > floor + 1.5f);
+    if (!ROD->anchored && (sSinkerY <= floor + 1.0f) && (ROD->baitDepth > 4.0f)) {
+        // reaching the bed: a tick through the line
+        ROD->anchored = true;
+        ROD->dip = 3.0f;
+        Rod_Rumble(FEEL(FEEL_RUMBLE_NIBBLE), 200.0f, 2.0f, 100, 1);
+    } else if (sSinkerY > floor + 4.0f) {
+        ROD->anchored = false; // (drawn up off it: it ticks again when it lands)
+    }
+}
+
 static void Rod_UpdateRigDepth(PlayState* play, Input* input) {
     f32 surface;
     f32 floor;
@@ -993,6 +1076,10 @@ static void Rod_UpdateRigDepth(PlayState* play, Input* input) {
     }
     ROD->floorY = floor;
     depth = CLAMP_MIN(ROD->waterY - floor, 2.0f);
+    if (ROD->rig == FISHMOD_RIG_SINKER) {
+        Rod_UpdateSinker(floor);
+        return;
+    }
     switch (ROD->rig) {
         case FISHMOD_RIG_LURE_POND:
             want = (ROD->reeling == 2) ? POND_DIVE_FAST : (ROD->reeling == 1) ? POND_DIVE_SLOW : 0.0f;
@@ -1012,10 +1099,8 @@ static void Rod_UpdateRigDepth(PlayState* play, Input* input) {
             rate = (want > ROD->baitDepth) ? SINK_RATE : 2.0f;
             break;
         }
-        default: // the sinker
-            want = depth - 1.0f - SINKER_LEADER;
-            rate = SINKER_RATE;
-            break;
+        default:
+            return;
     }
     want = CLAMP(want, 0.0f, CLAMP_MIN(depth - 2.0f, 0.0f));
     Math_StepToF(&ROD->baitDepth, want, rate);
@@ -1030,7 +1115,7 @@ static void Rod_UpdateRigDepth(PlayState* play, Input* input) {
 
 /** Where the sinker is (the bait's on its leader above it): on the bed, or on its way down under the bait. */
 static f32 Rod_SinkerY(void) {
-    return CLAMP_MIN(ROD->waterY - ROD->baitDepth - SINKER_LEADER, ROD->floorY + 1.0f);
+    return sSinkerLive ? sSinkerY : ROD->bobberPos.y;
 }
 
 static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, Input* input) {
@@ -1446,6 +1531,7 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                 ROD->baitTarget = ROD->baitDepth;
                 ROD->sinking = true;
                 ROD->anchored = false;
+                sSinkerLive = false; // (the sinker rig starts again from the splash: Rod_UpdateSinker)
                 ROD->lineOut = Math_Vec3f_DistXZ(&ROD->tipPos, &ROD->bobberPos);
                 Actor_PlaySfx(&this->actor, NA_SE_EV_BOMB_DROP_WATER);
                 Rod_Splash(play, &ROD->bobberPos, true);
@@ -1966,11 +2052,20 @@ static void Rod_DrawLine(PlayState* play) {
 
         hook.y -= (ROD->state == ROD_STATE_FLOAT) ? ROD->baitDepth : 4.0f;
         Rod_DrawLineSegment(play, &ROD->bobberPos, &hook, 0.001f);
-    } else if ((ROD->rig == FISHMOD_RIG_SINKER) && (ROD->state == ROD_STATE_FLOAT)) {
-        Vec3f hook = ROD->bobberPos;
+    } else if ((ROD->rig == FISHMOD_RIG_SINKER) && (ROD->state == ROD_STATE_FLOAT) && sSinkerLive) {
+        // the leader, weight to hook: a string, sagging when it's slack
+        Vec3f hook = sSinkerHook;
+        Vec3f mid;
+        f32 slack;
 
-        hook.y = FISHMOD_ROD_BAIT_Y(ROD) - ROD->dip;
-        Rod_DrawLineSegment(play, &ROD->bobberPos, &hook, 0.001f);
+        hook.y -= ROD->dip;
+        slack = SINKER_LEADER - Math_Vec3f_DistXYZ(&ROD->bobberPos, &hook);
+        mid.x = (ROD->bobberPos.x + hook.x) * 0.5f;
+        mid.y = (ROD->bobberPos.y + hook.y) * 0.5f - CLAMP_MIN(slack, 0.0f) * 0.5f;
+        mid.z = (ROD->bobberPos.z + hook.z) * 0.5f;
+        mid.y = CLAMP_MIN(mid.y, ROD->floorY + 0.5f);
+        Rod_DrawLineSegment(play, &ROD->bobberPos, &mid, 0.001f);
+        Rod_DrawLineSegment(play, &mid, &hook, 0.001f);
     }
 
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
@@ -2217,7 +2312,12 @@ static void Rod_DrawSinker(PlayState* play) {
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
     gSPDisplayList(POLY_OPA_DISP++, sSinkerDL);
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
-    hook.y = (ROD->state == ROD_STATE_FLOAT) ? (FISHMOD_ROD_BAIT_Y(ROD) - ROD->dip) : (hook.y + 3.0f);
+    if ((ROD->state == ROD_STATE_FLOAT) && sSinkerLive) {
+        hook = sSinkerHook;
+        hook.y -= ROD->dip; // (a tug: pulled down toward the weight)
+    } else {
+        hook.y += 3.0f;
+    }
     Rod_DrawBaitedHook(play, &hook);
 }
 

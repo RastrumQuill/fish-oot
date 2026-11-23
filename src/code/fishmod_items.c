@@ -406,43 +406,60 @@ void Fishmod_DpadUpdateBottle(PlayState* play, u8 item, s32 button) {
     play->pauseCtx.cursorItem[PAUSE_ITEM] = item;
 }
 
-/** The pause menu: put a slot (or an equipment mark) on the D-pad button pressed; on it already, take it off. A slot
- * goes on one D-pad button at a time. Returns false if no D-pad button was pressed. */
-s32 Fishmod_DpadAssign(u16 press, s32 slot) {
-    u8* dpad = FISHMOD_SAVE->dpad[DPAD_AGE()];
+/*
+ * The pause menu: the D-pad buttons are C buttons, seven in all (0-2 C-Left, C-Down, C-Right; 3-6 D-pad up, down,
+ * left, right). A slot (or an equipment mark) is on one button at a time; put on a button while it's on another, the
+ * two trade (that other button takes what this one had), as the C buttons do among themselves; put on the button
+ * it's on already, it comes off.
+ */
+static s32 Button_Get(s32 b) {
+    return (b < 3) ? gSaveContext.save.info.equips.cButtonSlots[b] : FISHMOD_SAVE->dpad[DPAD_AGE()][b - 3];
+}
+
+static void Button_Set(PlayState* play, s32 b, s32 slot) {
+    if (b < 3) {
+        gSaveContext.save.info.equips.cButtonSlots[b] = slot;
+        gSaveContext.save.info.equips.buttonItems[b + 1] = (slot == SLOT_NONE) ? ITEM_NONE : Fishmod_SlotItem(slot);
+        if (gSaveContext.save.info.equips.buttonItems[b + 1] != ITEM_NONE) {
+            Interface_LoadItemIcon1(play, b + 1);
+        }
+    } else {
+        FISHMOD_SAVE->dpad[DPAD_AGE()][b - 3] = slot;
+    }
+}
+
+void Fishmod_ButtonPut(PlayState* play, s32 b, s32 slot) {
+    s32 old = Button_Get(b);
+    s32 j;
+
+    if (old == slot) {
+        Button_Set(play, b, SLOT_NONE);
+        return;
+    }
+    for (j = 0; j < 7; j++) {
+        if ((j != b) && (Button_Get(j) == slot)) {
+            Button_Set(play, j, old);
+        }
+    }
+    Button_Set(play, b, slot);
+}
+
+/** The pause menu: put a slot on the D-pad button pressed (Fishmod_ButtonPut). Returns false if none was pressed. */
+s32 Fishmod_DpadAssign(PlayState* play, u16 press, s32 slot) {
     s32 d;
-    s32 i;
 
     for (d = 0; d < 4; d++) {
         if (CHECK_BTN_ALL(press, sDpadButtons[d])) {
-            break;
+            Fishmod_ButtonPut(play, 3 + d, slot);
+            return true;
         }
     }
-    if (d == 4) {
-        return false;
-    }
-    if (dpad[d] == slot) {
-        dpad[d] = SLOT_NONE;
-        return true;
-    }
-    for (i = 0; i < 4; i++) {
-        if (dpad[i] == slot) {
-            dpad[i] = SLOT_NONE;
-        }
-    }
-    // (and off the C buttons: a slot is on one button of either set)
-    for (i = 0; i < 3; i++) {
-        if (gSaveContext.save.info.equips.cButtonSlots[i] == slot) {
-            gSaveContext.save.info.equips.cButtonSlots[i] = SLOT_NONE;
-            gSaveContext.save.info.equips.buttonItems[i + 1] = ITEM_NONE;
-        }
-    }
-    dpad[d] = slot;
-    return true;
+    return false;
 }
 
-/** The pause menu put a slot on a C button: off the D-pad (a slot is on one button of either set). */
-void Fishmod_DpadRemoveSlot(s32 slot) {
+/** The item page put a slot on a C button that had `old` (vanilla's animation, its own trades among the C buttons):
+ * a D-pad button with the slot takes `old`. */
+void Fishmod_DpadTrade(s32 slot, s32 old) {
     u8* dpad = FISHMOD_SAVE->dpad[DPAD_AGE()];
     s32 i;
 
@@ -451,7 +468,7 @@ void Fishmod_DpadRemoveSlot(s32 slot) {
     }
     for (i = 0; i < 4; i++) {
         if (dpad[i] == slot) {
-            dpad[i] = SLOT_NONE;
+            dpad[i] = old;
         }
     }
 }

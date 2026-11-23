@@ -101,6 +101,7 @@ typedef struct FishRigSpecies {
     RigMtx finPre[RIG_MAX_FINS];       // fin bone: its parent bone's frame -> the fin's joint, before its rotation
     u8 finParent[RIG_MAX_FINS];
     Vec3f headPoint; // the head limb's origin, relative to the head bone (for the head position)
+    Vec3f mouthPoint; // the snout's tip (the front of the spine), relative to the head bone: where it's held by
     Vec3f tailPoint; // the tail tip, relative to the last body bone
     RigMtx rootK;    // the root's constant part (the model's turn, the species' shape, the pivot, the head frame):
                      // root = T(position) Ry Rx Rz S(scale) rootK, made once here instead of every fish every frame
@@ -1005,6 +1006,9 @@ static FishRigSpecies* Rig_BuildSpecies(const FishmodSpecies* species, s32 model
     rig->headPoint.x = -rig->bonePos[0].x;
     rig->headPoint.y = -rig->bonePos[0].y;
     rig->headPoint.z = -rig->bonePos[0].z;
+    rig->mouthPoint.x = rig->axis.x * sMin - rig->bonePos[0].x;
+    rig->mouthPoint.y = rig->axis.y * sMin - rig->bonePos[0].y;
+    rig->mouthPoint.z = rig->axis.z * sMin - rig->bonePos[0].z;
     rig->tailPoint.x = rig->axis.x * sMax - rig->bonePos[base->bodyBones].x;
     rig->tailPoint.y = rig->axis.y * sMax - rig->bonePos[base->bodyBones].y;
     rig->tailPoint.z = rig->axis.z * sMax - rig->bonePos[base->bodyBones].z;
@@ -1293,6 +1297,7 @@ void EnFishmod_RigDraw(EnFishmod* this, PlayState* play, s32 variant, s32 wantBo
 #endif
 
     Rig_MulPoint(&frames[0], &rig->headPoint, &this->headPos);
+    Rig_MulPoint(&frames[0], &rig->mouthPoint, &this->mouthPos);
     if (wantBounds) {
         Vec3f p;
 

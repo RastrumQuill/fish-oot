@@ -963,6 +963,9 @@ void Fishmod_TestStart(void) {
     gSaveContext.save.entranceIndex = ENTR_LAKE_HYLIA_0;
     gSaveContext.save.linkAge = LINK_AGE_ADULT;
     Fishmod_TestSetAge(true);
+    // (a test file from an earlier build too: the lake's full, so the Water Temple's beaten, its rain gone)
+    SET_EVENTCHKINF(EVENTCHKINF_RESTORED_LAKE_HYLIA);
+    SET_EVENTCHKINF(EVENTCHKINF_4A);
 #elif FISHMOD_TEST_START == 3
     // Lake Hylia as child (the lake is full for him whatever the flag)
     gSaveContext.save.entranceIndex = ENTR_LAKE_HYLIA_0;

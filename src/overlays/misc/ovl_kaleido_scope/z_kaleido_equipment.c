@@ -594,29 +594,14 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
 
             if (!CHECK_AGE_REQ_EQUIP(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP])) {
                 SFX_PLAY_CENTERED(NA_SE_SY_ERROR);
-            } else if (Fishmod_DpadAssign(input->press.button, slot)) {
+            } else if (Fishmod_DpadAssign(play, input->press.button, slot)) {
                 SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
             } else {
                 s32 c = CHECK_BTN_ALL(input->press.button, BTN_CLEFT)   ? 0
                         : CHECK_BTN_ALL(input->press.button, BTN_CDOWN) ? 1
                                                                           : 2;
-                s32 j;
 
-                if (gSaveContext.save.info.equips.cButtonSlots[c] == slot) {
-                    slot = SLOT_NONE; // the same C button again takes it off
-                }
-                for (j = 0; j < 3; j++) {
-                    if ((j != c) && (gSaveContext.save.info.equips.cButtonSlots[j] == slot)) {
-                        gSaveContext.save.info.equips.cButtonSlots[j] = SLOT_NONE;
-                        gSaveContext.save.info.equips.buttonItems[j + 1] = ITEM_NONE;
-                    }
-                }
-                gSaveContext.save.info.equips.cButtonSlots[c] = slot;
-                Fishmod_DpadRemoveSlot(slot);
-                gSaveContext.save.info.equips.buttonItems[c + 1] = Fishmod_SlotItem(slot);
-                if (slot != SLOT_NONE) {
-                    Interface_LoadItemIcon1(play, c + 1);
-                }
+                Fishmod_ButtonPut(play, c, slot); // (trading with the button it was on, as the C buttons do)
                 SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
             }
         }

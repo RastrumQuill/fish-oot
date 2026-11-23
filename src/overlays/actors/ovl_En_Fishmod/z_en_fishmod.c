@@ -2009,14 +2009,14 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
 
 static void Fish_Caught(EnFishmod* this, PlayState* play, FishAI* ai) {
     Player* player = GET_PLAYER(play);
-    // Hanging by the mouth from Link's right hand: move the fish so its head (measured on the last
+    // Hanging by the mouth from Link's right hand: move the fish so its mouth (its snout's tip, measured on the last
     // draw, so it's right for every species and size) ends up at the hand.
     Vec3f* hand = &player->bodyPartsPos[PLAYER_BODYPART_R_HAND];
     Vec3f off;
 
-    off.x = hand->x - this->headPos.x;
-    off.y = hand->y - 2.0f - this->headPos.y;
-    off.z = hand->z - this->headPos.z;
+    off.x = hand->x - this->mouthPos.x;
+    off.y = hand->y - 1.0f - this->mouthPos.y;
+    off.z = hand->z - this->mouthPos.z;
     // a big fish held by a small Link rests its tail on the ground rather than going into it
     off.y = CLAMP_MIN(off.y, player->actor.world.pos.y + 1.0f - this->boundsMin.y);
     if ((SQ(off.x) + SQ(off.y) + SQ(off.z)) > SQ(80.0f)) {
@@ -2606,6 +2606,7 @@ void EnFishmod_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* 
     }
 
     this->headPos = limbPos;
+    this->mouthPos = limbPos; // (the limb-drawn fish: its head's the nearest there is)
 
 }
 

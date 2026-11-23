@@ -446,7 +446,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                     } else if (CHECK_BTN_ANY(input->press.button, BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT)) {
                         // fishmod: onto (or off) a D-pad button, at once
                         if (CHECK_AGE_REQ_SLOT(cursorSlot) && (cursorItem != ITEM_SOLD_OUT) &&
-                            Fishmod_DpadAssign(input->press.button, cursorSlot)) {
+                            Fishmod_DpadAssign(play, input->press.button, cursorSlot)) {
                             SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
                         } else {
                             SFX_PLAY_CENTERED(NA_SE_SY_ERROR);
@@ -483,6 +483,32 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
             gSPVertex(POLY_OPA_DISP++, &pauseCtx->itemVtx[j], 4, 0);
             POLY_OPA_DISP = KaleidoScope_QuadTextureIA8(POLY_OPA_DISP, gEquippedItemOutlineTex, 32, 32, 0);
         }
+    }
+    // fishmod: the D-pad's items boxed too, as the C buttons' are (their quads made here, as KaleidoScope_SetVertices
+    // makes the C buttons')
+    for (i = 0; i < 4; i++) {
+        u8 slot = FISHMOD_SAVE->dpad[gSaveContext.save.linkAge == LINK_AGE_CHILD][i];
+        Vtx* v;
+        Vtx* grid;
+        s32 c;
+
+        if ((slot > ITEM_QUAD_GRID_LAST) || (INV_SLOT(slot) == ITEM_NONE)) {
+            continue; // (empty, an equipment mark, or an item no longer there)
+        }
+        v = GRAPH_ALLOC(play->state.gfxCtx, 4 * sizeof(Vtx));
+        grid = &pauseCtx->itemVtx[slot * 4];
+        for (c = 0; c < 4; c++) {
+            v[c].v.ob[0] = grid->v.ob[0] + ITEM_GRID_SELECTED_QUAD_MARGIN + ((c & 1) ? ITEM_GRID_SELECTED_QUAD_WIDTH : 0);
+            v[c].v.ob[1] = grid->v.ob[1] - ITEM_GRID_SELECTED_QUAD_MARGIN - ((c & 2) ? ITEM_GRID_SELECTED_QUAD_HEIGHT : 0);
+            v[c].v.ob[2] = 0;
+            v[c].v.flag = 0;
+            v[c].v.tc[0] = (c & 1) ? ITEM_GRID_SELECTED_QUAD_TEX_SIZE * (1 << 5) : 0;
+            v[c].v.tc[1] = (c & 2) ? ITEM_GRID_SELECTED_QUAD_TEX_SIZE * (1 << 5) : 0;
+            v[c].v.cn[0] = v[c].v.cn[1] = v[c].v.cn[2] = 255;
+            v[c].v.cn[3] = pauseCtx->alpha;
+        }
+        gSPVertex(POLY_OPA_DISP++, v, 4, 0);
+        POLY_OPA_DISP = KaleidoScope_QuadTextureIA8(POLY_OPA_DISP, gEquippedItemOutlineTex, 32, 32, 0);
     }
 
     gDPPipeSync(POLY_OPA_DISP++);
@@ -712,9 +738,10 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                     }
                 }
 
+                // fishmod: a D-pad button with it takes what this C button had (they trade, as the C buttons do)
+                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, gSaveContext.save.info.equips.cButtonSlots[0]);
                 gSaveContext.save.info.equips.buttonItems[1] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[0] = pauseCtx->equipTargetSlot;
-                Fishmod_DpadRemoveSlot(pauseCtx->equipTargetSlot); // fishmod
                 Interface_LoadItemIcon1(play, 1);
 
                 PRINTF(T("Ｃ左sl_item_no=%d (1)=%d (2)=%d (3)=%d\n", "C left sl_item_no=%d (1)=%d (2)=%d (3)=%d\n"),
@@ -788,9 +815,10 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                     }
                 }
 
+                // fishmod: a D-pad button with it takes what this C button had (they trade, as the C buttons do)
+                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, gSaveContext.save.info.equips.cButtonSlots[1]);
                 gSaveContext.save.info.equips.buttonItems[2] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[1] = pauseCtx->equipTargetSlot;
-                Fishmod_DpadRemoveSlot(pauseCtx->equipTargetSlot); // fishmod
                 Interface_LoadItemIcon1(play, 2);
 
                 PRINTF(T("Ｃ下sl_item_no=%d (1)=%d (2)=%d (3)=%d\n", "C down sl_item_no=%d (1)=%d (2)=%d (3)=%d\n"),
@@ -864,9 +892,10 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                     }
                 }
 
+                // fishmod: a D-pad button with it takes what this C button had (they trade, as the C buttons do)
+                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, gSaveContext.save.info.equips.cButtonSlots[2]);
                 gSaveContext.save.info.equips.buttonItems[3] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[2] = pauseCtx->equipTargetSlot;
-                Fishmod_DpadRemoveSlot(pauseCtx->equipTargetSlot); // fishmod
                 Interface_LoadItemIcon1(play, 3);
 
                 PRINTF(T("Ｃ右sl_item_no=%d (1)=%d (2)=%d (3)=%d\n", "C right sl_item_no=%d (1)=%d (2)=%d (3)=%d\n"),

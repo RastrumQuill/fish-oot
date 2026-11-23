@@ -168,6 +168,7 @@ typedef struct EnFishmod {
     f32 fightDepth;
     s16 leapCooldown;
     f32 leapVelPrev;
+    Vec3f mouthPos; // world position of its mouth (the tip of its snout), from the last draw: where it's held by
 } EnFishmod;
 
 // Each fish's memory: a fixed size, whatever EnFishmod's (the dozens of fish sit between the actors' code in the arena:
