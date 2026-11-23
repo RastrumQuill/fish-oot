@@ -5,6 +5,7 @@
  */
 
 #include "z_en_weather_tag.h"
+#include "fishmod.h"
 
 #include "printf.h"
 #include "regs.h"
@@ -155,6 +156,12 @@ u8 WeatherTag_CheckEnableWeatherEffect(EnWeatherTag* this, PlayState* play, u8 s
                 gInterruptSongOfStorms = false;
 #endif
                 if (gWeatherMode != weatherMode) {
+                    // fishmod: the day's cloudy sky is already up: blend on from it, not from a clear sky (the
+                    // sky jumped to clear and clouded over again on walking in)
+                    if (Fishmod_WeatherRolled() != FISHMOD_WEATHER_CLEAR) {
+                        skyboxConfig = play->envCtx.skyboxConfig;
+                        lightConfig = play->envCtx.lightConfig;
+                    }
 #if OOT_VERSION < PAL_1_0
                     gInterruptSongOfStorms = false;
 #endif
@@ -199,6 +206,11 @@ u8 WeatherTag_CheckRestoreWeather(EnWeatherTag* this, PlayState* play, u8 skybox
                  (play->envCtx.lightConfig != 1 && !play->envCtx.changeLightEnabled))) {
                 gInterruptSongOfStorms = false;
                 gWeatherMode = WEATHER_MODE_CLEAR;
+                // fishmod: back to the day's weather, not to a clear sky (its cloudy sky and darker light)
+                if (Fishmod_WeatherRolled() != FISHMOD_WEATHER_CLEAR) {
+                    changeSkyboxNextConfig = 1;
+                    changeLightNextConfig = 2;
+                }
                 play->envCtx.changeSkyboxState = CHANGE_SKYBOX_REQUESTED;
                 play->envCtx.skyboxConfig = skyboxConfig;
                 play->envCtx.changeSkyboxNextConfig = changeSkyboxNextConfig;
@@ -279,8 +291,13 @@ void EnWeatherTag_DisabledRainLakeHylia(EnWeatherTag* this, PlayState* play) {
 
 void EnWeatherTag_EnabledRainLakeHylia(EnWeatherTag* this, PlayState* play) {
     if (WeatherTag_CheckRestoreWeather(this, play, 1, 0, 2, 0, 100)) {
-        Environment_StopStormNatureAmbience(play);
-        play->envCtx.precipitation[PRECIP_RAIN_MAX] = 0;
+        // fishmod: the day's own rain keeps falling (its sound with it)
+        if (Fishmod_WeatherRolled() == FISHMOD_WEATHER_RAIN) {
+            play->envCtx.precipitation[PRECIP_RAIN_MAX] = 20;
+        } else {
+            Environment_StopStormNatureAmbience(play);
+            play->envCtx.precipitation[PRECIP_RAIN_MAX] = 0;
+        }
         EnWeatherTag_SetupAction(this, EnWeatherTag_DisabledRainLakeHylia);
     }
 }

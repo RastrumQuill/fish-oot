@@ -1480,9 +1480,10 @@ void Fishmod_TimeOnSceneExit(void) {
 }
 
 /*
- * Weather: a roll per fishing spot per day (the same all day): mostly clear, sometimes overcast, rarely rain. Set
- * up the way the engine's own rainy weather is (darker sky and light, rain falling). The Song of Storms still
- * brings rain on top of it.
+ * Weather: a roll per day (the same all day, and the same everywhere under the open sky: it was a roll per fishing
+ * spot, so walking from Hyrule Field, always clear, into Lake Hylia could turn the sky on the spot): mostly clear,
+ * sometimes overcast, rarely rain. Set up the way the engine's own rainy weather is (darker sky and light, rain
+ * falling). The Song of Storms still brings rain on top of it.
  */
 #define WEATHER_RAIN_CHANCE 10     // percent of days
 #define WEATHER_OVERCAST_CHANCE 20
@@ -1512,11 +1513,11 @@ void Fishmod_OnEnvironmentInit(PlayState* play) {
 
     sWeather = FISHMOD_WEATHER_CLEAR;
     sRainSoundPending = false;
-    if ((Fishmod_GetSceneSpawns(play->sceneId) == NULL) || (play->skyboxId != SKYBOX_NORMAL_SKY) ||
-        (gWeatherMode != WEATHER_MODE_CLEAR) || (gSaveContext.gameMode != GAMEMODE_NORMAL)) {
-        return; // (and the title screen and the credits: as vanilla's, no weather of ours)
+    if ((play->skyboxId != SKYBOX_NORMAL_SKY) || (gWeatherMode != WEATHER_MODE_CLEAR) ||
+        (gSaveContext.gameMode != GAMEMODE_NORMAL)) {
+        return; // (under the open sky only; and the title screen and the credits: as vanilla's, no weather of ours)
     }
-    sWeather = Fishmod_WeatherRoll(play->sceneId, gSaveContext.save.totalDays);
+    sWeather = Fishmod_WeatherRoll(0, gSaveContext.save.totalDays); // (the day's, everywhere)
     if (sWeather == FISHMOD_WEATHER_CLEAR) {
         return;
     }
@@ -1531,6 +1532,11 @@ void Fishmod_OnEnvironmentInit(PlayState* play) {
         envCtx->stormState = STORM_STATE_ON;
         sRainSoundPending = true;
     }
+}
+
+/** The day's weather as rolled for this scene (the Song of Storms not counted): vanilla's weather zones go back to it. */
+s32 Fishmod_WeatherRolled(void) {
+    return sWeather;
 }
 
 s32 Fishmod_Weather(PlayState* play) {
