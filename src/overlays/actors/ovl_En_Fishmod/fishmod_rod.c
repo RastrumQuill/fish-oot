@@ -1818,19 +1818,133 @@ static void Rod_DrawLine(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
 }
 
-/** A hook (the pond's: two plates crossed) at pos, its eye toward yaw. */
-static void Rod_DrawHook(PlayState* play, Vec3f* pos, f32 yaw) {
+/**
+ * A hook (the pond's: two plates crossed) hanging from pos (its eye), turned to yaw. scale: HOOK_LURE as the pond's
+ * lures carry them; HOOK_BAIT for a baited hook, drawn larger than life so it reads (the mesh lies flat in its own
+ * x-z plane, eye at z 27: turned to hang down).
+ */
+#define HOOK_LURE 0.004f
+#define HOOK_BAIT 0.0095f
+#define HOOK_DROP(scale) ((scale) * 586.0f * 1.25f) // eye to bend
+
+static void Rod_DrawHook(PlayState* play, Vec3f* pos, f32 yaw, f32 scale) {
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
     Matrix_Translate(pos->x, pos->y, pos->z, MTXMODE_NEW);
     Matrix_RotateY(yaw, MTXMODE_APPLY);
-    Matrix_Scale(0.004f, 0.004f, 0.005f, MTXMODE_APPLY);
-    Matrix_RotateY(M_PI, MTXMODE_APPLY);
+    Matrix_RotateX(-M_PI / 2, MTXMODE_APPLY);
+    Matrix_Scale(scale, scale, scale * 1.25f, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
     gSPDisplayList(POLY_OPA_DISP++, gFishmodLureHookDL);
     Matrix_RotateZ(M_PI / 2, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
     gSPDisplayList(POLY_OPA_DISP++, gFishmodLureHookDL);
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+}
+
+// a bead for the bait (a 12-point ball, lit from the upper left in its vertex colours, its colour the primitive's)
+static Vtx sBeadVtx[] = {
+    VTX(-53, 85, 0, 0, 0, 234, 234, 234, 255),  VTX(53, 85, 0, 0, 0, 156, 156, 156, 255),
+    VTX(-53, -85, 0, 0, 0, 107, 107, 107, 255), VTX(53, -85, 0, 0, 0, 107, 107, 107, 255),
+    VTX(0, -53, 85, 0, 0, 115, 115, 115, 255),  VTX(0, 53, 85, 0, 0, 225, 225, 225, 255),
+    VTX(0, -53, -85, 0, 0, 107, 107, 107, 255), VTX(0, 53, -85, 0, 0, 107, 107, 107, 255),
+    VTX(85, 0, -53, 0, 0, 107, 107, 107, 255),  VTX(85, 0, 53, 0, 0, 107, 107, 107, 255),
+    VTX(-85, 0, -53, 0, 0, 131, 131, 131, 255), VTX(-85, 0, 53, 0, 0, 209, 209, 209, 255),
+};
+
+static Gfx sBeadSetupDL[] = {
+    gsDPPipeSync(),
+    gsSPTexture(0, 0, 0, G_TX_RENDERTILE, G_OFF),
+    gsDPSetCombineLERP(SHADE, 0, PRIMITIVE, 0, 0, 0, 0, 1, 0, 0, 0, COMBINED, 0, 0, 0, COMBINED),
+    gsSPClearGeometryMode(G_LIGHTING | G_CULL_BACK),
+    gsSPEndDisplayList(),
+};
+
+static Gfx sBeadDL[] = {
+    gsSPVertex(sBeadVtx, 12, 0),
+    gsSP2Triangles(0, 11, 5, 0, 0, 5, 1, 0),
+    gsSP2Triangles(0, 1, 7, 0, 0, 7, 10, 0),
+    gsSP2Triangles(0, 10, 11, 0, 1, 5, 9, 0),
+    gsSP2Triangles(5, 11, 4, 0, 11, 10, 2, 0),
+    gsSP2Triangles(10, 7, 6, 0, 7, 1, 8, 0),
+    gsSP2Triangles(3, 9, 4, 0, 3, 4, 2, 0),
+    gsSP2Triangles(3, 2, 6, 0, 3, 6, 8, 0),
+    gsSP2Triangles(3, 8, 9, 0, 4, 9, 5, 0),
+    gsSP2Triangles(2, 4, 11, 0, 6, 2, 10, 0),
+    gsSP2Triangles(8, 6, 7, 0, 9, 8, 1, 0),
+    gsSPEndDisplayList(),
+};
+
+/*
+ * The bait on the hook, drawn so it reads (somewhat larger than life, as the hook): beads in its shape and colour,
+ * hung round the hook's bend. x across (turned to face the rod), y up, in units; r its radius.
+ */
+typedef struct BaitBead {
+    f32 x, y, r;
+} BaitBead;
+static const BaitBead sWormBeads[] = { { 0.0f, 1.8f, 0.6f },  { 0.9f, 1.3f, 0.6f },   { 1.3f, 0.4f, 0.6f },
+                                       { 1.1f, -0.5f, 0.6f }, { 0.4f, -1.1f, 0.6f },  { -0.4f, -1.3f, 0.55f },
+                                       { -1.1f, -0.9f, 0.5f } };
+static const BaitBead sLarvaBeads[] = { { 0.0f, 1.0f, 1.05f }, { 0.95f, 0.4f, 1.0f }, { 1.0f, -0.6f, 0.9f },
+                                        { 0.25f, -1.15f, 0.7f } };
+static const BaitBead sBugBeads[] = { { 0.0f, 1.2f, 0.55f }, { 0.0f, 0.25f, 0.7f }, { 0.0f, -0.9f, 0.95f } };
+
+static void Rod_DrawBait(PlayState* play, Vec3f* at, f32 yaw) {
+    const BaitBead* beads;
+    s32 n;
+    s32 i;
+    u8 rgb[3][3]; // (a colour for each part: the bug's head, thorax and abdomen differ)
+    f32 cy = cosf(yaw);
+    f32 sy = sinf(yaw);
+
+    switch (ROD->bait) {
+        case FISHMOD_BAIT_WORM:
+            beads = sWormBeads, n = ARRAY_COUNT(sWormBeads);
+            rgb[0][0] = rgb[1][0] = rgb[2][0] = 255, rgb[0][1] = rgb[1][1] = rgb[2][1] = 140,
+            rgb[0][2] = rgb[1][2] = rgb[2][2] = 150; // (a bright pink: the water's fog takes some of it)
+            break;
+        case FISHMOD_BAIT_BEE_LARVA:
+            beads = sLarvaBeads, n = ARRAY_COUNT(sLarvaBeads);
+            rgb[0][0] = rgb[1][0] = rgb[2][0] = 252, rgb[0][1] = rgb[1][1] = rgb[2][1] = 240,
+            rgb[0][2] = rgb[1][2] = rgb[2][2] = 196;
+            break;
+        case FISHMOD_BAIT_BUG:
+            beads = sBugBeads, n = ARRAY_COUNT(sBugBeads);
+            rgb[0][0] = 60, rgb[0][1] = 44, rgb[0][2] = 30;
+            rgb[1][0] = 84, rgb[1][1] = 110, rgb[1][2] = 46;
+            rgb[2][0] = 52, rgb[2][1] = 78, rgb[2][2] = 36;
+            break;
+        default:
+            return;
+    }
+    OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, sBeadSetupDL);
+    for (i = 0; i < n; i++) {
+        f32 x = beads[i].x * 1.4f;
+        f32 y = beads[i].y * 1.4f;
+        s32 part = (n == 3) ? i : 0;
+
+        if (ROD->bait == FISHMOD_BAIT_WORM) {
+            x += Math_SinS(play->gameplayFrames * 0x900 + i * 0x2400) * 0.35f; // (it wriggles)
+        }
+        Matrix_Translate(at->x + x * cy, at->y + y, at->z - x * sy, MTXMODE_NEW);
+        Matrix_Scale(beads[i].r * 0.014f, beads[i].r * 0.014f, beads[i].r * 0.014f, MTXMODE_APPLY);
+        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, rgb[part][0], rgb[part][1], rgb[part][2], 255);
+        gSPDisplayList(POLY_OPA_DISP++, sBeadDL);
+    }
+    gSPSetGeometryMode(POLY_OPA_DISP++, G_LIGHTING);
+    CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+}
+
+/** The bobber's and the sinker's hook, its bait round the bend, at the bait's place (`bait`: where the fish go). */
+static void Rod_DrawBaitedHook(PlayState* play, Vec3f* bait) {
+    f32 yaw = Math_FAtan2F(ROD->tipPos.x - ROD->bobberPos.x, ROD->tipPos.z - ROD->bobberPos.z);
+    Vec3f eye = *bait;
+
+    eye.y += HOOK_DROP(HOOK_BAIT) * 0.75f; // (the bait round the bend, at the bait's place)
+    Rod_DrawHook(play, &eye, yaw, HOOK_BAIT);
+    Rod_DrawBait(play, bait, yaw + M_PI / 2);
 }
 
 /**
@@ -1869,7 +1983,7 @@ static void Rod_DrawPondLure(PlayState* play) {
     Matrix_MultVec3f(&hookAt, &hookPos[1]);
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
     for (i = 0; i < 2; i++) {
-        Rod_DrawHook(play, &hookPos[i], yaw);
+        Rod_DrawHook(play, &hookPos[i], yaw, HOOK_LURE);
     }
 }
 
@@ -1930,7 +2044,8 @@ static void Rod_DrawSinkingLure(PlayState* play) {
         gSPDisplayList(POLY_XLU_DISP++, gFishmodSinkingLureSegmentModelDL);
     }
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
-    Rod_DrawHook(play, &sSinkSeg[0], Math_FAtan2F(ROD->tipPos.x - ROD->bobberPos.x, ROD->tipPos.z - ROD->bobberPos.z));
+    Rod_DrawHook(play, &sSinkSeg[0], Math_FAtan2F(ROD->tipPos.x - ROD->bobberPos.x, ROD->tipPos.z - ROD->bobberPos.z),
+                 HOOK_LURE * 1.2f);
 }
 
 /** The sinker on the bed (or falling), and the baited hook up its leader. */
@@ -1945,7 +2060,7 @@ static void Rod_DrawSinker(PlayState* play) {
     gSPDisplayList(POLY_OPA_DISP++, sSinkerDL);
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
     hook.y = (ROD->state == ROD_STATE_FLOAT) ? (FISHMOD_ROD_BAIT_Y(ROD) - ROD->dip) : (hook.y + 3.0f);
-    Rod_DrawHook(play, &hook, Math_FAtan2F(ROD->tipPos.x - ROD->bobberPos.x, ROD->tipPos.z - ROD->bobberPos.z));
+    Rod_DrawBaitedHook(play, &hook);
 }
 
 static void Rod_DrawBobber(PlayState* play) {
@@ -1977,15 +2092,15 @@ static void Rod_DrawBobber(PlayState* play) {
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
     gSPDisplayList(POLY_OPA_DISP++, sBobberDL);
 
-    // hook under the bobber
-    if (ROD->state == ROD_STATE_FLOAT) {
-        Matrix_Translate(ROD->bobberPos.x, ROD->bobberPos.y - ROD->baitDepth, ROD->bobberPos.z, MTXMODE_NEW);
-        Matrix_Scale(0.004f, 0.004f, 0.004f, MTXMODE_APPLY);
-        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
-        gSPDisplayList(POLY_OPA_DISP++, gFishmodLureHookDL);
-    }
-
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+
+    // the baited hook under the bobber
+    if (ROD->state == ROD_STATE_FLOAT) {
+        Vec3f hook = ROD->bobberPos;
+
+        hook.y = FISHMOD_ROD_BAIT_Y(ROD) - ROD->dip;
+        Rod_DrawBaitedHook(play, &hook);
+    }
 }
 
 static void Rod_FillRect(Gfx** gfxP, s32 x0, s32 y0, s32 x1, s32 y1, u8 r, u8 g, u8 b) {
