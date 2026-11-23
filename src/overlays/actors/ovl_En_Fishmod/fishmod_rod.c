@@ -1885,11 +1885,8 @@ static void Rod_DrawSinkingLure(PlayState* play) {
         1.0f, 1.5f, 1.8f, 2.0f, 1.8f, 1.6f, 1.4f, 1.2f, 1.0f, 1.0f,
         0.9f, 0.85f, 0.8f, 0.7f, 0.8f, 1.0f, 1.2f, 1.1f, 1.0f, 0.8f,
     };
-    // the tail: lifting a little as it swims, lying down on the bed once it's settled there (as the pond's does when
-    // it's found the bottom), hanging in the air
-    f32 lift = (ROD->bobberPos.y >= ROD->waterY)                            ? -5.0f
-               : (ROD->anchored && (ROD->reeling == 0) && (ROD->stillFrames > 10)) ? -1.0f
-                                                                                 : 0.5f;
+    // the tail floats up a little under water (a soft lure), as the pond's does in use; it hangs down in the air
+    f32 lift = (ROD->bobberPos.y >= ROD->waterY) ? -5.0f : 0.5f;
     s32 i;
 
     if (Math_Vec3f_DistXYZ(&sSinkSeg[0], &ROD->bobberPos) > 30.0f) {
@@ -1921,14 +1918,16 @@ static void Rod_DrawSinkingLure(PlayState* play) {
     }
 
     OPEN_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
-    Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, gFishmodSinkingLureSegmentMaterialDL);
+    // (in the translucent pass, after the scenery: its soft-edged mode tests the depth but doesn't write it, so drawn
+    // with the opaque things it was painted over by any plant drawn after it, however far behind)
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, gFishmodSinkingLureSegmentMaterialDL);
     for (i = SINK_SEGS - 1; i >= 0; i--) {
         Matrix_Translate(sSinkSeg[i].x, sSinkSeg[i].y, sSinkSeg[i].z, MTXMODE_NEW);
         Matrix_Scale(sSizes[i] * 0.04f, sSizes[i] * 0.04f, sSizes[i] * 0.04f, MTXMODE_APPLY);
         Matrix_ReplaceRotation(&play->billboardMtxF);
-        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
-        gSPDisplayList(POLY_OPA_DISP++, gFishmodSinkingLureSegmentModelDL);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
+        gSPDisplayList(POLY_XLU_DISP++, gFishmodSinkingLureSegmentModelDL);
     }
     CLOSE_DISPS(play->state.gfxCtx, "../fishmod_rod.c", __LINE__);
     Rod_DrawHook(play, &sSinkSeg[0], Math_FAtan2F(ROD->tipPos.x - ROD->bobberPos.x, ROD->tipPos.z - ROD->bobberPos.z));
