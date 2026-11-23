@@ -163,6 +163,11 @@ typedef struct EnFishmod {
     s32 bbKey;                                     // what bbColor was made for (as lookKey)
     u8 fogRgb[3];                                  // the colour its flat fog goes to (EnFishmod_FogAmount)
     u8 bbColor[6][3];                              // its far shape's corner colours (EnFishmod_DrawBillboard), made once
+    // hooked (Fish_Hooked): the share of the water's depth it fights at this run (from its species' depth band),
+    // frames before it may leap again, and the leap's height last frame (the rod judges the top of the leap by it)
+    f32 fightDepth;
+    s16 leapCooldown;
+    f32 leapVelPrev;
 } EnFishmod;
 
 // Each fish's memory: a fixed size, whatever EnFishmod's (the dozens of fish sit between the actors' code in the arena:

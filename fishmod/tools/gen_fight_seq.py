@@ -3,7 +3,9 @@
 
 An 8-bar loop in E minor at 160 BPM using the field soundfont (Soundfont 3), the instruments the field enemy
 theme uses: a fast repeating 16th-note bass ostinato (like Twilight Princess's reeling music), held low roots,
-a sustained tension line on top and a soft 16th-note pulse on the drums. Tense, not combat.
+a sustained tension line on top and a soft 16th-note pulse on the drums. Tense, not combat. Two more layers the game
+fades in with the fight (fishmod_rod.c Rod_FightMusic): a trembling high trill as the line nears breaking, and a pounding
+heartbeat when the fish is spent or being landed; the game also fades the ostinato and the drums with the fish's runs.
 Edit the tables below and rerun to change it.
 """
 import os
@@ -72,12 +74,36 @@ def drum_layer():
     return out
 
 
+def strain_layer():
+    """A trembling semitone trill high above (B4 and C5 in 16ths): the line about to give. Faded in by the game as the
+    tension nears breaking (fishmod_rod.c Rod_FightMusic)."""
+    out = []
+    for _ in ROOTS:
+        for i in range(16):
+            out.append(f"    notedvg     {pitch('B4' if i % 2 == 0 else 'C5')}, {SIXTEENTH}, {72 if i % 4 == 0 else 58}, 92")
+    return out
+
+
+def surge_layer():
+    """A pounding heartbeat: each bar's root an octave up on every beat, the first of the bar hardest. Faded in when
+    the fish is spent or at Link's feet (the landing)."""
+    out = []
+    for root in ROOTS:
+        r = semis(root) + 12
+        for beat in range(4):
+            out.append(f"    notedvg     {pitch(name_of(r))}, {TICKS_PER_BEAT}, {110 if beat == 0 else 88}, 40")
+    return out
+
+
 CHANNELS = [
     # name, layer, instrument, volume, pan, reverb
     ("BASS", bass_layer, "SF3_INST_11", 127, 64, 8),
     ("ROOT", root_layer, "SF3_INST_12", 115, 56, 16),
     ("PAD", pad_layer, "SF3_INST_7", 100, 40, 64),
     ("DRUMS", drum_layer, "FONTANY_INSTR_DRUM", 105, 84, 16),
+    # (the game fades these two in and out: fishmod_rod.c Rod_FightMusic; its channels 4 and 5)
+    ("STRAIN", strain_layer, "SF3_INST_7", 96, 72, 48),
+    ("SURGE", surge_layer, "SF3_INST_12", 120, 64, 24),
 ]
 
 

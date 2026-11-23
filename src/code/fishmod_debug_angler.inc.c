@@ -90,8 +90,14 @@
                     }
                 }
 #endif
-                if (gFishmodRodInfo.tension < 60.0f) {
+                if (gFishmodRodInfo.landOpen) {
+                    // the landing: A only while the window's open (a press outside it puts the next one off)
+                    button = ((sAnglerTimer & 1) == 0) ? BTN_A : 0;
+                } else if (gFishmodRodInfo.tension < 60.0f) {
                     button = BTN_A;
+                }
+                if (gFishmodRodInfo.leaping) {
+                    stickY = -70; // (the rod down for a leap)
                 }
                 break;
             case 7: // landed: A through the catch textbox (its cursor starts on keeping it)

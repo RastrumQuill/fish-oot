@@ -903,6 +903,15 @@ void Fishmod_InitTestSave(void) {
     INV_SLOT(SLOT_LURE_2) = ITEM_LURE_SINKING;
     INV_SLOT(SLOT_LURE_3) = ITEM_SINKER;
 
+    // the Lens of Truth (it sees through the lake's water: Fishmod_WaterFogSetup) on D-pad Up at both ages, and
+    // double magic, full
+    inv->items[SLOT_LENS_OF_TRUTH] = ITEM_LENS_OF_TRUTH;
+    FISHMOD_SAVE->dpad[0][0] = SLOT_LENS_OF_TRUTH;
+    FISHMOD_SAVE->dpad[1][0] = SLOT_LENS_OF_TRUTH;
+    gSaveContext.save.info.playerData.isMagicAcquired = true;
+    gSaveContext.save.info.playerData.isDoubleMagicAcquired = true;
+    gSaveContext.save.info.playerData.magic = MAGIC_DOUBLE_METER;
+
     // the slingshot knocks down beehives for larvae
     inv->items[SLOT_SLINGSHOT] = ITEM_SLINGSHOT;
     Inventory_ChangeUpgrade(UPG_BULLET_BAG, 1);

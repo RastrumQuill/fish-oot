@@ -7,7 +7,7 @@
 .sequence FIGHT_SEQ
     mutebhv     0x20
     mutescale   50
-    initchan    0b1111
+    initchan    0b111111
     vol         115
     tempo       160
 FIGHT_SEQ_LOOP:
@@ -15,6 +15,8 @@ FIGHT_SEQ_LOOP:
     ldchan      1, FIGHT_CHAN_ROOT
     ldchan      2, FIGHT_CHAN_PAD
     ldchan      3, FIGHT_CHAN_DRUMS
+    ldchan      4, FIGHT_CHAN_STRAIN
+    ldchan      5, FIGHT_CHAN_SURGE
     delay       1536
     jump        FIGHT_SEQ_LOOP
 
@@ -55,6 +57,26 @@ FIGHT_SEQ_LOOP:
     pan         84
     reverb      16
     instr       FONTANY_INSTR_DRUM
+    delay       1536
+    end
+
+.channel FIGHT_CHAN_STRAIN
+    noshort
+    ldlayer     0, FIGHT_LAYER_STRAIN
+    vol         96
+    pan         72
+    reverb      48
+    instr       SF3_INST_7
+    delay       1536
+    end
+
+.channel FIGHT_CHAN_SURGE
+    noshort
+    ldlayer     0, FIGHT_LAYER_SURGE
+    vol         120
+    pan         64
+    reverb      24
+    instr       SF3_INST_12
     delay       1536
     end
 
@@ -338,6 +360,172 @@ FIGHT_SEQ_LOOP:
     notedvg     PITCH_F2, 12, 46, 43
     notedvg     PITCH_E2, 12, 46, 43
     notedvg     PITCH_F2, 12, 46, 43
+    end
+
+.layer FIGHT_LAYER_STRAIN
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 72, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    notedvg     PITCH_B4, 12, 58, 92
+    notedvg     PITCH_C5, 12, 58, 92
+    end
+
+.layer FIGHT_LAYER_SURGE
+    notedvg     PITCH_E3, 48, 110, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 110, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_C3, 48, 110, 40
+    notedvg     PITCH_C3, 48, 88, 40
+    notedvg     PITCH_C3, 48, 88, 40
+    notedvg     PITCH_C3, 48, 88, 40
+    notedvg     PITCH_D3, 48, 110, 40
+    notedvg     PITCH_D3, 48, 88, 40
+    notedvg     PITCH_D3, 48, 88, 40
+    notedvg     PITCH_D3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 110, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 110, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_E3, 48, 88, 40
+    notedvg     PITCH_F3, 48, 110, 40
+    notedvg     PITCH_F3, 48, 88, 40
+    notedvg     PITCH_F3, 48, 88, 40
+    notedvg     PITCH_F3, 48, 88, 40
+    notedvg     PITCH_B2, 48, 110, 40
+    notedvg     PITCH_B2, 48, 88, 40
+    notedvg     PITCH_B2, 48, 88, 40
+    notedvg     PITCH_B2, 48, 88, 40
     end
 
 .endseq Sequence_110

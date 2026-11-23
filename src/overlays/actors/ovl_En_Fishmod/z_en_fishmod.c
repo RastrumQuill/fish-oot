@@ -1536,11 +1536,18 @@ static void EnFishmod_CombUpdate(EnFishmod* this, PlayState* play) {
  * fields itself).
  */
 
-/** Hooked: it ate the bait, and it's terrified. */
+/** Hooked: it ate the bait, and it's terrified. Its strength on the line (FEEL fight_length) and its first leap a
+ * few seconds off (as TP's: not straight away). */
 void EnFishmod_FishHook(EnFishmod* this) {
     EnFishmod_FishSetState(this, FISH_STATE_HOOKED);
     this->mood.hunger = 30;
     this->mood.fear = 255;
+    this->staminaMax = (60.0f + this->species->behavior.stamina * 3.0f + this->lengthInches * 4.0f) *
+                       FEEL(FEEL_FIGHT_LENGTH);
+    this->stamina = this->staminaMax;
+    this->leapCooldown = 70 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 60.0f);
+    this->runTimer = 0; // (its first run at once)
+    this->fightDepth = 0.3f;
 }
 
 /** Fighting the line wears it out. */
@@ -1849,11 +1856,15 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
     Vec3f next;
 
     this->jawRot = 3000;
-    // Now and then it makes a run: away from Link, veering left or right, toward open water, with a burst
-    // of speed at the start (stateTimer counts the burst down; the rod pulls harder while it lasts).
-    // Runs come in three kinds so the fight has a rhythm: off away from Link, a sweep across the line
-    // (left or right, swinging the rod over), or, while still fresh, a charge back toward Link that throws
-    // slack into the line.
+    if (this->leapCooldown > 0) {
+        this->leapCooldown--;
+    }
+    // The fight in phases by what it has left (as TP's and Sega Bass Fishing's fish): fresh, it never settles, re-aiming
+    // its run every half second to second and a half (TP's fish re-aim every 0.3-1.7 s), shaking its head between;
+    // working, longer runs and the leaps; tiring, short surges further apart; spent, it barely pulls. Each run aims
+    // roughly away from Link (within about 55 degrees, as TP's), across the line, or (fresh) a charge back at him.
+    // A run's start is when it may leap (TP rolls at each new run): by its species' jumpiness, bigger ones more
+    // often, never near Link nor soon after the last.
     if (--this->runTimer <= 0) {
         s16 awayYaw = Math_Vec3f_Yaw(&player->actor.world.pos, &this->actor.world.pos);
         f32 fresh = this->stamina / this->staminaMax;
@@ -1865,18 +1876,45 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
             yaw = awayYaw + 0x8000 + (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x3000);
         } else if (roll < 0.55f) {
             this->runKind = FISH_RUN_ACROSS;
-            yaw = awayYaw + ((Fishmod_RandZeroOne(gFishmodRngNow) < 0.5f) ? 0x3800 : -0x3800) + (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x1000);
+            yaw = awayYaw + ((Fishmod_RandZeroOne(gFishmodRngNow) < 0.5f) ? 0x3800 : -0x3800) +
+                  (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x1000);
         } else {
             this->runKind = FISH_RUN_AWAY;
-            yaw = awayYaw + (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x3000);
+            yaw = awayYaw + (s16)Fishmod_RandCenteredFloat(gFishmodRngNow, 0x5000);
         }
         this->runYaw = EnFishmod_OpenWaterYaw(this, play, yaw);
-        this->runTimer = 40 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 70.0f);
+        if (fresh > 0.66f) {
+            this->runTimer = 10 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 22.0f);
+        } else if (fresh > 0.33f) {
+            this->runTimer = 18 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 32.0f);
+        } else {
+            this->runTimer = 30 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 45.0f);
+        }
         this->stateTimer = (s16)((12.0f + b->strength * 0.3f) * (0.3f + 0.7f * fresh));
         if (this->runKind == FISH_RUN_CHARGE) {
             this->stateTimer = this->stateTimer * 2 / 3;
         }
+        // where in the water it fights this run: its species' band (the bottom feeders stay down)
+        this->fightDepth =
+            (this->species->depthTop +
+             Fishmod_RandZeroFloat(gFishmodRngNow, this->species->depthBottom - this->species->depthTop)) /
+            255.0f;
+        // a leap?
+        if (!this->jumping && (this->leapCooldown == 0) && (fresh > 0.2f) &&
+            (Math_Vec3f_DistXZ(&player->actor.world.pos, &this->actor.world.pos) > 120.0f) &&
+            (Fishmod_RandZeroOne(gFishmodRngNow) <
+             b->jumpiness * 0.006f * ((this->lengthInches >= this->species->lengthTypical) ? 1.3f : 0.7f))) {
+            Vec3f splash = this->actor.world.pos;
+
+            this->jumping = true;
+            this->leapCooldown = 25;
+            this->vel.y = 7.0f + b->strength * 0.04f;
+            splash.y = this->waterY;
+            EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
+            Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
+        }
     }
+    this->leapVelPrev = this->vel.y;
 
     // rod has computed where the line lets it go
     next = this->target;
@@ -1915,28 +1953,15 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
 
         if (fits) {
             // up near the surface while it runs, sounding deep while it holds against the line
-            f32 depthY = (this->stateTimer > 0)
-                             ? this->waterY - 8.0f
-                             : CLAMP_MIN(this->waterY - 8.0f - (this->waterY - this->floorY) * 0.5f,
-                                         this->floorY + this->halfHeight + 2.0f);
+            f32 band = (this->stateTimer > 0) ? this->fightDepth * 0.6f : this->fightDepth; // (up a little on a run)
+            f32 depthY = CLAMP(this->waterY - 6.0f - (this->waterY - this->floorY) * band,
+                               this->floorY + this->halfHeight + 2.0f, this->waterY - 6.0f);
 
             next.y = this->actor.world.pos.y;
             Math_ApproachF(&next.y, depthY, 0.1f, 1.0f);
             next.y = EnFishmod_ClampY(this, next.y);
             this->actor.world.pos = next;
             this->actor.shape.rot.x = 0;
-
-            // leap
-            if ((gFishmodRodState.tension > 45.0f) && (this->stamina > this->staminaMax * 0.2f) &&
-                (Fishmod_RandZeroOne(gFishmodRngNow) < b->jumpiness * 0.0004f)) {
-                Vec3f splash = this->actor.world.pos;
-
-                this->jumping = true;
-                this->vel.y = 6.0f + b->strength * 0.04f;
-                splash.y = this->waterY;
-                EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
-                Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
-            }
         } else if (reeledIn && EnFishmod_WaterAt(play, next.x, next.z, &surface, &floor) &&
                    (surface - floor > 1.0f)) {
             // thrashing in the shallows, belly on the bottom
@@ -1966,7 +1991,7 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
         f32 fight = 0.3f + 0.7f * (this->stamina / this->staminaMax);
 
         Math_SmoothStepToS(&this->actor.shape.rot.y,
-                           this->runYaw + (s16)(Math_SinS(this->timer * 0x1400) * 0x700 * fight), 3, 0x1000,
+                           this->runYaw + (s16)(Math_SinS(this->timer * 0x1800) * 0xC00 * fight * fight), 3, 0x1400,
                            0x100);
         this->actor.shape.rot.z = Math_SinS(this->timer * 0x1C00) * 0xA00 * fight;
         this->swimPhaseStep = 0.35f + (this->stamina / this->staminaMax) * 0.3f;

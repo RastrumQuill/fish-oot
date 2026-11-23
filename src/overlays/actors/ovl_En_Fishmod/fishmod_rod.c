@@ -35,6 +35,9 @@
 #include "z_lib.h"
 #include "play_state.h"
 #include "player.h"
+#include "letterbox.h"
+#include "sequence.h"
+#include "seqcmd.h"
 #include "interface.h"
 #include "item.h"
 #include "save.h"
@@ -192,6 +195,19 @@ s32 EnFishmod_RodClaim(EnFishmod* fish) {
 static s16 sRumbleJolt;
 static u8 sRumbleRunning; // (the fight's last frame: a run, a leap)
 static u8 sRumbleLeaping; // game frames a jolt still has the motor (the fight's steady rumble waits for it)
+enum { FIGHT_CH_BASS, FIGHT_CH_ROOT, FIGHT_CH_PAD, FIGHT_CH_DRUMS, FIGHT_CH_STRAIN, FIGHT_CH_SURGE, FIGHT_CH_MAX };
+static s16 sFightMusicSent[FIGHT_CH_MAX];
+// the landing (TP's): at Link's feet a window opens now and then, shorter the bigger the fish; A in it lands it
+static u8 sLandPhase;
+static s16 sLandTimeout;
+static s16 sLandWait;
+static s16 sLandWindow;
+// a leap: seen, and the rod dropped for it
+static u8 sLeapSeen;
+static u8 sLeapDipped;
+// the catch's hero shot: the camera's distance, easing back
+static f32 sHeroDist;
+
 
 static void Rod_Rumble(f32 scale, f32 strength, f32 duration, s32 decay, s32 joltFrames) {
     if (scale <= 0.0f) {
@@ -337,8 +353,9 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
         Vec3f at;
 
         Math_SmoothStepToS(&eyeYaw, player->actor.shape.rot.y, 4, 0x900, 0x100);
-        ROD->camEye.x = player->actor.world.pos.x + Math_SinS(eyeYaw) * 85.0f;
-        ROD->camEye.z = player->actor.world.pos.z + Math_CosS(eyeYaw) * 85.0f;
+        Math_ApproachF(&sHeroDist, 95.0f, 0.04f, 1.0f); // (the hero shot: close, then easing back)
+        ROD->camEye.x = player->actor.world.pos.x + Math_SinS(eyeYaw) * sHeroDist;
+        ROD->camEye.z = player->actor.world.pos.z + Math_CosS(eyeYaw) * sHeroDist;
         Math_ApproachF(&ROD->camEye.y, player->actor.world.pos.y + height + 10.0f, 0.2f, 10.0f);
         at = player->actor.world.pos;
         at.y += height;
@@ -492,6 +509,8 @@ static void Rod_PublishInfo(void) {
     gFishmodRodInfo.castPower = ROD->castPower;
     gFishmodRodInfo.choice = ROD->choice;
     gFishmodRodInfo.bait = ROD->bait;
+    gFishmodRodInfo.landOpen = (ROD->state == ROD_STATE_FIGHT) && sLandPhase && (sLandWindow > 0);
+    gFishmodRodInfo.leaping = (ROD->state == ROD_STATE_FIGHT) && (ROD->fish != NULL) && ROD->fish->jumping;
 }
 
 static void Rod_EndCast(PlayState* play, Player* player) {
@@ -503,8 +522,24 @@ static void Rod_EndCast(PlayState* play, Player* player) {
     ROD->tension = 0.0f;
     ROD->underCam = false;
     ROD->anchored = false;
+    sLandPhase = false;
+    Letterbox_SetSizeTarget(0); // (the catch's hero shot over)
     player->unk_860 = 0; // Link goes back to standing with the rod
     Rod_CameraStop(play);
+}
+
+/*
+ * The fight's music in layers (the fight sequence's channels, fishmod/tools/gen_fight_seq.py), faded in and out with
+ * the fight: the held roots and the tension line always; the bass ostinato and the drums with a run; a trilled
+ * strain line as the line nears breaking; a pounding surge when the fish is spent or at Link's feet. Neither TP nor
+ * Sega Bass Fishing moves its fight music with the fight: this does.
+ */
+static void Rod_FightMusicReset(void) {
+    s32 i;
+
+    for (i = 0; i < FIGHT_CH_MAX; i++) {
+        sFightMusicSent[i] = -1;
+    }
 }
 
 static void Rod_StartFight(PlayState* play, Player* player) {
@@ -525,6 +560,8 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     EnFishmod_RodMessage(1, "FISH ON!", NULL);
     Sfx_PlaySfxCentered(NA_SE_SY_CORRECT_CHIME);
     func_800F5ACC(NA_BGM_FISHMOD_FIGHT); // fish-on music in place of the area's, until the fight ends
+    Rod_FightMusicReset();
+    sLandPhase = sLeapSeen = sLeapDipped = false;
 }
 
 static void Rod_LoseFish(PlayState* play, Player* player, const char* why) {
@@ -532,6 +569,7 @@ static void Rod_LoseFish(PlayState* play, Player* player, const char* why) {
 
     gFishmodRodInfo.lost++;
     Rod_StopFightMusic();
+    sLandPhase = false;
     if (fish != NULL) {
         EnFishmod_FishSetState(fish, FISH_STATE_FLEE);
         EnFishmod_LearnBait(fish, ROD->hookedBait); // it got away with that one in its mouth
@@ -572,6 +610,34 @@ static f32 sFishLeft;
 #define TENSION_LOW 25.0f
 #define TENSION_HIGH 70.0f
 #define TENSION_DRAG FEEL(FEEL_DRAG_AT) // (the drag: include/fishmod_feel.h)
+
+static void Rod_FightMusic(EnFishmod* fish) {
+    s16 want[FIGHT_CH_MAX];
+    s32 running = (fish != NULL) && (fish->stateTimer > 0);
+    f32 left = (fish != NULL) ? fish->stamina / fish->staminaMax : 0.0f;
+    f32 strain = CLAMP((ROD->tension - TENSION_HIGH) / (TENSION_DRAG - TENSION_HIGH), 0.0f, 1.0f);
+    s32 i;
+
+    if (Audio_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN) != NA_BGM_FISHMOD_FIGHT) {
+        Rod_FightMusicReset(); // (not playing yet, or the area's again: its channels aren't ours to fade)
+        return;
+    }
+    want[FIGHT_CH_BASS] = running ? 127 : 64;
+    want[FIGHT_CH_ROOT] = 127;
+    want[FIGHT_CH_PAD] = 110;
+    want[FIGHT_CH_DRUMS] = running ? 127 : (ROD->tension > TENSION_HIGH) ? 90 : 24;
+    want[FIGHT_CH_STRAIN] = (s16)(strain * 127.0f);
+    want[FIGHT_CH_SURGE] = (sLandPhase || (left < 0.3f)) ? 127 : 0;
+    for (i = 0; i < FIGHT_CH_MAX; i++) {
+        if ((sFightMusicSent[i] < 0) || (ABS(want[i] - sFightMusicSent[i]) > 10) ||
+            ((want[i] == 0) != (sFightMusicSent[i] == 0))) {
+            SEQCMD_SET_CHANNEL_VOLUME(SEQ_PLAYER_BGM_MAIN, i, (sFightMusicSent[i] < 0) ? 1 : 10, want[i]);
+            sFightMusicSent[i] = want[i];
+        }
+    }
+}
+
+static void Rod_Land(PlayState* play, Player* player, EnFishmod* fish);
 
 static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, Input* input) {
     EnFishmod* fish = ROD->fish;
@@ -615,8 +681,17 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         s32 running = (fish->stateTimer > 0);
 
         sPullAngle = (s16)(fish->runYaw + 0x8000 + 0x4000 - Camera_GetInputDirYaw(GET_ACTIVE_CAM(play)));
-        if (running && !sRunning) {
-            Sfx_PlaySfxCentered(NA_SE_SY_ATTENTION_ON); // it's off on a run: look at the arrow
+        if (running && !sRunning && !fish->jumping) {
+            // it's off on a run: the command, as Sega Bass Fishing calls it (which way to hold the rod against it:
+            // the stick's way that the arrow shows)
+            static const char* sCommand[] = { "! Pull right !", "! Pull left !", "! Push forward !", "! Pull back !" };
+            f32 sx = -Math_CosS(sPullAngle);
+            f32 sy = Math_SinS(sPullAngle);
+
+            Sfx_PlaySfxCentered(NA_SE_SY_ATTENTION_ON);
+            EnFishmod_RodMessage(2, sCommand[(fabsf(sx) > fabsf(sy)) ? ((sx > 0.0f) ? 0 : 1) : ((sy > 0.0f) ? 2 : 3)],
+                                 "against the run");
+            ROD->messageTimer = 30;
         }
         if (opposing && !sOpposing) {
             Sfx_PlaySfxCentered(NA_SE_SY_LOCK_ON); // the stick is against it
@@ -624,6 +699,34 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         sRunning = running;
         sOpposing = opposing;
         sFishLeft = staminaFrac;
+    }
+
+    // a leap (TP's): the rod down (the stick down) while it's in the air, or at the top of the leap it may throw the
+    // hook, likelier the tighter the line; done right, the line eases
+    if (fish->jumping) {
+        if (!sLeapSeen) {
+            sLeapSeen = true;
+            sLeapDipped = false;
+            EnFishmod_RodMessage(2, "It's leaping!", "Rod down! (stick down)");
+            ROD->messageTimer = 25;
+        }
+        if (input->rel.stick_y < -40) {
+            if (!sLeapDipped) {
+                Sfx_PlaySfxCentered(NA_SE_SY_CURSOR);
+            }
+            sLeapDipped = true;
+        }
+        if ((fish->leapVelPrev > 0.0f) && (fish->vel.y <= 0.0f)) {
+            if (sLeapDipped) {
+                ROD->tension *= 0.5f;
+            } else if (Fishmod_RandZeroOne(gFishmodRngNow) <
+                       FEEL(FEEL_LEAP_THROW) * (0.5f + 0.5f * CLAMP(ROD->tension / 100.0f, 0.0f, 1.0f))) {
+                Rod_LoseFish(play, player, "It threw the hook!");
+                return;
+            }
+        }
+    } else {
+        sLeapSeen = false;
     }
 
     // where the fish wants to go
@@ -704,8 +807,11 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
         }
     }
 
-    // snap
-    if (ROD->tension >= 100.0f) {
+    // snap: only a fish heavy enough breaks the line (a small one can't: the drag gives it line)
+    if ((ROD->tension >= 100.0f) && (pounds < FEEL(FEEL_SNAP_LBS))) {
+        ROD->tension = 99.0f;
+        ROD->overTimer = 0;
+    } else if (ROD->tension >= 100.0f) {
         if (++ROD->overTimer > (s16)FEEL(FEEL_SNAP_FRAMES)) {
             Rod_Rumble(FEEL(FEEL_RUMBLE_BITE), 255.0f, 30.0f, 10, 15);
             Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
@@ -742,37 +848,89 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
     } else if ((ROD->tension > FEEL(FEEL_DRAG_AT)) && (taut > 0.0f)) {
         Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 235.0f, 3.0f, 60, 0);
     } else if (ROD->tension >= TENSION_SLACK) {
-        Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 40.0f + ROD->tension * 1.6f + (sRumbleRunning ? 50.0f : 0.0f), 3.0f, 60,
-                   0);
+        // (pulsing with its tail beat, as TP's rumble does)
+        Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT),
+                   (40.0f + ROD->tension * 1.6f + (sRumbleRunning ? 50.0f : 0.0f)) *
+                       (0.65f + 0.35f * Math_SinS(fish->timer * 0x2400)),
+                   3.0f, 60, 0);
     }
 
-    // landed
+    Rod_FightMusic(fish);
+
+    // at Link's feet (or dragged up the bank): the landing (TP's). A window opens now and then, shorter the bigger the
+    // fish (half a second for the biggest); A in it lands it, A outside it puts the next one off (no mashing); too
+    // long and it slips away.
     if ((ROD->lineOut <= LINE_MIN + 2.0f) || fish->beached ||
         (Math_Vec3f_DistXZ(&player->actor.world.pos, &fish->actor.world.pos) < 32.0f)) {
-        f32 weight = fish->species->weightCoef * fish->lengthInches * fish->lengthInches * fish->lengthInches *
-                     0.000001f;
-
-        ROD->state = ROD_STATE_LANDING;
-        ROD->timer = 25; // Link holds it up before the textbox opens
-        ROD->tension = 0.0f; // the rod relaxes once the fish is out of the water
-        ROD->choice = 0;
-        ROD->messageTimer = 0;
-        gFishmodRodInfo.caught++;
-        player->unk_860 = 3; // catch animation
-        EnFishmod_FishSetState(fish, FISH_STATE_CAUGHT);
-        Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 200.0f, 12.0f, 15, 6); // landed
-        Sfx_PlaySfxCentered(NA_SE_EV_JUMP_OUT_WATER);
-        Rod_StopFightMusic();
-        Audio_PlayFanfare(NA_BGM_ITEM_GET | 0x900);
-
-        sCatchRecord = Fishmod_RecordCatch(fish->species - gFishmodSpecies, fish->lengthInches);
-        if (weight < 1.0f) {
-            sprintf(sCatchSize, "%d.%d in, %d oz", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
-                    (s32)(weight * 16.0f + 0.5f));
-        } else {
-            sprintf(sCatchSize, "%d.%d in, %d.%d lbs", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
-                    (s32)weight, (s32)(weight * 10.0f) % 10);
+        ROD->lineOut = CLAMP_MAX(ROD->lineOut, LINE_MIN + 2.0f);
+        if (!sLandPhase) {
+            sLandPhase = true;
+            sLandTimeout = 140;
+            sLandWait = 8;
+            sLandWindow = 0;
+            EnFishmod_RodMessage(1, "Land it!", "A when it shows");
         }
+        if (--sLandTimeout <= 0) {
+            Rod_LoseFish(play, player, "It slipped away!");
+            return;
+        }
+        if (sLandWindow > 0) {
+            if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
+                Rod_Land(play, player, fish);
+                return;
+            }
+            if (--sLandWindow == 0) {
+                sLandWait = 30 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 25.0f);
+            }
+        } else {
+            if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
+                sLandWait += 30; // (too soon: the next one waits)
+                Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+            }
+            if (--sLandWait <= 0) {
+                f32 big = CLAMP((load - FEEL(FEEL_LOAD_MIN)) / (FEEL(FEEL_LOAD_MAX) - FEEL(FEEL_LOAD_MIN)), 0.0f, 1.0f);
+
+                sLandWindow = (s16)((20.0f - 12.0f * big) * FEEL(FEEL_LAND_WINDOW));
+                EnFishmod_RodMessage(1, "A: LAND!", NULL);
+                ROD->messageTimer = sLandWindow;
+                Sfx_PlaySfxCentered(NA_SE_SY_FSEL_CURSOR);
+                Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 200.0f, 3.0f, 80, 2);
+            }
+        }
+    } else {
+        sLandPhase = false;
+    }
+}
+
+/** Landed: Link holds it up; the hero shot (letterboxed, the camera easing back), its size, the jingle (a record's
+ * the bigger one). */
+static void Rod_Land(PlayState* play, Player* player, EnFishmod* fish) {
+    f32 weight = fish->species->weightCoef * fish->lengthInches * fish->lengthInches * fish->lengthInches *
+                 0.000001f;
+
+    ROD->state = ROD_STATE_LANDING;
+    ROD->timer = 25; // Link holds it up before the textbox opens
+    ROD->tension = 0.0f; // the rod relaxes once the fish is out of the water
+    ROD->choice = 0;
+    ROD->messageTimer = 0;
+    gFishmodRodInfo.caught++;
+    player->unk_860 = 3; // catch animation
+    EnFishmod_FishSetState(fish, FISH_STATE_CAUGHT);
+    Rod_Rumble(FEEL(FEEL_RUMBLE_FIGHT), 200.0f, 12.0f, 15, 6); // landed
+    Sfx_PlaySfxCentered(NA_SE_EV_JUMP_OUT_WATER);
+    Rod_StopFightMusic();
+    sLandPhase = false;
+    sCatchRecord = Fishmod_RecordCatch(fish->species - gFishmodSpecies, fish->lengthInches);
+    // (a record gets the big fanfare, any other the small one)
+    Audio_PlayFanfare(sCatchRecord ? (NA_BGM_ITEM_GET | 0x900) : NA_BGM_SMALL_ITEM_GET);
+    Letterbox_SetSizeTarget(30);
+    sHeroDist = 55.0f;
+    if (weight < 1.0f) {
+        sprintf(sCatchSize, "%d.%d in, %d oz", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
+                (s32)(weight * 16.0f + 0.5f));
+    } else {
+        sprintf(sCatchSize, "%d.%d in, %d.%d lbs", (s32)fish->lengthInches, (s32)(fish->lengthInches * 10.0f) % 10,
+                (s32)weight, (s32)(weight * 10.0f) % 10);
     }
 }
 

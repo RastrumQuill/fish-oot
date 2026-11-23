@@ -245,6 +245,8 @@ typedef struct FishmodRodInfo {
     /* 0x14 */ const char* notice; // a one-line notice for the rod's banner, shown once
     /* 0x18 */ u8 bait;          // FishmodBait on the hook
     /* 0x19 */ u8 baitRequest;   // set by a bait bottle: put this on the hook
+    /* 0x1A */ u8 landOpen;      // the landing window is open (A lands the fish)
+    /* 0x1B */ u8 leaping;       // the hooked fish is in the air (the stick down drops the rod)
 } FishmodRodInfo;
 
 extern FishmodRodInfo gFishmodRodInfo;
