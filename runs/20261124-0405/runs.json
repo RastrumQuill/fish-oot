@@ -1,0 +1,72 @@
+[
+ {
+  "run": 1,
+  "label": "bed-uncut-1",
+  "patch": "releases\\fish-oot-remesh-off-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-24 04:05:52",
+  "patch_sha1": "5bc2cf6e6da03149e9cc70628f380183d52afd8f",
+  "upload_check": "ok",
+  "packets": 442,
+  "bytes": 3347472,
+  "packs": 1,
+  "seconds": 225
+ },
+ {
+  "run": 2,
+  "label": "bed-remesh-1",
+  "patch": "releases\\fish-oot-remesh-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-24 04:09:40",
+  "patch_sha1": "7b2f51e2d347e2307da1d4fb50dffe4112285cd9",
+  "upload_check": "ok",
+  "packets": 445,
+  "bytes": 3363792,
+  "packs": 1,
+  "seconds": 233
+ },
+ {
+  "run": 3,
+  "label": "bed-uncut-2",
+  "patch": "releases\\fish-oot-remesh-off-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-24 04:13:36",
+  "patch_sha1": "5bc2cf6e6da03149e9cc70628f380183d52afd8f",
+  "upload_check": "ok",
+  "packets": 442,
+  "bytes": 3349904,
+  "packs": 1,
+  "seconds": 226
+ },
+ {
+  "run": 4,
+  "label": "bed-remesh-2",
+  "patch": "releases\\fish-oot-remesh-bench.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-24 04:17:25",
+  "patch_sha1": "7b2f51e2d347e2307da1d4fb50dffe4112285cd9",
+  "upload_check": "ok",
+  "packets": 447,
+  "bytes": 3383376,
+  "packs": 1,
+  "seconds": 237
+ },
+ {
+  "run": 5,
+  "label": "hw-replay-g14o2",
+  "patch": "releases\\hwsuite\\hw-replay-g14o2.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-24 04:21:25",
+  "patch_sha1": "e62b8d4d984c2922981eaf0957c187350c4f7123",
+  "upload_check": "ok",
+  "packets": 146,
+  "bytes": 1015232,
+  "packs": 1,
+  "seconds": 262
+ }
+]

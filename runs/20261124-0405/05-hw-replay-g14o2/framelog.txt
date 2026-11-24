@@ -1,0 +1,69 @@
+(left out: 23 frames that sent a USB packet, the profiler's own cost: --keep-sends to keep them)
+# Frame log: 4193 frames (0.06 h, 19.7 fps), 76 over 52 ms (2%); 22 gaps in the frame count
+
+**On screen: 6 of 4158 frames (0%) left a picture up 4 refreshes or more (a visible hitch).** In the frames that made them late: neither over 50 ms 83%, RDP alone over 50 ms 17%
+
+(The 'slow frames' below are by frame period, over 52 ms: with run-ahead, not all of them are hitches.)
+
+**Press to picture** (the controller read to the refresh the picture went up at; the TV's own delay not included): mean 129 ms, 90% under 132 ms, the most 232 ms; 0% of the pictures went up with another finished frame waiting behind them
+
+| ms per frame | slow frames | full-speed frames | difference |
+|---|---|---|---|
+| frame period | 92.90 | 50.00 | +42.90 |
+| CPU update | 11.55 | 3.80 | +7.76 |
+| CPU draw | 15.58 | 7.70 | +7.88 |
+| RSP graphics | 12.56 | 7.40 | +5.15 |
+| RSP audio | 10.77 | 5.11 | +5.66 |
+| RDP | 30.31 | 21.47 | +8.84 |
+| fish draw | 0.03 | 0.10 | -0.06 |
+|   update: fm_play | 0.04 | 0.07 | -0.03 |
+|   update: fm_debug | 1.07 | 0.60 | +0.47 |
+|   update: col_oc | 0.04 | 0.10 | -0.06 |
+|   update: col_clear | 0.07 | 0.03 | +0.04 |
+|   update: actors | 5.90 | 2.21 | +3.69 |
+|   update: dynapoly | 0.22 | 0.14 | +0.08 |
+|   update: cutscene | 0.29 | 0.18 | +0.11 |
+|   update: effects | 0.06 | 0.04 | +0.01 |
+|   update: interface | 0.05 | 0.05 | +0.00 |
+|   update: animtask | 1.17 | 0.03 | +1.14 |
+|   update: camera | 0.29 | 0.26 | +0.04 |
+|   update: env | 0.07 | 0.08 | -0.01 |
+|   actors: bg | 0.23 | 0.07 | +0.16 |
+|   actors: player | 0.89 | 0.68 | +0.21 |
+|   actors: npc | 0.16 | 0.09 | +0.07 |
+|   actors: prop | 0.02 | 0.07 | -0.04 |
+|   actors: itemaction | 1.60 | 0.80 | +0.80 |
+
+RDP in slow frames: command buffer busy 0%, pipeline 0%, TMEM 0%
+
+RDP in full-speed frames: command buffer busy 0%, pipeline 0%, TMEM 0%
+
+Costliest actor kinds in slow frames (ms per slow frame, where among a frame's top four):
+  En_Elf                   1.24
+  Player                   0.89
+  En_Viewer                0.22
+  En_Horse                 0.20
+  Object_Kankyo            0.14
+  En_Ko                    0.10
+  En_Fishmod               0.04
+  Bg_Spot00_Hanebasi       0.03
+  En_Kanban                0.02
+  En_Holl                  0.01
+  En_Wood02                0.00
+  En_Mag                   0.00
+
+Slow frames by the longer of CPU (update + draw) and RDP: RDP 91%, CPU 9%
+
+| lap | conditions | leg | frames | fps | over 52 ms |
+|---|---|---|---|---|---|
+| 1 | clear dawn | 1 | 4193 | 19.7 | 2% |
+
+## The screen's pacing (how long each picture stayed)
+
+4740 pictures over 13852 refreshes: 20.53 fps on screen
+| longest a picture stayed in the record | records | share |
+|---|---|---|
+| 3 refreshes (on time) | 4173 | 99.8% |
+| 4 refreshes (a hitch) | 1 | 0.0% |
+| 6 refreshes or more (a hitch) | 6 | 0.1% |
+Hitches in a row: 1: 7

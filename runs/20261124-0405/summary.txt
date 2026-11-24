@@ -1,0 +1,7 @@
+Morning runs 20261124-0405
+
+ 1. bed-uncut-1                  done        442 packets    3.3 MB   225 s  
+ 2. bed-remesh-1                 done        445 packets    3.4 MB   233 s  
+ 3. bed-uncut-2                  done        442 packets    3.3 MB   226 s  
+ 4. bed-remesh-2                 done        447 packets    3.4 MB   237 s  
+ 5. hw-replay-g14o2              done        146 packets    1.0 MB   262 s  

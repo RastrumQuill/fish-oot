@@ -1,0 +1,34 @@
+Console test suite: 20261124-0405
+
+1. Did each run work
+
+  ok   bed-uncut-1            frames 3764, sets 819, hash D13BA047
+  ok   bed-remesh-1           frames 3758, sets 742, hash BB4A0362
+  ok   bed-uncut-2            frames 3764, sets 819, hash D13BA047
+  ok   bed-remesh-2           frames 3760, sets 742, hash BB4A0362
+  ok   hw-replay-g14o2        replay 5000 frames, 214 checks: in step, no repairs
+
+2. Do a build's own runs agree (the same ROM twice must do the same thing)
+
+  ok   bed-uncut              2 runs agree
+  DIFF bed-remesh             2 runs DO NOT agree: the run isn't repeatable on the console
+
+3. How fast (the frames the bench counts; ms a frame)
+
+  run                       fps   period   update     draw      RSP      RDP  slow %
+  bed-uncut-1             18.28    54.70    27.16    22.60    34.01    44.00    50.7
+  bed-remesh-1            17.61    56.78    27.27    22.76    36.72    47.13    65.3
+  bed-uncut-2             18.22    54.89    27.38    22.65    34.29    43.93    52.2
+  bed-remesh-2            17.65    56.66    27.26    22.79    36.56    47.14    64.2
+  hw-replay-g14o2         19.63    50.94     4.04     7.85    12.72    21.63     1.9
+
+4. Each build against hw-base (CPU = update + draw; the spread is between a build's own runs: a difference
+   smaller than the spreads is noise)
+
+  (no run of hw-base with a frame log: nothing to compare with)
+
+5. The same over frames 60 to 860 only, where every build plays the same game (the fair comparison: after
+   that the builds' cameras part and they aren't doing the same work)
+
+
+RESULT: all runs worked
