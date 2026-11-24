@@ -149,7 +149,7 @@ def to_ia8(la):
 
 
 def make_name(text, fnt):
-    """128 x 16 IA4, centred like the game's item names (white text; the game draws its shadow)."""
+    """128 x 16 IA4, centred like the game's item names (white text in a black border, as theirs)."""
     widths, glyphs = fnt
     canvas = np.zeros((16, 128), np.float32)
     total = sum(widths[ord(ch) - 32] for ch in text)
@@ -162,7 +162,17 @@ def make_name(text, fnt):
             reg[...] = np.maximum(reg, g[:, :reg.shape[1]].astype(np.float32))
         x += int(round(widths[ord(ch) - 32]))
     i = np.clip(np.round(canvas / 255.0 * 7), 0, 7).astype(np.uint8)
-    a = (canvas > 40).astype(np.uint8)
+    # the black border round the letters, opaque, as the game's own item names have it baked in (fitted to theirs:
+    # a pixel either side, two above and below)
+    ink = canvas > 100
+    a = canvas > 40
+    for dy in range(-2, 3):
+        for dx in range(-1, 2):
+            sh = np.zeros_like(ink)
+            sh[max(dy, 0):16 + min(dy, 0), max(dx, 0):128 + min(dx, 0)] = \
+                ink[max(-dy, 0):16 + min(-dy, 0), max(-dx, 0):128 + min(-dx, 0)]
+            a |= sh
+    a = a.astype(np.uint8)
     nib = (i << 1) | a
     return ((nib[:, 0::2] << 4) | nib[:, 1::2]).astype(np.uint8), canvas
 
