@@ -97,7 +97,9 @@ another coming back.
 ### Checked and not for us
 - **Triangle snakes / strips (F3DEX3, tiny3d):** F3DEX3's own `Performance.md` now says snakes are "no longer
   competitive in RSP time" (~70 µs RDRAM saved against ~400 µs more RSP in a typical scene). tiny3d's strips belong to
-  its own microcode.
+  its own microcode. **Reopened (24 November):** that trade only loses where the RSP is the limit. At Lake Hylia the
+  RDP is (the RSP stalls ~19 ms a frame on a full RDP FIFO), so the extra RSP work fills a wait and the RDRAM saved
+  goes to the RDP. Worth a console A/B for the RDP-bound scenes only (not the tank, which is RSP-bound); small.
 - **CPU skinning** (OoT/MM `z_skin.c`, Epona's way): rewrites vertices on the CPU every frame. Our CPU is the tighter
   side.
 - **Shared-pose instancing:** every bone matrix holds the fish's world transform, so the RSP still needs per-fish
