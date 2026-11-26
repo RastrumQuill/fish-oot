@@ -42,8 +42,9 @@
 #                  reads a copy, after --texpack's and --colpack's); outputs get a -seams suffix
 #   --meshpack     the lake's widest mesh pieces cut into areas, each culled by the RSP on its own (tools/meshpack.py):
 #                  the build reads a copy (after the other packs); outputs get a -meshpack suffix
-#   --strips       the scenes' triangles as F3DEX3 triangle snakes (tools/strippass.py, after the other passes): a test of
-#                  whether strips pay off where the frame waits on the RDP; outputs get a -strips suffix
+#   --no-strips    the game's triangles left as they are; by default an F3DEX3 build draws them as triangle snakes
+#                  (tools/strippass.py, after the other passes: fewer RDRAM bytes for the RDP-bound frames; the strips A/B,
+#                  releases/notes-stripsab.md: 5 points fewer hitches at the lake); outputs get -nostrips. --strips forces them
 #   --mod-opt L    the mod's own files at GCC level L (Os, O3...), the game's unchanged; outputs get a -modL suffix
 #   --no-timers    a debug build measured from outside (ares's exact profile): the debug timers compiled out; outputs
 #                  get a -notimers suffix
@@ -73,7 +74,7 @@ TEXPACK=0
 COLPACK=0
 MESHPACK=0
 SEAMS=0
-STRIPS=0
+STRIPS=
 PGO=0
 NOTIMERS=0
 MODOPT=""
@@ -113,6 +114,7 @@ while [ $# -gt 0 ]; do
         --meshpack) MESHPACK=1 ;;
         --seams) SEAMS=1 ;;
         --strips) STRIPS=1 ;;
+        --no-strips) STRIPS=0 ;;
         --clang-opt) CLANG=1; CLANG_OPT="$2"; shift ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
@@ -211,6 +213,7 @@ if [ "$MESHPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$MP_OUT")
 fi
+[ -z "$STRIPS" ] && STRIPS=$F3DEX3
 if [ "$STRIPS" = 1 ]; then
     ST_SRC="extracted/$VERSION"
     [ "$TEXPACK" = 1 ] && ST_SRC="$TP_OUT"
@@ -331,8 +334,8 @@ fi
 if [ "$MESHPACK" = 1 ]; then
     SUFFIX="$SUFFIX-meshpack"
 fi
-if [ "$STRIPS" = 1 ]; then
-    SUFFIX="$SUFFIX-strips"
+if [ "$STRIPS" = 0 ] && [ "$F3DEX3" = 1 ]; then
+    SUFFIX="$SUFFIX-nostrips"
 fi
 if [ "$SEAMS" = 1 ]; then
     SUFFIX="$SUFFIX-seams"

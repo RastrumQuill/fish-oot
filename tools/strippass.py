@@ -3,7 +3,8 @@
 pay off where the frame waits on the RDP (Lake Hylia: the RSP stalls on the RDP's full FIFO there, so its extra work
 for a snake may hide in that wait while the RDRAM a snake saves goes to the RDP).
 
-Every run of triangle commands in a scene's room lists (between vertex loads and state changes) is drawn as snakes: a
+Every run of triangle commands in the game's display lists (the scenes' rooms, every object's models, the actors'
+own; the objects the mod reads triangles from at run time left alone: SKIP_DIRS) (between vertex loads and state changes) is drawn as snakes: a
 chain of triangles each joined to the one before by an edge, 1 byte a triangle after the first three (8 to 16 bytes
 for 5 triangles, against 8 bytes for every 2 in gsSP2Triangles). A chain of 1 or 2 triangles stays as it was (a snake
 of 2 is no smaller). Each triangle keeps its own winding; the order within a run changes, so lists with a
@@ -21,6 +22,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meshpack as mp  # noqa: E402
 
 TRI_CMDS = ("gsSP1Triangle", "gsSP2Triangles", "gsSP1Quadrangle")
+# models whose triangles the mod reads at run time, which only knows the plain triangle commands: the fish rig
+# (fishmod_rig.c: object_fish's fish, gameplay_keep's), the plants that bend (fishmod_scatter.c: object_fish's reed)
+SKIP_DIRS = {"object_fish", "gameplay_keep"}
+UNSIZED = []  # (directory, list name): lists whose length changed
 STATS = {"tris": 0, "snaked": 0, "snakes": 0, "bytes_before": 0, "bytes_after": 0, "lists": 0}
 
 
@@ -174,20 +179,25 @@ def main():
     if os.path.exists(out):
         shutil.rmtree(out)
     shutil.copytree(src, out, copy_function=os.link)
-    base = os.path.join(out, "assets", "scenes")
-    for root, _, files in os.walk(base):
+    base = os.path.join(out, "assets")
+    for root, dirs, files in os.walk(base):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for f in files:
             p = os.path.join(root, f)
-            if re.search(r"_room_\d+_.*_DL\.inc\.c$", f):
+            if f.endswith(".inc.c") and "Vtx" not in f:
                 text = open(p).read()
-                if "Triangle" not in text:
+                if ("gsSP2Triangles" not in text and "gsSP1Triangle" not in text) or "#include" in text:
                     continue
-                new = convert(mp.split_items(text))
-                if new is None:
+                items = mp.split_items(text)
+                if not all(("(" in c) and c.lstrip().startswith("gs") for c in items):
+                    continue  # (not a display list on its own)
+                new = convert(items)
+                if new is None or new == items:
                     continue
                 os.remove(p)
                 open(p, "w").write("".join("    %s,\n" % c for c in new))
                 STATS["lists"] += 1
+                UNSIZED.append((root, f[:-len(".inc.c")]))
             elif re.search(r"_room_\d+\.c$", f):
                 text = open(p).read()
                 if "gsSP2Triangles" not in text:
@@ -205,6 +215,20 @@ def main():
                 if new_text != text:
                     os.remove(p)
                     open(p, "w").write(new_text)
+    # the changed lists' declared lengths (the .c and .h beside them give each its original length) left to their contents
+    by_dir = {}
+    for d, name in UNSIZED:
+        by_dir.setdefault(d, set()).add(name)
+    for d, names in by_dir.items():
+        pat = re.compile(r"\b(%s)\[\d+\]" % "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True)))
+        for f in os.listdir(d):
+            if f.endswith((".c", ".h")) and not f.endswith(".inc.c"):
+                p = os.path.join(d, f)
+                text = open(p).read()
+                new = pat.sub(lambda m: m.group(1) + "[]", text)
+                if new != text:
+                    os.remove(p)
+                    open(p, "w").write(new)
     s = STATS
     print("strippass: %d lists; %d of %d triangles in %d snakes (%.1f a snake); triangle commands %d -> %d bytes" % (
         s["lists"], s["snaked"], s["tris"], s["snakes"], s["snaked"] / max(1, s["snakes"]),
