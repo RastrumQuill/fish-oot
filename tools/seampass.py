@@ -36,6 +36,11 @@ import meshpack as mp  # noqa: E402  (the display list parser and the vertex int
 
 WELD = 2.0        # corners this close (units) are one
 ON_LINE = 0.6     # a corner this close to an edge's line lies on it
+# The longest edge split (units). A split adds a corner, and the game works out fog (and light, on lit surfaces) at
+# each corner and blends it between them: a long triangle split has its fog worked out at the new corner rather than
+# blended there, which shifts the whole surface's shading (the castle courtyard's walkway came out darker). Short edges
+# shift too little to see.
+MAX_SPLIT_EDGE = float(os.environ.get("SEAMPASS_MAX_EDGE", "200"))
 END_FRAC = 0.01   # ...and between its ends by this much of its length
 DECAL_COS = 0.9   # a weld along both surfaces' normals (cosine) is a layer, not a crack
 VTX_SLOTS = 32    # the vertex buffer the re-emitted lists load into (F3DEX2's; F3DEX3 has more)
@@ -82,6 +87,10 @@ def read_scene(dirpath, arrays):
             n = mp.name_of(c)
             if n in BUFFER_READERS:
                 lf.ok, lf.why = False, n
+            if n == "gsDPSetRenderMode" and ("XLU" in c or "DECAL" in c):
+                # (translucent: a sliver where a split triangle's pieces overlap is drawn twice, darker; a decal is
+                # laid over another surface on purpose. Seams there don't show: left as they are)
+                lf.ok, lf.why = False, "translucent or decal"
             if n == "gsSPVertex":
                 a = mp.args_of(c)
                 m2 = mp.VTX_REF.match(a[0])
@@ -285,6 +294,61 @@ def close_gaps(leaves, arrays):
 
 # ---- T-junctions ----
 
+def layered(leaves, arrays):
+    """(leaf name, triangle number) of the triangles with another lying on them in the same plane (a surface drawn
+    twice, a second layer on the first: which one shows is decided by equal depths, and a split one's depths round a
+    little differently, so the other layer would show through in places: the castle courtyard's darker floor)"""
+    tris = []
+    for lf in leaves:
+        for ti, (_, _, t) in enumerate(lf.tris):
+            ps = [pos(arrays[a][i]) for a, i in t]
+            u = [ps[1][k] - ps[0][k] for k in range(3)]
+            w = [ps[2][k] - ps[0][k] for k in range(3)]
+            n = (u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0])
+            ln = math.sqrt(sum(x * x for x in n))
+            if ln == 0:
+                continue
+            n = tuple(x / ln for x in n)
+            tris.append(((lf.name, ti), ps, n, sum(n[k] * ps[0][k] for k in range(3))))
+    grid = collections.defaultdict(list)
+    cell = 64
+    for i, (_, ps, _, _) in enumerate(tris):
+        c = [sum(p[k] for p in ps) / 3 for k in range(3)]
+        grid[tuple(int(c[k] // cell) for k in range(3))].append(i)
+
+    def inside(p, ps, n):
+        # p in the triangle ps (in its plane), by the signs of the edges' cross products along the normal
+        s = []
+        for k in range(3):
+            a, b = ps[k], ps[(k + 1) % 3]
+            e = [b[j] - a[j] for j in range(3)]
+            q = [p[j] - a[j] for j in range(3)]
+            c = (e[1] * q[2] - e[2] * q[1], e[2] * q[0] - e[0] * q[2], e[0] * q[1] - e[1] * q[0])
+            s.append(sum(c[j] * n[j] for j in range(3)))
+        return all(x >= -1e-6 for x in s) or all(x <= 1e-6 for x in s)
+
+    out = set()
+    for i, (key, ps, n, d) in enumerate(tris):
+        c = [sum(p[k] for p in ps) / 3 for k in range(3)]
+        g = tuple(int(c[k] // cell) for k in range(3))
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    for j in grid.get((g[0] + dx, g[1] + dy, g[2] + dz), ()):
+                        if j == i:
+                            continue
+                        key2, ps2, n2, d2 = tris[j]
+                        if abs(sum(n[k] * n2[k] for k in range(3))) < 0.999:
+                            continue
+                        if abs(sum(n[k] * ps2[0][k] for k in range(3)) - d) > 1.0:
+                            continue
+                        c2 = [sum(p[k] for p in ps2) / 3 for k in range(3)]
+                        if inside(c2, ps, n) or inside(c, ps2, n):
+                            out.add(key)
+                            out.add(key2)
+    return out
+
+
 def t_junctions(leaves, arrays):
     """{(leaf name, triangle number): [(edge k, points along it: (fraction, position))]} for the triangles to split"""
     pts_lines = collections.defaultdict(set)  # position -> directions of the edges through it (unit, signless)
@@ -312,7 +376,7 @@ def t_junctions(leaves, arrays):
         grid[(p[0] // cell, p[1] // cell, p[2] // cell)].append(p)
     out = collections.defaultdict(list)
     for name, ti, k, a, b, ln, u in edges:
-        if ln < 4:
+        if ln < 4 or ln > MAX_SPLIT_EDGE:
             continue
         lo = [min(a[j], b[j]) - 1 for j in range(3)]
         hi = [max(a[j], b[j]) + 1 for j in range(3)]
@@ -376,53 +440,95 @@ def lit_state(lf):
     return out
 
 
+# commands that change what a vertex load computes (its lighting, fog, texture coordinates, transform): a load moved
+# past one of them would compute its vertices differently (the game sometimes loads with lighting on and draws with it
+# off: the floor of the castle courtyard keeps that light)
+LOAD_STATE = {"gsSPSetGeometryMode", "gsSPClearGeometryMode", "gsSPLoadGeometryMode", "gsSPGeometryMode",
+              "gsSPTexture", "gsSPMatrix", "gsSPPopMatrix", "gsSPSetLights0", "gsSPSetLights1", "gsSPSetLights2",
+              "gsSPSetLights3", "gsSPSetLights4", "gsSPSetLights5", "gsSPSetLights6", "gsSPSetLights7", "gsSPLight",
+              "gsSPLightColor", "gsSPNumLights", "gsSPFogPosition", "gsSPFogFactor", "gsSPSegment", "gsSPDisplayList",
+              "gsSPLookAt", "gsSPLookAtX", "gsSPLookAtY", "gsSPPerspNormalize", "gsSPViewport", "gsMoveWd", "gsMoveMem",
+              "gsSPAmbOcclusion", "gsSPSetLights"}
+
+
 def rewrite(lf, arrays, splits):
-    """the list's commands again, its triangles from a vertex array of its own (the split ones as their pieces);
-    returns (commands, array) or None"""
+    """the list's commands again, its triangles from a vertex array of its own (the split ones as their pieces), each
+    original load's triangles loaded where that load was (under the same state); None if a load's triangles, split,
+    need more than one load and a command between them changes what a load computes"""
     lits = lit_state(lf)
     tri_at = collections.defaultdict(list)
     for ti, (ci, k, t) in enumerate(lf.tris):
         tri_at[ci].append(ti)
     vname = lf.name + "_seamVtx"
-    vtx, out, pending = [], [], []
-
-    def flush():
-        if pending:
-            mp.emit_tris([(None, t) for t in pending], vname, vtx, out)
-            pending.clear()
-
+    vtx, out = [], []
     cmds = lf.cmds
-    skip_next_vertex = set()
+    cull_box = set()
+    for ci, c in enumerate(cmds):
+        if "(" in c and mp.name_of(c) == "gsSPCullDisplayList" and ci > 0 and mp.name_of(cmds[ci - 1]) == "gsSPVertex":
+            cull_box.add(ci - 1)
+    # the segments: from each load to the next (its triangles and the commands between them)
+    segs = []
+    cur = None
     for ci, c in enumerate(cmds):
         n = mp.name_of(c) if "(" in c else c
-        if n == "gsSPCullDisplayList" and ci > 0 and mp.name_of(cmds[ci - 1]) == "gsSPVertex":
-            skip_next_vertex.add(ci - 1)
-    for ci, c in enumerate(cmds):
-        n = mp.name_of(c) if "(" in c else c
-        if n == "gsSPVertex":
-            if ci in skip_next_vertex:
-                flush()
-                out.append(c)  # (the cull's box: as it was)
+        if n == "gsSPVertex" and ci not in cull_box:
+            cur = {"items": [], "lit": bool(lits[ci])}  # (a split corner's colour or normal: as the load reads it)
+            segs.append(cur)
+            continue
+        if cur is None or ci in cull_box:
+            out.append(c) if cur is None else cur["items"].append(("cmd", c))
             continue
         if n in ("gsSP1Triangle", "gsSP2Triangles", "gsSP1Quadrangle"):
             for ti in tri_at.get(ci, []):
                 _, _, t = lf.tris[ti]
                 vs = tuple(arrays[a][i] for a, i in t)
-                sp = splits.get((lf.name, ti))
-                if sp:
-                    lit = lits[ci]
-                    if lit is None:
-                        lit = False
-                    pending.extend(split_tri(vs, sp, lit))
+                sp_ = splits.get((lf.name, ti))
+                pieces = split_tri(vs, sp_, cur["lit"]) if sp_ else [vs]
+                for pc in pieces:
+                    cur["items"].append(("tri", pc))
+            continue
+        cur["items"].append(("cmd", c))
+    for seg in segs:
+        tris = [x[1] for x in seg["items"] if x[0] == "tri"]
+        uniq = list(dict.fromkeys(v for t in tris for v in t))
+        if len(uniq) <= VTX_SLOTS:
+            # one load, where the original was; the commands and triangles after it as they were
+            start = len(vtx)
+            vtx.extend(uniq)
+            if uniq:
+                out.append("gsSPVertex(&%s[%d], %d, 0)" % (vname, start, len(uniq)))
+            pend = []
+
+            def flush():
+                k = 0
+                while k < len(pend):
+                    if k + 1 < len(pend):
+                        out.append("gsSP2Triangles(%d, %d, %d, 0, %d, %d, %d, 0)" % (pend[k] + pend[k + 1]))
+                        k += 2
+                    else:
+                        out.append("gsSP1Triangle(%d, %d, %d, 0)" % pend[k])
+                        k += 1
+                pend.clear()
+            for kind, x in seg["items"]:
+                if kind == "tri":
+                    pend.append(tuple(uniq.index(v) for v in x))
                 else:
-                    pending.append(vs)
-            continue
-        if n == "gsSPCullDisplayList":
-            out.append(c)
-            continue
-        flush()
-        out.append(c)
-    flush()
+                    flush()
+                    out.append(x)
+            flush()
+        else:
+            # more than one load: only if nothing between them changes what a load computes
+            if any(kind == "cmd" and "(" in x and mp.name_of(x) in LOAD_STATE for kind, x in seg["items"]):
+                return None
+            pend = []
+            for kind, x in seg["items"]:
+                if kind == "tri":
+                    pend.append((None, x))
+                else:
+                    mp.emit_tris(pend, vname, vtx, out)
+                    pend = []
+                    out.append(x)
+            mp.emit_tris(pend, vname, vtx, out)
     return out, vtx
 
 
@@ -441,9 +547,17 @@ def process(dirpath, write):
     arrays = {}
     leaves = read_scene(dirpath, arrays)
     ok = [lf for lf in leaves if lf.ok]
-    nweld, _ = weld(ok, arrays)
-    nweld += close_gaps(ok, arrays)
-    splits = t_junctions(ok, arrays)
+    nweld = 0
+    if not os.environ.get("SEAMPASS_NO_WELD"):
+        nweld, _ = weld(ok, arrays)
+        nweld += close_gaps(ok, arrays)
+    splits = {} if os.environ.get("SEAMPASS_NO_SPLIT") else t_junctions(ok, arrays)
+    lay = layered(ok, arrays)
+    splits = {k: v for k, v in splits.items() if k not in lay}
+    only = os.environ.get("SEAMPASS_SPLIT_ONLY")  # (a bisection's aid: split only in lists whose names hold one of these)
+    if only:
+        keys = only.split(",")
+        splits = {k: v for k, v in splits.items() if any(x in k[0] for x in keys)}
     nsplit = len(splits)
     if not write:
         return nweld, nsplit, 0
@@ -463,7 +577,10 @@ def process(dirpath, write):
     for lf in ok:
         if not any(k[0] == lf.name for k in splits):
             continue
-        cmds, vtx = rewrite(lf, arrays, splits)
+        res = rewrite(lf, arrays, splits)
+        if res is None:
+            continue  # (left unsplit: its loads couldn't stay where they were)
+        cmds, vtx = res
         os.remove(lf.path)
         open(lf.path, "w").write("".join("    %s,\n" % c for c in cmds))
         room = re.match(r"(.+_room_\d+)_", lf.name).group(1)

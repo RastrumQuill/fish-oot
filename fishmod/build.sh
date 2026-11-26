@@ -193,7 +193,7 @@ if [ "$SEAMS" = 1 ]; then
     [ "$TEXPACK" = 1 ] && SP_SRC="$TP_OUT"
     [ "$COLPACK" = 1 ] && SP_SRC="$CP_OUT"
     SP_OUT="$SP_SRC-seams"
-    SP_SUM="$({ cat tools/seampass.py tools/meshpack.py; cat "$SP_SRC/.texpack" "$SP_SRC/.colpack" 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    SP_SUM="$({ cat tools/seampass.py tools/meshpack.py; echo "${SEAMPASS_NO_WELD:-}${SEAMPASS_NO_SPLIT:-}${SEAMPASS_SPLIT_ONLY:-}${SEAMPASS_MAX_EDGE:-}"; cat "$SP_SRC/.texpack" "$SP_SRC/.colpack" 2>/dev/null || true; } | md5sum | cut -c1-8)"
     if [ "$(cat "$SP_OUT/.seams" 2>/dev/null)" != "$SP_SUM" ]; then
         python3 tools/seampass.py "$SP_SRC" "$SP_OUT"
         echo "$SP_SUM" > "$SP_OUT/.seams"
