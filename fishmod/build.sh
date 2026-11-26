@@ -42,6 +42,8 @@
 #                  reads a copy, after --texpack's and --colpack's); outputs get a -seams suffix
 #   --meshpack     the lake's widest mesh pieces cut into areas, each culled by the RSP on its own (tools/meshpack.py):
 #                  the build reads a copy (after the other packs); outputs get a -meshpack suffix
+#   --strips       the scenes' triangles as F3DEX3 triangle snakes (tools/strippass.py, after the other passes): a test of
+#                  whether strips pay off where the frame waits on the RDP; outputs get a -strips suffix
 #   --mod-opt L    the mod's own files at GCC level L (Os, O3...), the game's unchanged; outputs get a -modL suffix
 #   --no-timers    a debug build measured from outside (ares's exact profile): the debug timers compiled out; outputs
 #                  get a -notimers suffix
@@ -71,6 +73,7 @@ TEXPACK=0
 COLPACK=0
 MESHPACK=0
 SEAMS=0
+STRIPS=0
 PGO=0
 NOTIMERS=0
 MODOPT=""
@@ -109,6 +112,7 @@ while [ $# -gt 0 ]; do
         --colpack) COLPACK=1 ;;
         --meshpack) MESHPACK=1 ;;
         --seams) SEAMS=1 ;;
+        --strips) STRIPS=1 ;;
         --clang-opt) CLANG=1; CLANG_OPT="$2"; shift ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
@@ -207,7 +211,21 @@ if [ "$MESHPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$MP_OUT")
 fi
-MODE="cc=${FISHMOD_GCC:-} gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} seams=$SEAMS${SP_SUM:+-$SP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE teststart=$TEST_START expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+if [ "$STRIPS" = 1 ]; then
+    ST_SRC="extracted/$VERSION"
+    [ "$TEXPACK" = 1 ] && ST_SRC="$TP_OUT"
+    [ "$COLPACK" = 1 ] && ST_SRC="$CP_OUT"
+    [ "$SEAMS" = 1 ] && ST_SRC="$SP_OUT"
+    [ "$MESHPACK" = 1 ] && ST_SRC="$MP_OUT"
+    ST_OUT="$ST_SRC-strips"
+    ST_SUM="$({ cat tools/strippass.py tools/meshpack.py; cat "$ST_SRC"/.texpack "$ST_SRC"/.colpack "$ST_SRC"/.seams "$ST_SRC"/.meshpack 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    if [ "$(cat "$ST_OUT/.strips" 2>/dev/null)" != "$ST_SUM" ]; then
+        python3 tools/strippass.py "$ST_SRC" "$ST_OUT"
+        echo "$ST_SUM" > "$ST_OUT/.strips"
+    fi
+    TEXPACK_ARGS=(EXTRACTED_DIR="$ST_OUT")
+fi
+MODE="cc=${FISHMOD_GCC:-} gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} seams=$SEAMS${SP_SUM:+-$SP_SUM} strips=$STRIPS${ST_SUM:+-$ST_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE teststart=$TEST_START expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -312,6 +330,9 @@ if [ "$COLPACK" = 1 ]; then
 fi
 if [ "$MESHPACK" = 1 ]; then
     SUFFIX="$SUFFIX-meshpack"
+fi
+if [ "$STRIPS" = 1 ]; then
+    SUFFIX="$SUFFIX-strips"
 fi
 if [ "$SEAMS" = 1 ]; then
     SUFFIX="$SUFFIX-seams"
