@@ -191,6 +191,98 @@ def weld(leaves, arrays):
     return n, target
 
 
+# ---- open-edge gaps ----
+
+OPEN_GAP = 1.5  # two surfaces' open edges side by side this close (units) were meant to meet
+
+
+def close_gaps(leaves, arrays):
+    """two surfaces' borders running side by side a hair apart (their corners not lining up, so neither a weld nor a
+    T-junction): each corner of the shorter border moved onto the longer one's line (the T-junction step then splits
+    the longer at it). Not a decal's border over the surface it's laid on (the gap along both normals). Returns the
+    corners moved."""
+    ec = collections.Counter()
+    normals = collections.defaultdict(list)
+    tri_pts = []
+    for lf in leaves:
+        for _, _, t in lf.tris:
+            ps = [pos(arrays[a][i]) for a, i in t]
+            if len(set(ps)) < 3:
+                continue
+            tri_pts.append(ps)
+            u = [ps[1][k] - ps[0][k] for k in range(3)]
+            w = [ps[2][k] - ps[0][k] for k in range(3)]
+            n = (u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0])
+            ln = math.sqrt(sum(x * x for x in n))
+            for k in range(3):
+                a, b = ps[k], ps[(k + 1) % 3]
+                e = (min(a, b), max(a, b))
+                ec[e] += 1
+                if ln > 0:
+                    normals[e].append(tuple(x / ln for x in n))
+    edges = [e for e, c in ec.items() if c == 1 and math.dist(*e) >= 4]
+    grid = collections.defaultdict(list)
+    cell = 32
+    for i, (a, b) in enumerate(edges):
+        for p in (a, b, tuple((a[j] + b[j]) / 2 for j in range(3))):
+            grid[tuple(int(p[j] // cell) for j in range(3))].append(i)
+    target = {}
+    for i, (a, b) in enumerate(edges):
+        L = math.dist(a, b)
+        u = [(b[j] - a[j]) / L for j in range(3)]
+        cand = set()
+        for p in (a, b, tuple((a[j] + b[j]) / 2 for j in range(3))):
+            g = tuple(int(p[j] // cell) for j in range(3))
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        cand.update(grid.get((g[0] + dx, g[1] + dy, g[2] + dz), ()))
+        for k in cand:
+            if k == i:
+                continue
+            c, d = edges[k]
+            L2 = math.dist(c, d)
+            if L2 > L or (L2 == L and k < i):
+                continue  # (the shorter border's corners go onto the longer's line)
+            w = [(d[j] - c[j]) / L2 for j in range(3)]
+            if abs(sum(u[j] * w[j] for j in range(3))) < 0.995:
+                continue
+            for p in (c, d):
+                if p in (a, b):
+                    continue
+                f = sum((p[j] - a[j]) * u[j] for j in range(3)) / L
+                if f < -0.001 or f > 1.001:
+                    continue
+                q = [a[j] + f * L * u[j] for j in range(3)]
+                gap = math.dist(p, q)
+                if gap < 0.3 or gap > OPEN_GAP:
+                    continue
+                g = [(q[j] - p[j]) / gap for j in range(3)]
+                layer = any(abs(sum(n1[j] * n2[j] for j in range(3))) > 0.95 and
+                            abs(sum(n1[j] * g[j] for j in range(3))) > DECAL_COS
+                            for n1 in normals[(a, b)] for n2 in normals[(c, d)])
+                if layer:
+                    continue
+                target.setdefault(p, tuple(int(round(x)) for x in q))
+    # never two corners of one triangle onto one point
+    for ps in tri_pts:
+        moved = [target.get(p, p) for p in ps]
+        if len(set(moved)) < 3:
+            for p in ps:
+                target.pop(p, None)
+    n = 0
+    for arr, vs in arrays.items():
+        if vs is None:
+            continue
+        for i, v in enumerate(vs):
+            p = pos(v)
+            if p in target and target[p] != p:
+                q = target[p]
+                vs[i] = (str(q[0]), str(q[1]), str(q[2])) + tuple(v[3:])
+                n += 1
+    return n
+
+
 # ---- T-junctions ----
 
 def t_junctions(leaves, arrays):
@@ -350,6 +442,7 @@ def process(dirpath, write):
     leaves = read_scene(dirpath, arrays)
     ok = [lf for lf in leaves if lf.ok]
     nweld, _ = weld(ok, arrays)
+    nweld += close_gaps(ok, arrays)
     splits = t_junctions(ok, arrays)
     nsplit = len(splits)
     if not write:
