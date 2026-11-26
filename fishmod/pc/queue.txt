@@ -1,11 +1,7 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
-# The lake bed remeshed along its depth lines (releases/notes-remesh.md): bed-uncut is the same tree with each whole
-# triangle in one fog band (as rc2); bed-remesh has the fog and caustics changing along depth lines. A B A B, Expansion
-# Pak in.
-releases/fish-oot-remesh-off-bench.bps 12 bed-uncut-1
-releases/fish-oot-remesh-bench.bps 12 bed-remesh-1
-releases/fish-oot-remesh-off-bench.bps 12 bed-uncut-2
-releases/fish-oot-remesh-bench.bps 12 bed-remesh-2
-# The collision lead's replay (releases/hwsuite/results-20261119.md: a recorded opening replayed on the build the
-# emulator liked best; re-padded so it uploads), still to run. No Expansion Pak needed.
-releases/hwsuite/hw-replay-g14o2.bps 12 hw-replay-g14o2
+# Strips A/B (releases/notes-stripsab.md): the frame-log bench without and with the scenes' triangles as F3DEX3
+# triangle snakes. Off, on, off, on, so the console's warming up falls on both alike. No Expansion Pak needed.
+releases/fish-oot-stripsab-off.bps 12 strips-off-1
+releases/fish-oot-stripsab-on.bps 12 strips-on-1
+releases/fish-oot-stripsab-off.bps 12 strips-off-2
+releases/fish-oot-stripsab-on.bps 12 strips-on-2
