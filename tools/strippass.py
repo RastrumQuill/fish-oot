@@ -35,7 +35,7 @@ TURN_ALL = bool(os.environ.get("STRIPPASS_TURN_ALL"))
 SHADE_TOL = int(os.environ.get("STRIPPASS_SHADE_TOL", "8"))
 # A triangle with no edge longer than this (units) may be turned whatever its shading: the near plane hardly ever cuts
 # one so small, and if it does, only a sliver of it
-SMALL_EDGE = int(os.environ.get("STRIPPASS_SMALL_EDGE", "128"))
+SMALL_EDGE = int(os.environ.get("STRIPPASS_SMALL_EDGE", "64"))
 # Each model's own scale (its units to the world's), for the size test: an object's or an actor's models are drawn at
 # the scale its actors give them (Actor_SetScale or an init chain's scale, the largest of them: the cautious one); a
 # room's are the world's own. Not found: 1 (no triangle counts as small that isn't small in its own units).

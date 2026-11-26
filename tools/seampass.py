@@ -41,6 +41,10 @@ ON_LINE = 0.6     # a corner this close to an edge's line lies on it
 # blended there, which shifts the whole surface's shading (the castle courtyard's walkway came out darker). Short edges
 # shift too little to see.
 MAX_SPLIT_EDGE = float(os.environ.get("SEAMPASS_MAX_EDGE", "200"))
+# ...and a triangle is split only if it's small (no edge longer than this) or its corners shade alike (within this, of
+# 255, in every channel): see process()
+SPLIT_SMALL = float(os.environ.get("SEAMPASS_SPLIT_SMALL", "64"))
+SPLIT_SHADE_TOL = int(os.environ.get("SEAMPASS_SHADE_TOL", "8"))
 END_FRAC = 0.01   # ...and between its ends by this much of its length
 DECAL_COS = 0.9   # a weld along both surfaces' normals (cosine) is a layer, not a crack
 VTX_SLOTS = 32    # the vertex buffer the re-emitted lists load into (F3DEX2's; F3DEX3 has more)
@@ -483,6 +487,9 @@ def rewrite(lf, arrays, splits):
                 _, _, t = lf.tris[ti]
                 vs = tuple(arrays[a][i] for a, i in t)
                 sp_ = splits.get((lf.name, ti))
+                if cur["lit"]:
+                    sp_ = None  # (lit: a split corner would be lit by its own normal where the game blended the light
+                    #             between the corners: the Ice Cavern's walls came out darker; left as it was)
                 pieces = split_tri(vs, sp_, cur["lit"]) if sp_ else [vs]
                 for pc in pieces:
                     cur["items"].append(("tri", pc))
@@ -554,6 +561,21 @@ def process(dirpath, write):
     splits = {} if os.environ.get("SEAMPASS_NO_SPLIT") else t_junctions(ok, arrays)
     lay = layered(ok, arrays)
     splits = {k: v for k, v in splits.items() if k not in lay}
+    # only triangles whose new shape can't show: small ones (the near plane hardly ever cuts them) or ones whose corners
+    # shade alike. A split triangle is drawn as new triangles from other first corners, and a cut one is fanned from
+    # its first corner, its shading following where the fan starts (the Ice Cavern's wall by the camera, darker)
+    by_name = {lf.name: lf for lf in ok}
+
+    def keep(key):
+        lf = by_name[key[0]]
+        _, _, t = lf.tris[key[1]]
+        vs = [arrays[a][i] for a, i in t]
+        ps = [pos(v) for v in vs]
+        small = all(math.dist(ps[k], ps[(k + 1) % 3]) <= SPLIT_SMALL for k in range(3))
+        alike = all(max(int(v[c], 0) for v in vs) - min(int(v[c], 0) for v in vs) <= SPLIT_SHADE_TOL
+                    for c in range(5, 9))
+        return small or alike
+    splits = {k: v for k, v in splits.items() if keep(k)}
     only = os.environ.get("SEAMPASS_SPLIT_ONLY")  # (a bisection's aid: split only in lists whose names hold one of these)
     if only:
         keys = only.split(",")

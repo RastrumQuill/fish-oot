@@ -1366,6 +1366,22 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
                     continue; // (a run taking up where another stopped)
                 }
 #endif
+#ifdef FISHMOD_SWEEP_ONLY
+                {
+                    // (only these entrances: a recheck of a few scenes)
+                    static const s16 sOnly[] = { FISHMOD_SWEEP_ONLY };
+                    u32 o;
+
+                    for (o = 0; o < ARRAY_COUNT(sOnly); o++) {
+                        if (sOnly[o] == entrance) {
+                            break;
+                        }
+                    }
+                    if (o == ARRAY_COUNT(sOnly)) {
+                        continue;
+                    }
+                }
+#endif
                 if (scene < 0) {
                     scene = -scene;
                 }
