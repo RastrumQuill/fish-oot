@@ -221,7 +221,7 @@ if [ "$STRIPS" = 1 ]; then
     [ "$SEAMS" = 1 ] && ST_SRC="$SP_OUT"
     [ "$MESHPACK" = 1 ] && ST_SRC="$MP_OUT"
     ST_OUT="$ST_SRC-strips"
-    ST_SUM="$({ cat tools/strippass.py tools/meshpack.py; echo "${STRIPPASS_TURN_ALL:-}"; cat "$ST_SRC"/.texpack "$ST_SRC"/.colpack "$ST_SRC"/.seams "$ST_SRC"/.meshpack 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    ST_SUM="$({ cat tools/strippass.py tools/meshpack.py; echo "${STRIPPASS_TURN_ALL:-}${STRIPPASS_SHADE_TOL:-}${STRIPPASS_SMALL_EDGE:-}"; cat "$ST_SRC"/.texpack "$ST_SRC"/.colpack "$ST_SRC"/.seams "$ST_SRC"/.meshpack 2>/dev/null || true; } | md5sum | cut -c1-8)"
     if [ "$(cat "$ST_OUT/.strips" 2>/dev/null)" != "$ST_SUM" ]; then
         python3 tools/strippass.py "$ST_SRC" "$ST_OUT"
         echo "$ST_SUM" > "$ST_OUT/.strips"

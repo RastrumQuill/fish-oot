@@ -30,6 +30,21 @@ SKIP_DIRS = {"object_fish", "gameplay_keep"}
 # STRIPPASS_TURN_ALL=1: every triangle may be turned to join a strip (the most strips; the floor at the camera's feet
 # shaded a little differently where the near plane cuts it)
 TURN_ALL = bool(os.environ.get("STRIPPASS_TURN_ALL"))
+# How alike a triangle's corners must shade (colour or normal, alpha: the most any one channel differs, of 255) for it
+# to be turned: the fan's start then shifts a cut triangle's blend by about this much at most
+SHADE_TOL = int(os.environ.get("STRIPPASS_SHADE_TOL", "8"))
+# A triangle with no edge longer than this (units) may be turned whatever its shading: the near plane hardly ever cuts
+# one so small, and if it does, only a sliver of it
+SMALL_EDGE = int(os.environ.get("STRIPPASS_SMALL_EDGE", "128"))
+
+
+def Strip_Alike(sh):
+    """a triangle's corners shade alike (within SHADE_TOL in every channel)"""
+    for ch in range(4):
+        vals = [int(v[ch], 0) for v in sh]
+        if max(vals) - min(vals) > SHADE_TOL:
+            return False
+    return True
 UNSIZED = []  # (directory, list name): lists whose length changed
 STATS = {"tris": 0, "snaked": 0, "snakes": 0, "bytes_before": 0, "bytes_after": 0, "lists": 0}
 
@@ -144,6 +159,14 @@ def convert(cmds, dirpath=None):
     def shade_of(i):
         v = buf[i] if 0 <= i < 64 else None
         return None if v is None else tuple(v[5:9])
+
+    def small(t):
+        # a triangle the near plane hardly ever cuts: no edge longer than SMALL_EDGE (in the model's own units)
+        vs = [buf[i] if 0 <= i < 64 else None for i in t]
+        if None in vs:
+            return False
+        ps = [tuple(int(x, 0) for x in v[0:3]) for v in vs]
+        return all(sum((ps[k][j] - ps[(k + 1) % 3][j]) ** 2 for j in range(3)) <= SMALL_EDGE ** 2 for k in range(3))
     for c in cmds:
         if "(" in c and mp.name_of(c) in ("gsDPSetRenderMode",) and "XLU" in c:
             return None
@@ -201,7 +224,7 @@ def convert(cmds, dirpath=None):
             run.append(c)
             for t in tris_of(c):
                 sh = [shade_of(i) for i in t]
-                run_free.append(TURN_ALL or ((sh[0] is not None) and sh[0] == sh[1] == sh[2]))
+                run_free.append(TURN_ALL or ((None not in sh) and Strip_Alike(sh)) or small(t))
             continue
         flush()
         out.append(c)
