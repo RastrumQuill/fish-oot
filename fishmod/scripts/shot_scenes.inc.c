@@ -3,7 +3,9 @@
 // pass). Read with a debugger at the same frame of each leg (gFishmodSweepLeg: the entrance + 1).
 #define FISHMOD_AUDWORLD 1
 #define FISHMOD_SWEEP_SCENES 1
+#ifndef FISHMOD_AUDWORLD_FRAMES
 #define FISHMOD_AUDWORLD_FRAMES 150
+#endif
 #define FISHMOD_SCRIPT_ENTRANCE ENTR_HYRULE_FIELD_0
 #define FISHMOD_SCRIPT_ADULT 1
 static Vec3f sScriptStartPos = { 0.0f, 0.0f, 0.0f };

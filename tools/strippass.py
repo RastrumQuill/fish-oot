@@ -7,7 +7,9 @@ Every run of triangle commands in the game's display lists (the scenes' rooms, e
 own; the objects the mod reads triangles from at run time left alone: SKIP_DIRS) (between vertex loads and state changes) is drawn as snakes: a
 chain of triangles each joined to the one before by an edge, 1 byte a triangle after the first three (8 to 16 bytes
 for 5 triangles, against 8 bytes for every 2 in gsSP2Triangles). A chain of 1 or 2 triangles stays as it was (a snake
-of 2 is no smaller). Each triangle keeps its own winding; the order within a run changes, so lists with a
+of 2 is no smaller). Each triangle is drawn exactly as the game drew it, its corners in the same order (a triangle the near plane cuts
+is drawn as a fan from its first corner, and its shading follows where the fan starts: a strip that turned them
+shaded the floor at the camera's feet differently); the order within a run changes, so lists with a
 translucent render mode are left alone (their draw order matters). Everything else in the lists is as it was. The
 lists the mesh pass writes into the rooms' .c files (the lake's areas) are done too.
 
@@ -47,7 +49,7 @@ def same_tri(t, u):
     return u in rotations(t)
 
 
-def grow(start, unused):
+def grow(start, unused, free=None):
     """the longest greedy chain from start (A, B, C as the snake holds them): [(index, direction)] after the first"""
     a, b, c = start
     seq = []
@@ -60,7 +62,10 @@ def grow(start, unused):
             t = unused[k]
             for direction in (0, 1):  # 0 right: (n, A, C); 1 left: (n, B, A)
                 e1, e2 = (a, c) if direction == 0 else (b, a)
-                for r in rotations(t):
+                # (the triangle as the game drew it, its own first corner first: a triangle the near plane cuts is
+                # drawn as a fan from its first corner, and its shading follows where the fan starts; one whose
+                # corners all shade alike draws the same from any corner, and may be turned)
+                for r in (rotations(t) if (free and free.get(k)) else (t,)):
                     if r[1] == e1 and r[2] == e2 and r[0] not in (e1, e2):
                         nxt = (k, r[0], direction)
                         break
@@ -80,7 +85,7 @@ def grow(start, unused):
         a = n
 
 
-def snakes(tris):
+def snakes(tris, free=None):
     """the run's triangles as chains: [(first triangle as (i1, i2, i3), [(index, direction)])]"""
     unused = {k: t for k, t in enumerate(tris)}
     out = []
@@ -88,9 +93,10 @@ def snakes(tris):
         best = None
         for k0, t in list(unused.items()):
             rest = {k: u for k, u in unused.items() if k != k0}
-            for r in rotations(t):
-                # the snake draws A-B-C = i3-i1-i2 first: A, B, C a rotation of the triangle
-                seq, used = grow(r, rest)
+            for r in (rotations(t) if (free and free.get(k0)) else (t,)):
+                # the snake draws A-B-C = i3-i1-i2 first: A, B, C the triangle as the game drew it (or turned, if
+                # its corners shade alike)
+                seq, used = grow(r, rest, free)
                 if best is None or len(seq) > len(best[2]):
                     best = (k0, r, seq)
             if best and len(best[2]) >= 8:
@@ -126,20 +132,29 @@ def encode(first, seq):
     return cmds
 
 
-def convert(cmds):
-    """the list's commands with its triangle runs as snakes; None if it's left alone"""
+def convert(cmds, dirpath=None):
+    """the list's commands with its triangle runs as snakes; None if it's left alone. dirpath: where its vertex arrays
+    are (to know which triangles' corners shade alike)"""
+    buf = [None] * 64
+    arrays = {}
+
+    def shade_of(i):
+        v = buf[i] if 0 <= i < 64 else None
+        return None if v is None else tuple(v[5:9])
     for c in cmds:
         if "(" in c and mp.name_of(c) in ("gsDPSetRenderMode",) and "XLU" in c:
             return None
         if "(" in c and mp.name_of(c) in ("gsSPTriSnake", "gsSPContinueSnake"):
             return None
     out, run = [], []
+    run_free = []
 
     def flush():
         if not run:
             return
         tris = [t for c in run for t in tris_of(c)]
-        chains = snakes(tris)
+        free = {k: f for k, f in enumerate(run_free)}
+        chains = snakes(tris, free)
         small = []
         for first, seq in chains:
             STATS["tris"] += 1 + len(seq)
@@ -154,16 +169,36 @@ def convert(cmds):
                     n, d = seq[0]
                     # (the second triangle as the snake would have drawn it: right (n, i3, i2), left (n, i1, i3))
                     small.append((n, i3, i2) if d == 0 else (n, i1, i3))
+                # (each as the game drew it: the first corner first)
         for k in range(0, len(small) - 1, 2):
             out.append("gsSP2Triangles(%d, %d, %d, 0, %d, %d, %d, 0)" % (small[k] + small[k + 1]))
         if len(small) % 2:
             out.append("gsSP1Triangle(%d, %d, %d, 0)" % small[-1])
         STATS["bytes_before"] += 8 * len(run)
         run.clear()
+        run_free.clear()
 
     for c in cmds:
+        if "(" in c and mp.name_of(c) == "gsSPVertex" and dirpath is not None:
+            a = mp.args_of(c)
+            m = mp.VTX_REF.match(a[0])
+            try:
+                cnt, v0 = int(a[1], 0), int(a[2], 0)
+            except ValueError:
+                cnt, v0 = 0, 0
+            arr = m.group(1) if m else None
+            if arr is not None and arr not in arrays:
+                pth = os.path.join(dirpath, arr + ".inc.c")
+                arrays[arr] = mp.load_vtx(dirpath, arr) if os.path.exists(pth) else None
+            vs = arrays.get(arr)
+            idx = int(m.group(2) or 0) if m else 0
+            for k in range(cnt):
+                buf[v0 + k] = vs[idx + k] if (vs is not None and idx + k < len(vs) and v0 + k < 64) else None
         if "(" in c and mp.name_of(c) in TRI_CMDS:
             run.append(c)
+            for t in tris_of(c):
+                sh = [shade_of(i) for i in t]
+                run_free.append((sh[0] is not None) and sh[0] == sh[1] == sh[2])
             continue
         flush()
         out.append(c)
@@ -191,7 +226,7 @@ def main():
                 items = mp.split_items(text)
                 if not all(("(" in c) and c.lstrip().startswith("gs") for c in items):
                     continue  # (not a display list on its own)
-                new = convert(items)
+                new = convert(items, root)
                 if new is None or new == items:
                     continue
                 os.remove(p)
@@ -206,7 +241,7 @@ def main():
                 def sub(m):
                     if "Triangle" not in m.group(2) or "#include" in m.group(2):
                         return m.group(0)
-                    new = convert(mp.split_items(m.group(2)))
+                    new = convert(mp.split_items(m.group(2)), root)
                     if new is None:
                         return m.group(0)
                     STATS["lists"] += 1
