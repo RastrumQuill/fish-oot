@@ -1,0 +1,6 @@
+Morning runs 20261125-2100
+
+ 1. strips-off-1                 done        463 packets    3.5 MB   246 s  
+ 2. strips-on-1                  done        459 packets    3.5 MB   241 s  
+ 3. strips-off-2                 done        460 packets    3.5 MB   246 s  
+ 4. strips-on-2                  done        459 packets    3.5 MB   241 s  
