@@ -36,6 +36,34 @@ SHADE_TOL = int(os.environ.get("STRIPPASS_SHADE_TOL", "8"))
 # A triangle with no edge longer than this (units) may be turned whatever its shading: the near plane hardly ever cuts
 # one so small, and if it does, only a sliver of it
 SMALL_EDGE = int(os.environ.get("STRIPPASS_SMALL_EDGE", "128"))
+# Each model's own scale (its units to the world's), for the size test: an object's or an actor's models are drawn at
+# the scale its actors give them (Actor_SetScale or an init chain's scale, the largest of them: the cautious one); a
+# room's are the world's own. Not found: 1 (no triangle counts as small that isn't small in its own units).
+KNOWN_SCALE = {"object_link_boy": 0.01, "object_link_child": 0.01}  # (Player's, set in its code, not in a profile)
+
+
+def model_scales(root):
+    """{asset directory name: scale} from the actors' sources"""
+    import glob
+
+    out = dict(KNOWN_SCALE)
+    for f in glob.glob(os.path.join(root, "src", "overlays", "actors", "*", "*.c")):
+        t = open(f, errors="ignore").read()
+        sc = [float(x.rstrip("f")) for x in re.findall(r"Actor_SetScale\([^,]+,\s*([0-9.]+)f?\s*\)", t)]
+        sc += [int(x) / 1000 for x in re.findall(r"ICHAIN_VEC3F_DIV1000\(scale,\s*(\d+)", t)]
+        sc = [x for x in sc if x > 0]  # (a scale of 0: an actor growing in from nothing)
+        if not sc:
+            continue
+        m = re.search(r"ActorProfile\s+\w+\s*=\s*\{([^}]*)\}", t, re.S)
+        names = [o.lower() for o in re.findall(r"OBJECT_[A-Z0-9_]+", m.group(1))] if m else []
+        names.append(os.path.basename(os.path.dirname(f)))  # (the actor's own models: assets/overlays/ovl_X)
+        for n in names:
+            if n not in KNOWN_SCALE:
+                out[n] = max(out.get(n, 0.0), max(sc))
+    return out
+
+
+SCALES = {}
 
 
 def Strip_Alike(sh):
@@ -150,7 +178,7 @@ def encode(first, seq):
     return cmds
 
 
-def convert(cmds, dirpath=None):
+def convert(cmds, dirpath=None, scale=1.0):
     """the list's commands with its triangle runs as snakes; None if it's left alone. dirpath: where its vertex arrays
     are (to know which triangles' corners shade alike)"""
     buf = [None] * 64
@@ -166,7 +194,8 @@ def convert(cmds, dirpath=None):
         if None in vs:
             return False
         ps = [tuple(int(x, 0) for x in v[0:3]) for v in vs]
-        return all(sum((ps[k][j] - ps[(k + 1) % 3][j]) ** 2 for j in range(3)) <= SMALL_EDGE ** 2 for k in range(3))
+        lim = (SMALL_EDGE / scale) ** 2
+        return all(sum((ps[k][j] - ps[(k + 1) % 3][j]) ** 2 for j in range(3)) <= lim for k in range(3))
     for c in cmds:
         if "(" in c and mp.name_of(c) in ("gsDPSetRenderMode",) and "XLU" in c:
             return None
@@ -240,6 +269,18 @@ def main():
     if os.path.exists(out):
         shutil.rmtree(out)
     shutil.copytree(src, out, copy_function=os.link)
+    SCALES.update(model_scales(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+    def scale_of(d):
+        # a room: the world's units; an object's or an actor's models: their actors' scale (else 1)
+        parts = os.path.relpath(d, base).split(os.sep)
+        if parts[0] == "scenes":
+            return 1.0
+        for p_ in parts:
+            if p_ in SCALES:
+                return SCALES[p_]
+        return 1.0
+
     base = os.path.join(out, "assets")
     for root, dirs, files in os.walk(base):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
@@ -252,7 +293,7 @@ def main():
                 items = mp.split_items(text)
                 if not all(("(" in c) and c.lstrip().startswith("gs") for c in items):
                     continue  # (not a display list on its own)
-                new = convert(items, root)
+                new = convert(items, root, scale_of(root))
                 if new is None or new == items:
                     continue
                 os.remove(p)
@@ -267,7 +308,7 @@ def main():
                 def sub(m):
                     if "Triangle" not in m.group(2) or "#include" in m.group(2):
                         return m.group(0)
-                    new = convert(mp.split_items(m.group(2)), root)
+                    new = convert(mp.split_items(m.group(2)), root, 1.0)
                     if new is None:
                         return m.group(0)
                     STATS["lists"] += 1
