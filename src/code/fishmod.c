@@ -1556,6 +1556,38 @@ void Fishmod_OnEnvironmentInit(PlayState* play) {
     }
 }
 
+/**
+ * Where the game's own weather (a weather tag, z_en_weather_tag.c, by its type) covers the whole scene rather than a
+ * zone in it: the drained Lake Hylia's rain, the frozen Zora's Domain's and Fountain's snow, Lon Lon Ranch's clouds
+ * (the ranch itself; Hyrule Field's are a zone by the ranch). Its own conditions (the Water Temple, Epona) are the
+ * tag's, as the game has them.
+ */
+s32 Fishmod_WeatherWholeScene(s16 sceneId, s32 tagType) {
+    static const struct {
+        s16 sceneId;
+        u8 tagType;
+    } sWhole[] = {
+        { SCENE_LAKE_HYLIA, 3 },     // EN_WEATHER_TAG_TYPE_RAIN_LAKE_HYLIA
+        { SCENE_ZORAS_DOMAIN, 2 },   // EN_WEATHER_TAG_TYPE_SNOW_ZORAS_DOMAIN
+        { SCENE_ZORAS_FOUNTAIN, 2 },
+        { SCENE_LON_LON_RANCH, 1 },  // EN_WEATHER_TAG_TYPE_CLOUDY_LON_LON_RANCH
+    };
+    u32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sWhole); i++) {
+        if ((sWhole[i].sceneId == sceneId) && (sWhole[i].tagType == tagType)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** The scene's weather is the game's own, over all of it (a whole-scene weather tag): what the fish see. */
+void Fishmod_WeatherSetScene(PlayState* play, s32 weather) {
+    (void)play;
+    sWeather = weather;
+}
+
 /** The rest of today clear, everywhere (the Water Temple beaten: vanilla brings the morning and clears the sky). */
 void Fishmod_WeatherClearToday(void) {
     FISHMOD_SAVE->clearDay = (u16)(gSaveContext.save.totalDays + 1);

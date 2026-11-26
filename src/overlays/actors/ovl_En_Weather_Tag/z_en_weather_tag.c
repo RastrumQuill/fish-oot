@@ -24,8 +24,9 @@
 void EnWeatherTag_Init(Actor* thisx, PlayState* play);
 void EnWeatherTag_Destroy(Actor* thisx, PlayState* play);
 void EnWeatherTag_Update(Actor* thisx, PlayState* play);
-void EnWeatherTag_RainAllOverLakeHylia(EnWeatherTag* this, PlayState* play);
-static u8 sLakeRainSoundOn; // fishmod
+void EnWeatherTag_WholeScene(EnWeatherTag* this, PlayState* play);
+static void EnWeatherTag_SetWholeScene(EnWeatherTag* this, PlayState* play, s32 type);
+static u8 sWholeSoundOn; // fishmod
 
 void EnWeatherTag_DisabledCloudyHyruleMarket(EnWeatherTag* this, PlayState* play);
 void EnWeatherTag_EnabledCloudyHyruleMarket(EnWeatherTag* this, PlayState* play);
@@ -103,15 +104,7 @@ void EnWeatherTag_Init(Actor* thisx, PlayState* play) {
             if (GET_EVENTCHKINF(EVENTCHKINF_4A)) {
                 Actor_Kill(&this->actor);
             }
-            // fishmod: the drained lake's rain is over the whole lake from the moment Link arrives (it was a zone by
-            // the water: walking toward the lake clouded the sky over and brought the rain)
-            gWeatherMode = WEATHER_MODE_RAIN;
-            play->envCtx.skyboxConfig = play->envCtx.changeSkyboxNextConfig = 1;
-            play->envCtx.lightConfig = play->envCtx.changeLightNextConfig = 2;
-            gLightConfigAfterUnderwater = 2;
-            play->envCtx.precipitation[PRECIP_RAIN_MAX] = play->envCtx.precipitation[PRECIP_RAIN_CUR] = 25;
-            sLakeRainSoundOn = false;
-            EnWeatherTag_SetupAction(this, EnWeatherTag_RainAllOverLakeHylia);
+            EnWeatherTag_SetupAction(this, EnWeatherTag_DisabledRainLakeHylia);
             break;
         case EN_WEATHER_TAG_TYPE_CLOUDY_DEATH_MOUNTAIN:
             PRINTF("\n\n");
@@ -146,6 +139,12 @@ void EnWeatherTag_Init(Actor* thisx, PlayState* play) {
 
             EnWeatherTag_SetupAction(this, EnWeatherTag_DisabledRainThunder);
             break;
+    }
+    // fishmod: a weather the game gives the whole scene here (not one it has just removed: Actor_Kill takes effect at
+    // the frame's end, so the setup above still ran)
+    if ((this->actor.update != NULL) && (PARAMS_GET_U(this->actor.params, 0, 4) <= EN_WEATHER_TAG_TYPE_THUNDERSTORM_KAKARIKO) &&
+        Fishmod_WeatherWholeScene(play->sceneId, PARAMS_GET_U(this->actor.params, 0, 4))) {
+        EnWeatherTag_SetWholeScene(this, play, PARAMS_GET_U(this->actor.params, 0, 4));
     }
 }
 
@@ -299,12 +298,45 @@ void EnWeatherTag_DisabledRainLakeHylia(EnWeatherTag* this, PlayState* play) {
     }
 }
 
-/** fishmod: the drained lake's rain, all over the lake: its sound started once the scene's running, then nothing. */
-void EnWeatherTag_RainAllOverLakeHylia(EnWeatherTag* this, PlayState* play) {
-    if (!sLakeRainSoundOn) {
-        Environment_PlayStormNatureAmbience(play);
-        sLakeRainSoundOn = true;
+/** fishmod: a weather over the whole scene: its rain's sound started once the scene's running, then nothing. */
+void EnWeatherTag_WholeScene(EnWeatherTag* this, PlayState* play) {
+    if (!sWholeSoundOn) {
+        if (play->envCtx.precipitation[PRECIP_RAIN_MAX] > 0) {
+            Environment_PlayStormNatureAmbience(play);
+        }
+        sWholeSoundOn = true;
     }
+}
+
+/*
+ * fishmod: the weather's one owner (Fishmod_WeatherWholeScene, fishmod.c): where the game's weather covers the whole
+ * scene (the drained lake's rain, the frozen Zora's Domain and Fountain, Lon Lon Ranch's clouds), it's there from the
+ * moment Link arrives, the sky's textures loaded for it at once (no streaming over a drawn sky); elsewhere it's a zone,
+ * blending from and back to the day's weather (WeatherTag_CheckEnableWeatherEffect, WeatherTag_CheckRestoreWeather).
+ */
+static void EnWeatherTag_SetWholeScene(EnWeatherTag* this, PlayState* play, s32 type) {
+    static const u8 sMode[] = { WEATHER_MODE_CLOUDY_CONFIG3, WEATHER_MODE_CLOUDY_CONFIG2, WEATHER_MODE_SNOW,
+                                WEATHER_MODE_RAIN,           WEATHER_MODE_CLOUDY_CONFIG2, WEATHER_MODE_HEAVY_RAIN };
+    static const u8 sLight[] = { 3, 2, 2, 2, 2, 4 };
+    EnvironmentContext* env = &play->envCtx;
+
+    gWeatherMode = sMode[type];
+    env->skyboxConfig = env->changeSkyboxNextConfig = 1;
+    env->lightConfig = env->changeLightNextConfig = sLight[type];
+    gLightConfigAfterUnderwater = sLight[type];
+    if (type == EN_WEATHER_TAG_TYPE_SNOW_ZORAS_DOMAIN) {
+        env->precipitation[PRECIP_SNOW_MAX] = env->precipitation[PRECIP_SNOW_CUR] = 64;
+    } else if (type == EN_WEATHER_TAG_TYPE_RAIN_LAKE_HYLIA) {
+        env->precipitation[PRECIP_RAIN_MAX] = env->precipitation[PRECIP_RAIN_CUR] = 25;
+    } else if (type == EN_WEATHER_TAG_TYPE_THUNDERSTORM_KAKARIKO) {
+        env->precipitation[PRECIP_RAIN_MAX] = env->precipitation[PRECIP_RAIN_CUR] = 30;
+        env->lightningState = LIGHTNING_ON;
+    }
+    Fishmod_WeatherSetScene(play, (env->precipitation[PRECIP_RAIN_MAX] > 0) ? FISHMOD_WEATHER_RAIN
+                                                                            : FISHMOD_WEATHER_OVERCAST);
+    Skybox_FishmodReload(play);
+    sWholeSoundOn = false;
+    EnWeatherTag_SetupAction(this, EnWeatherTag_WholeScene);
 }
 
 void EnWeatherTag_EnabledRainLakeHylia(EnWeatherTag* this, PlayState* play) {

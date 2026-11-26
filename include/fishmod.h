@@ -774,6 +774,9 @@ void Fishmod_OnEnvironmentInit(struct PlayState* play);
 s32 Fishmod_Weather(struct PlayState* play);
 s32 Fishmod_WeatherRolled(void);
 s32 Fishmod_WeatherToday(s16 skyboxId, s32 beforeEnvInit);
+s32 Fishmod_WeatherWholeScene(s16 sceneId, s32 tagType);
+void Fishmod_WeatherSetScene(struct PlayState* play, s32 weather);
+void Skybox_FishmodReload(struct PlayState* play);
 void Fishmod_WeatherClearToday(void);
 f32 Fishmod_Light(struct PlayState* play);
 // Underwater haze, 0 (camera above water) to 1 (under)

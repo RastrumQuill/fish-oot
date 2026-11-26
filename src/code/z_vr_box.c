@@ -495,6 +495,58 @@ void Skybox_Calculate128(SkyboxContext* skyboxCtx, s32 nFaces) {
     }
 }
 
+static u32 sFishmodSkySize; // fishmod: the size the normal sky's texture buffers were made (Skybox_Setup)
+
+/**
+ * fishmod: the normal sky's textures loaded again, now, for the environment's sky config as it is (the weather set a
+ * cloudy sky for the scene after Skybox_Setup loaded a clear one: loaded here at the scene's start, not streamed in
+ * while the sky is drawn). Only between textures of the size the buffers were made for.
+ */
+void Skybox_FishmodReload(PlayState* play) {
+    SkyboxContext* skyboxCtx = &play->skyboxCtx;
+    EnvironmentContext* env = &play->envCtx;
+    s32 i;
+    u32 size;
+    u8 new1 = 0xFF;
+    u8 new2 = 0xFF;
+
+    if ((play->skyboxId != SKYBOX_NORMAL_SKY) || (sFishmodSkySize == 0) || (env->skyboxDmaState != SKYBOX_DMA_INACTIVE)) {
+        return;
+    }
+    for (i = 0; i < ARRAY_COUNT(gTimeBasedSkyboxConfigs[env->skyboxConfig]); i++) {
+        if (gSaveContext.skyboxTime >= gTimeBasedSkyboxConfigs[env->skyboxConfig][i].startTime &&
+            (gSaveContext.skyboxTime < gTimeBasedSkyboxConfigs[env->skyboxConfig][i].endTime ||
+             gTimeBasedSkyboxConfigs[env->skyboxConfig][i].endTime == 0xFFFF)) {
+            new1 = gTimeBasedSkyboxConfigs[env->skyboxConfig][i].skybox1Index;
+            new2 = gTimeBasedSkyboxConfigs[env->skyboxConfig][i].skybox2Index;
+            break;
+        }
+    }
+    if ((new1 == 0xFF) || ((new1 == env->skybox1Index) && (new2 == env->skybox2Index))) {
+        return;
+    }
+    if ((gNormalSkyFiles[new1].file.vromEnd - gNormalSkyFiles[new1].file.vromStart != sFishmodSkySize) ||
+        (gNormalSkyFiles[new2].file.vromEnd - gNormalSkyFiles[new2].file.vromStart != sFishmodSkySize)) {
+        return;
+    }
+    DMA_REQUEST_SYNC(skyboxCtx->staticSegments[0], gNormalSkyFiles[new1].file.vromStart, sFishmodSkySize,
+                     "../z_vr_box.c", __LINE__);
+    DMA_REQUEST_SYNC(skyboxCtx->staticSegments[1], gNormalSkyFiles[new2].file.vromStart, sFishmodSkySize,
+                     "../z_vr_box.c", __LINE__);
+    size = gNormalSkyFiles[new1].palette.vromEnd - gNormalSkyFiles[new1].palette.vromStart;
+    if ((new1 & 1) ^ ((new1 & 4) >> 2)) {
+        DMA_REQUEST_SYNC(skyboxCtx->palettes, gNormalSkyFiles[new1].palette.vromStart, size, "../z_vr_box.c", __LINE__);
+        DMA_REQUEST_SYNC((u8*)skyboxCtx->palettes + size, gNormalSkyFiles[new2].palette.vromStart, size,
+                         "../z_vr_box.c", __LINE__);
+    } else {
+        DMA_REQUEST_SYNC(skyboxCtx->palettes, gNormalSkyFiles[new2].palette.vromStart, size, "../z_vr_box.c", __LINE__);
+        DMA_REQUEST_SYNC((u8*)skyboxCtx->palettes + size, gNormalSkyFiles[new1].palette.vromStart, size,
+                         "../z_vr_box.c", __LINE__);
+    }
+    env->skybox1Index = new1;
+    env->skybox2Index = new2;
+}
+
 void Skybox_Setup(PlayState* play, SkyboxContext* skyboxCtx, s16 skyboxId) {
     u32 size;
     s16 i;
@@ -534,6 +586,7 @@ void Skybox_Setup(PlayState* play, SkyboxContext* skyboxCtx, s16 skyboxId) {
             }
 
             size = gNormalSkyFiles[skybox1Index].file.vromEnd - gNormalSkyFiles[skybox1Index].file.vromStart;
+            sFishmodSkySize = size; // fishmod (Skybox_FishmodReload)
             skyboxCtx->staticSegments[0] = GAME_STATE_ALLOC(&play->state, size, "../z_vr_box.c", 1054);
             ASSERT(skyboxCtx->staticSegments[0] != NULL, "vr_box->vr_box_staticSegment[0] != NULL", "../z_vr_box.c",
                    1055);
