@@ -11,3 +11,6 @@ static s16 sScriptStartYaw = 0;
 static FishmodAutoplayStep sScriptSteps[] = {
     { 60, 0, 0, 0 },
 };
+#ifndef FISHMOD_SWEEP_FROM
+#define FISHMOD_SWEEP_FROM 0
+#endif

@@ -1357,6 +1357,15 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
                 s32 entrance = sSweepEntrance++;
                 s32 scene = gEntranceTable[entrance].sceneId;
 
+                if (entrance == ENTR_MARKET_RUINS_0_2) {
+                    continue; // (Link placed through it crashes the scene's load, Scene_CommandPlayerEntryList: the
+                              // scene's next entrance is taken)
+                }
+#ifdef FISHMOD_SWEEP_FROM
+                if (entrance < FISHMOD_SWEEP_FROM) {
+                    continue; // (a run taking up where another stopped)
+                }
+#endif
                 if (scene < 0) {
                     scene = -scene;
                 }
