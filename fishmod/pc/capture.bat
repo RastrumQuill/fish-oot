@@ -4,5 +4,5 @@ rem Run it from the Anaconda Prompt with the fishoot environment, or double-clic
 rem   capture.bat --list      the devices it can see
 rem   capture.bat --video 1 --audio "Cam Link"
 call conda activate fishoot 2>nul
-python -c "import cv2, sounddevice" 2>nul || python -m pip install --quiet opencv-python sounddevice
+python -c "import cv2, sounddevice, imageio_ffmpeg" 2>nul || python -m pip install --quiet opencv-python sounddevice imageio-ffmpeg
 python "%~dp0capture.py" %*

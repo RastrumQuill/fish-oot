@@ -11,6 +11,8 @@ through the speakers, plus screenshots to the clipboard, and a local web address
 Keys (in the window):
   S or F12      screenshot to the clipboard (and saved in fishmod/pc/captures/)
   A             the last 10 seconds of sound as a .wav (and a screenshot) in fishmod/pc/captures/
+  V             start recording video (picture and sound); V again stops it and saves it as an .mp4 in
+                fishmod/pc/captures/ (quitting while recording saves it too). Anywhere: Ctrl+Alt+V
   F or F11      full screen on and off
   M             sound off and on
   L             the frame rate and delay shown in the corner
@@ -18,7 +20,8 @@ Keys (in the window):
                 1% lows, over the last 10 seconds and since it was last reset
   R             reset the frame analyzer's totals (on quit they're printed, and saved to fishmod/pc/captures/)
   Q or Esc      quit
-Anywhere (even with another window in front): Ctrl+Alt+S, a screenshot to the clipboard.
+Anywhere (even with another window in front): Ctrl+Alt+S, a screenshot to the clipboard; Ctrl+Alt+V, recording on
+and off.
 
 For another program (only from this PC): http://127.0.0.1:8765/frame.jpg (the newest picture), /frame.png,
 /audio.wav?s=5 (the last 5 seconds of sound, up to 10), /stats.json (the frame analyzer's numbers), and / (a page that
@@ -96,6 +99,7 @@ class Video:
         self.cap.set(cv2.CAP_PROP_FPS, fps)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # (where the driver honours it: no queue of old frames)
         self.latest = None
+        self.recorder = None
         self.analyzer = FrameAnalyzer()
         self.stamp = 0.0
         self.count = 0
@@ -115,6 +119,12 @@ class Video:
                 self.latest = frame
                 self.stamp = t
                 self.count += 1
+            rec = self.recorder
+            if rec is not None:
+                try:
+                    rec.add_frame(frame, t)
+                except Exception:
+                    pass
             try:
                 self.analyzer.feed(frame, t)
             except Exception:  # (never let the analyzer stop the picture)
@@ -277,6 +287,94 @@ def list_video():
 # Sound
 
 
+class Recorder:
+    """A recording: every picture the card sends, written as it comes (Motion JPEG: cheap enough to keep up), the
+    sound kept beside it, then the two joined into one .mp4 (H.264 and AAC, by imageio-ffmpeg's ffmpeg) when it
+    stops. The pictures are laid on the card's refresh rate by their timestamps: a refresh the card didn't deliver
+    repeats the picture before, so the sound stays in step."""
+
+    def __init__(self, video, audio, fps):
+        import cv2
+
+        os.makedirs(SHOTS, exist_ok=True)
+        self.base = os.path.join(SHOTS, time.strftime("video-%Y%m%d-%H%M%S"))
+        self.fps = fps
+        self.video = video
+        self.audio = audio
+        frame, _ = video.frame()
+        h, w = frame.shape[:2] if frame is not None else (480, 720)
+        self.writer = cv2.VideoWriter(self.base + ".avi", cv2.VideoWriter_fourcc(*"MJPG"), fps, (w, h))
+        self.size = (w, h)
+        self.t0 = None
+        self.written = 0
+        self.last = None
+        self.lock = threading.Lock()
+        self.sound = []
+        if audio is not None:
+            audio.recorder = self
+        video.recorder = self
+
+    def add_frame(self, frame, t):
+        with self.lock:
+            if self.writer is None:
+                return
+            if self.t0 is None:
+                self.t0 = t
+            if frame.shape[1] != self.size[0] or frame.shape[0] != self.size[1]:
+                return
+            # the refresh this picture belongs to; any skipped ones repeat the last picture
+            n = int(round((t - self.t0) * self.fps))
+            while self.written < n and self.last is not None:
+                self.writer.write(self.last)
+                self.written += 1
+            if self.written <= n:
+                self.writer.write(frame)
+                self.written += 1
+            self.last = frame
+
+    def add_sound(self, data):
+        if self.t0 is not None:
+            self.sound.append(data.copy())
+
+    def seconds(self):
+        return self.written / self.fps
+
+    def stop(self):
+        """closes the files and joins them; returns the path of what was saved"""
+        with self.lock:
+            self.video.recorder = None
+            if self.audio is not None:
+                self.audio.recorder = None
+            self.writer.release()
+            self.writer = None
+        wav = None
+        if self.sound:
+            wav = self.base + ".wav"
+            with wave.open(wav, "wb") as w:
+                w.setnchannels(CHANNELS)
+                w.setsampwidth(2)
+                w.setframerate(self.audio.rate)
+                w.writeframes(np.concatenate(self.sound).tobytes())
+        try:
+            import subprocess
+
+            import imageio_ffmpeg
+
+            ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+            cmd = [ffmpeg, "-loglevel", "error", "-y", "-i", self.base + ".avi"]
+            if wav:
+                cmd += ["-i", wav, "-c:a", "aac", "-b:a", "192k", "-shortest"]
+            cmd += ["-c:v", "libx264", "-crf", "16", "-preset", "veryfast", "-pix_fmt", "yuv420p", self.base + ".mp4"]
+            subprocess.run(cmd, check=True)
+            os.remove(self.base + ".avi")
+            if wav:
+                os.remove(wav)
+            return self.base + ".mp4"
+        except Exception as e:
+            print(f"recording kept as .avi{' and .wav' if wav else ''} (not joined into an .mp4: {e})")
+            return self.base + ".avi"
+
+
 class Audio:
     """The capture card's sound straight to the speakers, and the last KEEP_SECONDS of it kept for saving."""
 
@@ -285,6 +383,7 @@ class Audio:
 
         self.sd = sd
         self.muted = False
+        self.recorder = None
         self.peak = 0
         self.pos = 0
         self.lock = threading.Lock()
@@ -311,6 +410,9 @@ class Audio:
         data = indata if self.channels == CHANNELS else np.repeat(indata, CHANNELS, axis=1)
         self.peak = max(self.peak, int(np.abs(indata.astype(np.int32)).max()) if len(indata) else 0)
         outdata[:] = 0 if self.muted else data
+        rec = self.recorder
+        if rec is not None:
+            rec.add_sound(data)
         with self.lock:
             n = len(data)
             end = self.pos + n
@@ -506,8 +608,9 @@ def serve(port, video, audio):
     return server
 
 
-def global_hotkey(on_press):
-    """Ctrl+Alt+S anywhere (Windows): calls on_press. The hotkey belongs to this thread's message loop."""
+def global_hotkey(on_press, on_record=None):
+    """Ctrl+Alt+S anywhere (Windows): calls on_press; Ctrl+Alt+V: on_record. The hotkeys belong to this thread's
+    message loop."""
     if sys.platform != "win32":
         return
 
@@ -518,11 +621,15 @@ def global_hotkey(on_press):
         MOD_ALT, MOD_CONTROL, MOD_NOREPEAT = 0x1, 0x2, 0x4000
         if not user32.RegisterHotKey(None, 1, MOD_ALT | MOD_CONTROL | MOD_NOREPEAT, ord("S")):
             print("(Ctrl+Alt+S is taken by another program: use S in the window)")
-            return
+        if on_record is not None and not user32.RegisterHotKey(None, 2, MOD_ALT | MOD_CONTROL | MOD_NOREPEAT, ord("V")):
+            print("(Ctrl+Alt+V is taken by another program: use V in the window)")
         msg = ctypes.wintypes.MSG()
         while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
             if msg.message == 0x0312:  # WM_HOTKEY
-                on_press()
+                if msg.wParam == 2 and on_record is not None:
+                    on_record()
+                else:
+                    on_press()
 
     threading.Thread(target=run, daemon=True).start()
 
@@ -590,7 +697,9 @@ def main():
         print(f"for other programs: http://127.0.0.1:{args.port}/frame.jpg  /audio.wav?s=5  /")
 
     shot_request = threading.Event()
-    global_hotkey(shot_request.set)
+    record_request = threading.Event()
+    global_hotkey(shot_request.set, record_request.set)
+    recorder = None
 
     cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
     cv2.resizeWindow(WINDOW, 960, 720)
@@ -612,7 +721,7 @@ def main():
         while True:
             frame, stamp = video.frame()
             if frame is not None:
-                if overlay or analyzer or (time.perf_counter() < message_until):
+                if overlay or analyzer or (time.perf_counter() < message_until) or (recorder is not None):
                     frame = frame.copy()
                     y = 24
                     if overlay:
@@ -630,6 +739,10 @@ def main():
                             cv2.putText(frame, text, (8, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1,
                                         cv2.LINE_AA)
                             y += 22
+                    if recorder is not None:
+                        cv2.circle(frame, (frame.shape[1] - 16, 16), 7, (0, 0, 255), -1)
+                        cv2.putText(frame, f"REC {recorder.seconds():.0f}s", (frame.shape[1] - 92, 21),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
                     if time.perf_counter() < message_until:
                         cv2.putText(frame, message, (8, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1,
                                     cv2.LINE_AA)
@@ -646,6 +759,17 @@ def main():
             if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
                 break
             raw, _ = video.frame()
+            if (record_request.is_set() or (key != -1 and key < 0x10000 and chr(key & 0xFF).lower() == "v")) and \
+                    raw is not None:
+                record_request.clear()
+                if recorder is None:
+                    recorder = Recorder(video, audio, args.fps)
+                    message, message_until = "recording (V again to stop)", now + 1.5
+                else:
+                    path = recorder.stop()
+                    recorder = None
+                    message, message_until = f"saved {os.path.basename(path)}", now + 2.5
+                key = -1
             if shot_request.is_set() and raw is not None:
                 shot_request.clear()
                 screenshot(raw)
@@ -679,6 +803,8 @@ def main():
                 video.analyzer.reset()
                 message, message_until = "frame analyzer reset", now + 1.0
     finally:
+        if recorder is not None:
+            print(f"recording saved: {recorder.stop()}")
         # the frame analyzer's totals: printed and saved beside the screenshots
         try:
             report = video.analyzer.report()
