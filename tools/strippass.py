@@ -27,6 +27,9 @@ TRI_CMDS = ("gsSP1Triangle", "gsSP2Triangles", "gsSP1Quadrangle")
 # models whose triangles the mod reads at run time, which only knows the plain triangle commands: the fish rig
 # (fishmod_rig.c: object_fish's fish, gameplay_keep's), the plants that bend (fishmod_scatter.c: object_fish's reed)
 SKIP_DIRS = {"object_fish", "gameplay_keep"}
+# STRIPPASS_TURN_ALL=1: every triangle may be turned to join a strip (the most strips; the floor at the camera's feet
+# shaded a little differently where the near plane cuts it)
+TURN_ALL = bool(os.environ.get("STRIPPASS_TURN_ALL"))
 UNSIZED = []  # (directory, list name): lists whose length changed
 STATS = {"tris": 0, "snaked": 0, "snakes": 0, "bytes_before": 0, "bytes_after": 0, "lists": 0}
 
@@ -198,7 +201,7 @@ def convert(cmds, dirpath=None):
             run.append(c)
             for t in tris_of(c):
                 sh = [shade_of(i) for i in t]
-                run_free.append((sh[0] is not None) and sh[0] == sh[1] == sh[2])
+                run_free.append(TURN_ALL or ((sh[0] is not None) and sh[0] == sh[1] == sh[2]))
             continue
         flush()
         out.append(c)
