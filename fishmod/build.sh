@@ -38,6 +38,8 @@
 #                  converted copy of the extracted assets (extracted/VERSION-texpack); outputs get a -texpack suffix
 #   --colpack      fewer collision triangles, the same surfaces (tools/colpack.py): the build reads a merged copy of the
 #                  extracted assets (after --texpack's, if both); outputs get a -colpack suffix
+#   --seams        the scenes' seams closed (tools/seampass.py: near-miss corners welded, T-junctions split; the build
+#                  reads a copy, after --texpack's and --colpack's); outputs get a -seams suffix
 #   --meshpack     the lake's widest mesh pieces cut into areas, each culled by the RSP on its own (tools/meshpack.py):
 #                  the build reads a copy (after the other packs); outputs get a -meshpack suffix
 #   --mod-opt L    the mod's own files at GCC level L (Os, O3...), the game's unchanged; outputs get a -modL suffix
@@ -68,6 +70,7 @@ GCC_LIBULTRA=0
 TEXPACK=0
 COLPACK=0
 MESHPACK=0
+SEAMS=0
 PGO=0
 NOTIMERS=0
 MODOPT=""
@@ -105,6 +108,7 @@ while [ $# -gt 0 ]; do
         --texpack) TEXPACK=1 ;;
         --colpack) COLPACK=1 ;;
         --meshpack) MESHPACK=1 ;;
+        --seams) SEAMS=1 ;;
         --clang-opt) CLANG=1; CLANG_OPT="$2"; shift ;;
         *) MAKE_ARGS+=("$1") ;;
     esac
@@ -178,19 +182,32 @@ if [ "$COLPACK" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$CP_OUT")
 fi
+if [ "$SEAMS" = 1 ]; then
+    SP_SRC="extracted/$VERSION"
+    [ "$TEXPACK" = 1 ] && SP_SRC="$TP_OUT"
+    [ "$COLPACK" = 1 ] && SP_SRC="$CP_OUT"
+    SP_OUT="$SP_SRC-seams"
+    SP_SUM="$({ cat tools/seampass.py tools/meshpack.py; cat "$SP_SRC/.texpack" "$SP_SRC/.colpack" 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    if [ "$(cat "$SP_OUT/.seams" 2>/dev/null)" != "$SP_SUM" ]; then
+        python3 tools/seampass.py "$SP_SRC" "$SP_OUT"
+        echo "$SP_SUM" > "$SP_OUT/.seams"
+    fi
+    TEXPACK_ARGS=(EXTRACTED_DIR="$SP_OUT")
+fi
 if [ "$MESHPACK" = 1 ]; then
     MP_SRC="extracted/$VERSION"
     [ "$TEXPACK" = 1 ] && MP_SRC="$TP_OUT"
     [ "$COLPACK" = 1 ] && MP_SRC="$CP_OUT"
+    [ "$SEAMS" = 1 ] && MP_SRC="$SP_OUT"
     MP_OUT="$MP_SRC-meshpack"
-    MP_SUM="$({ cat tools/meshpack.py; cat "$MP_SRC/.texpack" "$MP_SRC/.colpack" 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    MP_SUM="$({ cat tools/meshpack.py; cat "$MP_SRC/.texpack" "$MP_SRC/.colpack" "$MP_SRC/.seams" 2>/dev/null || true; } | md5sum | cut -c1-8)"
     if [ "$(cat "$MP_OUT/.meshpack" 2>/dev/null)" != "$MP_SUM" ]; then
         python3 tools/meshpack.py "$MP_SRC" "$MP_OUT" --report
         echo "$MP_SUM" > "$MP_OUT/.meshpack"
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$MP_OUT")
 fi
-MODE="cc=${FISHMOD_GCC:-} gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE teststart=$TEST_START expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+MODE="cc=${FISHMOD_GCC:-} gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} seams=$SEAMS${SP_SUM:+-$SP_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE teststart=$TEST_START expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi
@@ -295,6 +312,9 @@ if [ "$COLPACK" = 1 ]; then
 fi
 if [ "$MESHPACK" = 1 ]; then
     SUFFIX="$SUFFIX-meshpack"
+fi
+if [ "$SEAMS" = 1 ]; then
+    SUFFIX="$SUFFIX-seams"
 fi
 if [ "$CLANG_AUDIO" = 1 ]; then
     SUFFIX="$SUFFIX-clangaudio"
