@@ -190,13 +190,27 @@ NAME_GLYPHS = {
     "v": ("HoverBoots", 45, 52), "l": ("HylianShield", 44, 48), "S": ("HylianShield", 63, 72),
     "L": ("RutosLetter", 46, 53), "R": ("RedPotion", 33, 41),
 }
-NAME_SPACE = 3
+NAME_SPACE = 4  # (the gap between words, as the game's)
+NAME_GAP = 1    # (between letters: the game's letters stand a column apart)
+# pairs set closer than NAME_GAP (columns), as the game's lettering tucks a letter under a slanted or open side
+NAME_KERN = {"Wo": -2, "Po": -1, "Ro": -1, "Fi": -1, "Lu": -1, "Bo": 0}
+# what the cuts still take in of a letter's neighbours, picked out by hand: (row, column) in the cut
+NAME_ERASE = {
+    "d": [(5, 0), (6, 0), (6, 1), (7, 0)],
+    "e": [(5, 0), (6, 0), (7, 0)],
+    "b": [(y, 0) for y in range(7, 12)],
+    "v": [(y, 6) for y in range(6, 12)],
+    "W": [(y, 13) for y in range(7, 11)],
+    "r": [(3, 0), (4, 0)],
+    "m": [(y, 0) for y in range(7, 11)],
+    "g": [(y, 7) for y in range(6, 11)],
+}
 
 
 def name_glyph(ch):
     """One letter cut from the game's lettering, with only its own strokes: the bits of its neighbours the cut takes
     in at its edges are dropped (small pieces touching the cut's sides), and its black border drawn again round what's
-    left (a pixel either side, two above and below, as the game's). 16 x w x (intensity, alpha)."""
+    left. 16 x w intensities, trimmed to the letter."""
     tex, x0, x1 = NAME_GLYPHS[ch]
     la = np.asarray(Image.open(os.path.join(NAME_TEX, f"g{tex}ItemNameENGTex.ia4.png")).convert("LA"), np.uint8)
     la = la[:, x0:x1].copy()
@@ -229,33 +243,42 @@ def name_glyph(ch):
         if (size == big) or ((not edge) and (size >= 4)) or (size >= big * 0.6):
             keep |= m
     inten = np.where(keep, la[..., 0], 0)
-    alpha = np.zeros((h, w), bool)
-    for dy in range(-2, 3):
-        for dx in range(-1, 2):
-            sh = np.zeros_like(keep)
-            sh[max(dy, 0):h + min(dy, 0), max(dx, 0):w + min(dx, 0)] = \
-                keep[max(-dy, 0):h + min(-dy, 0), max(-dx, 0):w + min(-dx, 0)]
-            alpha |= sh
-    return np.dstack([inten, alpha * 255]).astype(np.uint8)
+    for y, x in NAME_ERASE.get(ch, ()):
+        inten[y, x] = 0
+    lit = np.nonzero((inten > 0).any(0))[0]
+    return inten[:, lit[0]:lit[-1] + 1] if len(lit) else inten[:, :1]
 
 
 def make_name_vanilla(text):
     """128 x 16 IA4 from the game's own lettering (NAME_GLYPHS), centred; None if a letter isn't there."""
     if any((ch != " ") and (ch not in NAME_GLYPHS) for ch in text):
         return None
-    cols = []
-    for ch in text:
+    word = np.zeros((16, 256), np.uint8)
+    x = 0
+    for k, ch in enumerate(text):
         if ch == " ":
-            cols += [np.zeros((16, 2), np.uint8)] * NAME_SPACE
+            x += NAME_SPACE
             continue
+        if (k > 0) and (text[k - 1] != " "):
+            x += NAME_GAP + NAME_KERN.get(text[k - 1] + ch, 0)
         g = name_glyph(ch)
-        for x in range(g.shape[1]):
-            cols.append(g[:, x])
-    w = len(cols)
+        word[:, x:x + g.shape[1]] = np.maximum(word[:, x:x + g.shape[1]], g)
+        x += g.shape[1]
+    word = word[:, :min(x, 124)]
+    w = word.shape[1]
     canvas = np.zeros((16, 128, 2), np.uint8)
-    x = max(0, (128 - w) // 2)
-    for k, c in enumerate(cols[:128]):
-        canvas[:, x + k] = c
+    x = (128 - w) // 2
+    canvas[:, x:x + w, 0] = word
+    # the black border round the whole name, as the game's (a pixel either side, two above and below)
+    ink = canvas[..., 0] > 0
+    alpha = np.zeros_like(ink)
+    for dy in range(-2, 3):
+        for dx in range(-1, 2):
+            sh = np.zeros_like(ink)
+            sh[max(dy, 0):16 + min(dy, 0), max(dx, 0):128 + min(dx, 0)] = \
+                ink[max(-dy, 0):16 + min(-dy, 0), max(-dx, 0):128 + min(-dx, 0)]
+            alpha |= sh
+    canvas[..., 1] = alpha * 255
     i = np.clip(np.round(canvas[..., 0] / 255.0 * 7), 0, 7).astype(np.uint8)
     a = (canvas[..., 1] > 0).astype(np.uint8)
     nib = (i << 1) | a
