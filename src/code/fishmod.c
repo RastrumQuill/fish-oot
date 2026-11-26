@@ -1515,19 +1515,31 @@ s32 Fishmod_WeatherRoll(s16 sceneId, s32 day) {
     return FISHMOD_WEATHER_CLEAR;
 }
 
+/**
+ * The weather of ours a scene with this skybox gets today: the day's roll, everywhere under the open sky (not over a
+ * vanilla weather, the title screen or the credits; clear all the day the lake came back). Asked by the skybox too,
+ * before it loads its textures (Skybox_Setup): a cloudy day's sky loaded as such, not loaded clear and then streamed
+ * over while it's drawn (the noise in the sky after a scene change).
+ */
+s32 Fishmod_WeatherToday(s16 skyboxId, s32 beforeEnvInit) {
+    // (a vanilla weather carried into the scene: Environment_Init keeps gWeatherMode only if it's retained, so the
+    // skybox, asked before that, reads it as it will be)
+    if ((skyboxId != SKYBOX_NORMAL_SKY) ||
+        ((gWeatherMode != WEATHER_MODE_CLEAR) && (!beforeEnvInit || gSaveContext.retainWeatherMode)) ||
+        (gSaveContext.gameMode != GAMEMODE_NORMAL)) {
+        return FISHMOD_WEATHER_CLEAR;
+    }
+    if (FISHMOD_SAVE->clearDay == (u16)(gSaveContext.save.totalDays + 1)) {
+        return FISHMOD_WEATHER_CLEAR;
+    }
+    return Fishmod_WeatherRoll(0, gSaveContext.save.totalDays);
+}
+
 void Fishmod_OnEnvironmentInit(PlayState* play) {
     EnvironmentContext* envCtx = &play->envCtx;
 
-    sWeather = FISHMOD_WEATHER_CLEAR;
     sRainSoundPending = false;
-    if ((play->skyboxId != SKYBOX_NORMAL_SKY) || (gWeatherMode != WEATHER_MODE_CLEAR) ||
-        (gSaveContext.gameMode != GAMEMODE_NORMAL)) {
-        return; // (under the open sky only; and the title screen and the credits: as vanilla's, no weather of ours)
-    }
-    sWeather = Fishmod_WeatherRoll(0, gSaveContext.save.totalDays); // (the day's, everywhere)
-    if (FISHMOD_SAVE->clearDay == (u16)(gSaveContext.save.totalDays + 1)) {
-        sWeather = FISHMOD_WEATHER_CLEAR; // (the morning the lake came back: clear all that day)
-    }
+    sWeather = Fishmod_WeatherToday(play->skyboxId, false);
     if (sWeather == FISHMOD_WEATHER_CLEAR) {
         return;
     }

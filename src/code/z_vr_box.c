@@ -1,4 +1,5 @@
 #include "skybox.h"
+#include "fishmod.h"
 
 #include "array_count.h"
 #include "dma.h"
@@ -508,6 +509,9 @@ void Skybox_Setup(PlayState* play, SkyboxContext* skyboxCtx, s16 skyboxId) {
             if (gSaveContext.retainWeatherMode && !IS_CUTSCENE_LAYER && gWeatherMode > WEATHER_MODE_CLEAR &&
                 gWeatherMode <= WEATHER_MODE_HEAVY_RAIN) {
                 skyboxConfig = 1;
+            }
+            if (Fishmod_WeatherToday(skyboxId, true) != FISHMOD_WEATHER_CLEAR) {
+                skyboxConfig = 1; // fishmod: the day's clouds (Fishmod_OnEnvironmentInit sets the same), loaded now
             }
 
             for (i = 0; i < ARRAY_COUNT(gTimeBasedSkyboxConfigs[skyboxConfig]); i++) {
