@@ -163,6 +163,7 @@ static f32 sNearScale[FISHMOD_PROP_KIND_MAX]; // each kind's near distance over 
 // With the camera under water, each kind's distances as the LOD tuning measured them (fishmod_lod_tune.h: the
 // shortest that changed no view, per time of day), at the prop's scale; 0: the defaults. Above water the defaults
 // (set by eye: the tuning's views there were harsher than the game's).
+static s32 Scatter_GfxWords(u32* w);
 static f32 sTunedCut[FISHMOD_PROP_KIND_MAX];
 // (the tuned cut no further than this: past it the shapes in the haze are faint, and the budget goes on nearer
 // plants; the dissolve past the cut hides the edge)
@@ -649,7 +650,7 @@ void EnFishmod_ScatterLoad(PlayState* play) {
             u32* w = (u32*)((u8*)sScatter + list[i]);
 
             list[i] = (u32)w;
-            for (; (w[0] >> 24) != G_ENDDL; w += 2) {
+            for (; (w[0] >> 24) != G_ENDDL; w += 2 * Scatter_GfxWords(w)) {
                 if ((w[0] >> 24) == G_VTX) {
                     w[1] += (u32)sScatter;
                 } else if (((w[0] >> 24) == G_DL) && ((w[1] & 0xFFFF0000) == ROCK_STEP_TOKEN)) {
@@ -1212,7 +1213,7 @@ static void Scatter_DryRocks(PlayState* play) {
             (surface > prop->y + 8.0f)) {
             continue; // (still under, or mostly: its moss stays)
         }
-        for (w = (u32*)sRockList[prop->yaw]; (w[0] >> 24) != G_ENDDL; w += 2) {
+        for (w = (u32*)sRockList[prop->yaw]; (w[0] >> 24) != G_ENDDL; w += 2 * Scatter_GfxWords(w)) {
             if ((w[0] >> 24) == G_VTX) {
                 Vtx* v = (Vtx*)w[1];
                 s32 n = (w[0] >> 12) & 0xFF;
@@ -1982,6 +1983,26 @@ static void* Scatter_BendAddr(u32 a, u8* seg6) {
     return NULL;
 }
 
+/**
+ * The 8-byte words a command takes, from its first: 1, or for an F3DEX3 triangle snake (the generated props' and rocks'
+ * triangles, fishmod/tools/snake.py) its continuations too (each index byte in the command's second word and the words
+ * after; the one with 0x80 the last).
+ */
+static s32 Scatter_GfxWords(u32* w) {
+#ifdef G_TRISNAKE
+    if (((w[0] >> 24) == G_TRISNAKE) && !(w[0] & 0x80)) {
+        u8* p = (u8*)&w[1]; // (the index bytes run on through the next words)
+        s32 k = 0;
+
+        while (!(p[k] & 0x80)) {
+            k++;
+        }
+        return (k < 4) ? 1 : (1 + (k - 4) / 8 + 1);
+    }
+#endif
+    return 1;
+}
+
 static ScatterBend* Scatter_BendBuild(Gfx* modelIn, u8* seg6, s32 nbands) {
     Gfx* model = Scatter_BendAddr((u32)modelIn, seg6);
     static BendV sTri[BEND_TRI_MAX][3];
@@ -2007,7 +2028,7 @@ static ScatterBend* Scatter_BendBuild(Gfx* modelIn, u8* seg6, s32 nbands) {
     }
     bzero(slot, sizeof(slot));
     // the model's triangles (a list of vertex loads and triangles)
-    for (n = 0; n < 1024; n++, w += 2) {
+    for (n = 0; n < 1024; n++, w += 2 * Scatter_GfxWords(w)) {
         u32 op = w[0] >> 24;
 
         if (op == G_ENDDL) {
@@ -2023,12 +2044,57 @@ static ScatterBend* Scatter_BendBuild(Gfx* modelIn, u8* seg6, s32 nbands) {
             for (i = 0; i < cnt; i++) {
                 slot[v0 + i] = &v[i];
             }
-        } else if ((op == G_TRI1) || (op == G_TRI2)) {
+        } else if ((op == G_TRI1) || (op == G_TRI2)
+#ifdef G_TRISNAKE
+                   || (op == G_TRISNAKE)
+#endif
+        ) {
             s32 t;
+            s32 nt = (op == G_TRI2) ? 2 : 1;
+            u8 snakeTri[48][3]; // (a snake's triangles, as index bytes: A-B-C as the microcode draws them)
 
-            for (t = 0; t < ((op == G_TRI2) ? 2 : 1); t++) {
+#ifdef G_TRISNAKE
+            if (op == G_TRISNAKE) {
+                // F3DEX3's snake: A-B-C start as i3-i1-i2; each next index byte turns right (B = A) or left (C = A),
+                // then becomes A; the one with 0x80 the last
+                u8 a = w[0] & 0xFF;
+                u8 bb = (w[0] >> 8) & 0xFF;
+                u8 cc = (w[0] >> 16) & 0xFF;
+                u8* p = (u8*)&w[1];
+                s32 k = 0;
+
+                nt = 0;
+                snakeTri[nt][0] = a;
+                snakeTri[nt][1] = bb;
+                snakeTri[nt][2] = cc;
+                nt++;
+                while (!(a & 0x80) && (nt < ARRAY_COUNT(snakeTri))) {
+                    u8 nb = p[k];
+
+                    k++;
+                    if (nb & 1) {
+                        cc = a;
+                    } else {
+                        bb = a;
+                    }
+                    a = nb;
+                    snakeTri[nt][0] = a;
+                    snakeTri[nt][1] = bb;
+                    snakeTri[nt][2] = cc;
+                    nt++;
+                }
+            }
+#endif
+            for (t = 0; t < nt; t++) {
                 u32 x = (t == 0) ? w[0] : w[1];
                 s32 c;
+
+#ifdef G_TRISNAKE
+                if (op == G_TRISNAKE) {
+                    // (as a TRI1 word: the three index bytes, each index * 2)
+                    x = ((snakeTri[t][0] & 0x7E) << 16) | ((snakeTri[t][1] & 0x7E) << 8) | (snakeTri[t][2] & 0x7E);
+                }
+#endif
 
                 if (nTri >= BEND_TRI_MAX) {
                     return NULL;

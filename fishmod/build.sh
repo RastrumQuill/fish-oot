@@ -214,6 +214,7 @@ if [ "$MESHPACK" = 1 ]; then
     TEXPACK_ARGS=(EXTRACTED_DIR="$MP_OUT")
 fi
 [ -z "$STRIPS" ] && STRIPS=$F3DEX3
+export FISHMOD_STRIPS=${FISHMOD_MODSTRIPS:-$STRIPS}  # (FISHMOD_MODSTRIPS=0: the scenes' strips without the mod's own generated props and rocks: fishmod/tools/snake.py)
 if [ "$STRIPS" = 1 ]; then
     ST_SRC="extracted/$VERSION"
     [ "$TEXPACK" = 1 ] && ST_SRC="$TP_OUT"
@@ -228,7 +229,7 @@ if [ "$STRIPS" = 1 ]; then
     fi
     TEXPACK_ARGS=(EXTRACTED_DIR="$ST_OUT")
 fi
-MODE="cc=${FISHMOD_GCC:-} gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} seams=$SEAMS${SP_SUM:+-$SP_SUM} strips=$STRIPS${ST_SUM:+-$ST_SUM} debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE teststart=$TEST_START expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
+MODE="cc=${FISHMOD_GCC:-} gccrest=${GCC_REST:-0} modopt=$MODOPT notimers=$NOTIMERS texpack=$TEXPACK${TP_SUM:+-$TP_SUM} colpack=$COLPACK${CP_SUM:+-$CP_SUM} meshpack=$MESHPACK${MP_SUM:+-$MP_SUM} seams=$SEAMS${SP_SUM:+-$SP_SUM} strips=$STRIPS${ST_SUM:+-$ST_SUM} modstrips=$FISHMOD_STRIPS debug=$DEBUG f3dex3=$F3DEX3 occ=$F3DEX3_OCC prof=${F3DEX3_PROF:-} testmode=$TESTMODE teststart=$TEST_START expak=$EXPAK profile=$PROFILE gcc=$GCC clang=$CLANG$CLANG_SUM game=$CLANG_GAME audio=$CLANG_AUDIO$([ "$CLANG_AUDIO" = 1 ] && md5sum < tools/fishmod_clang_cc.sh | cut -c1-8) gccaudio=$GCC_AUDIO gccultra=$GCC_LIBULTRA$(md5sum < tools/fishmod_gcc_cc.sh | cut -c1-8) opt=$CLANG_OPT ${CLANG_EXTRA:-}"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$MODE" ]; then
     make VERSION=$VERSION clean
 fi

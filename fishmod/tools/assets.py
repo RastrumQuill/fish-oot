@@ -310,6 +310,13 @@ def convert_model(entry, textures):
     start = 0
     for bverts, bfaces in batches:
         dl.append(f"    gsSPVertex(&{name}Vtx[{start}], {len(bverts)}, 0),")
+        if STRIP_MODELS:
+            # (F3DEX3 triangle snakes, fishmod/tools/snake.py: the generated props of a build that draws them)
+            import snake
+            for line in snake.c_lines(snake.run(bfaces, [verts[v] for v in bverts], 1.0)):
+                dl.append(f"    {line},")
+            start += len(bverts)
+            continue
         for i in range(0, len(bfaces), 2):
             if i + 1 < len(bfaces):
                 a, b = bfaces[i], bfaces[i + 1]
@@ -379,12 +386,17 @@ def build(manifest, check):
     return problems
 
 
+STRIP_MODELS = False  # (set for a generated manifest, never the committed one: its C stays the same in every build)
+
+
 def main():
+    global STRIP_MODELS
     args = sys.argv[1:]
     check = "--check" in args
     manifest = MANIFEST
     if "--manifest" in args:
         manifest = args[args.index("--manifest") + 1]
+        STRIP_MODELS = os.environ.get("FISHMOD_STRIPS") == "1" and os.path.basename(manifest) == "props_manifest.json"
     with open(manifest) as f:
         manifest = json.load(f)
     sys.exit(1 if build(manifest, check) else 0)

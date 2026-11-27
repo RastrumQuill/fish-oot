@@ -158,9 +158,11 @@ def pack(nverts, faces):
     return loads
 
 
-def dl_words(loads, vtx_offset, prefix=()):
+def dl_words(loads, vtx_offset, prefix=(), vdata=None):
     """the rock's list: its prefix (commands as word pairs), its vertex loads (the loads' vertices one after another
-    from vtx_offset in the data: relocated to an address at load) and triangles, the end"""
+    from vtx_offset in the data: relocated to an address at load) and triangles (as F3DEX3 triangle snakes where the
+    build draws them: snake.py, vdata each load's vertices as (x, y, z, s, t, r, g, b) for which may be turned), the end"""
+    import snake
     out = []
     for w0, w1 in prefix:
         out += [w0, w1]
@@ -169,15 +171,7 @@ def dl_words(loads, vtx_offset, prefix=()):
         n = len(verts)
         out += [(G_VTX << 24) | (n << 12) | (n << 1), at]
         at += n * 16
-        k = 0
-        while k < len(tris):
-            a = [i * 2 for i in tris[k]]
-            if k + 1 < len(tris):
-                b = [i * 2 for i in tris[k + 1]]
-                out += [(G_TRI2 << 24) | (a[0] << 16) | (a[1] << 8) | a[2], (b[0] << 16) | (b[1] << 8) | b[2]]
-                k += 2
-            else:
-                out += [(G_TRI1 << 24) | (a[0] << 16) | (a[1] << 8) | a[2], 0]
-                k += 1
+        vd = vdata[loads.index((verts, tris))] if vdata else [(0, 0, 0, 0, 0, 0, 0, 0)] * n
+        out += snake.words(snake.run(tris, vd, 1.0))
     out += [G_ENDDL << 24, 0]
     return out
