@@ -397,6 +397,7 @@ void Fishmod_ResetRodInfo(void) {
     gFishmodRodInfo.notice = NULL;
     gFishmodRodInfo.bait = FISHMOD_BAIT_NONE;
     gFishmodRodInfo.baitRequest = FISHMOD_BAIT_NONE;
+    gFishmodRodInfo.spareBait = FISHMOD_BAIT_NONE; // (with the hook's own: it didn't outlive the scene, or the file)
 }
 
 /** Link has the rod out in a fishing scene (its actor is there and he's holding it). */
