@@ -5,3 +5,9 @@ releases/fish-oot-stripsab-off.bps 12 strips-off-1
 releases/fish-oot-stripsab-on.bps 12 strips-on-1
 releases/fish-oot-stripsab-off.bps 12 strips-off-2
 releases/fish-oot-stripsab-on.bps 12 strips-on-2
+# Mod-strips A/B (releases/notes-modstripsab.md): the frame-log bench with the scenes as snakes in both; -on also
+# draws the mod's own props, plants and rocks as snakes. Off, on, off, on. No Expansion Pak needed.
+releases/fish-oot-modstripsab-off.bps 12 modstrips-off-1
+releases/fish-oot-modstripsab-on.bps 12 modstrips-on-1
+releases/fish-oot-modstripsab-off.bps 12 modstrips-off-2
+releases/fish-oot-modstripsab-on.bps 12 modstrips-on-2

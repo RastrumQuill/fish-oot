@@ -30,6 +30,7 @@ results are in [history/](history/), and its patch is in the repository's histor
 | `fish-oot-frames26.bps` | frames25 with the water fog from above being the underwater fog, by the ray's length in the water (bed and props, vertex by vertex), nothing poking out of the water, reeds bending | [notes](notes-frames26.md) |
 | `fish-oot-frames27.bps` | frames26 with the water fog from above in the RSP's own fog (the bed in depth bands, each prop by its depth; no CPU fog), plants bending as ropes, the lens working on the D-pad | [notes](notes-frames27.md) |
 | `fish-oot-stripsab-off.bps`, `fish-oot-stripsab-on.bps` | the frame-log bench twice, without and with the scenes' triangles as F3DEX3 triangle snakes: does it pay off where the RDP is the limit? | [notes](notes-stripsab.md) |
+| `fish-oot-modstripsab-off.bps`, `fish-oot-modstripsab-on.bps` | the frame-log bench twice, the scenes as snakes in both; `-on` also draws the mod's own props, plants and rocks as snakes | [notes](notes-modstripsab.md) |
 | `fish-oot-frames28.bps` | frames27 with plants no longer left out between the camera and Link | [notes](notes-frames28.md) |
 | `fish-oot-frames28-nobands.bps` | frames28 without the lake bed's water-fog bands (the props' fog still on): what the bands cost | [notes](notes-frames28-nobands.md) |
 | `fish-oot-frames28-audiocol.bps`, `-nocut.bps`, `-bands4.bps`, `-all.bps` | frames28 with the audio and collision leads' work; the bed's fog bands uncut; cut at 4 depths; all of them | [notes](notes-frames28-set.md) |
