@@ -1,1 +1,16 @@
 # Each line: a patch (from the repository root), the most minutes it may take, a label.
+# The review fixes on the console (releases/notes-fixab.md). About 1 h 50 min in all.
+# 1. Frame times before and after the fixes: the frame-log bench at Lake Hylia. "old" is this morning's
+#    modstripsab-on build; "new" is the same bench with every fix since (the strip pass keeping draw order where a
+#    surface blends, the lake bed's own normals, the D-pad on the C buttons' code, the fishing fixes). Old, new, old, new.
+releases/fish-oot-modstripsab-on.bps 12 fixab-old-1
+releases/fish-oot-fixab-new.bps 12 fixab-new-1
+releases/fish-oot-modstripsab-on.bps 12 fixab-old-2
+releases/fish-oot-fixab-new.bps 12 fixab-new-2
+# 2. Every scene of the game, 150 frames each with nobody playing: that none crashes or hangs on the console, and
+#    each scene's frame times there.
+releases/fish-oot-hwscenes.bps 60 hwscenes
+# 3. The recorded opening replayed from power-on (fishmod/docs/hw-suite.md): never yet run on the console. LAST, and
+#    note: it writes the recording's empty save over the cart's save memory. Back the save up first if it matters, or
+#    delete this line.
+releases/hwsuite/hw-replay-g14o2.bps 12 hw-replay-g14o2

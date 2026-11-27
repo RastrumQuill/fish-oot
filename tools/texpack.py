@@ -365,8 +365,21 @@ def main():
             out.append(cur)
         return out
 
+    # lists the game's code enters part-way (&list[n], a count of Gfx words from its start): a palette load put in
+    # ahead of that point would move it (Ganon's Castle's rubble, drawn from its 28th word: seven words were added
+    # before it, and the collapse drew from the middle of a load). Such a list stays as the game shipped it.
+    mid_entry = set()
+    for root, _, files in os.walk("src"):
+        for f in files:
+            if f.endswith(".c"):
+                for m in re.finditer(r"&\s*(\w+)\s*\[\s*(\w+)\s*\]", open(os.path.join(root, f), errors="replace").read()):
+                    if m.group(2) not in ("0", "0x0"):
+                        mid_entry.add(m.group(1))
+
     def list_ok(inc):
         cmds = lists[inc]
+        if os.path.basename(str(inc)).split(".")[0] in mid_entry:
+            return False
         first = next((k for k, (n, _) in enumerate(cmds) if n in LOAD), None)
         for k, (name, _) in enumerate(cmds):
             if name in CALLS or name.startswith("gsSPBranch") or name in ("gsDPSetTile", "gsDPSetTextureImage"):
