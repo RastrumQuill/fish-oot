@@ -2047,6 +2047,7 @@ void Inventory_DeleteItem(u16 item, u16 invSlot) {
             gSaveContext.save.info.equips.cButtonSlots[i - 1] = SLOT_NONE;
         }
     }
+    Fishmod_DpadDeleteSlot(invSlot); // fishmod: and off the D-pad
 }
 
 s32 Inventory_ReplaceItem(PlayState* play, u16 oldItem, u16 newItem) {
@@ -4080,6 +4081,7 @@ void Interface_Update(PlayState* play) {
                 ((msgCtx->msgMode != MSGMODE_NONE) && (play->sceneId == SCENE_BOMBCHU_BOWLING_ALLEY))) {
                 if (play->gameOverCtx.state == GAMEOVER_INACTIVE) {
                     func_80083108(play);
+                    Fishmod_DpadUpdateStatus(play); // fishmod: the D-pad's buttons by the same rules
                 }
             }
         }

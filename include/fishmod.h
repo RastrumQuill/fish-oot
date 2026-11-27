@@ -247,6 +247,7 @@ typedef struct FishmodRodInfo {
     /* 0x19 */ u8 baitRequest;   // set by a bait bottle: put this on the hook
     /* 0x1A */ u8 landOpen;      // the landing window is open (A lands the fish)
     /* 0x1B */ u8 leaping;       // the hooked fish is in the air (the stick down drops the rod)
+    /* 0x1C */ u8 spareBait;     // the bait that was on the hook when a lure went on: back on it when the lure comes off
 } FishmodRodInfo;
 
 extern FishmodRodInfo gFishmodRodInfo;
@@ -366,6 +367,10 @@ u8* Fishmod_InvSlot(s32 slot);
 #define FISHMOD_SLOT_EQUIP 0x80
 #define FISHMOD_IS_EQUIP_SLOT(slot) (((slot) >= FISHMOD_SLOT_EQUIP) && ((slot) < FISHMOD_SLOT_EQUIP + 16))
 #define FISHMOD_EQUIP_SLOT(type, value) (FISHMOD_SLOT_EQUIP + (type) * 4 + (value))
+// The bow with a fire, ice or light arrow set on it, on a D-pad button: FISHMOD_SLOT_BOW_ARROW + 0-2 (a C button keeps
+// it the game's way: the bow's slot, and ITEM_BOW_FIRE.. as its item)
+#define FISHMOD_SLOT_BOW_ARROW 0x90
+#define FISHMOD_IS_BOW_ARROW_SLOT(slot) (((slot) >= FISHMOD_SLOT_BOW_ARROW) && ((slot) < FISHMOD_SLOT_BOW_ARROW + 3))
 
 // Item buttons: 0 B, 1-3 the C buttons, 4-7 the D-pad (up, down, left, right)
 #define FISHMOD_BUTTON_DPAD 4
@@ -379,7 +384,9 @@ s32 Fishmod_EquipItem(struct PlayState* play, s32 item);
 void Fishmod_EquipButtons(struct PlayState* play, struct Input* input); // every frame (z_player.c)
 void Fishmod_DpadUpdateBottle(struct PlayState* play, u8 item, s32 button);
 s32 Fishmod_DpadAssign(struct PlayState* play, u16 press, s32 slot);
-void Fishmod_DpadTrade(s32 slot, s32 old);
+void Fishmod_DpadTrade(s32 slot, s32 c);
+void Fishmod_DpadDeleteSlot(s32 slot);
+void Fishmod_DpadUpdateStatus(struct PlayState* play);
 void Fishmod_ButtonPut(struct PlayState* play, s32 b, s32 slot);
 void Fishmod_DpadDraw(struct PlayState* play);
 // The HUD clock under the overworld minimap (fishmod_items.c)
@@ -773,7 +780,8 @@ s32 Fishmod_WeatherRoll(s16 sceneId, s32 day);
 void Fishmod_OnEnvironmentInit(struct PlayState* play);
 s32 Fishmod_Weather(struct PlayState* play);
 s32 Fishmod_WeatherRolled(void);
-s32 Fishmod_WeatherToday(s16 skyboxId, s32 beforeEnvInit);
+s32 Fishmod_WeatherToday(struct PlayState* play, s16 skyboxId, s32 beforeEnvInit);
+s32 Fishmod_WeatherDay(void);
 s32 Fishmod_WeatherWholeScene(s16 sceneId, s32 tagType);
 void Fishmod_WeatherSetScene(struct PlayState* play, s32 weather);
 void Skybox_FishmodReload(struct PlayState* play);

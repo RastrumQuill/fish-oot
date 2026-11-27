@@ -217,6 +217,7 @@ u8* Fishmod_InvSlot(s32 slot) {
 #define DPAD_AGE() (((void)0, gSaveContext.save.linkAge) == LINK_AGE_CHILD)
 
 static u16 sDpadButtons[4] = { BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
+static const u8 sArrowSlots[3] = { SLOT_ARROW_FIRE, SLOT_ARROW_ICE, SLOT_ARROW_LIGHT };
 
 u8 Fishmod_ButtonSlot(s32 button) {
     if ((button >= 1) && (button <= 3)) {
@@ -236,6 +237,15 @@ u8 Fishmod_SlotItem(s32 slot) {
 
         return ((type < EQUIP_TYPE_MAX) && (value >= 1)) ? ITEM_SWORD_KOKIRI + type * 3 + value - 1 : ITEM_NONE;
     }
+    if (FISHMOD_IS_BOW_ARROW_SLOT(slot)) {
+        // the bow with an arrow set on it (plain once the arrow's gone; nothing without the bow)
+        if (INV_SLOT(SLOT_BOW) != ITEM_BOW) {
+            return ITEM_NONE;
+        }
+        return (INV_SLOT(sArrowSlots[slot - FISHMOD_SLOT_BOW_ARROW]) != ITEM_NONE)
+                   ? ITEM_BOW_FIRE + (slot - FISHMOD_SLOT_BOW_ARROW)
+                   : ITEM_BOW;
+    }
     return ((u32)slot < INVENTORY_SLOTS) ? INV_SLOT(slot) : ITEM_NONE;
 }
 
@@ -243,45 +253,112 @@ s32 Fishmod_IsEquipItem(s32 item) {
     return (item >= ITEM_SWORD_KOKIRI) && (item <= ITEM_BOOTS_HOVER);
 }
 
-/** Whether the D-pad works now: as the C buttons (off when they all are: cutscenes, minigames, riding...), not in
- * test builds while L is held (L + D-pad warps), and an item also on a C button only when that button works. */
-static s32 Fishmod_DpadOn(PlayState* play, s32 item) {
-    s32 i;
+/*
+ * Whether a D-pad button works now, by the rules the C buttons go by (func_80083108, z_parameter.c: what's on each C
+ * button decides whether it's lit; a D-pad button gets the same answer for what's on it): underwater only the
+ * hookshot, and that only standing on the bottom; nothing while climbing or crawling; only the ocarina on a rented
+ * horse; the scene's restrictions (bottles, trade items, the hookshot, the ocarina, the spells, everything else).
+ * Worked out each frame the game works its own out (Fishmod_DpadUpdateStatus, called after it), and kept as the C
+ * buttons' is while it doesn't (text up, cutscenes). In the states where the game shuts the C buttons as a whole
+ * (riding, the minigames, the fishing pond, a cutscene's own doing) a D-pad button is off while all three are.
+ */
+#define DPAD_FOLLOW 2 // (as the C buttons as a whole)
+static u8 sDpadStatus[4] = { DPAD_FOLLOW, DPAD_FOLLOW, DPAD_FOLLOW, DPAD_FOLLOW };
 
-    if ((gSaveContext.buttonStatus[1] == BTN_DISABLED) && (gSaveContext.buttonStatus[2] == BTN_DISABLED) &&
-        (gSaveContext.buttonStatus[3] == BTN_DISABLED)) {
+static s32 Fishmod_DpadRule(PlayState* play, s32 item) {
+    InterfaceContext* interfaceCtx = &play->interfaceCtx;
+    Player* player = GET_PLAYER(play);
+    s32 hazard;
+    s32 ocarina = (item == ITEM_OCARINA_FAIRY) || (item == ITEM_OCARINA_OF_TIME);
+    s32 hookshot = (item == ITEM_HOOKSHOT) || (item == ITEM_LONGSHOT);
+
+    if (!((gSaveContext.save.cutsceneIndex < CS_INDEX_0) ||
+          ((play->sceneId == SCENE_LON_LON_RANCH) && (gSaveContext.save.cutsceneIndex == CS_INDEX_0)))) {
+        return DPAD_FOLLOW;
+    }
+    if ((player->stateFlags1 & PLAYER_STATE1_23) || (play->shootingGalleryStatus > 1) ||
+        ((play->sceneId == SCENE_BOMBCHU_BOWLING_ALLEY) && Flags_GetSwitch(play, 0x38)) ||
+        (play->sceneId == SCENE_CHAMBER_OF_THE_SAGES) || (play->sceneId == SCENE_FISHING_POND) ||
+        (play->msgCtx.msgMode != MSGMODE_NONE)) {
+        return DPAD_FOLLOW;
+    }
+    if (Fishmod_IsEquipItem(item)) {
+        return true; // (equipment is put on whatever the buttons' state: Fishmod_EquipButtons)
+    }
+    hazard = Player_GetEnvironmentalHazard(play);
+    if ((hazard >= PLAYER_ENV_HAZARD_UNDERWATER_FLOOR) && (hazard <= PLAYER_ENV_HAZARD_UNDERWATER_FREE)) {
+        return (hazard == PLAYER_ENV_HAZARD_UNDERWATER_FLOOR) && hookshot;
+    }
+    if ((player->stateFlags1 & PLAYER_STATE1_21) || (player->stateFlags2 & PLAYER_STATE2_CRAWLING)) {
         return false;
     }
-#if FISHMOD_TESTMODE
-    if (CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_L)) {
-        return false;
+    if (GET_EVENTINF_INGO_RACE_STATE() == INGO_RACE_STATE_HORSE_RENTAL_PERIOD) {
+        return ocarina;
     }
-#endif
-    for (i = 1; i <= 3; i++) {
-        if ((gSaveContext.save.info.equips.buttonItems[i] == item) && (gSaveContext.buttonStatus[i] == BTN_DISABLED)) {
-            return false;
-        }
+    if (Fishmod_IsBottleItem(item)) {
+        return interfaceCtx->restrictions.bottles == 0;
+    }
+    if ((item >= ITEM_WEIRD_EGG) && (item <= ITEM_CLAIM_CHECK)) {
+        return interfaceCtx->restrictions.tradeItems == 0;
+    }
+    if (ocarina) {
+        return interfaceCtx->restrictions.ocarina == 0;
+    }
+    if (interfaceCtx->restrictions.all != 0) {
+        return (play->sceneId == SCENE_TREASURE_BOX_SHOP) && (item == ITEM_LENS_OF_TRUTH);
+    }
+    if (hookshot) {
+        return interfaceCtx->restrictions.hookshot == 0;
+    }
+    if (item == ITEM_FARORES_WIND) {
+        return interfaceCtx->restrictions.farores == 0;
+    }
+    if ((item == ITEM_DINS_FIRE) || (item == ITEM_NAYRUS_LOVE)) {
+        return interfaceCtx->restrictions.dinsNayrus == 0;
     }
     return true;
+}
+
+/** After the game has gone over its own buttons (Interface_Update). */
+void Fishmod_DpadUpdateStatus(PlayState* play) {
+    s32 d;
+
+    for (d = 0; d < 4; d++) {
+        sDpadStatus[d] = Fishmod_DpadRule(play, Fishmod_SlotItem(FISHMOD_SAVE->dpad[DPAD_AGE()][d]));
+    }
+}
+
+static s32 Fishmod_DpadOn(PlayState* play, s32 d) {
+#if FISHMOD_TESTMODE
+    if (CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_L)) {
+        return false; // (L + D-pad: the test build's warps)
+    }
+#endif
+    if (sDpadStatus[d] == DPAD_FOLLOW) {
+        return !((gSaveContext.buttonStatus[1] == BTN_DISABLED) && (gSaveContext.buttonStatus[2] == BTN_DISABLED) &&
+                 (gSaveContext.buttonStatus[3] == BTN_DISABLED));
+    }
+    return sDpadStatus[d];
 }
 
 /** What D-pad button (4-7) gives now (ITEM_NONE: nothing on it, or off). */
 s32 Fishmod_DpadItem(PlayState* play, s32 button) {
     s32 item = Fishmod_SlotItem(Fishmod_ButtonSlot(button));
 
-    if ((item == ITEM_NONE) || !Fishmod_DpadOn(play, item)) {
+    // (a trade item sold out: the game takes it off a C button)
+    if ((item == ITEM_NONE) || (item == ITEM_SOLD_OUT) || !Fishmod_DpadOn(play, button - FISHMOD_BUTTON_DPAD)) {
         return ITEM_NONE;
     }
     return item;
 }
 
-/** Whether a D-pad button holds this item now (the lens's magic: z_parameter.c turned it off unless a C button held
- * it, so the lens on the D-pad went off the moment it came on). */
+/** Whether a D-pad button holds this item (lit or not: the lens's magic, z_parameter.c, turns the lens off once no
+ * C button holds it, whatever the buttons' state). */
 s32 Fishmod_DpadHasItem(PlayState* play, s32 item) {
     s32 b;
 
     for (b = FISHMOD_BUTTON_DPAD; b < FISHMOD_BUTTON_MAX; b++) {
-        if (Fishmod_DpadItem(play, b) == item) {
+        if (Fishmod_SlotItem(Fishmod_ButtonSlot(b)) == item) {
             return true;
         }
     }
@@ -413,19 +490,35 @@ void Fishmod_DpadUpdateBottle(PlayState* play, u8 item, s32 button) {
  * it's on already, it comes off.
  */
 static s32 Button_Get(s32 b) {
-    return (b < 3) ? gSaveContext.save.info.equips.cButtonSlots[b] : FISHMOD_SAVE->dpad[DPAD_AGE()][b - 3];
+    if (b < 3) {
+        s32 item = gSaveContext.save.info.equips.buttonItems[b + 1];
+
+        // (the game keeps a bow with an arrow set on it as the bow's slot and the pair's item)
+        if ((item >= ITEM_BOW_FIRE) && (item <= ITEM_BOW_LIGHT)) {
+            return FISHMOD_SLOT_BOW_ARROW + (item - ITEM_BOW_FIRE);
+        }
+        return gSaveContext.save.info.equips.cButtonSlots[b];
+    }
+    return FISHMOD_SAVE->dpad[DPAD_AGE()][b - 3];
 }
 
 static void Button_Set(PlayState* play, s32 b, s32 slot) {
     if (b < 3) {
-        gSaveContext.save.info.equips.cButtonSlots[b] = slot;
+        gSaveContext.save.info.equips.cButtonSlots[b] = FISHMOD_IS_BOW_ARROW_SLOT(slot) ? SLOT_BOW : slot;
         gSaveContext.save.info.equips.buttonItems[b + 1] = (slot == SLOT_NONE) ? ITEM_NONE : Fishmod_SlotItem(slot);
         if (gSaveContext.save.info.equips.buttonItems[b + 1] != ITEM_NONE) {
             Interface_LoadItemIcon1(play, b + 1);
+        } else {
+            gSaveContext.save.info.equips.cButtonSlots[b] = SLOT_NONE;
         }
     } else {
         FISHMOD_SAVE->dpad[DPAD_AGE()][b - 3] = slot;
     }
+}
+
+/** What two buttons can't both hold: a slot, and the bow with or without an arrow on it is one thing. */
+static s32 Button_Key(s32 slot) {
+    return FISHMOD_IS_BOW_ARROW_SLOT(slot) ? SLOT_BOW : slot;
 }
 
 void Fishmod_ButtonPut(PlayState* play, s32 b, s32 slot) {
@@ -433,21 +526,37 @@ void Fishmod_ButtonPut(PlayState* play, s32 b, s32 slot) {
     s32 j;
 
     if (old == slot) {
-        Button_Set(play, b, SLOT_NONE);
-        return;
+        if (!FISHMOD_IS_BOW_ARROW_SLOT(slot)) {
+            Button_Set(play, b, SLOT_NONE);
+        }
+        return; // (an arrow set again on the bow that has it stays, as on a C button)
     }
-    for (j = 0; j < 7; j++) {
-        if ((j != b) && (Button_Get(j) == slot)) {
-            Button_Set(play, j, old);
+    if (Button_Key(old) != Button_Key(slot)) {
+        for (j = 0; j < 7; j++) {
+            if ((j != b) && (Button_Key(Button_Get(j)) == Button_Key(slot))) {
+                Button_Set(play, j, old);
+            }
         }
     }
     Button_Set(play, b, slot);
 }
 
-/** The pause menu: put a slot on the D-pad button pressed (Fishmod_ButtonPut). Returns false if none was pressed. */
+/**
+ * The pause menu: put a slot on the D-pad button pressed (Fishmod_ButtonPut). A fire, ice or light arrow goes on as
+ * the bow with it set, as on a C button. Returns false if no button was pressed (or the arrow has no bow).
+ */
 s32 Fishmod_DpadAssign(PlayState* play, u16 press, s32 slot) {
     s32 d;
 
+    for (d = 0; d < ARRAY_COUNT(sArrowSlots); d++) {
+        if (slot == sArrowSlots[d]) {
+            if (INV_SLOT(SLOT_BOW) != ITEM_BOW) {
+                return false;
+            }
+            slot = FISHMOD_SLOT_BOW_ARROW + d;
+            break;
+        }
+    }
     for (d = 0; d < 4; d++) {
         if (CHECK_BTN_ALL(press, sDpadButtons[d])) {
             Fishmod_ButtonPut(play, 3 + d, slot);
@@ -457,18 +566,36 @@ s32 Fishmod_DpadAssign(PlayState* play, u16 press, s32 slot) {
     return false;
 }
 
-/** The item page put a slot on a C button that had `old` (vanilla's animation, its own trades among the C buttons):
- * a D-pad button with the slot takes `old`. */
-void Fishmod_DpadTrade(s32 slot, s32 old) {
+/**
+ * The item page is putting a slot on C button `c` (0-2; vanilla's animation, with its own trades among the C
+ * buttons), about to write it: a D-pad button with the slot (the bow's, for a bow with or without an arrow) takes
+ * what that C button has.
+ */
+void Fishmod_DpadTrade(s32 slot, s32 c) {
     u8* dpad = FISHMOD_SAVE->dpad[DPAD_AGE()];
+    s32 old = Button_Get(c);
     s32 i;
 
-    if (slot == SLOT_NONE) {
+    if ((slot == SLOT_NONE) || (Button_Key(old) == slot)) {
         return;
     }
     for (i = 0; i < 4; i++) {
-        if (dpad[i] == slot) {
+        if (Button_Key(dpad[i]) == slot) {
             dpad[i] = old;
+        }
+    }
+}
+
+/** An item is gone from its slot for good (Inventory_DeleteItem clears the C buttons with it): off the D-pad too. */
+void Fishmod_DpadDeleteSlot(s32 slot) {
+    s32 age;
+    s32 i;
+
+    for (age = 0; age < 2; age++) {
+        for (i = 0; i < 4; i++) {
+            if (FISHMOD_SAVE->dpad[age][i] == slot) {
+                FISHMOD_SAVE->dpad[age][i] = SLOT_NONE;
+            }
         }
     }
 }
@@ -566,13 +693,13 @@ void Fishmod_DpadDraw(PlayState* play) {
         s32 full = false;
         s32 ammo;
 
-        if ((item == ITEM_NONE) || (item >= ITEM_NONE_FE)) {
+        if ((item == ITEM_NONE) || (item >= ITEM_NONE_FE) || (item == ITEM_SOLD_OUT)) {
             continue;
         }
         if (sDpadIconItem[d] != DPAD_ICON_KEY(item)) {
             Fishmod_DpadLoadIcon(d, item);
         }
-        a = Fishmod_DpadOn(play, item) ? alpha : MIN(alpha, 70);
+        a = Fishmod_DpadOn(play, d) ? alpha : MIN(alpha, 70);
         // the item, at half size
         gDPPipeSync(OVERLAY_DISP++);
         gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);

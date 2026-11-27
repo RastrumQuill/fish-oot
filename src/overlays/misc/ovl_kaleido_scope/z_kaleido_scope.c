@@ -3143,7 +3143,8 @@ void KaleidoScope_SetVertices(PlayState* play, GraphicsContext* gfxCtx) {
     // ITEM_QUAD_GRID_SELECTED_C_LEFT, ITEM_QUAD_GRID_SELECTED_C_DOWN, ITEM_QUAD_GRID_SELECTED_C_RIGHT
 
     for (j = 1; j < 4; i += 4, j++) {
-        if (gSaveContext.save.info.equips.cButtonSlots[j - 1] != ITEM_NONE) {
+        // fishmod: (an equipment mark on the button is no item slot: it read past the item quads)
+        if (gSaveContext.save.info.equips.cButtonSlots[j - 1] < INVENTORY_SLOTS) {
             k = gSaveContext.save.info.equips.cButtonSlots[j - 1] * 4;
 
             pauseCtx->itemVtx[i + 0].v.ob[0] = pauseCtx->itemVtx[i + 2].v.ob[0] =

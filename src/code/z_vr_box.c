@@ -562,7 +562,7 @@ void Skybox_Setup(PlayState* play, SkyboxContext* skyboxCtx, s16 skyboxId) {
                 gWeatherMode <= WEATHER_MODE_HEAVY_RAIN) {
                 skyboxConfig = 1;
             }
-            if (Fishmod_WeatherToday(skyboxId, true) != FISHMOD_WEATHER_CLEAR) {
+            if (Fishmod_WeatherToday(play, skyboxId, true) != FISHMOD_WEATHER_CLEAR) {
                 skyboxConfig = 1; // fishmod: the day's clouds (Fishmod_OnEnvironmentInit sets the same), loaded now
             }
 
