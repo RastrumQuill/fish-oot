@@ -1,0 +1,85 @@
+(the bench's counted frames only: --all-frames for every frame)
+(left out: 408 frames that sent a USB packet, the profiler's own cost: --keep-sends to keep them)
+# Frame log: 2472 frames (0.04 h, 17.5 fps), 1558 over 52 ms (63%); 300 gaps in the frame count
+
+**On screen: 916 of 1936 frames (47%) left a picture up 4 refreshes or more (a visible hitch).** In the frames that made them late: both over 50 ms 53%, RDP alone over 50 ms 26%, CPU alone over 50 ms 11%, neither over 50 ms 10%
+
+(The 'slow frames' below are by frame period, over 52 ms: with run-ahead, not all of them are hitches.)
+
+**Press to picture** (the controller read to the refresh the picture went up at; the TV's own delay not included): mean 127 ms, 90% under 149 ms, the most 182 ms; 0% of the pictures went up with another finished frame waiting behind them
+
+| ms per frame | slow frames | full-speed frames | difference |
+|---|---|---|---|
+| frame period | 61.59 | 49.51 | +12.07 |
+| CPU update | 24.56 | 23.11 | +1.45 |
+| CPU draw | 26.26 | 20.86 | +5.40 |
+| RSP graphics | 27.58 | 22.07 | +5.50 |
+| RSP audio | 13.39 | 10.23 | +3.17 |
+| RDP | 50.43 | 42.08 | +8.35 |
+| fish update | 5.57 | 4.13 | +1.45 |
+| fish draw | 8.27 | 4.49 | +3.78 |
+| props draw | 4.96 | 2.11 | +2.85 |
+|   update: fm_play | 0.08 | 0.11 | -0.03 |
+|   update: fm_debug | 1.21 | 1.15 | +0.06 |
+|   update: col_at | 0.19 | 0.19 | -0.00 |
+|   update: col_oc | 0.85 | 0.95 | -0.10 |
+|   update: col_clear | 0.05 | 0.08 | -0.03 |
+|   update: actors | 16.52 | 14.86 | +1.67 |
+|   update: dynapoly | 0.37 | 0.41 | -0.04 |
+|   update: effects | 1.13 | 1.03 | +0.10 |
+|   update: interface | 0.24 | 0.24 | -0.01 |
+|   update: animtask | 0.05 | 0.07 | -0.02 |
+|   update: camera | 3.47 | 3.79 | -0.32 |
+|   update: env | 0.35 | 0.28 | +0.07 |
+|   actors: bg | 0.23 | 0.27 | -0.04 |
+|   actors: player | 2.27 | 2.53 | -0.25 |
+|   actors: npc | 5.06 | 3.73 | +1.33 |
+|   actors: enemy | 3.59 | 3.18 | +0.42 |
+|   actors: prop | 0.35 | 0.35 | -0.00 |
+|   actors: itemaction | 0.57 | 0.63 | -0.06 |
+|   actors: misc | 0.98 | 0.83 | +0.15 |
+
+RDP in slow frames: command buffer busy 78%, pipeline 83%, TMEM 5%
+
+RDP in full-speed frames: command buffer busy 76%, pipeline 81%, TMEM 5%
+
+Costliest actor kinds in slow frames (ms per slow frame, where among a frame's top four):
+  En_Fishmod               5.66
+  En_Tite                  2.38
+  Player                   2.25
+  En_Crow                  1.08
+  En_Elf                   0.29
+  En_Sw                    0.11
+  En_River_Sound           0.06
+  En_Kakasi2               0.03
+  Obj_Mure2                0.02
+  En_Kanban                0.02
+  En_Door                  0.01
+  En_A_Obj                 0.01
+
+Slow frames by the longer of CPU (update + draw) and RDP: CPU 51%, RDP 49%
+
+| lap | conditions | leg | frames | fps | over 52 ms |
+|---|---|---|---|---|---|
+| 1 | clear dawn | 1 | 205 | 15.5 | 83% |
+| 1 | clear dawn | 2 | 208 | 16.0 | 90% |
+| 1 | clear dawn | 3 | 203 | 18.9 | 43% |
+| 1 | clear dawn | 4 | 211 | 15.9 | 96% |
+| 1 | clear dawn | 5 | 216 | 16.0 | 85% |
+| 1 | clear dawn | 6 | 210 | 17.4 | 64% |
+| 1 | clear dawn | 7 | 204 | 18.1 | 62% |
+| 1 | clear dawn | 8 | 196 | 17.3 | 84% |
+| 1 | clear dawn | 9 | 202 | 19.2 | 40% |
+| 1 | clear dawn | 10 | 194 | 18.6 | 53% |
+| 1 | clear dawn | 11 | 222 | 19.4 | 24% |
+| 1 | clear dawn | 21 | 201 | 19.2 | 32% |
+
+## The screen's pacing (how long each picture stayed)
+
+2480 pictures over 8547 refreshes: 17.41 fps on screen
+| longest a picture stayed in the record | records | share |
+|---|---|---|
+| 3 refreshes (on time) | 1131 | 51.6% |
+| 4 refreshes (a hitch) | 1028 | 46.9% |
+| 5 refreshes (a hitch) | 31 | 1.4% |
+Hitches in a row: 1: 187, 2: 26, 3: 10, 4: 8, 5: 7, 6+: 18

@@ -1,0 +1,10 @@
+Morning runs 20261127-1100
+
+ 1. strips-off-1                 done        463 packets    3.5 MB   329 s  
+ 2. strips-on-1                  done        458 packets    3.5 MB   308 s  
+ 3. strips-off-2                 done        461 packets    3.5 MB   328 s  
+ 4. strips-on-2                  done        459 packets    3.5 MB   306 s  
+ 5. modstrips-off-1              done        441 packets    3.3 MB   326 s  
+ 6. modstrips-on-1               done        442 packets    3.3 MB   318 s  
+ 7. modstrips-off-2              done        442 packets    3.4 MB   405 s  
+ 8. modstrips-on-2               done        445 packets    3.4 MB   400 s  
