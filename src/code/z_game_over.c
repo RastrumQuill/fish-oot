@@ -7,6 +7,7 @@
 #include "game_over.h"
 #include "play_state.h"
 #include "save.h"
+#include "fishmod.h"
 
 void GameOver_Init(PlayState* play) {
     play->gameOverCtx.state = GAMEOVER_INACTIVE;
@@ -82,6 +83,7 @@ void GameOver_Update(PlayState* play) {
             gSaveContext.eventInf[3] = 0;
             gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
                 gSaveContext.buttonStatus[3] = gSaveContext.buttonStatus[4] = BTN_ENABLED;
+            Fishmod_DpadSetStatus(BTN_ENABLED); // fishmod: the D-pad's with the C buttons'
             gSaveContext.forceRisingButtonAlphas = gSaveContext.nextHudVisibilityMode = gSaveContext.hudVisibilityMode =
                 gSaveContext.hudVisibilityModeTimer = 0; // false, HUD_VISIBILITY_NO_CHANGE
 

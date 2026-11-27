@@ -29,6 +29,7 @@
 #include "ultra64.h"
 #include "play_state.h"
 #include "save.h"
+#include "fishmod.h"
 #include "sram.h"
 
 void MapSelect_LoadTitle(MapSelectState* this) {
@@ -51,6 +52,7 @@ void MapSelect_LoadGame(MapSelectState* this, s32 entranceIndex) {
     }
     gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
         gSaveContext.buttonStatus[3] = gSaveContext.buttonStatus[4] = BTN_ENABLED;
+    Fishmod_DpadSetStatus(BTN_ENABLED); // fishmod: the D-pad's with the C buttons'
     gSaveContext.forceRisingButtonAlphas = gSaveContext.nextHudVisibilityMode = gSaveContext.hudVisibilityMode =
         gSaveContext.hudVisibilityModeTimer = 0; // false, HUD_VISIBILITY_NO_CHANGE
     SEQCMD_STOP_SEQUENCE(SEQ_PLAYER_BGM_MAIN, 0);

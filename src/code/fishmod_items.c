@@ -254,77 +254,29 @@ s32 Fishmod_IsEquipItem(s32 item) {
 }
 
 /*
- * Whether a D-pad button works now, by the rules the C buttons go by (func_80083108, z_parameter.c: what's on each C
- * button decides whether it's lit; a D-pad button gets the same answer for what's on it): underwater only the
- * hookshot, and that only standing on the bottom; nothing while climbing or crawling; only the ocarina on a rented
- * horse; the scene's restrictions (bottles, trade items, the hookshot, the ocarina, the spells, everything else).
- * Worked out each frame the game works its own out (Fishmod_DpadUpdateStatus, called after it), and kept as the C
- * buttons' is while it doesn't (text up, cutscenes). In the states where the game shuts the C buttons as a whole
- * (riding, the minigames, the fishing pond, a cutscene's own doing) a D-pad button is off while all three are.
+ * Whether a D-pad button works now: a status each, as the C buttons have (gSaveContext.buttonStatus), set by the
+ * game's own code wherever it sets theirs. The rules by what's on a button are one function for all seven
+ * (Interface_ItemButtonRule, z_parameter.c); where the game sets the C buttons' as one (riding, minigames, the pause
+ * menu, a new file) it sets these with them (Fishmod_DpadSetStatus).
  */
-#define DPAD_FOLLOW 2 // (as the C buttons as a whole)
-static u8 sDpadStatus[4] = { DPAD_FOLLOW, DPAD_FOLLOW, DPAD_FOLLOW, DPAD_FOLLOW };
+u8 gFishmodDpadStatus[4]; // BTN_ENABLED or BTN_DISABLED, as gSaveContext.buttonStatus is for the C buttons
 
-static s32 Fishmod_DpadRule(PlayState* play, s32 item) {
-    InterfaceContext* interfaceCtx = &play->interfaceCtx;
-    Player* player = GET_PLAYER(play);
-    s32 hazard;
-    s32 ocarina = (item == ITEM_OCARINA_FAIRY) || (item == ITEM_OCARINA_OF_TIME);
-    s32 hookshot = (item == ITEM_HOOKSHOT) || (item == ITEM_LONGSHOT);
-
-    if (!((gSaveContext.save.cutsceneIndex < CS_INDEX_0) ||
-          ((play->sceneId == SCENE_LON_LON_RANCH) && (gSaveContext.save.cutsceneIndex == CS_INDEX_0)))) {
-        return DPAD_FOLLOW;
-    }
-    if ((player->stateFlags1 & PLAYER_STATE1_23) || (play->shootingGalleryStatus > 1) ||
-        ((play->sceneId == SCENE_BOMBCHU_BOWLING_ALLEY) && Flags_GetSwitch(play, 0x38)) ||
-        (play->sceneId == SCENE_CHAMBER_OF_THE_SAGES) || (play->sceneId == SCENE_FISHING_POND) ||
-        (play->msgCtx.msgMode != MSGMODE_NONE)) {
-        return DPAD_FOLLOW;
-    }
-    if (Fishmod_IsEquipItem(item)) {
-        return true; // (equipment is put on whatever the buttons' state: Fishmod_EquipButtons)
-    }
-    hazard = Player_GetEnvironmentalHazard(play);
-    if ((hazard >= PLAYER_ENV_HAZARD_UNDERWATER_FLOOR) && (hazard <= PLAYER_ENV_HAZARD_UNDERWATER_FREE)) {
-        return (hazard == PLAYER_ENV_HAZARD_UNDERWATER_FLOOR) && hookshot;
-    }
-    if ((player->stateFlags1 & PLAYER_STATE1_21) || (player->stateFlags2 & PLAYER_STATE2_CRAWLING)) {
-        return false;
-    }
-    if (GET_EVENTINF_INGO_RACE_STATE() == INGO_RACE_STATE_HORSE_RENTAL_PERIOD) {
-        return ocarina;
-    }
-    if (Fishmod_IsBottleItem(item)) {
-        return interfaceCtx->restrictions.bottles == 0;
-    }
-    if ((item >= ITEM_WEIRD_EGG) && (item <= ITEM_CLAIM_CHECK)) {
-        return interfaceCtx->restrictions.tradeItems == 0;
-    }
-    if (ocarina) {
-        return interfaceCtx->restrictions.ocarina == 0;
-    }
-    if (interfaceCtx->restrictions.all != 0) {
-        return (play->sceneId == SCENE_TREASURE_BOX_SHOP) && (item == ITEM_LENS_OF_TRUTH);
-    }
-    if (hookshot) {
-        return interfaceCtx->restrictions.hookshot == 0;
-    }
-    if (item == ITEM_FARORES_WIND) {
-        return interfaceCtx->restrictions.farores == 0;
-    }
-    if ((item == ITEM_DINS_FIRE) || (item == ITEM_NAYRUS_LOVE)) {
-        return interfaceCtx->restrictions.dinsNayrus == 0;
-    }
-    return true;
+/** All four at once: wherever the game sets the three C buttons' as one (riding, minigames, the pause menu...). */
+void Fishmod_DpadSetStatus(u8 status) {
+    gFishmodDpadStatus[0] = gFishmodDpadStatus[1] = gFishmodDpadStatus[2] = gFishmodDpadStatus[3] = status;
 }
 
-/** After the game has gone over its own buttons (Interface_Update). */
-void Fishmod_DpadUpdateStatus(PlayState* play) {
+/** The pause menu keeps the buttons' statuses while it's open and puts them back (as it does the C buttons'). */
+void Fishmod_DpadSaveStatus(s32 save) {
+    static u8 sSaved[4];
     s32 d;
 
     for (d = 0; d < 4; d++) {
-        sDpadStatus[d] = Fishmod_DpadRule(play, Fishmod_SlotItem(FISHMOD_SAVE->dpad[DPAD_AGE()][d]));
+        if (save) {
+            sSaved[d] = gFishmodDpadStatus[d];
+        } else {
+            gFishmodDpadStatus[d] = sSaved[d];
+        }
     }
 }
 
@@ -334,11 +286,7 @@ static s32 Fishmod_DpadOn(PlayState* play, s32 d) {
         return false; // (L + D-pad: the test build's warps)
     }
 #endif
-    if (sDpadStatus[d] == DPAD_FOLLOW) {
-        return !((gSaveContext.buttonStatus[1] == BTN_DISABLED) && (gSaveContext.buttonStatus[2] == BTN_DISABLED) &&
-                 (gSaveContext.buttonStatus[3] == BTN_DISABLED));
-    }
-    return sDpadStatus[d];
+    return gFishmodDpadStatus[d] != BTN_DISABLED;
 }
 
 /** What D-pad button (4-7) gives now (ITEM_NONE: nothing on it, or off). */

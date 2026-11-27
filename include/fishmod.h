@@ -386,7 +386,9 @@ void Fishmod_DpadUpdateBottle(struct PlayState* play, u8 item, s32 button);
 s32 Fishmod_DpadAssign(struct PlayState* play, u16 press, s32 slot);
 void Fishmod_DpadTrade(s32 slot, s32 c);
 void Fishmod_DpadDeleteSlot(s32 slot);
-void Fishmod_DpadUpdateStatus(struct PlayState* play);
+extern u8 gFishmodDpadStatus[4];
+void Fishmod_DpadSetStatus(u8 status);
+void Fishmod_DpadSaveStatus(s32 save);
 void Fishmod_ButtonPut(struct PlayState* play, s32 b, s32 slot);
 void Fishmod_DpadDraw(struct PlayState* play);
 // The HUD clock under the overworld minimap (fishmod_items.c)
