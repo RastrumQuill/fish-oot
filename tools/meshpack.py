@@ -274,6 +274,7 @@ VTX_REF = re.compile(r"&?\s*(\w+)\s*(?:\[\s*(\d+)\s*\])?")
 
 
 ORIGIN = {}  # a vertex (its fields) -> the first room vertex it was read from ("array[index]"): its copies' source
+ORIGIN_VTX = {}  # "array[index]" -> that room vertex's fields
 
 
 def load_vtx(dirpath, arr):
@@ -282,7 +283,27 @@ def load_vtx(dirpath, arr):
     vs = [tuple(a.strip() for a in m.split(",")) for m in re.findall(r"VTX\(([^)]*)\)", open(f).read())]
     for i, v in enumerate(vs):
         ORIGIN.setdefault(v, "%s[%d]" % (arr, i))
+        ORIGIN_VTX.setdefault("%s[%d]" % (arr, i), v)
     return vs
+
+
+def relit_sources(room, table):
+    """each relit vertex's source (where the CPU reads its normal): the room vertex it's a copy of (the same place,
+    the same normal: one of the scene's own arrays, whose normals the game's bed shading shortens), else the vertex's
+    own entry in the table (a vertex the cuts or the remesh made: its normal is its own, interpolated along the cut
+    edge or averaged over the corners merged into it, not the neighbour's it was made from). Returns (the sources as C
+    expressions, [(index, vertex)] of those that are their own: fishmod/tools/gen_bedshade.py shades them too)"""
+    srcs, own = [], []
+    for i, v in enumerate(table):
+        o = ORIGIN.get(v)
+        ov = ORIGIN_VTX.get(o)
+        if ov is not None and o.split("[")[0].endswith("_Vtx_fused_") and ov[0:3] == v[0:3] and \
+                [_sb(x) for x in ov[5:8]] == [_sb(x) for x in v[5:8]]:
+            srcs.append(o)
+        else:
+            srcs.append("%s_relitVtx[%d]" % (room, i))
+            own.append((i, v))
+    return srcs, own
 
 
 def state_key(c):
@@ -1162,11 +1183,16 @@ def main():
             # each vertex's source in the room (identical copies share one: the same normal, the same shade): the CPU
             # reads the normal from there, as the game may have shaded it (fishmod_scatter.c's lake bed shading
             # shortens the normals of the room's own vertices)
-            missing = [v for v in table if v not in ORIGIN]
-            if missing:
-                sys.exit("meshpack: %d relit vertices with no source in the room" % len(missing))
-            defs.append("Vtx* %s_relitSrc[] = {\n%s};\n\n" % (room, "".join(
-                "    &%s,\n" % ORIGIN[v] for v in table)))
+            # (a vertex the cuts or the remesh made is its own source: see relit_sources; the bed shading reaches
+            # those through the list written beside the room, which gen_bedshade.py reads)
+            srcs, own = relit_sources(room, table)
+            defs.append("Vtx* %s_relitSrc[] = {\n%s};\n\n" % (room, "".join("    &%s,\n" % o for o in srcs)))
+            open(os.path.join(d, room + "_relitOwn.txt"), "w").write("".join(
+                "%d %s\n" % (i, " ".join(str(x) for x in (int(v[0], 0), int(v[1], 0), int(v[2], 0),
+                                                         _sb(v[5]), _sb(v[6]), _sb(v[7])))) for i, v in own))
+            if report:
+                print("meshpack: %s: %d of the %d lit vertices are their own source (made by the cuts or the "
+                      "remesh: their own normal)" % (room, len(own), len(table)))
             defs.append("void* %s_fishmodRelit[3] = { (void*)%d, %s_relitVtx, %s_relitSrc };\n" % (
                 room, len(table), room, room))
         if not defs:

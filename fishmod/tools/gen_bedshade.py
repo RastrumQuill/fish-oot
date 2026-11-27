@@ -12,6 +12,11 @@ The ground has few vertices (about 340 under the water), so this is broad shadin
 
 Made from the scene's own vertices (the extracted assets), so written to src/fishmod_data/ (not committed).
 
+A mesh pack build (tools/meshpack.py) lights the bed on the CPU from each vertex's source in the room. The vertices
+its cuts and remesh made are their own sources (the room's table of lit vertices: their normals are their own, not a
+neighbour's), listed in spot06_room_0_relitOwn.txt in the build's tree (FISHMOD_BEDSHADE_TREE, set by build.sh):
+those are shaded here too, each by its own place.
+
 Usage: fishmod/tools/gen_bedshade.py [--png preview.png]   (FISHMOD_BEDSHADE=0: none, for comparing)
 """
 import argparse
@@ -64,7 +69,32 @@ def main():
     props = gs.place("SCENE_LAKE_HYLIA")
     shade_pts = [(p["x"], p["z"], SHADE[p["kind"]] * p["scale"]) for p in props if p["kind"] in SHADE]
 
+    def factor(x, y, z):
+        """the share of the sunlight left at a point of the bed (None: above the water)"""
+        depth = SURFACE - y
+        if depth <= 0:
+            return None
+        near = sum(w * math.exp(-((x - px) ** 2 + (z - pz) ** 2) / (2 * SIGMA ** 2)) for px, pz, w in shade_pts
+                   if abs(x - px) < 3 * SIGMA and abs(z - pz) < 3 * SIGMA)
+        dense = 1.0 - math.exp(-near / DENSE)
+        deep = min(max((depth - DEPTH0) / (DEPTH1 - DEPTH0), 0.0), 1.0)
+        f = (1.0 - BED_DARK * dense) * (1.0 - DEPTH_DARK * deep)
+        return 1.0 - (1.0 - f) * min(depth / FADE, 1.0)
+
     out = []
+    extern = []
+    tree = os.environ.get("FISHMOD_BEDSHADE_TREE")
+    own = os.path.join(ROOT, tree, "assets", "scenes", "overworld", "spot06", "spot06_room_0_relitOwn.txt") if tree else ""
+    if own and os.path.exists(own):
+        extern.append("extern Vtx spot06_room_0_relitVtx[];\n")
+        for line in open(own):
+            i, x, y, z, n0, n1, n2 = (int(a) for a in line.split())
+            f = factor(x, y, z)
+            if f is None:
+                continue
+            nn = [max(-128, min(127, round(c * f))) for c in (n0, n1, n2)]
+            if nn != [n0, n1, n2]:
+                out.append((f"&spot06_room_0_relitVtx[{i}]", nn, (x, z, f)))
     for path in sorted(glob.glob(os.path.join(SCENE, "*_Vtx_fused_.inc.c"))):
         array = os.path.basename(path)[:-len(".inc.c")]  # (the vertex array's own name: its address is the linker's)
         for m in VTX.finditer(open(path).read()):
@@ -73,12 +103,7 @@ def main():
             if depth <= 0:
                 continue
             n = [s8(m.group(i)) for i in (6, 7, 8)]
-            near = sum(w * math.exp(-((x - px) ** 2 + (z - pz) ** 2) / (2 * SIGMA ** 2)) for px, pz, w in shade_pts
-                       if abs(x - px) < 3 * SIGMA and abs(z - pz) < 3 * SIGMA)
-            dense = 1.0 - math.exp(-near / DENSE)
-            deep = min(max((depth - DEPTH0) / (DEPTH1 - DEPTH0), 0.0), 1.0)
-            f = (1.0 - BED_DARK * dense) * (1.0 - DEPTH_DARK * deep)
-            f = 1.0 - (1.0 - f) * min(depth / FADE, 1.0)
+            f = factor(x, y, z)
             nn = [max(-128, min(127, round(c * f))) for c in n]
             if nn != n:
                 out.append((f"&{array}[{int(m.group(10))}]", nn, (x, z, f)))
@@ -91,6 +116,7 @@ def main():
         f.write("// else in the room changes size) and their shorter normals (less of the sun under dense weed and in\n")
         f.write("// deep water).\n")
         f.write('#include "assets/scenes/overworld/spot06/spot06_room_0.h"\n')
+        f.write("".join(extern))
         # what it was made for: the scene, and its water there (the game shades only with the water at this level:
         # not the drained lake)
         sx, sz = (out[0][2][0], out[0][2][1]) if out else (0, 0)

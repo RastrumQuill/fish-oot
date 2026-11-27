@@ -206,7 +206,7 @@ if [ "$MESHPACK" = 1 ]; then
     [ "$COLPACK" = 1 ] && MP_SRC="$CP_OUT"
     [ "$SEAMS" = 1 ] && MP_SRC="$SP_OUT"
     MP_OUT="$MP_SRC-meshpack"
-    MP_SUM="$({ cat tools/meshpack.py; cat "$MP_SRC/.texpack" "$MP_SRC/.colpack" "$MP_SRC/.seams" 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    MP_SUM="$({ cat tools/meshpack.py tools/meshpack_remesh.py tools/meshpack_merge.py; env | grep '^MESHPACK_' | sort || true; cat "$MP_SRC/.texpack" "$MP_SRC/.colpack" "$MP_SRC/.seams" 2>/dev/null || true; } | md5sum | cut -c1-8)"
     if [ "$(cat "$MP_OUT/.meshpack" 2>/dev/null)" != "$MP_SUM" ]; then
         python3 tools/meshpack.py "$MP_SRC" "$MP_OUT" --report
         echo "$MP_SUM" > "$MP_OUT/.meshpack"
@@ -222,7 +222,7 @@ if [ "$STRIPS" = 1 ]; then
     [ "$SEAMS" = 1 ] && ST_SRC="$SP_OUT"
     [ "$MESHPACK" = 1 ] && ST_SRC="$MP_OUT"
     ST_OUT="$ST_SRC-strips"
-    ST_SUM="$({ cat tools/strippass.py tools/meshpack.py; echo "${STRIPPASS_TURN_ALL:-}${STRIPPASS_SHADE_TOL:-}${STRIPPASS_SMALL_EDGE:-}"; cat "$ST_SRC"/.texpack "$ST_SRC"/.colpack "$ST_SRC"/.seams "$ST_SRC"/.meshpack 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    ST_SUM="$({ cat tools/strippass.py tools/meshpack.py; env | grep '^STRIPPASS_' | sort || true; echo "${STRIPPASS_TURN_ALL:-}${STRIPPASS_SHADE_TOL:-}${STRIPPASS_SMALL_EDGE:-}"; cat "$ST_SRC"/.texpack "$ST_SRC"/.colpack "$ST_SRC"/.seams "$ST_SRC"/.meshpack 2>/dev/null || true; } | md5sum | cut -c1-8)"
     if [ "$(cat "$ST_OUT/.strips" 2>/dev/null)" != "$ST_SUM" ]; then
         python3 tools/strippass.py "$ST_SRC" "$ST_OUT"
         echo "$ST_SUM" > "$ST_OUT/.strips"
@@ -263,7 +263,8 @@ python3 fishmod/tools/gen_scatter.py --c ${FISHMOD_UNTHINNED:+--unthinned}  # (F
 # the bed cards: each chunk's distant plants as one card, from the scatter and the plants' meshes (not committed)
 FISHMOD_HW=$HW python3 fishmod/tools/bedcard.py > /dev/null
 # Lake Hylia's bed shaded under the water (generated, not committed)
-python3 fishmod/tools/gen_bedshade.py > /dev/null
+# (a mesh pack build: the bed's vertices the pack made are shaded too, from its list of them in its tree)
+FISHMOD_BEDSHADE_TREE="$([ "$MESHPACK" = 1 ] && echo "$MP_OUT" || true)" python3 fishmod/tools/gen_bedshade.py > /dev/null
 # the solid props' collision (rocks), added to the scene's at load (generated, not committed)
 python3 fishmod/tools/gen_collision.py
 # occluder candidates for the occlusion plane, from the collision (generated, not committed)
