@@ -1421,6 +1421,11 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
                 gFishmodSweepLeg = 0xFFFE; // (and the profiler has saved a cut named 65535: the runner's sign to stop)
             } else if ((sSweepEntrance >= ENTR_MAX) && (sAudWorldTimer >= FISHMOD_AUDWORLD_FRAMES)) {
                 gFishmodSweepLeg = 0xFFFF; // (the last scene's time is up: the sweep's end)
+                {
+                    extern s32 gFishmodBenchDone;
+
+                    gFishmodBenchDone = true; // (on the console: the frame log's last counts, then FISHMOD-DONE)
+                }
             }
         }
         }
