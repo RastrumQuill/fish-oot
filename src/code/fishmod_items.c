@@ -90,25 +90,66 @@ s32 Fishmod_ItemNameIndex(s32 item) {
 
 /* The item page's own graphics (fishmod/tools/gen_item_page.py, include/fishmod_item_page.h) */
 
-FishmodItemPage* gFishmodItemPageData;
+// What's loaded of them while paused (NULL: not loaded, it didn't fit): the tackle's icons, then the page's tiles
+#define LURE_ICONS_LOADED 3 // the pond lure, the sinking lure, and the sinker item's as it shows now (Fishmod_TackleShown)
+#define TACKLE_BOBBER_ICON_ROM 3 // (lureIcons[3]: the bobber, shown for the sinker item while the sinker's on)
+#define LURE_ICON_SIZE sizeof(((FishmodItemPage*)0)->lureIcons[0])
+static u64 (*sLureIconsRam)[32 * 32 * 4 / 8];
+u64 (*gFishmodItemPageTiles)[80 * 32 / 8];
+s32 gFishmodItemPageMargin; // debug: the bytes left over after them in the object space at the last pause (< 0: short)
 
 u32 Fishmod_ItemPageSize(void) {
-    return offsetof(FishmodItemPage, names); // (the names stay in ROM)
+    return LURE_ICONS_LOADED * LURE_ICON_SIZE + sizeof(((FishmodItemPage*)0)->pageTex);
+}
+
+static void Fishmod_LoadLureIcon(void* dst, s32 index) {
+    DMA_REQUEST_SYNC(dst,
+                     (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, lureIcons) +
+                         index * LURE_ICON_SIZE,
+                     LURE_ICON_SIZE, "fishmod_items.c", __LINE__);
 }
 
 /**
- * Loads the page's graphics at `dst`, after the pause menu's own in the scene's object space. That space is nearly
- * full already (adult Link outside a dungeon leaves about 41 KB past the Link preview's coverage; these take 35 KB),
- * so if they wouldn't fit, the page stays vanilla.
+ * Loads the page's graphics at `dst`, after the pause menu's own. The pause menu fills the scene's object space from
+ * its start (the objects are loaded again when it closes), and nearly fills it. How much is left depends only on the
+ * space's size (1000 KB at least), Link's age and whether the scene is a dungeon, not on what the scene had loaded.
+ * The tightest case is adult Link outside a dungeon in a scene with the 1000 KB space: measured at Lake Hylia, 41,712
+ * bytes past the Link preview's coverage, of which these take 35,328 (6,384 left: gFishmodItemPageMargin, debug
+ * builds). A child has 43 KB more (his object is smaller), a dungeon 40 KB more (its map graphics are smaller).
+ * In two parts, so that running short never
+ * shows a wrong texture: the tackle's icons first (12 KB; without them the tackle shows the rod's icon), then the
+ * page's redrawn tiles (23 KB; without them the game's own page is drawn under the same grid). Only three of the four
+ * tackle icons: the sinker item shows the sinker or the bobber by the rig on the line, which doesn't change while
+ * paused.
  */
 void Fishmod_LoadItemPage(PlayState* play, void* dst) {
-    if ((uintptr_t)dst + Fishmod_ItemPageSize() > (uintptr_t)play->objectCtx.spaceEnd) {
-        gFishmodItemPageData = NULL;
-        return;
+    uintptr_t end = (uintptr_t)play->objectCtx.spaceEnd;
+    uintptr_t at = (uintptr_t)dst;
+    s32 i;
+
+    gFishmodItemPageMargin = (s32)(end - (at + Fishmod_ItemPageSize()));
+    sLureIconsRam = NULL;
+    gFishmodItemPageTiles = NULL;
+    if (at + LURE_ICONS_LOADED * LURE_ICON_SIZE <= end) {
+        sLureIconsRam = (void*)at;
+        for (i = 0; i < LURE_ICONS_LOADED; i++) {
+            // (the last: the sinker item's, as it shows with this rig on)
+            Fishmod_LoadLureIcon(sLureIconsRam[i],
+                                 ((i == LURE_ICONS_LOADED - 1) && (FISHMOD_RIG() == FISHMOD_RIG_SINKER)) ? TACKLE_BOBBER_ICON_ROM : i);
+        }
+        at += LURE_ICONS_LOADED * LURE_ICON_SIZE;
+        if (at + sizeof(((FishmodItemPage*)0)->pageTex) <= end) {
+            gFishmodItemPageTiles = (void*)at;
+            DMA_REQUEST_SYNC((void*)at, (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, pageTex),
+                             sizeof(((FishmodItemPage*)0)->pageTex), "fishmod_items.c", __LINE__);
+        }
     }
-    gFishmodItemPageData = dst;
-    DMA_REQUEST_SYNC(dst, (uintptr_t)_fishmod_item_pageSegmentRomStart, Fishmod_ItemPageSize(), "fishmod_items.c",
-                     __LINE__);
+#if FISHMOD_DEBUG
+    if (gFishmodItemPageMargin < 0) {
+        osSyncPrintf("fishmod: the item page's graphics don't fit (%d bytes short): %s\n", -gFishmodItemPageMargin,
+                     (sLureIconsRam == NULL) ? "nothing loaded" : "the tackle's icons only");
+    }
+#endif
 }
 
 /*
@@ -132,8 +173,11 @@ void* Fishmod_PauseItemIcon(s32 item) {
         if (def->ramIcon != NULL) {
             return def->ramIcon;
         }
-        if ((def->lureIcon != NO_PAGE_INDEX) && (gFishmodItemPageData != NULL)) {
-            return gFishmodItemPageData->lureIcons[Fishmod_TackleShown(def, item, false)];
+        if (def->lureIcon != NO_PAGE_INDEX) {
+            // (the tackle's icons as loaded for this pause: the third is the sinker item's, whichever it shows; if
+            // they didn't fit, the rod's own icon, which is the game's and always there)
+            return (sLureIconsRam != NULL) ? (void*)sLureIconsRam[MIN(def->lureIcon, LURE_ICONS_LOADED - 1)]
+                                           : gItemIcons[ITEM_FISHING_POLE];
         }
     }
     return gItemIcons[item];
@@ -147,7 +191,7 @@ uintptr_t Fishmod_ItemIconVrom(s32 item) {
         return 0;
     }
     return (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, lureIcons) +
-           Fishmod_TackleShown(def, item, false) * sizeof(gFishmodItemPageData->lureIcons[0]);
+           Fishmod_TackleShown(def, item, false) * LURE_ICON_SIZE;
 }
 
 /** Where the pause menu loads one of the mod's name graphics from in ROM, or 0 (the game's own). */
@@ -158,7 +202,7 @@ uintptr_t Fishmod_ItemNameVrom(s32 item) {
         return 0;
     }
     return (uintptr_t)_fishmod_item_pageSegmentRomStart + offsetof(FishmodItemPage, names) +
-           Fishmod_TackleShown(def, item, true) * sizeof(gFishmodItemPageData->names[0]);
+           Fishmod_TackleShown(def, item, true) * sizeof(((FishmodItemPage*)0)->names[0]);
 }
 
 /*

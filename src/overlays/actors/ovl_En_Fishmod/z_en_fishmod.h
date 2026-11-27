@@ -168,6 +168,8 @@ typedef struct EnFishmod {
     f32 fightDepth;
     s16 leapCooldown;
     f32 leapVelPrev;
+    f32 leapRise;   // the rush up to the surface before a leap: its speed this frame
+    u8 leapPending; // frames left to get near enough to the surface for the leap it has in mind (0: none)
     Vec3f mouthPos; // world position of its mouth (the tip of its snout), from the last draw: where it's held by
 } EnFishmod;
 

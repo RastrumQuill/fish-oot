@@ -910,6 +910,7 @@ void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
             this->stamina = this->staminaMax;
             this->runTimer = 0;
             this->jumping = false;
+            this->leapPending = 0;
             this->runYaw = this->actor.shape.rot.y;
             this->beached = false;
             break;
@@ -1568,6 +1569,18 @@ void EnFishmod_FishLetGo(EnFishmod* this, Vec3f* spot) {
     EnFishmod_FishSetState(this, FISH_STATE_FLEE);
 }
 
+// A hooked fish's leap: it rushes the surface from at most LEAP_RUSH_DEPTH under it (gathering LEAP_RUSH_ACCEL a frame
+// up to LEAP_RUSH_SPEED: about 18 frames from that deep); from deeper it first swims up at LEAP_RISE_SPEED, for
+// LEAP_PENDING_FRAMES at most
+#define LEAP_RUSH_DEPTH 200.0f
+#define LEAP_RUSH_SPEED 15.0f
+#define LEAP_RUSH_ACCEL 2.5f
+#define LEAP_RISE_SPEED 5.0f
+#define LEAP_PENDING_FRAMES 80
+#if FISHMOD_DEBUG
+static s16 sLeapRushFrames; // (the fight's tests: how long the rush up took)
+#endif
+
 /** What every state of the fish's AI looks at, worked out once a frame (EnFishmod_FishAI). */
 typedef struct FishAI {
     FishmodRod* rod;
@@ -1905,10 +1918,47 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
             (Math_Vec3f_DistXZ(&player->actor.world.pos, &this->actor.world.pos) > 120.0f) &&
             (Fishmod_RandZeroOne(gFishmodRngNow) <
              b->jumpiness * 0.006f * ((this->lengthInches >= this->species->lengthTypical) ? 1.3f : 0.7f))) {
-            // (from wherever it's holding: it rushes up first, and breaks the surface at this speed)
+            // (from wherever it's holding: it comes up first if it's very deep, then rushes the surface)
+            this->leapPending = LEAP_PENDING_FRAMES;
+        }
+    }
+#if FISHMOD_DEBUG // (the fight's tests: a leap as soon as the last is over; holding at the bottom)
+    if ((gFishmodFightTest & FIGHT_TEST_LEAP) && !this->jumping && (this->leapCooldown == 0) &&
+        (this->leapPending == 0)) {
+        this->leapPending = LEAP_PENDING_FRAMES;
+    }
+    if ((gFishmodFightTest & FIGHT_TEST_DEEP) && (this->leapPending == 0)) {
+        this->fightDepth = 1.0f;
+    }
+    FT_LOW(FT_STAMINA_MIN, this->stamina * 10.0f);
+#endif
+    // a leap it has in mind: from within a rush's reach of the surface it goes (the rush up is the angler's warning);
+    // from deeper it swims up first (below), and thinks better of it if that takes too long
+    if ((this->leapPending > 0) && !this->jumping) {
+        f32 reach = LEAP_RUSH_DEPTH;
+
+#if FISHMOD_DEBUG
+        if (gFishmodFightTest & FIGHT_TEST_FAR) {
+            reach *= 1.0f / 6.0f;
+        }
+#endif
+        if (this->waterY - this->actor.world.pos.y <= reach) {
+            this->leapPending = 0;
             this->jumping = true;
             this->leapCooldown = 25;
-            this->vel.y = 7.0f + b->strength * 0.04f;
+            this->leapRise = 0.0f;
+            this->vel.y = 7.0f + b->strength * 0.04f; // (the speed it leaves the water at)
+            FT_ADD(FT_LEAPS);
+            FT_HIGH(FT_LEAP_DEPTH, this->waterY - this->actor.world.pos.y);
+#if FISHMOD_DEBUG
+            sLeapRushFrames = 0;
+#endif
+        } else {
+            this->leapPending--;
+            FT_ADD(FT_SWIM_UP);
+            if (this->leapPending == 0) {
+                FT_ADD(FT_GAVE_UP);
+            }
         }
     }
     this->leapVelPrev = this->vel.y;
@@ -1925,11 +1975,17 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
             next.z = this->actor.world.pos.z;
         }
         if ((this->vel.y > 0.0f) && (this->actor.world.pos.y < this->waterY - 2.0f)) {
-            // the rush up from the deep (a hooked fish holds well down): to the surface in a few frames, whatever its
-            // depth, its leap's own speed kept for the air (the warning the angler gets to drop the rod)
-            f32 rise = CLAMP_MIN(this->vel.y, (this->waterY - this->actor.world.pos.y) * (1.0f / 5.0f));
+            // the rush up from where it was holding: gathering speed, then easing to the speed it leaves the water at
+            // as it nears the surface (no faster than the eye follows: under a second from LEAP_RUSH_DEPTH down)
+            f32 depth = this->waterY - this->actor.world.pos.y;
 
-            next.y = this->actor.world.pos.y + rise;
+            this->leapRise = CLAMP_MAX(this->leapRise + LEAP_RUSH_ACCEL, LEAP_RUSH_SPEED);
+            next.y = this->actor.world.pos.y +
+                     CLAMP_MAX(this->leapRise, CLAMP_MIN(depth * 0.35f, CLAMP_MAX(this->vel.y, this->leapRise + 2.0f)));
+            FT_HIGH(FT_RISE_MAX, (next.y - this->actor.world.pos.y) * 10.0f);
+#if FISHMOD_DEBUG
+            FT_HIGH(FT_RUSH_FRAMES, ++sLeapRushFrames);
+#endif
         } else {
             this->vel.y -= 0.7f;
             next.y = this->actor.world.pos.y + this->vel.y;
@@ -1941,9 +1997,11 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
             splash.y = this->waterY;
             EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
             Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
+            FT_ADD(FT_SURFACED);
         }
         if ((this->vel.y <= 0.0f) && (next.y < this->waterY - 2.0f)) {
             this->jumping = false;
+            FT_ADD(FT_REENTRIES);
             next.y = EnFishmod_ClampY(this, this->waterY - 4.0f);
             {
                 Vec3f splash = next;
@@ -1971,7 +2029,12 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
                                this->floorY + this->halfHeight + 2.0f, this->waterY - 6.0f);
 
             next.y = this->actor.world.pos.y;
-            Math_ApproachF(&next.y, depthY, 0.1f, 1.0f);
+            if (this->leapPending > 0) {
+                // up for a leap: toward the surface, and quickly
+                Math_ApproachF(&next.y, this->waterY - 6.0f, 0.2f, LEAP_RISE_SPEED);
+            } else {
+                Math_ApproachF(&next.y, depthY, 0.1f, 1.0f);
+            }
             next.y = EnFishmod_ClampY(this, next.y);
             this->actor.world.pos = next;
             this->actor.shape.rot.x = 0;
@@ -2065,6 +2128,7 @@ static void Fish_Flee(EnFishmod* this, PlayState* play, FishAI* ai) {
 
             this->jumping = false;
             this->vel.y = 0.0f;
+            FT_ADD(FT_AIR_FALLS);
             this->actor.world.pos.y = EnFishmod_ClampY(this, this->waterY - 4.0f);
             splash.y = this->waterY;
             EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 250);

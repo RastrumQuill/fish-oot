@@ -386,7 +386,7 @@ const char* Fishmod_BaitName(s32 bait) {
     return ((bait >= 0) && (bait < FISHMOD_BAIT_MAX)) ? sBaitNames[bait] : "?";
 }
 
-/** Forget the rod's state (a new scene, or the rod gone): nothing held, nothing on the hook. */
+/** Forget the rod's state (a new scene, or the rod gone): nothing held. What's on the hook stays on it. */
 void Fishmod_ResetRodInfo(void) {
     gFishmodRodInfo.state = 0;
     gFishmodRodInfo.biting = false;
@@ -395,9 +395,9 @@ void Fishmod_ResetRodInfo(void) {
     gFishmodRodInfo.castPower = 0.0f;
     gFishmodRodInfo.choice = 0;
     gFishmodRodInfo.notice = NULL;
-    gFishmodRodInfo.bait = FISHMOD_BAIT_NONE;
     gFishmodRodInfo.baitRequest = FISHMOD_BAIT_NONE;
-    gFishmodRodInfo.spareBait = FISHMOD_BAIT_NONE; // (with the hook's own: it didn't outlive the scene, or the file)
+    // (the bait on the hook and the one set aside under a lure stay: the next scene's rod takes them up,
+    // EnFishmod_RodInit. They go with the file: Fishmod_InitSaveExtras)
 }
 
 /** Link has the rod out in a fishing scene (its actor is there and he's holding it). */
@@ -1124,6 +1124,9 @@ static_assert(FISHMOD_SPECIES_MAX <= FISHMOD_SAVE_SPECIES_MAX, "more species tha
 void Fishmod_InitSaveExtras(void) {
     FishmodSaveData* save = FISHMOD_SAVE;
     s32 i;
+
+    // (a file loaded or begun: the last one's bait isn't on this one's hook)
+    gFishmodRodInfo.bait = gFishmodRodInfo.spareBait = gFishmodRodInfo.baitRequest = FISHMOD_BAIT_NONE;
 
     if (save->magic != FISHMOD_SAVE_MAGIC) {
         // a save from before the move, or a new file (whose old place is zeros too): no scene of this build has
@@ -1888,6 +1891,24 @@ static void Fishmod_TerrainModesWalk(TerrainModes* tm, void* seg, u32* dl, s32 d
         if (op == G_ENDDL) {
             return;
         }
+#ifdef G_TRISNAKE
+        if ((op == G_TRISNAKE) && !(dl[0] & 0x80)) {
+            // a triangle snake's index bytes run on through the words after it (to the byte with 0x80): they're no
+            // commands, and are stepped over as the microcode does (read as commands, a last byte of vertex 47 or
+            // up is G_DL, G_ENDDL or the render mode's own first byte)
+            u8* p = (u8*)&dl[1];
+            s32 k = 0;
+
+            while (!(p[k] & 0x80) && (k < 4096 * 8)) {
+                k++;
+            }
+            if (k >= 4) {
+                dl += 2 * ((k - 4) / 8 + 1);
+                n += (k - 4) / 8 + 1;
+            }
+            continue;
+        }
+#endif
         if ((op == G_DL) && (depth < 8)) {
             u32 a = dl[1];
 

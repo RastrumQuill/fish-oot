@@ -470,7 +470,8 @@ void EnFishmod_RodInit(EnFishmod* this, PlayState* play) {
     bzero(ROD, sizeof(*ROD));
     ROD->camId = SUB_CAM_ID_DONE;
     ROD->state = ROD_STATE_NONE;
-    ROD->bait = FISHMOD_BAIT_NONE;
+    // the bait that was on the hook in the last scene is still on it (a lure is the rig's: taken up the first frame)
+    ROD->bait = (gFishmodRodInfo.bait < FISHMOD_BAIT_LURE_POND) ? gFishmodRodInfo.bait : FISHMOD_BAIT_NONE;
     ROD->baitDepth = BAIT_DEPTH_START;
     ROD->rig = 0xFF; // (the save's rig taken up quietly the first frame the rod's held)
     this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
@@ -521,6 +522,7 @@ static void Rod_PublishInfo(void) {
     gFishmodRodInfo.choice = ROD->choice;
     gFishmodRodInfo.bait = ROD->bait;
     gFishmodRodInfo.landOpen = (ROD->state == ROD_STATE_FIGHT) && sLandPhase && (sLandWindow > 0);
+    gFishmodRodInfo.landing = (ROD->state == ROD_STATE_FIGHT) && sLandPhase;
     gFishmodRodInfo.leaping = (ROD->state == ROD_STATE_FIGHT) && (ROD->fish != NULL) && ROD->fish->jumping;
 }
 
@@ -572,6 +574,10 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     ROD->tension = 35.0f;
     ROD->overTimer = ROD->slackTimer = 0;
     ROD->hookedBait = ROD->bait;
+    FT_ADD(FT_FIGHTS);
+    if (ROD->bait >= FISHMOD_BAIT_LURE_POND) {
+        FT_ADD(FT_FIGHTS_LURE);
+    }
     ROD->bait = FISHMOD_BAIT_NONE; // the fish took it (a lure's back on the line when the fight's over)
     EnFishmod_FishHook(fish);
     // its thrashing scares the fish round about
@@ -590,6 +596,11 @@ static void Rod_LoseFish(PlayState* play, Player* player, const char* why) {
     EnFishmod* fish = ROD->fish;
 
     gFishmodRodInfo.lost++;
+    FT_ADD(FT_LOST);
+#if FISHMOD_DEBUG
+    // (the fight's tests: why each was lost, the last in the low bytes: its message's first and fourth letters)
+    gFishmodFT[FT_KEEP + 14] = (gFishmodFT[FT_KEEP + 14] << 16) | ((u8)why[0] << 8) | (u8)why[3];
+#endif
     Rod_StopFightMusic();
     sLandPhase = false;
     if (fish != NULL) {
@@ -730,7 +741,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
             sLeapSeen = true;
             sLeapDipped = false;
             EnFishmod_RodMessage(2, "It's leaping!", "Rod down! (stick down)");
-            ROD->messageTimer = 25;
+            ROD->messageTimer = 40; // (its rush up and its time in the air)
         }
         if (input->rel.stick_y < -40) {
             if (!sLeapDipped) {
@@ -739,10 +750,12 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
             sLeapDipped = true;
         }
         if ((fish->leapVelPrev > 0.0f) && (fish->vel.y <= 0.0f)) {
+            FT_ADD(FT_APEX);
             if (sLeapDipped) {
                 ROD->tension *= 0.5f;
             } else if (Fishmod_RandZeroOne(gFishmodRngNow) <
                        FEEL(FEEL_LEAP_THROW) * (0.5f + 0.5f * CLAMP(ROD->tension / 100.0f, 0.0f, 1.0f))) {
+                FT_ADD(FT_THROWN);
                 Rod_LoseFish(play, player, "It threw the hook!");
                 return;
             }
@@ -1211,13 +1224,19 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
     if (ROD->biting) {
         if (--ROD->biteTimer <= 0) {
             if (ROD->fish != NULL) {
-                EnFishmod_FishSetState(ROD->fish, FISH_STATE_FLEE);
-                EnFishmod_LearnBait(ROD->fish, ROD->bait); // it got the bait free (or felt the hook come late)
+                EnFishmod* freed = ROD->fish;
+
+                // (the fish kept by: setting it fleeing lets go of the rod's fish, EnFishmod_RodRelease, and learning
+                // through ROD->fish after that read through a null pointer: every bite let go by crashed)
+                EnFishmod_LearnBait(freed, ROD->bait); // it got the bait free (or felt the hook come late)
+                EnFishmod_FishSetState(freed, FISH_STATE_FLEE);
             }
             ROD->fish = NULL;
             ROD->biting = false;
             ROD->dipTarget = 0.0f;
+            FT_ADD(FT_MISSED);
             if (ROD->bait >= FISHMOD_BAIT_LURE_POND) {
+                FT_ADD(FT_MISSED_LURE);
                 EnFishmod_RodMessage(2, "It spat the lure out!", NULL); // (still a lure: the cast goes on)
             } else if (ROD->bait != FISHMOD_BAIT_NONE) {
                 ROD->bait = FISHMOD_BAIT_NONE;

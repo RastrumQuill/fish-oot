@@ -248,6 +248,7 @@ typedef struct FishmodRodInfo {
     /* 0x1A */ u8 landOpen;      // the landing window is open (A lands the fish)
     /* 0x1B */ u8 leaping;       // the hooked fish is in the air (the stick down drops the rod)
     /* 0x1C */ u8 spareBait;     // the bait that was on the hook when a lure went on: back on it when the lure comes off
+    /* 0x1D */ u8 landing;       // the fish is at Link's feet: the landing's on (A only when its window shows)
 } FishmodRodInfo;
 
 extern FishmodRodInfo gFishmodRodInfo;
@@ -436,7 +437,8 @@ void Fishmod_InitSaveExtras(void);
 // The item page's own graphics (fishmod_item_page.h), loaded with the pause menu's: where to load them, and once
 // loaded, the page's tiles in place of vanilla ones
 struct FishmodItemPage;
-extern struct FishmodItemPage* gFishmodItemPageData;
+extern u64 (*gFishmodItemPageTiles)[80 * 32 / 8]; // the item page's redrawn tiles while paused, or NULL
+extern s32 gFishmodItemPageMargin;
 u32 Fishmod_ItemPageSize(void);
 void Fishmod_LoadItemPage(struct PlayState* play, void* dst);
 // The item's icon in ROM (fishmod's items whose icons aren't in RAM), or 0
@@ -671,6 +673,43 @@ extern OSTime gFishmodLastProf[FISHMOD_PROF_MAX]; // over the last frame
 #define FISHMOD_BENCH_NOFOG (1 << 26)     // no scene fog at all (Play_SetFog): to look at the terrain as it is
 #define FISHMOD_BENCH_SKIP(flag) ((gFishmodBench & (flag)) != 0)
 extern s32 gFishmodBench;
+// debug: the fight's tests (fishmod/scripts/fight_*.inc.c). gFishmodFightTest: FIGHT_TEST_* bits, what the fish are made
+// to do; gFishmodFT: what happened, counted, for the emulator to read (FT_*)
+#define FIGHT_TEST_LEAP (1 << 0) // a hooked fish leaps as often as it can
+#define FIGHT_TEST_DEEP (1 << 1) // a hooked fish holds at the bottom
+#define FIGHT_TEST_FAR (1 << 2)  // the rush's reach a sixth of what it is: the swim up first, in water that isn't deep
+typedef enum FishmodFightTally {
+    FT_LEAPS,        // leaps begun (the rush up)
+    FT_LEAP_DEPTH,   // the deepest one was begun from (units)
+    FT_RISE_MAX,     // the most a rush rose in a frame (tenths)
+    FT_RUSH_FRAMES,  // the longest rush (frames)
+    FT_SURFACED,     // times a leaping fish broke the surface
+    FT_REENTRIES,    // times it came down again still hooked
+    FT_APEX,         // tops of leaps the rod judged
+    FT_THROWN,       // hooks thrown
+    FT_AIR_FALLS,    // fish free in the air that fell back in with a splash
+    FT_FIGHTS,       // fights begun
+    FT_FIGHTS_LURE,  // of them, on a lure
+    FT_LOST,         // fish lost
+    FT_MISSED,       // bites not answered
+    FT_MISSED_LURE,  // of them, at a lure (still on the line)
+    FT_STAMINA_MIN,  // the least stamina a hooked fish had (tenths)
+    FT_GAVE_UP,      // leaps given up (too deep for too long)
+    FT_SWIM_UP,      // frames a fish swam up for a leap before its rush
+    FT_KEEP,         // FT_KEEP + n: the bait test's readings (fishmod_debug_angler.inc.c)
+    FT_MAX = FT_KEEP + 16
+} FishmodFightTally;
+extern u8 gFishmodFightTest;
+extern s32 gFishmodFT[FT_MAX];
+#if FISHMOD_DEBUG
+#define FT_ADD(i) (gFishmodFT[i]++)
+#define FT_HIGH(i, v) (gFishmodFT[i] = MAX(gFishmodFT[i], (s32)(v)))
+#define FT_LOW(i, v) (gFishmodFT[i] = MIN(gFishmodFT[i], (s32)(v)))
+#else
+#define FT_ADD(i) ((void)0)
+#define FT_HIGH(i, v) ((void)0)
+#define FT_LOW(i, v) ((void)0)
+#endif
 extern s32 gFishmodTestCallFish; // debug: set from outside, as test mode's L + D-pad Right (fishmod_rod.c)
 extern void* gFishmodDebugRod;    // debug: the rod's state (the overlay's gFishmodRodState), for the emulator
 extern struct Actor* gFishmodDrawingActor; // debug builds: the actor Actor_Draw is drawing (the crash record says which)

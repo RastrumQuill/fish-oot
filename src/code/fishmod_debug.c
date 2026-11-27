@@ -8,8 +8,11 @@
 
 #include "dma.h"
 #include "fishmod.h"
+#include "fishmod_feel.h"
 
 s32 gFishmodTestCallFish;
+u8 gFishmodFightTest;
+s32 gFishmodFT[FT_MAX] = { [FT_STAMINA_MIN] = 0x7FFFFFFF };
 void* gFishmodDebugRod;
 #include "fishmod_sram.h"
 #include "src/fishmod_data/fishmod_profile.h"
@@ -1398,6 +1401,17 @@ void Fishmod_DebugPlayUpdate(PlayState* play) {
                     play->linkAgeOnLoad = LINK_AGE_CHILD;
                     gSaveContext.save.dayTime = gSaveContext.skyboxTime = CLOCK_TIME(22, 0);
                 }
+                // (A grotto's way out goes back to where Link dropped in, which the hole he dropped through wrote
+                // down. The sweep puts him in a grotto with no hole, so its exit led to entrance 0 at the origin
+                // with no start mode: no Navi, and the first Navi message spot he walked into wrote through a null
+                // pointer. The return point a hole would have left: Hyrule Field, where the scripts start.)
+                gSaveContext.respawn[RESPAWN_MODE_RETURN].entranceIndex = ENTR_HYRULE_FIELD_0;
+                gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex = 0;
+                gSaveContext.respawn[RESPAWN_MODE_RETURN].pos = sScriptStartPos;
+                gSaveContext.respawn[RESPAWN_MODE_RETURN].yaw = 0;
+                gSaveContext.respawn[RESPAWN_MODE_RETURN].playerParams =
+                    PLAYER_PARAMS(PLAYER_START_MODE_GROTTO, PLAYER_START_BG_CAM_DEFAULT); // (as Door_Ana sets it)
+                gSaveContext.respawn[RESPAWN_MODE_RETURN].data = 0;
                 play->nextEntranceIndex = entrance;
                 play->transitionTrigger = TRANS_TRIGGER_START;
                 play->transitionType = TRANS_TYPE_FADE_BLACK;

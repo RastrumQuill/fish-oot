@@ -1101,13 +1101,13 @@ static void** KaleidoScope_FishmodItemPageTexs(void** vanilla) {
     s32 r;
     s32 k;
 
-    if (gFishmodItemPageData == NULL) {
+    if (gFishmodItemPageTiles == NULL) {
         return vanilla;
     }
     for (c = 0; c < 3; c++) {
         for (r = 0; r < 5; r++) {
             k = (r == 0) ? -1 : sTileIndex[c * 4 + r - 1];
-            sTexs[c * 5 + r] = (k < 0) ? vanilla[c * 5 + r] : (void*)gFishmodItemPageData->pageTex[k];
+            sTexs[c * 5 + r] = (k < 0) ? vanilla[c * 5 + r] : (void*)gFishmodItemPageTiles[k];
         }
     }
     return sTexs;
