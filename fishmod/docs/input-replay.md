@@ -152,11 +152,15 @@ routine, file or system (`--match scatter --all` shows the props' code whether o
 ### Without a recording: every scene
 
 `--script prof_scenes` walks every scene in the entrance table (150 frames each, Link running, rolling, swinging;
-opening cutscenes play out) with no player. **Not usable yet:** on 17 Nov it crashed at its 17th scene (the
-grottos, entrance 0x3F, play frame 2,553, the same in both emulator builds): an actor's update wrote through a null
-pointer (bad address 0x288, the code in an overlay at 0x80256468, called from z_actor.c at 0x80028384). Whether the
-audio sweep's own run of this route does the same hasn't been checked. It's the path to profile until there's a recorded playthrough, and a
+opening cutscenes play out) with no player. It's the path to profile until there's a recorded playthrough, and a
 check that a change didn't cost some scene the playthrough spends little time in.
+
+It used to crash at its 17th scene (the grottos, entrance 0x3F). That was the walk's doing, not the game's: Link,
+put in a grotto with no hole behind him, ran into the grotto's way out, which goes back to "where he dropped in":
+nothing had written that down, so he was loaded at entrance 0, at the origin, with no start mode and so no Navi, and
+the first Navi message spot he stood in wrote through the null pointer. The walk now leaves the return point a hole
+would have (Hyrule Field) before each scene. `FISHMOD_SWEEP_FROM` / `FISHMOD_SWEEP_ONLY` in a copy of the script take
+the walk up part-way or to a few entrances; the whole of it is over an hour in the emulator.
 
 ### A compiler's profile
 
