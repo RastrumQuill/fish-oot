@@ -408,6 +408,13 @@ static void Rod_CameraUpdate(PlayState* play, Player* player, Vec3f* focus) {
                 break;
             }
         }
+        if (k == 3) {
+            // no water deep enough anywhere behind it (a bank all along that side): the eye over the tackle itself,
+            // in the water it's known to be in, not inside the bank
+            eyeTarget.x = sUnderFocus.x + dx * 6.0f;
+            eyeTarget.z = sUnderFocus.z + dz * 6.0f;
+            eyeFloor = ROD->floorY;
+        }
         eyeTarget.y = CLAMP(sUnderFocus.y + 12.0f, eyeFloor + 10.0f, ROD->waterY - 10.0f);
         focus = &sUnderFocus;
         zoom = 0.0f;
@@ -546,6 +553,17 @@ static void Rod_FightMusicReset(void) {
     }
 }
 
+/** What's on the hook once a fish has had its go at it: a lure is still a lure; bait is gone. */
+static s32 Rod_BaitAfterTake(void) {
+    if (ROD->rig == FISHMOD_RIG_LURE_POND) {
+        return FISHMOD_BAIT_LURE_POND;
+    }
+    if (ROD->rig == FISHMOD_RIG_LURE_SINKING) {
+        return FISHMOD_BAIT_LURE_SINKING;
+    }
+    return FISHMOD_BAIT_NONE;
+}
+
 static void Rod_StartFight(PlayState* play, Player* player) {
     EnFishmod* fish = ROD->fish;
 
@@ -554,7 +572,7 @@ static void Rod_StartFight(PlayState* play, Player* player) {
     ROD->tension = 35.0f;
     ROD->overTimer = ROD->slackTimer = 0;
     ROD->hookedBait = ROD->bait;
-    ROD->bait = FISHMOD_BAIT_NONE; // the fish took it
+    ROD->bait = FISHMOD_BAIT_NONE; // the fish took it (a lure's back on the line when the fight's over)
     EnFishmod_FishHook(fish);
     // its thrashing scares the fish round about
     EnFishmod_Disturb(play, &fish->actor.world.pos, 220.0f, 120);
@@ -582,7 +600,7 @@ static void Rod_LoseFish(PlayState* play, Player* player, const char* why) {
     ROD->state = ROD_STATE_FLOAT;
     ROD->tension = 0.0f;
     ROD->dip = ROD->dipTarget = 0.0f;
-    ROD->bait = FISHMOD_BAIT_NONE;
+    ROD->bait = Rod_BaitAfterTake();
     // the bobber pops back up where the fish was
     if (fish != NULL) {
         ROD->bobberPos.x = fish->actor.world.pos.x;
@@ -892,7 +910,7 @@ static void Rod_UpdateFight(EnFishmod* this, PlayState* play, Player* player, In
                 Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
             }
             if (--sLandWait <= 0) {
-                f32 big = CLAMP((load - FEEL(FEEL_LOAD_MIN)) / (FEEL(FEEL_LOAD_MAX) - FEEL(FEEL_LOAD_MIN)), 0.0f, 1.0f);
+                f32 big = CLAMP((load - FEEL(FEEL_LOAD_MIN)) / MAX(FEEL(FEEL_LOAD_MAX) - FEEL(FEEL_LOAD_MIN), 0.01f), 0.0f, 1.0f);
 
                 sLandWindow = (s16)((20.0f - 12.0f * big) * FEEL(FEEL_LAND_WINDOW));
                 EnFishmod_RodMessage(1, "A: LAND!", NULL);
@@ -1199,7 +1217,9 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
             ROD->fish = NULL;
             ROD->biting = false;
             ROD->dipTarget = 0.0f;
-            if (ROD->bait != FISHMOD_BAIT_NONE) {
+            if (ROD->bait >= FISHMOD_BAIT_LURE_POND) {
+                EnFishmod_RodMessage(2, "It spat the lure out!", NULL); // (still a lure: the cast goes on)
+            } else if (ROD->bait != FISHMOD_BAIT_NONE) {
                 ROD->bait = FISHMOD_BAIT_NONE;
                 EnFishmod_RodMessage(2, "It stole the bait!", NULL);
             } else {
@@ -1252,6 +1272,8 @@ static void Rod_UpdateFloat(EnFishmod* this, PlayState* play, Player* player, In
             // the lure itself, where its bait is: a bite pulls it under (dip); at the surface it rides the ripples
             ROD->bobberPos.y = ROD->waterY - ROD->baitDepth - ROD->dip * 0.6f +
                                ((ROD->baitDepth < 1.0f) ? Math_SinS(play->gameplayFrames * 0x500) * 0.4f : 0.0f);
+            // (a bite at a lure lying on the bed: it can't be pulled down through it)
+            ROD->bobberPos.y = CLAMP_MIN(ROD->bobberPos.y, ROD->floorY + 1.5f);
             break;
     }
     (void)groundY;
@@ -1403,14 +1425,24 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
             // the tackle (Fishmod_UseItem changes the save's rig): a lure is its own bait; off, the hook's bare
             if (FISHMOD_RIG() != ROD->rig) {
                 s32 quiet = (ROD->rig == 0xFF);
+                s32 baitBack = false;
 
                 ROD->rig = FISHMOD_RIG();
-                if (ROD->rig == FISHMOD_RIG_LURE_POND) {
-                    ROD->bait = FISHMOD_BAIT_LURE_POND;
-                } else if (ROD->rig == FISHMOD_RIG_LURE_SINKING) {
-                    ROD->bait = FISHMOD_BAIT_LURE_SINKING;
-                } else if (ROD->bait >= FISHMOD_BAIT_LURE_POND) {
-                    ROD->bait = FISHMOD_BAIT_NONE;
+                if ((ROD->rig == FISHMOD_RIG_LURE_POND) || (ROD->rig == FISHMOD_RIG_LURE_SINKING)) {
+                    // the bait that was on the hook is set aside, not thrown away: it's back when the lure comes off
+                    if ((ROD->bait != FISHMOD_BAIT_NONE) && (ROD->bait < FISHMOD_BAIT_LURE_POND)) {
+                        gFishmodRodInfo.spareBait = ROD->bait;
+                    }
+                    ROD->bait = Rod_BaitAfterTake();
+                } else {
+                    if (ROD->bait >= FISHMOD_BAIT_LURE_POND) {
+                        ROD->bait = FISHMOD_BAIT_NONE;
+                    }
+                    if ((ROD->bait == FISHMOD_BAIT_NONE) && (gFishmodRodInfo.spareBait != FISHMOD_BAIT_NONE)) {
+                        ROD->bait = gFishmodRodInfo.spareBait;
+                        baitBack = true;
+                    }
+                    gFishmodRodInfo.spareBait = FISHMOD_BAIT_NONE;
                 }
                 if (!quiet) {
                     static const char* sRigNames[] = { "Bobber on", "Pond lure on", "Sinking lure on", "Sinker on" };
@@ -1421,8 +1453,11 @@ void EnFishmod_RodUpdate(EnFishmod* this, PlayState* play) {
                         "It rests on the bed, the bait above it",
                     };
 
-                    EnFishmod_RodMessage(1, sRigNames[ROD->rig], sRigHints[ROD->rig]);
+                    EnFishmod_RodMessage(1, sRigNames[ROD->rig], baitBack ? "Your bait's back on the hook"
+                                                                           : sRigHints[ROD->rig]);
                 }
+            } else if (ROD->bait == FISHMOD_BAIT_NONE) {
+                ROD->bait = Rod_BaitAfterTake(); // a lure a fish was landed on (or took off with) is on the line again
             }
             // a bait bottle used from a C button (Fishmod_UseItem) asks for bait on the hook
             if (gFishmodRodInfo.baitRequest != FISHMOD_BAIT_NONE) {

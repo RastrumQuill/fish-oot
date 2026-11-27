@@ -447,7 +447,15 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                         // fishmod: onto (or off) a D-pad button, at once
                         if (CHECK_AGE_REQ_SLOT(cursorSlot) && (cursorItem != ITEM_SOLD_OUT) &&
                             Fishmod_DpadAssign(play, input->press.button, cursorSlot)) {
-                            SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
+                            if (cursorItem == ITEM_ARROW_FIRE) {
+                                SFX_PLAY_CENTERED(NA_SE_SY_SET_FIRE_ARROW);
+                            } else if (cursorItem == ITEM_ARROW_ICE) {
+                                SFX_PLAY_CENTERED(NA_SE_SY_SET_ICE_ARROW);
+                            } else if (cursorItem == ITEM_ARROW_LIGHT) {
+                                SFX_PLAY_CENTERED(NA_SE_SY_SET_LIGHT_ARROW);
+                            } else {
+                                SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
+                            }
                         } else {
                             SFX_PLAY_CENTERED(NA_SE_SY_ERROR);
                         }
@@ -492,6 +500,9 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
         Vtx* grid;
         s32 c;
 
+        if (FISHMOD_IS_BOW_ARROW_SLOT(slot)) {
+            slot = SLOT_BOW; // (the bow with an arrow set on it: the bow's box, as a C button's)
+        }
         if ((slot > ITEM_QUAD_GRID_LAST) || (INV_SLOT(slot) == ITEM_NONE)) {
             continue; // (empty, an equipment mark, or an item no longer there)
         }
@@ -739,7 +750,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                 }
 
                 // fishmod: a D-pad button with it takes what this C button had (they trade, as the C buttons do)
-                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, gSaveContext.save.info.equips.cButtonSlots[0]);
+                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, 0);
                 gSaveContext.save.info.equips.buttonItems[1] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[0] = pauseCtx->equipTargetSlot;
                 Interface_LoadItemIcon1(play, 1);
@@ -816,7 +827,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                 }
 
                 // fishmod: a D-pad button with it takes what this C button had (they trade, as the C buttons do)
-                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, gSaveContext.save.info.equips.cButtonSlots[1]);
+                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, 1);
                 gSaveContext.save.info.equips.buttonItems[2] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[1] = pauseCtx->equipTargetSlot;
                 Interface_LoadItemIcon1(play, 2);
@@ -893,7 +904,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                 }
 
                 // fishmod: a D-pad button with it takes what this C button had (they trade, as the C buttons do)
-                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, gSaveContext.save.info.equips.cButtonSlots[2]);
+                Fishmod_DpadTrade(pauseCtx->equipTargetSlot, 2);
                 gSaveContext.save.info.equips.buttonItems[3] = pauseCtx->equipTargetItem;
                 gSaveContext.save.info.equips.cButtonSlots[2] = pauseCtx->equipTargetSlot;
                 Interface_LoadItemIcon1(play, 3);

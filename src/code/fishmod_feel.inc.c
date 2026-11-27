@@ -28,6 +28,12 @@ static const char* sFeelName[FEEL_MAX] = { FISHMOD_FEEL_LIST(FEEL_NAME) };
 #undef FEEL_NAME
 #define FEEL_DEF(id, name, def, lo, hi, what) def,
 static const f32 sFeelDefault[FEEL_MAX] = { FISHMOD_FEEL_LIST(FEEL_DEF) };
+// (each number's range, as the tuner's sliders have it: a number typed past it is held to it, so no setting can make
+// the fight divide by nothing or run backwards)
+#define FEEL_LO(id, name, def, lo, hi, what) lo,
+#define FEEL_HI(id, name, def, lo, hi, what) hi,
+static const f32 sFeelLo[FEEL_MAX] = { FISHMOD_FEEL_LIST(FEEL_LO) };
+static const f32 sFeelHi[FEEL_MAX] = { FISHMOD_FEEL_LIST(FEEL_HI) };
 #undef FEEL_DEF
 
 #define FEEL_SC64_BUFFER 0x1FFE0000 // the cart's 8 KB data buffer; its registers are 64 KB above
@@ -268,8 +274,8 @@ static void Feel_Line(const char* line) {
                 s32 ok;
                 f32 v = Feel_Number(p + n, &ok);
 
-                if (ok) {
-                    gFishmodFeel[k] = v;
+                if (ok && (v == v)) { // (a number, and not "nan")
+                    gFishmodFeel[k] = CLAMP(v, sFeelLo[k], sFeelHi[k]);
                 }
                 Feel_SayOne(k);
                 return;

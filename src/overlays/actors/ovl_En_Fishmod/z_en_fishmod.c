@@ -916,7 +916,8 @@ void EnFishmod_FishSetState(EnFishmod* this, s32 state) {
         case FISH_STATE_FLEE:
             this->stateTimer = 50;
             this->cooldown = 300 + (s16)Fishmod_RandZeroFloat(gFishmodRngNow, 300.0f);
-            this->jumping = false;
+            // (free in mid-leap, the hook thrown: it finishes its fall first, Fish_Flee)
+            this->jumping = this->jumping && (this->actor.world.pos.y > this->waterY);
             this->startle = (Fishmod_RandZeroOne(gFishmodRngNow) < 0.5f) ? 8 : -8;
             this->restTimer = 0;
             break;
@@ -1552,7 +1553,7 @@ void EnFishmod_FishHook(EnFishmod* this) {
 
 /** Fighting the line wears it out. */
 void EnFishmod_FishTire(EnFishmod* this, f32 amount) {
-    this->stamina -= amount;
+    this->stamina = CLAMP_MIN(this->stamina - amount, 0.0f); // (spent is spent: below nothing it swam backwards)
 }
 
 /** Where the line lets it go this frame (it swims for it). */
@@ -1904,14 +1905,10 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
             (Math_Vec3f_DistXZ(&player->actor.world.pos, &this->actor.world.pos) > 120.0f) &&
             (Fishmod_RandZeroOne(gFishmodRngNow) <
              b->jumpiness * 0.006f * ((this->lengthInches >= this->species->lengthTypical) ? 1.3f : 0.7f))) {
-            Vec3f splash = this->actor.world.pos;
-
+            // (from wherever it's holding: it rushes up first, and breaks the surface at this speed)
             this->jumping = true;
             this->leapCooldown = 25;
             this->vel.y = 7.0f + b->strength * 0.04f;
-            splash.y = this->waterY;
-            EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
-            Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
         }
     }
     this->leapVelPrev = this->vel.y;
@@ -1927,9 +1924,25 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
             next.x = this->actor.world.pos.x;
             next.z = this->actor.world.pos.z;
         }
-        this->vel.y -= 0.7f;
-        next.y = this->actor.world.pos.y + this->vel.y;
-        if (next.y < this->waterY - 2.0f) {
+        if ((this->vel.y > 0.0f) && (this->actor.world.pos.y < this->waterY - 2.0f)) {
+            // the rush up from the deep (a hooked fish holds well down): to the surface in a few frames, whatever its
+            // depth, its leap's own speed kept for the air (the warning the angler gets to drop the rod)
+            f32 rise = CLAMP_MIN(this->vel.y, (this->waterY - this->actor.world.pos.y) * (1.0f / 5.0f));
+
+            next.y = this->actor.world.pos.y + rise;
+        } else {
+            this->vel.y -= 0.7f;
+            next.y = this->actor.world.pos.y + this->vel.y;
+        }
+        if ((this->vel.y > 0.0f) && (this->actor.world.pos.y < this->waterY) && (next.y >= this->waterY)) {
+            // it breaks the surface
+            Vec3f splash = next;
+
+            splash.y = this->waterY;
+            EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 300);
+            Actor_PlaySfx(&this->actor, NA_SE_EV_FISH_LEAP);
+        }
+        if ((this->vel.y <= 0.0f) && (next.y < this->waterY - 2.0f)) {
             this->jumping = false;
             next.y = EnFishmod_ClampY(this, this->waterY - 4.0f);
             {
@@ -1971,7 +1984,8 @@ static void Fish_Hooked(EnFishmod* this, PlayState* play, FishAI* ai) {
             next.y = CLAMP_MIN(floor + this->halfHeight, (floor + surface) * 0.5f);
             this->actor.world.pos = next;
             this->actor.shape.rot.x = 0;
-        } else if (reeledIn) {
+        } else if (reeledIn && (Math_Vec3f_DistXZ(&next, &player->actor.world.pos) < 90.0f)) {
+            // up the bank at Link's feet (not onto a bar out in the lake: that's a shore to it, below)
             this->beached = true;
         } else {
             // can't go that way: shore. Turn for open water.
@@ -2041,6 +2055,25 @@ static void Fish_Flee(EnFishmod* this, PlayState* play, FishAI* ai) {
     const FishmodBehavior* b = ai->b;
     Vec3f away;
 
+    if (this->jumping) {
+        // it threw the hook at the top of its leap: down it comes, and in with a splash, before it's off
+        this->vel.y = CLAMP_MAX(this->vel.y, 0.0f) - 0.7f;
+        this->actor.world.pos.y += this->vel.y;
+        this->actor.shape.rot.x = -(s16)(this->vel.y * 1500.0f);
+        if (this->actor.world.pos.y < this->waterY - 2.0f) {
+            Vec3f splash = this->actor.world.pos;
+
+            this->jumping = false;
+            this->vel.y = 0.0f;
+            this->actor.world.pos.y = EnFishmod_ClampY(this, this->waterY - 4.0f);
+            splash.y = this->waterY;
+            EffectSsGSplash_Spawn(play, &splash, NULL, NULL, 0, 250);
+            EffectSsGRipple_Spawn(play, &splash, 80, 400, 0);
+            Actor_PlaySfx(&this->actor, NA_SE_EV_DIVE_INTO_WATER_L);
+        }
+        this->stateTimer = 50; // (its flight starts when it's back in the water)
+        return;
+    }
     // pick a way out once (away from the bobber, toward open water), and again only if the shore is
     // in the way
     if (this->stateTimer == 49) {

@@ -33,6 +33,8 @@
 #include "environment.h"
 #include "skybox.h"
 #include "sfx.h"
+#include "sequence.h"
+#include "audio.h"
 #include "z_lib.h"
 #include "string.h"
 #include "regs.h"
@@ -53,6 +55,7 @@ static s32 sFpsDetail = 1; // L + D-pad Left: the RDP readout on or off
 s32 Object_LoadPersistent(ObjectContext* objectCtx, s16 objectId);
 
 Actor* gFishmodRod = NULL;
+static void Fishmod_WeatherLeaveScene(void);
 static u8 sRainSoundPending; // start the rain's sound once the scene's music has started (see the weather)
 Vec3f gFishmodHivePos; // where the scene's added beehive went (debug display)
 
@@ -225,6 +228,7 @@ void Fishmod_OnSceneLoad(PlayState* play) {
 #endif
     gFishmodRod = NULL;
     Fishmod_ResetRodInfo();
+    Fishmod_WeatherLeaveScene();
     Fishmod_RandSeed(&gFishmodRng, FISHMOD_TIME_SEED() + play->sceneId);
 
     if (!Fishmod_SceneHasFish(play)) {
@@ -393,6 +397,7 @@ void Fishmod_ResetRodInfo(void) {
     gFishmodRodInfo.notice = NULL;
     gFishmodRodInfo.bait = FISHMOD_BAIT_NONE;
     gFishmodRodInfo.baitRequest = FISHMOD_BAIT_NONE;
+    gFishmodRodInfo.spareBait = FISHMOD_BAIT_NONE; // (with the hook's own: it didn't outlive the scene, or the file)
 }
 
 /** Link has the rod out in a fishing scene (its actor is there and he's holding it). */
@@ -455,6 +460,11 @@ s32 Fishmod_UseItem(PlayState* play, s32 item, s32 button) {
     if (Fishmod_RodHeld(play) && (gFishmodRodInfo.state == 1) &&
         ((FISHMOD_RIG() == FISHMOD_RIG_LURE_POND) || (FISHMOD_RIG() == FISHMOD_RIG_LURE_SINKING))) {
         Fishmod_SetRig(play, FISHMOD_RIG_BOBBER);
+        if (gFishmodRodInfo.spareBait != FISHMOD_BAIT_NONE) {
+            // the bait set aside when the lure went on goes back on the hook (the rod, next frame): none used up
+            Sfx_PlaySfxCentered(NA_SE_PL_PUT_OUT_ITEM);
+            return true;
+        }
         gFishmodRodInfo.bait = FISHMOD_BAIT_NONE;
     }
     if (!Fishmod_RodHeld(play) || (gFishmodRodInfo.state != 1) || (gFishmodRodInfo.bait != FISHMOD_BAIT_NONE) ||
@@ -1516,34 +1526,76 @@ s32 Fishmod_WeatherRoll(s16 sceneId, s32 day) {
 }
 
 /**
- * The weather of ours a scene with this skybox gets today: the day's roll, everywhere under the open sky (not over a
- * vanilla weather, the title screen or the credits; clear all the day the lake came back). Asked by the skybox too,
- * before it loads its textures (Skybox_Setup): a cloudy day's sky loaded as such, not loaded clear and then streamed
- * over while it's drawn (the noise in the sky after a scene change).
+ * Two weathers: the day's (Fishmod_WeatherDay: one roll per day, a function of the day's number, so there's nothing to
+ * keep and nothing rolled again from scene to scene) and the scene's (sWeather: what's over Link's head and what the
+ * fish see). The scene's is the day's wherever the scene can show it, clear where it can't, or the scene's own where
+ * the game gives one to all of it (the drained lake's rain: Fishmod_WeatherSetScene), and goes back to the day's on
+ * leaving.
  */
-s32 Fishmod_WeatherToday(s16 skyboxId, s32 beforeEnvInit) {
-    // (a vanilla weather carried into the scene: Environment_Init keeps gWeatherMode only if it's retained, so the
-    // skybox, asked before that, reads it as it will be)
-    if ((skyboxId != SKYBOX_NORMAL_SKY) ||
-        ((gWeatherMode != WEATHER_MODE_CLEAR) && (!beforeEnvInit || gSaveContext.retainWeatherMode)) ||
-        (gSaveContext.gameMode != GAMEMODE_NORMAL)) {
-        return FISHMOD_WEATHER_CLEAR;
-    }
+static u8 sWeatherSceneOwned; // a whole-scene weather of the game's is up (it set gWeatherMode): it ends with the scene
+
+s32 Fishmod_WeatherDay(void) {
     if (FISHMOD_SAVE->clearDay == (u16)(gSaveContext.save.totalDays + 1)) {
-        return FISHMOD_WEATHER_CLEAR;
+        return FISHMOD_WEATHER_CLEAR; // (the day the lake came back)
     }
     return Fishmod_WeatherRoll(0, gSaveContext.save.totalDays);
+}
+
+/**
+ * Whether this scene, as it's set up now, can show the day's weather: the engine's cloudy sky and its darker light
+ * are light set 2 of a scene lit by the time of day (the sets its day, dusk, night and dawn come from: 8 to 11 of its
+ * list), so only a scene under the open sky, lit that way, with those sets. Not a cutscene's set-up of a scene (they
+ * have their own, shorter light lists, and their own mood: vanilla doesn't carry its weather into them either), not
+ * a scene with one fixed light (the last fight, the castle's courtyards), not the title screen or the credits.
+ */
+#define WEATHER_LIGHT_SETS_NEEDED 12
+
+static s32 Fishmod_WeatherSceneTakesDay(PlayState* play, s16 skyboxId) {
+    return (skyboxId == SKYBOX_NORMAL_SKY) && (play->envCtx.lightMode == LIGHT_MODE_TIME) &&
+           (play->envCtx.numLightSettings >= WEATHER_LIGHT_SETS_NEEDED) && !IS_CUTSCENE_LAYER &&
+           (gSaveContext.gameMode == GAMEMODE_NORMAL);
+}
+
+/**
+ * The weather of ours this scene gets: the day's, where it can be shown and no vanilla weather is over it. Asked by
+ * the skybox too, before it loads its textures (Skybox_Setup): a cloudy day's sky loaded as such, not loaded clear
+ * and then streamed over while it's drawn (the noise in the sky after a scene change).
+ */
+s32 Fishmod_WeatherToday(PlayState* play, s16 skyboxId, s32 beforeEnvInit) {
+    // (a vanilla weather carried into the scene: Environment_Init keeps gWeatherMode only if it's retained, so the
+    // skybox, asked before that, reads it as it will be)
+    if (!Fishmod_WeatherSceneTakesDay(play, skyboxId) ||
+        ((gWeatherMode != WEATHER_MODE_CLEAR) && (!beforeEnvInit || gSaveContext.retainWeatherMode))) {
+        return FISHMOD_WEATHER_CLEAR;
+    }
+    return Fishmod_WeatherDay();
+}
+
+/**
+ * A scene's being loaded (before its sky and light are set up): a weather the game gave the whole of the last scene
+ * stays there. Vanilla's lake rain was a zone that had cleared by the exits; over the whole scene it would be carried
+ * out on foot (gWeatherMode kept across a walked exit) and never clear.
+ */
+static void Fishmod_WeatherLeaveScene(void) {
+    if (sWeatherSceneOwned) {
+        sWeatherSceneOwned = false;
+        gWeatherMode = WEATHER_MODE_CLEAR;
+        // (its rain's sound: the day's own rain, if any, starts it again once the scene runs)
+        Audio_SetNatureAmbienceChannelIO(NATURE_CHANNEL_RAIN, CHANNEL_IO_PORT_1, 0);
+        Audio_SetNatureAmbienceChannelIO(NATURE_CHANNEL_LIGHTNING, CHANNEL_IO_PORT_1, 0);
+    }
+    sWeather = FISHMOD_WEATHER_CLEAR;
 }
 
 void Fishmod_OnEnvironmentInit(PlayState* play) {
     EnvironmentContext* envCtx = &play->envCtx;
 
     sRainSoundPending = false;
-    sWeather = Fishmod_WeatherToday(play->skyboxId, false);
+    sWeather = Fishmod_WeatherToday(play, play->skyboxId, false);
     if (sWeather == FISHMOD_WEATHER_CLEAR) {
         return;
     }
-    // the cloudy sky and the darker light set (scenes have at least three light sets, so set 2 is safe)
+    // the cloudy sky and the darker light set (the scene has it: Fishmod_WeatherSceneTakesDay)
     envCtx->skyboxConfig = 1;
     envCtx->changeSkyboxNextConfig = 1;
     envCtx->lightConfig = 2;
@@ -1586,6 +1638,7 @@ s32 Fishmod_WeatherWholeScene(s16 sceneId, s32 tagType) {
 void Fishmod_WeatherSetScene(PlayState* play, s32 weather) {
     (void)play;
     sWeather = weather;
+    sWeatherSceneOwned = true;
 }
 
 /** The rest of today clear, everywhere (the Water Temple beaten: vanilla brings the morning and clears the sky). */
@@ -1594,7 +1647,7 @@ void Fishmod_WeatherClearToday(void) {
     sWeather = FISHMOD_WEATHER_CLEAR;
 }
 
-/** The day's weather as rolled for this scene (the Song of Storms not counted): vanilla's weather zones go back to it. */
+/** The day's weather as this scene shows it (the Song of Storms not counted): vanilla's weather zones go back to it. */
 s32 Fishmod_WeatherRolled(void) {
     return sWeather;
 }

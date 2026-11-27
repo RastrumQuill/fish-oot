@@ -2051,7 +2051,9 @@ static ScatterBend* Scatter_BendBuild(Gfx* modelIn, u8* seg6, s32 nbands) {
         ) {
             s32 t;
             s32 nt = (op == G_TRI2) ? 2 : 1;
-            u8 snakeTri[48][3]; // (a snake's triangles, as index bytes: A-B-C as the microcode draws them)
+            // (a snake's triangles, as index bytes: A-B-C as the microcode draws them; a snake of any length the
+            // model's own limit allows)
+            static u8 snakeTri[BEND_TRI_MAX][3];
 
 #ifdef G_TRISNAKE
             if (op == G_TRISNAKE) {
@@ -2082,6 +2084,9 @@ static ScatterBend* Scatter_BendBuild(Gfx* modelIn, u8* seg6, s32 nbands) {
                     snakeTri[nt][1] = bb;
                     snakeTri[nt][2] = cc;
                     nt++;
+                }
+                if (!(a & 0x80)) {
+                    return NULL; // (longer than the model may be: not bent at all, never bent with triangles missing)
                 }
             }
 #endif

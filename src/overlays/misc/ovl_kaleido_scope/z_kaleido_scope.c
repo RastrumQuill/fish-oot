@@ -1174,6 +1174,7 @@ void KaleidoScope_SetupPageSwitch(PauseContext* pauseCtx, u8 pt) {
     gSaveContext.buttonStatus[1] = gPageSwitchNextButtonStatus[pauseCtx->pageIndex + pt][1];
     gSaveContext.buttonStatus[2] = gPageSwitchNextButtonStatus[pauseCtx->pageIndex + pt][2];
     gSaveContext.buttonStatus[3] = gPageSwitchNextButtonStatus[pauseCtx->pageIndex + pt][3];
+    Fishmod_DpadSetStatus(gSaveContext.buttonStatus[3]); // fishmod
     gSaveContext.buttonStatus[4] = gPageSwitchNextButtonStatus[pauseCtx->pageIndex + pt][4];
 
     PRINTF("kscope->kscp_pos+pt = %d\n", pauseCtx->pageIndex + pt);
@@ -3143,7 +3144,8 @@ void KaleidoScope_SetVertices(PlayState* play, GraphicsContext* gfxCtx) {
     // ITEM_QUAD_GRID_SELECTED_C_LEFT, ITEM_QUAD_GRID_SELECTED_C_DOWN, ITEM_QUAD_GRID_SELECTED_C_RIGHT
 
     for (j = 1; j < 4; i += 4, j++) {
-        if (gSaveContext.save.info.equips.cButtonSlots[j - 1] != ITEM_NONE) {
+        // fishmod: (an equipment mark on the button is no item slot: it read past the item quads)
+        if (gSaveContext.save.info.equips.cButtonSlots[j - 1] < INVENTORY_SLOTS) {
             k = gSaveContext.save.info.equips.cButtonSlots[j - 1] * 4;
 
             pauseCtx->itemVtx[i + 0].v.ob[0] = pauseCtx->itemVtx[i + 2].v.ob[0] =
@@ -3599,6 +3601,7 @@ void KaleidoScope_UpdateOpening(PlayState* play) {
         gSaveContext.buttonStatus[1] = gPageSwitchNextButtonStatus[pauseCtx->pageIndex + PAGE_SWITCH_PT_LEFT][1];
         gSaveContext.buttonStatus[2] = gPageSwitchNextButtonStatus[pauseCtx->pageIndex + PAGE_SWITCH_PT_LEFT][2];
         gSaveContext.buttonStatus[3] = gPageSwitchNextButtonStatus[pauseCtx->pageIndex + PAGE_SWITCH_PT_LEFT][3];
+        Fishmod_DpadSetStatus(gSaveContext.buttonStatus[3]); // fishmod
         gSaveContext.buttonStatus[4] = gPageSwitchNextButtonStatus[pauseCtx->pageIndex + PAGE_SWITCH_PT_LEFT][4];
 
         pauseCtx->pageIndex = sPageSwitchNextPageIndex[pauseCtx->nextPageMode];
@@ -3808,6 +3811,7 @@ void KaleidoScope_Update(PlayState* play) {
             sSavedButtonStatus[1] = gSaveContext.buttonStatus[1];
             sSavedButtonStatus[2] = gSaveContext.buttonStatus[2];
             sSavedButtonStatus[3] = gSaveContext.buttonStatus[3];
+            Fishmod_DpadSaveStatus(true); // fishmod
             sSavedButtonStatus[4] = gSaveContext.buttonStatus[4];
 
             pauseCtx->cursorX[PAUSE_MAP] = 0;
@@ -4233,6 +4237,7 @@ void KaleidoScope_Update(PlayState* play) {
                         SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
                         gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
                             gSaveContext.buttonStatus[3] = BTN_DISABLED;
+                        Fishmod_DpadSetStatus(BTN_DISABLED); // fishmod: the D-pad's with the C buttons'
                         gSaveContext.buttonStatus[4] = BTN_ENABLED;
                         gSaveContext.hudVisibilityMode = HUD_VISIBILITY_NO_CHANGE;
                         Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_ALL);
@@ -4280,6 +4285,7 @@ void KaleidoScope_Update(PlayState* play) {
                         SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
                         gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
                             gSaveContext.buttonStatus[3] = BTN_DISABLED;
+                        Fishmod_DpadSetStatus(BTN_DISABLED); // fishmod: the D-pad's with the C buttons'
                         gSaveContext.buttonStatus[4] = BTN_ENABLED;
                         gSaveContext.hudVisibilityMode = HUD_VISIBILITY_NO_CHANGE;
                         Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_ALL);
@@ -4331,6 +4337,7 @@ void KaleidoScope_Update(PlayState* play) {
                         SFX_PLAY_CENTERED(NA_SE_SY_DECIDE);
                         gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
                             gSaveContext.buttonStatus[3] = BTN_DISABLED;
+                        Fishmod_DpadSetStatus(BTN_DISABLED); // fishmod: the D-pad's with the C buttons'
                         gSaveContext.buttonStatus[4] = BTN_ENABLED;
                         gSaveContext.hudVisibilityMode = HUD_VISIBILITY_NO_CHANGE;
                         Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_ALL);
@@ -4367,6 +4374,7 @@ void KaleidoScope_Update(PlayState* play) {
                             Interface_SetDoAction(play, DO_ACTION_NONE);
                             gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
                                 gSaveContext.buttonStatus[3] = BTN_ENABLED;
+                            Fishmod_DpadSetStatus(BTN_ENABLED); // fishmod: the D-pad's with the C buttons'
                             gSaveContext.hudVisibilityMode = HUD_VISIBILITY_NO_CHANGE;
                             Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_ALL);
                             pauseCtx->savePromptState = PAUSE_SAVE_PROMPT_STATE_CLOSING;
@@ -4397,6 +4405,7 @@ void KaleidoScope_Update(PlayState* play) {
                         func_800F64E0(0);
                         gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
                             gSaveContext.buttonStatus[3] = BTN_ENABLED;
+                        Fishmod_DpadSetStatus(BTN_ENABLED); // fishmod: the D-pad's with the C buttons'
                         gSaveContext.hudVisibilityMode = HUD_VISIBILITY_NO_CHANGE;
                         Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_ALL);
 #if PLATFORM_GC && OOT_NTSC
@@ -4411,6 +4420,7 @@ void KaleidoScope_Update(PlayState* play) {
                         Interface_SetDoAction(play, DO_ACTION_NONE);
                         gSaveContext.buttonStatus[0] = gSaveContext.buttonStatus[1] = gSaveContext.buttonStatus[2] =
                             gSaveContext.buttonStatus[3] = BTN_ENABLED;
+                        Fishmod_DpadSetStatus(BTN_ENABLED); // fishmod: the D-pad's with the C buttons'
                         gSaveContext.hudVisibilityMode = HUD_VISIBILITY_NO_CHANGE;
                         Interface_ChangeHudVisibilityMode(HUD_VISIBILITY_ALL);
                         pauseCtx->savePromptState = PAUSE_SAVE_PROMPT_STATE_CLOSING_AFTER_SAVED;
@@ -4838,6 +4848,7 @@ void KaleidoScope_Update(PlayState* play) {
             gSaveContext.buttonStatus[1] = sSavedButtonStatus[1];
             gSaveContext.buttonStatus[2] = sSavedButtonStatus[2];
             gSaveContext.buttonStatus[3] = sSavedButtonStatus[3];
+            Fishmod_DpadSaveStatus(false); // fishmod
             gSaveContext.buttonStatus[4] = sSavedButtonStatus[4];
             interfaceCtx->unk_1FA = interfaceCtx->unk_1FC = 0;
             PRINTF_COLOR_YELLOW();
