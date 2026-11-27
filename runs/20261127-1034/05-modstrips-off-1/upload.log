@@ -1,0 +1,15 @@
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe upload C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\morning.z64
+Uploading ROM [morning.z64]... error!
+Command response error: timed out
+
+(exit 1)
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe upload C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\morning.z64
+Uploading ROM [morning.z64]... error!
+Command response error: timed out
+
+(exit 1)
+$ C:\Users\tlann\Downloads\SummerCart64.Online.Updater.v1.0.1\sc64deployer.exe upload C:\Users\tlann\Documents\GitHub\fish-oot\fishmod\pc\work\morning.z64
+Uploading ROM [morning.z64]... error!
+IO error: A device attached to the system is not functioning. (os error 31)
+
+(exit 1)

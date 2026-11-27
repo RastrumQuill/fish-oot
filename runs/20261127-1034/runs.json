@@ -1,0 +1,68 @@
+[
+ {
+  "run": 1,
+  "label": "strips-off-1",
+  "patch": "releases\\fish-oot-stripsab-off.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-27 10:34:44",
+  "patch_sha1": "b9c5a3629dbd2765c6b9749ae12a315058ed1ad9",
+  "upload_check": "ok",
+  "packets": 460,
+  "bytes": 3485288,
+  "packs": 1,
+  "seconds": 328
+ },
+ {
+  "run": 2,
+  "label": "strips-on-1",
+  "patch": "releases\\fish-oot-stripsab-on.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-27 10:40:15",
+  "patch_sha1": "f25d62aa16258db193cf08dbb03a9cbdf9008993",
+  "upload_check": "ok",
+  "packets": 458,
+  "bytes": 3465776,
+  "packs": 1,
+  "seconds": 308
+ },
+ {
+  "run": 3,
+  "label": "strips-off-2",
+  "patch": "releases\\fish-oot-stripsab-off.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-27 10:45:26",
+  "patch_sha1": "b9c5a3629dbd2765c6b9749ae12a315058ed1ad9",
+  "upload_check": "ok",
+  "packets": 461,
+  "bytes": 3486832,
+  "packs": 1,
+  "seconds": 328
+ },
+ {
+  "run": 4,
+  "label": "strips-on-2",
+  "patch": "releases\\fish-oot-stripsab-on.bps",
+  "minutes_max": 12.0,
+  "status": "done",
+  "started": "2026-11-27 10:50:57",
+  "patch_sha1": "f25d62aa16258db193cf08dbb03a9cbdf9008993",
+  "upload_check": "ok",
+  "packets": 459,
+  "bytes": 3473008,
+  "packs": 1,
+  "seconds": 306
+ },
+ {
+  "run": 5,
+  "label": "modstrips-off-1",
+  "patch": "releases\\fish-oot-modstripsab-off.bps",
+  "minutes_max": 12.0,
+  "status": "failed",
+  "started": "2026-11-27 10:56:05",
+  "patch_sha1": "b4573ab7338b0be64a3f7580dc6c81aad4cc8a61",
+  "error": "upload failed"
+ }
+]

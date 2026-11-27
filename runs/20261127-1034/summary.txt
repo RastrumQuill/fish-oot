@@ -1,0 +1,8 @@
+Morning runs 20261127-1034
+
+ 1. strips-off-1                 done        460 packets    3.5 MB   328 s  
+ 2. strips-on-1                  done        458 packets    3.5 MB   308 s  
+ 3. strips-off-2                 done        461 packets    3.5 MB   328 s  
+ 4. strips-on-2                  done        459 packets    3.5 MB   306 s  
+ 5. modstrips-off-1              failed        0 packets    0.0 MB       s  upload failed
+(3 not run)
