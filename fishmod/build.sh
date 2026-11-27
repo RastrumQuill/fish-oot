@@ -193,7 +193,7 @@ if [ "$SEAMS" = 1 ]; then
     [ "$TEXPACK" = 1 ] && SP_SRC="$TP_OUT"
     [ "$COLPACK" = 1 ] && SP_SRC="$CP_OUT"
     SP_OUT="$SP_SRC-seams"
-    SP_SUM="$({ cat tools/seampass.py tools/meshpack.py; echo "${SEAMPASS_NO_WELD:-}${SEAMPASS_NO_SPLIT:-}${SEAMPASS_SPLIT_ONLY:-}${SEAMPASS_MAX_EDGE:-}${SEAMPASS_SPLIT_SMALL:-}${SEAMPASS_SHADE_TOL:-}"; cat "$SP_SRC/.texpack" "$SP_SRC/.colpack" 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    SP_SUM="$({ cat tools/seampass.py tools/meshpack.py tools/strippass.py; echo "${SEAMPASS_NO_DECAL_GUARD:-}${SEAMPASS_NO_WELD:-}${SEAMPASS_NO_SPLIT:-}${SEAMPASS_SPLIT_ONLY:-}${SEAMPASS_MAX_EDGE:-}${SEAMPASS_SPLIT_SMALL:-}${SEAMPASS_SHADE_TOL:-}"; cat "$SP_SRC/.texpack" "$SP_SRC/.colpack" 2>/dev/null || true; } | md5sum | cut -c1-8)"
     if [ "$(cat "$SP_OUT/.seams" 2>/dev/null)" != "$SP_SUM" ]; then
         python3 tools/seampass.py "$SP_SRC" "$SP_OUT"
         echo "$SP_SUM" > "$SP_OUT/.seams"
@@ -222,7 +222,9 @@ if [ "$STRIPS" = 1 ]; then
     [ "$SEAMS" = 1 ] && ST_SRC="$SP_OUT"
     [ "$MESHPACK" = 1 ] && ST_SRC="$MP_OUT"
     ST_OUT="$ST_SRC-strips"
-    ST_SUM="$({ cat tools/strippass.py tools/meshpack.py; env | grep '^STRIPPASS_' | sort || true; echo "${STRIPPASS_TURN_ALL:-}${STRIPPASS_SHADE_TOL:-}${STRIPPASS_SMALL_EDGE:-}"; cat "$ST_SRC"/.texpack "$ST_SRC"/.colpack "$ST_SRC"/.seams "$ST_SRC"/.meshpack 2>/dev/null || true; } | md5sum | cut -c1-8)"
+    # (the game's drawing code too: how a list is drawn, and under which render mode, decides whether its triangles may
+    # change order; any line of it changing runs the pass again)
+    ST_SUM="$({ cat tools/strippass.py tools/meshpack.py; grep -rhE '_DISP|RenderMode|OtherMode|SetupDL|DrawDList' src --include='*.c' | LC_ALL=C sort; env | grep '^STRIPPASS_' | sort || true; echo "${STRIPPASS_TURN_ALL:-}${STRIPPASS_SHADE_TOL:-}${STRIPPASS_SMALL_EDGE:-}"; cat "$ST_SRC"/.texpack "$ST_SRC"/.colpack "$ST_SRC"/.seams "$ST_SRC"/.meshpack 2>/dev/null || true; } | md5sum | cut -c1-8)"
     if [ "$(cat "$ST_OUT/.strips" 2>/dev/null)" != "$ST_SUM" ]; then
         python3 tools/strippass.py "$ST_SRC" "$ST_OUT"
         echo "$ST_SUM" > "$ST_OUT/.strips"

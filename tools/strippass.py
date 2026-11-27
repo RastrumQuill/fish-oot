@@ -36,6 +36,9 @@ SKIP_DIRS = {"object_fish", "gameplay_keep"}
 # STRIPPASS_TURN_ALL=1: every triangle may be turned to join a strip (the most strips; the floor at the camera's feet
 # shaded a little differently where the near plane cuts it)
 TURN_ALL = bool(os.environ.get("STRIPPASS_TURN_ALL"))
+# STRIPPASS_KEEP_ALL=1: every run of every list in the game's own order (snakes only along it), for an A/B in the
+# emulator against the pass's own classing: any difference seen is a list classed free that shouldn't have been
+KEEP_ALL = os.environ.get("STRIPPASS_KEEP_ALL", "") not in ("", "0")
 # How alike a triangle's corners must shade (colour or normal, alpha: the most any one channel differs, of 255) for it
 # to be turned: the fan's start then shifts a cut triangle's blend by about this much at most
 SHADE_TOL = int(os.environ.get("STRIPPASS_SHADE_TOL", "8"))
@@ -362,24 +365,104 @@ def entry_class(name, seen=()):
     return res
 
 
+_SETUPDL = None
+
+
+def setupdl_class(n):
+    """the render mode class of the game's setup list n (sSetupDL, z_rcp.c); ORDERED if not found"""
+    global _SETUPDL
+    if _SETUPDL is None:
+        _SETUPDL = {}
+        try:
+            text = open(os.path.join(ROOT, "src", "code", "z_rcp.c")).read()
+        except OSError:
+            text = ""
+        for m in re.finditer(r"/\* SETUPDL_(\d+) \*/(.*?)gsSPEndDisplayList", text, re.S):
+            cls = ORDERED
+            for c in mp.split_items(m.group(2)):
+                if "(" in c and cmd_mode(c) is not None:
+                    cls = cmd_mode(c)
+            _SETUPDL[int(m.group(1))] = cls
+    return _SETUPDL.get(n, ORDERED)
+
+
+BLEND_SET = re.compile(r"\bg[DS]PSet(RenderMode|OtherMode\w*)\(\s*([^,]+),((?:[^();]|\([^();]*\))*)\)")
+SETUP_CALL = re.compile(r"\bGfx_SetupDL(?:_(\d+)\w*)?\(([^;]*?)\)")
+_BLENDS = {}
+
+
+def sets_blend(body, opa_only):
+    """whether a function's code sets, by hand, a render mode that isn't FREE (blends, or doesn't write depth, or
+    isn't worked out): on the opaque buffer (opa_only), or on any buffer (a helper handed the buffer's pointer)"""
+    for m in BLEND_SET.finditer(body):
+        if opa_only and "POLY_OPA_DISP" not in m.group(2):
+            continue
+        args = mp.split_args(m.group(3)) if hasattr(mp, "split_args") else [x for x in m.group(3).split(",")]
+        if m.group(1) == "RenderMode":
+            cls = mode_class(" | ".join("(%s)" % x.strip() for x in args))
+        elif m.group(1) == "OtherMode":
+            cls = mode_class("(%s)" % args[-1].strip())
+        else:
+            cls = ORDERED
+        if cls != FREE:
+            return True
+    for m in SETUP_CALL.finditer(body):
+        name, args = m.group(0), m.group(2)
+        if opa_only and not (re.match(r"Gfx_SetupDL_\d+\w*Opa\w*\(", name) or "POLY_OPA_DISP" in args):
+            continue
+        n = m.group(1)
+        if n is None:
+            k = re.search(r"SETUPDL_(\d+)|,\s*(\d+)\s*$", args)
+            n = (k.group(1) or k.group(2)) if k else None
+        if n is None or setupdl_class(int(n)) != FREE:
+            return True
+    return False
+
+
+def opa_blends(body):
+    """whether a function may have a blending render mode up on the opaque buffer when it draws a list there: it sets
+    one itself, or hands the buffer to a helper that sets one (one call deep)"""
+    key = hash(body)
+    if key not in _BLENDS:
+        res = sets_blend(body, True)
+        if not res:
+            for m in re.finditer(r"\b(\w+)\(([^;]*?POLY_OPA_DISP[^;]*?)\)\s*;", body):
+                g = m.group(1)
+                if g in _FUNCS and not g.startswith("Gfx_SetupDL") and sets_blend(_FUNCS[g], False):
+                    res = True
+                    break
+        _BLENDS[key] = res
+    return _BLENDS[key]
+
+
 def scan_sources(names):
-    """how the game's code draws each list: on the translucent buffer (ORDERED), the opaque one (FREE), or some way
-    not told (None: a table, a skeleton, an argument)"""
+    """how the game's code draws each list: on the translucent buffer, the overlay's or the work buffer (ORDERED), the
+    opaque one (FREE: unless the function drawing it sets a render mode that blends on that buffer by hand, anywhere
+    in it: then ORDERED), or some way not told (None: a table, a skeleton, an argument)"""
+    import bisect
     import glob
 
     pat = re.compile(r"\b[A-Za-z_]\w*\b")
     for f in glob.glob(os.path.join(ROOT, "src", "**", "*.c"), recursive=True):
-        text = open(f, errors="ignore").read()
-        _SRC[f] = text
+        _SRC[f] = open(f, errors="ignore").read()
+    _functions()
+    for f, text in _SRC.items():
+        spans = _SPANS.get(id(text), [])
+        starts = [s[0] for s in spans]
         # by statement (a call may span lines)
-        for stmt in re.split(r"[;{}]", text):
+        for sm in re.finditer(r"[^;{}]+", text):
+            stmt = sm.group(0)
             hit = [w for w in pat.findall(stmt) if w in names]
             if not hit:
                 continue
-            if re.search(r"XLU|Xlu|OVERLAY_DISP|WORK_DISP", stmt):
+            if re.search(r"XLU|Xlu|OVERLAY_DISP|WORK_DISP|Overlay", stmt):
                 cls = ORDERED
             elif re.search(r"POLY_OPA_DISP|DrawDListOpa", stmt):
                 cls = FREE
+                k = bisect.bisect_right(starts, sm.start()) - 1
+                if k >= 0 and spans[k][0] <= sm.start() < spans[k][1] and opa_blends(spans[k][2]):
+                    cls = ORDERED
+                    HAND_BLEND.add(tuple(hit))
             else:
                 cls = None
             for w in hit:
@@ -391,6 +474,31 @@ def scan_sources(names):
                     MID_ENTRY[w] = max(MID_ENTRY.get(w, 0), at)
                 SRC_REFS.setdefault(w, set()).add(cls)
                 SRC_FILES.setdefault(w, set()).add(f)
+
+
+HAND_BLEND = set()  # the lists drawn on the opaque buffer by a function that sets a blending mode there by hand
+
+
+def check_mid_entries(src, out):
+    """the lists the game's code enters part-way (&list[n]): the commands before the entry must be the ones the game
+    shipped, each one word (an earlier pass, or an edit, that put a command in or took one out before it, or a snake
+    there, would send the code into the middle of something else). Stops the build if not."""
+    pristine = re.sub(r"(-texpack|-colpack|-seams|-meshpack)+/?$", "", src.rstrip("/"))
+    for name, at in sorted(MID_ENTRY.items()):
+        if name not in LISTS or name in DUPLICATE or at >= (1 << 30):
+            continue
+        cmds = LISTS[name]
+        if at >= len(cmds):
+            sys.exit("strippass: the game's code enters %s at command %d, and it has %d" % (name, at, len(cmds)))
+        if any("(" in c and mp.name_of(c) in ("gsSPTriSnake", "gsSPContinueSnake") for c in cmds[:at]):
+            sys.exit("strippass: %s has a triangle snake before command %d, where the game's code enters it" % (name, at))
+        if pristine != src.rstrip("/") and LIST_DIR.get(name):
+            p0 = os.path.join(pristine, os.path.relpath(LIST_DIR[name], out), name + ".inc.c")
+            if os.path.exists(p0):
+                orig = mp.split_items(open(p0).read())
+                if [name_of(c) for c in orig[:at + 1]] != [name_of(c) for c in cmds[:at + 1]]:
+                    sys.exit("strippass: %s isn't as the game shipped it up to command %d, where the game's code "
+                             "enters it (an earlier pass changed it)" % (name, at))
 
 
 def load_lists(base):
@@ -613,7 +721,7 @@ def convert(cmds, dirpath=None, scale=1.0, entry=ORDERED, keep=0):
             return
         tris = [t for c in run for t in tris_of(c)]
         free = {k: f for k, f in enumerate(run_free)}
-        ordered = (state[0] != FREE) or bool(keep)
+        ordered = (state[0] != FREE) or bool(keep) or KEEP_ALL
         chains = ordered_snakes(tris, free) if ordered else snakes(tris, free)
         small = []
         mark = len(out)
@@ -808,6 +916,7 @@ def main():
         if "scenes" not in root.split(os.sep):
             names.update(f.split(".")[0] for f in files if f.endswith(".inc.c"))  # (skeletons, animations: who draws the directory)
     scan_sources(names)
+    check_mid_entries(src, out)
     for root, dirs, files in os.walk(base):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for f in files:
@@ -821,6 +930,10 @@ def main():
                     continue  # (not a display list on its own)
                 new = convert(items, root, scale_of(root), entry_class(f[:-len(".inc.c")]),
                               MID_ENTRY.get(f[:-len(".inc.c")], 0))
+                keep_ = MID_ENTRY.get(f[:-len(".inc.c")], 0)
+                if new is not None and keep_ and new[:keep_] != items[:keep_]:
+                    sys.exit("strippass: %s is entered at its command %d by the game's code, and the pass moved it"
+                             % (f[:-len(".inc.c")], keep_))
                 if new is None or new == items:
                     continue
                 os.remove(p)

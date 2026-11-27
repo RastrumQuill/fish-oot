@@ -49,6 +49,35 @@ END_FRAC = 0.01   # ...and between its ends by this much of its length
 DECAL_COS = 0.9   # a weld along both surfaces' normals (cosine) is a layer, not a crack
 VTX_SLOTS = 32    # the vertex buffer the re-emitted lists load into (F3DEX2's; F3DEX3 has more)
 SKIP_SCENES = set()  # scene directories left alone (by their last path part)
+# Decals: a surface laid on another (a render mode whose depth mode is the decal's, ZMODE_DEC). Neither it nor the
+# surface under it is altered: a floor welded or split under its decal lifts or tilts out from under it, and the
+# decal's depth test (equal within a tolerance) fails in patches. SEAMPASS_NO_DECAL_GUARD=1: as the pass was (to count
+# what the guard keeps: --check)
+DECAL_GUARD = os.environ.get("SEAMPASS_NO_DECAL_GUARD", "") in ("", "0")
+DECAL_PLANE = 3.0  # a decal lies this close to its surface's plane (units)
+_GBI = None
+
+
+def is_decal_mode(c):
+    """whether a render mode command sets the decal depth mode"""
+    global _GBI
+    n = mp.name_of(c)
+    if n not in ("gsDPSetRenderMode", "gsDPSetOtherMode"):
+        return False
+    a = mp.args_of(c)
+    expr = " | ".join("(%s)" % x for x in a) if n == "gsDPSetRenderMode" else "(%s)" % a[-1]
+    try:
+        import strippass as sp
+        if _GBI is None:
+            _GBI = sp._Gbi()
+        v = eval(expr.replace("\n", " "), {}, _GBI)
+        if v is not None:
+            return (v & 0xC00) == 0xC00
+    except Exception:
+        pass
+    return "DEC" in c
+
+
 BUFFER_READERS = {"gsSPModifyVertex", "gsSPBranchLessZ", "gsSPBranchLessZraw", "gsSPBranchLessZrg",
                   "gsSPTriSnake", "gsSPTriStrip", "gsSPTriFan", "gsSPLineW3D", "gsSPLine3D"}
 
@@ -70,6 +99,7 @@ class Leaf:
         self.tris = []          # (command index, which of its triangles, ((array, index) x3))
         self.ok = True
         self.why = ""
+        self.decal = False
 
 
 def read_scene(dirpath, arrays):
@@ -91,6 +121,9 @@ def read_scene(dirpath, arrays):
             n = mp.name_of(c)
             if n in BUFFER_READERS:
                 lf.ok, lf.why = False, n
+            if is_decal_mode(c):
+                lf.decal = True
+                lf.ok, lf.why = False, "decal"
             if n == "gsDPSetRenderMode" and ("XLU" in c or "DECAL" in c):
                 # (translucent: a sliver where a split triangle's pieces overlap is drawn twice, darker; a decal is
                 # laid over another surface on purpose. Seams there don't show: left as they are)
@@ -124,8 +157,9 @@ def read_scene(dirpath, arrays):
 
 # ---- welding ----
 
-def weld(leaves, arrays):
-    """moves the near-miss corners together (in the arrays); returns how many corners moved"""
+def weld(leaves, arrays, frozen=()):
+    """moves the near-miss corners together (in the arrays); returns how many corners moved. frozen: positions that
+    stay where they are, and that nothing's moved onto (a decal's corners and its surface's)"""
     uses = collections.Counter()
     normals = collections.defaultdict(list)  # position -> the normals of its triangles
     for lf in leaves:
@@ -171,6 +205,8 @@ def weld(leaves, arrays):
                     for q in grid[(g[0] + dx, g[1] + dy, g[2] + dz)]:
                         if q <= p or math.dist(p, q) > WELD or along_normals(p, q):
                             continue
+                        if p in frozen or q in frozen:
+                            continue
                         parent[find(q)] = find(p)
     groups = collections.defaultdict(list)
     for p in pts:
@@ -209,7 +245,7 @@ def weld(leaves, arrays):
 OPEN_GAP = 1.5  # two surfaces' open edges side by side this close (units) were meant to meet
 
 
-def close_gaps(leaves, arrays):
+def close_gaps(leaves, arrays, frozen=()):
     """two surfaces' borders running side by side a hair apart (their corners not lining up, so neither a weld nor a
     T-junction): each corner of the shorter border moved onto the longer one's line (the T-junction step then splits
     the longer at it). Not a decal's border over the surface it's laid on (the gap along both normals). Returns the
@@ -274,7 +310,7 @@ def close_gaps(leaves, arrays):
                 layer = any(abs(sum(n1[j] * n2[j] for j in range(3))) > 0.95 and
                             abs(sum(n1[j] * g[j] for j in range(3))) > DECAL_COS
                             for n1 in normals[(a, b)] for n2 in normals[(c, d)])
-                if layer:
+                if layer or p in frozen:
                     continue
                 target.setdefault(p, tuple(int(round(x)) for x in q))
     # never two corners of one triangle onto one point
@@ -351,6 +387,90 @@ def layered(leaves, arrays):
                             out.add(key)
                             out.add(key2)
     return out
+
+
+def under_decals(decals, leaves, arrays):
+    """the surfaces decals lie on: ({(leaf name, triangle number)} of `leaves`' triangles a decal triangle overlaps (in
+    the same plane within DECAL_PLANE, their areas overlapping), {positions of those triangles' corners and of the
+    decals' own})"""
+    def plane(ps):
+        u = [ps[1][k] - ps[0][k] for k in range(3)]
+        w = [ps[2][k] - ps[0][k] for k in range(3)]
+        n = (u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0])
+        ln = math.sqrt(sum(x * x for x in n))
+        return None if ln == 0 else tuple(x / ln for x in n)
+
+    def inside(p, ps, n):
+        s = []
+        for k in range(3):
+            a, b = ps[k], ps[(k + 1) % 3]
+            e = [b[j] - a[j] for j in range(3)]
+            q = [p[j] - a[j] for j in range(3)]
+            c = (e[1] * q[2] - e[2] * q[1], e[2] * q[0] - e[0] * q[2], e[0] * q[1] - e[1] * q[0])
+            s.append(sum(c[j] * n[j] for j in range(3)))
+        return all(x >= -1e-6 for x in s) or all(x <= 1e-6 for x in s)
+
+    def crosses(a, b, c, d, n):
+        # the segments ab and cd cross (seen along n)
+        def side(p, q, r):
+            e = [q[j] - p[j] for j in range(3)]
+            f = [r[j] - p[j] for j in range(3)]
+            x = (e[1] * f[2] - e[2] * f[1], e[2] * f[0] - e[0] * f[2], e[0] * f[1] - e[1] * f[0])
+            return sum(x[j] * n[j] for j in range(3))
+        return side(a, b, c) * side(a, b, d) < 0 and side(c, d, a) * side(c, d, b) < 0
+
+    keys, frozen = set(), set()
+    dec = []
+    for lf in decals:
+        for _, _, t in lf.tris:
+            if any(arrays.get(a) is None for a, _ in t):
+                continue
+            ps = [pos(arrays[a][i]) for a, i in t]
+            frozen.update(ps)
+            n = plane(ps)
+            if n is not None:
+                dec.append((ps, n))
+    if not dec:
+        return keys, frozen
+    cell = 128
+    grid = collections.defaultdict(list)
+    for i, (ps, n) in enumerate(dec):
+        lo = [min(p[k] for p in ps) for k in range(3)]
+        hi = [max(p[k] for p in ps) for k in range(3)]
+        for x in range(int(lo[0] // cell), int(hi[0] // cell) + 1):
+            for y in range(int(lo[1] // cell), int(hi[1] // cell) + 1):
+                for z in range(int(lo[2] // cell), int(hi[2] // cell) + 1):
+                    grid[(x, y, z)].append(i)
+    for lf in leaves:
+        for ti, (_, _, t) in enumerate(lf.tris):
+            ps = [pos(arrays[a][i]) for a, i in t]
+            n = plane(ps)
+            if n is None:
+                continue
+            lo = [min(p[k] for p in ps) - DECAL_PLANE for k in range(3)]
+            hi = [max(p[k] for p in ps) + DECAL_PLANE for k in range(3)]
+            cand = set()
+            for x in range(int(lo[0] // cell), int(hi[0] // cell) + 1):
+                for y in range(int(lo[1] // cell), int(hi[1] // cell) + 1):
+                    for z in range(int(lo[2] // cell), int(hi[2] // cell) + 1):
+                        cand.update(grid.get((x, y, z), ()))
+            d = sum(n[k] * ps[0][k] for k in range(3))
+            for j in cand:
+                ps2, n2 = dec[j]
+                if abs(sum(n[k] * n2[k] for k in range(3))) < 0.99:
+                    continue
+                if max(abs(sum(n[k] * p[k] for k in range(3)) - d) for p in ps2) > DECAL_PLANE:
+                    continue
+                c1 = [sum(p[k] for p in ps) / 3 for k in range(3)]
+                c2 = [sum(p[k] for p in ps2) / 3 for k in range(3)]
+                if (inside(c2, ps, n) or inside(c1, ps2, n) or any(inside(p, ps, n) for p in ps2) or
+                        any(inside(p, ps2, n) for p in ps) or
+                        any(crosses(ps[a], ps[(a + 1) % 3], ps2[b], ps2[(b + 1) % 3], n)
+                            for a in range(3) for b in range(3))):
+                    keys.add((lf.name, ti))
+                    frozen.update(ps)
+                    break
+    return keys, frozen
 
 
 def t_junctions(leaves, arrays):
@@ -555,12 +675,13 @@ def process(dirpath, write):
     leaves = read_scene(dirpath, arrays)
     ok = [lf for lf in leaves if lf.ok]
     nweld = 0
+    under, frozen = under_decals([lf for lf in leaves if lf.decal], ok, arrays) if DECAL_GUARD else (set(), set())
     if not os.environ.get("SEAMPASS_NO_WELD"):
-        nweld, _ = weld(ok, arrays)
-        nweld += close_gaps(ok, arrays)
+        nweld, _ = weld(ok, arrays, frozen)
+        nweld += close_gaps(ok, arrays, frozen)
     splits = {} if os.environ.get("SEAMPASS_NO_SPLIT") else t_junctions(ok, arrays)
     lay = layered(ok, arrays)
-    splits = {k: v for k, v in splits.items() if k not in lay}
+    splits = {k: v for k, v in splits.items() if k not in lay and k not in under}
     # only triangles whose new shape can't show: small ones (the near plane hardly ever cuts them) or ones whose corners
     # shade alike. A split triangle is drawn as new triangles from other first corners, and a cut one is fanned from
     # its first corner, its shading following where the fan starts (the Ice Cavern's wall by the camera, darker)
@@ -637,6 +758,38 @@ def main():
             w, t, _ = process(os.path.join(TREE, s), False)
             print("%-45s %4d corners welded, %4d triangles split" % (s, w, t))
         return
+    if len(sys.argv) >= 4 and sys.argv[1] == "--check":
+        # the decals' triangles and the surfaces under them, before (SRC) and after (OUT): any changed
+        src, out = sys.argv[2], sys.argv[3]
+        ndec = nund = bad_dec = bad_und = 0
+        for s in scenes(src):
+            a0, a1 = {}, {}
+            l0 = read_scene(os.path.join(src, s), a0)
+            l1 = {lf.name: lf for lf in read_scene(os.path.join(out, s), a1)}
+            dec = [lf for lf in l0 if lf.decal]
+            if not dec:
+                continue
+            keys, _ = under_decals(dec, [lf for lf in l0 if not lf.decal and all(
+                a0.get(a) is not None for _, _, t in lf.tris for a, _ in t)], a0)
+
+            def tris(lf, arrays):
+                return sorted(tuple(pos(arrays[a][i]) for a, i in t) for _, _, t in lf.tris
+                              if all(arrays.get(a) is not None for a, _ in t))
+            for lf in dec:
+                ndec += len(lf.tris)
+                if lf.name not in l1 or tris(lf, a0) != tris(l1[lf.name], a1):
+                    bad_dec += len(lf.tris)
+            by = {lf.name: lf for lf in l0}
+            for name, ti in keys:
+                nund += 1
+                lf = by[name]
+                want = tuple(pos(a0[a][i]) for a, i in lf.tris[ti][2])
+                have = set(tuple(pos(a1[a][i]) for a, i in t) for _, _, t in l1[name].tris) if name in l1 else set()
+                if want not in have:
+                    bad_und += 1
+        print("seampass --check: %d decal triangles, %d changed; %d triangles under decals, %d changed" % (
+            ndec, bad_dec, nund, bad_und))
+        sys.exit(1 if (bad_dec or bad_und) else 0)
     if len(sys.argv) < 3:
         sys.exit(__doc__)
     src, out = sys.argv[1], sys.argv[2]
